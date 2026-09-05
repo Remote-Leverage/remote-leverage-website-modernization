@@ -40,6 +40,8 @@
   },
   "require": {
     "php": ">=8.3",
+    "livewire/livewire": "^4.4",
+    "log1x/acf-composer": "^3.4",
     "roots/acorn": "^6.0"
   },
   "require-dev": {

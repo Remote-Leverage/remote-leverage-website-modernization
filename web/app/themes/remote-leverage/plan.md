@@ -8,7 +8,7 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 
 ## Progress Overview
 
-- **Phase 1: Foundation & Infrastructure**: `95% Completed`
+- **Phase 1: Foundation & Infrastructure**: `100% Completed`
 - **Phase 2: Core Domain Architecture (DDD)**: `100% Completed`
 - **Phase 3: Design Tokens & Tailwind CSS v4**: `0% Completed`
 - **Phase 4: Livewire 4 Reactive UI Components**: `0% Completed`
@@ -34,10 +34,10 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
   - [x] Create `config/services.php` with Stripe, Calendly, Google Calendar, Customer.io, PostHog, and Notion schemas.
   - [x] Create `config/post-types.php` for `rl_partner` custom post type settings.
   - [x] Register master `DomainServiceProvider` inside `app/Providers/ThemeServiceProvider.php`.
-- [ ] **Package Dependencies Installation**
-  - [ ] Install `roots/acorn` dependencies & verify Acorn boot sequence.
-  - [ ] Install `livewire/livewire` for reactive frontend state management.
-  - [ ] Install `log1x/acf-composer` for code-driven native Gutenberg blocks.
+- [x] **Package Dependencies Installation**
+  - [x] Install `roots/acorn` dependencies & verify Acorn boot sequence.
+  - [x] Install `livewire/livewire` (`v4.4.3`) for reactive frontend state management.
+  - [x] Install `log1x/acf-composer` (`v3.4.7`) for code-driven native Gutenberg blocks.
 
 ---
 

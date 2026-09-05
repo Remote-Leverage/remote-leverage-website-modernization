@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class LivewireServiceProvider extends ServiceProvider
 {
@@ -13,7 +14,10 @@ class LivewireServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Reserved for Livewire 4 component mappings and directives
+        config([
+            'livewire.class_namespace' => 'App\\Application\\Livewire',
+            'livewire.view_path' => resource_path('views/livewire'),
+        ]);
     }
 
     /**
@@ -21,8 +25,8 @@ class LivewireServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (class_exists('Livewire\\Livewire')) {
-            // Register components namespace: App\Application\Livewire
+        if (class_exists(Livewire::class)) {
+            // Livewire boot hooks
         }
     }
 }
