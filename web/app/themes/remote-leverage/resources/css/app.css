@@ -1,4 +1,169 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=League+Spartan:wght@600;700;800&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
 @import "tailwindcss" theme(static);
+
 @source "../../app/**/*.php";
 @source "../**/*.blade.php";
 @source "../**/*.js";
+
+@theme {
+  /* Fonts */
+  --font-display: "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-spartan: "League Spartan", sans-serif;
+  --font-poppins: "Poppins", sans-serif;
+
+  /* Brand Colors */
+  --color-brand-purple: #8A2BE2;
+  --color-brand-purple-deep: #6200A4;
+  --color-brand-navy: #342567;
+  --color-brand-midnight: #18112C;
+  --color-brand-dark-violet: #250D4A;
+  --color-brand-hero: #13132F;
+  --color-brand-magenta: #F90066;
+  --color-brand-magenta-hover: #D90057;
+  --color-brand-orange: #FB7501;
+  --color-brand-orange-warm: #F97316;
+
+  /* Accent & Decorative Colors */
+  --color-star-purple: #9F53E7;
+  --color-electric-blue: #0016CC;
+  --color-lavender-tint: #DDE2F6;
+  --color-lavender-surface: #FBF6FF;
+  --color-step-num: #DCCDE0;
+
+  /* Surfaces & Neutrals */
+  --color-bg-light: #F4F6FC;
+  --color-surface-white: #FFFFFF;
+  --color-surface-dark: #070707;
+  --color-text-body: #1B1234;
+  --color-text-muted: #878EA0;
+  --color-text-slate: #94A3B8;
+
+  /* Semantic Feedback */
+  --color-status-success: #00D67D;
+  --color-status-warning: #F5C700;
+  --color-status-alert: #D94900;
+
+  /* Border Radii */
+  --radius-pill: 100px;
+  --radius-cta: 60px;
+  --radius-card-lg: 20px;
+  --radius-card: 14px;
+  --radius-badge: 10px;
+
+  /* Shadows */
+  --shadow-glow-purple: 0px 4px 150px 0px rgba(138, 43, 226, 0.7);
+  --shadow-glow-green: 0 0 8px #00D67D;
+  --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.08);
+  --shadow-card-subtle: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* Global Component & Utility Presets */
+@layer components {
+  /* Primary Pill CTA Button (Homepage & Global) */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    background-color: var(--color-brand-purple);
+    color: #ffffff;
+    font-family: var(--font-display);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: -0.03em;
+    font-size: 1rem;
+    line-height: 1.25rem;
+    padding: 1rem 2.25rem;
+    border-radius: var(--radius-pill);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 14px 0 rgba(138, 43, 226, 0.25);
+  }
+
+  .btn-primary:hover {
+    background-color: #000000;
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px 0 rgba(0, 0, 0, 0.25);
+  }
+
+  /* High-Impact Magenta Button (/hire-va-4/) */
+  .btn-magenta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    background-color: var(--color-brand-magenta);
+    color: #ffffff;
+    font-family: var(--font-sans);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+    font-size: 0.9375rem;
+    line-height: 1.25rem;
+    padding: 0.875rem 1.75rem;
+    border-radius: var(--radius-pill);
+    transition: all 0.2s ease-in-out;
+  }
+
+  .btn-magenta:hover {
+    background-color: #000000;
+    color: #ffffff;
+    transform: translateY(-1px);
+  }
+
+  /* Glassmorphism Pill Button */
+  .btn-glass {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    background-color: rgba(197, 205, 216, 0.5);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #000000;
+    font-family: var(--font-display);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: -0.03em;
+    font-size: 1rem;
+    padding: 1rem 2.25rem;
+    border-radius: var(--radius-cta);
+    transition: all 0.2s ease;
+  }
+
+  .btn-glass:hover {
+    background-color: rgba(255, 255, 255, 0.8);
+    border-color: rgba(255, 255, 255, 0.6);
+    transform: translateY(-1px);
+  }
+
+  /* Glassmorphism Feature Card */
+  .glass-card {
+    background-color: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(49.7px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-card);
+  }
+
+  /* Live Consultant Presence Pulse Dot */
+  .live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background-color: var(--color-status-success);
+    box-shadow: var(--shadow-glow-green);
+    animation: live-pulse 2s infinite ease-in-out;
+  }
+}
+
+@keyframes live-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}

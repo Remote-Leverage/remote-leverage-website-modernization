@@ -121,20 +121,21 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 
 ## Phase 3: Tailwind CSS v4 Design Tokens & Blade Shell (Sprint 1)
 
-- [ ] **Tailwind CSS v4 Configuration**
-  - [ ] Configure `resources/css/app.css` using modern `@theme` token syntax.
-  - [ ] Define Remote Leverage brand palette:
-    - Primary Navy (`#13132F`, `#0F172A`)
-    - Accent Blue (`#0284C7`, `#38BDF8`)
-    - Highlight Indigo/Purple (`#6366F1`, `#8A2BE2`)
-    - Slate Neutrals (`#F8FAFC`, `#E2E8F0`, `#64748B`, `#0F172A`)
-  - [ ] Define typography scale & import fonts (League Spartan, Inter Variable, Poppins).
-  - [ ] Configure glassmorphism utility classes (`backdrop-blur-md`, subtle borders, dark glass).
-- [ ] **Blade Layout Shell**
-  - [ ] Modernize `resources/views/layouts/app.blade.php`.
-  - [ ] Build global responsive navigation header (`resources/views/sections/header.blade.php`).
-  - [ ] Build global footer with dynamic menus & compliance links (`resources/views/sections/footer.blade.php`).
-  - [ ] Match block editor typography in `resources/css/editor.css`.
+- [x] **Tailwind CSS v4 Configuration**
+  - [x] Configure `resources/css/app.css` using modern `@theme` token syntax.
+  - [x] Define Remote Leverage brand palette extracted from live pages:
+    - Primary Brand Violet/Purple (`#8A2BE2`, `#6200A4`)
+    - Deep Midnight & Hero (`#13132F`, `#342567`, `#18112C`, `#250D4A`)
+    - High-Conversion Magenta & Accent Orange (`#F90066`, `#FB7501`, `#F97316`)
+    - Neutrals & Backgrounds (`#F4F6FC`, `#FFFFFF`, `#070707`, `#E2E8F0`, `#878EA0`)
+    - Semantic Status Colors (`#00D67D`, `#F5C700`, `#D94900`)
+  - [x] Define typography scale & import fonts (Inter, League Spartan, Poppins).
+  - [x] Configure utility classes (glassmorphism cards, glowing status live dot, pill buttons, marquee animations).
+- [x] **Blade Layout Shell**
+  - [x] Modernize `resources/views/layouts/app.blade.php` with Tailwind classes, smooth scroll, and Livewire tags.
+  - [x] Build global responsive navigation header (`resources/views/sections/header.blade.php`) with logo, roles dropdown, live status indicator, and mobile menu.
+  - [x] Build global footer (`resources/views/sections/footer.blade.php`) with specialties, resources, trust badges, and compliance links.
+  - [x] Match block editor typography in `resources/css/editor.css`.
 
 ---
 
