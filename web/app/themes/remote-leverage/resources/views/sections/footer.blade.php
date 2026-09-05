@@ -1,4 +1,4 @@
-<footer class="content-info bg-brand-midnight text-slate-300 border-t border-slate-800">
+<footer class="content-info bg-black text-slate-300 border-t border-neutral-900">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8">
       
@@ -25,7 +25,7 @@
         <!-- Direct Contact & Trust Badges -->
         <div class="space-y-2 pt-2">
           <div class="flex items-center gap-3 text-sm text-slate-300">
-            <svg class="w-4 h-4 text-brand-purple flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="w-4 h-4 text-brand-purple shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
             <a href="mailto:sales@remoteleverage.com" class="hover:text-white transition-colors">
@@ -136,13 +136,13 @@
 
     <!-- Optional WordPress Widget Area -->
     @if (is_active_sidebar('sidebar-footer'))
-      <div class="mt-12 pt-8 border-t border-slate-800">
+      <div class="mt-12 pt-8 border-t border-neutral-900">
         @php(dynamic_sidebar('sidebar-footer'))
       </div>
     @endif
 
     <!-- Bottom Legal Bar -->
-    <div class="mt-16 pt-8 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+    <div class="mt-16 pt-8 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
       <p>
         &copy; {{ date('Y') }} {{ $siteName ?? 'Remote Leverage' }}. {{ __('All rights reserved.', 'remote-leverage') }}
       </p>
