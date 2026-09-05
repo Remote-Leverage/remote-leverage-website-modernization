@@ -32,3 +32,7 @@ phpunit.xml
 
 # WP-CLI
 wp-cli.local.yml
+
+# macOS
+.DS_Store
+**/.DS_Store
