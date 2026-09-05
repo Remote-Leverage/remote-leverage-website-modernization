@@ -275,7 +275,7 @@ sequenceDiagram
     participant Ext as Calendly / Google Meet API
     participant CRM as Customer.io / Gravity Forms
 
-    User->>LW: Selects Role & Team Size (Step 1)
+    User->>LW: Fills lead information (Step 1)
     LW-->>User: Instant client-side validation (zero latency)
     User->>LW: Selects Preferred Date (Step 2)
     LW->>Domain: Query Available Slots (Timezone-aware)
