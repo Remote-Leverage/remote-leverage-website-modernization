@@ -41,7 +41,11 @@ same internal shape as the other domains in ADR-0004
 (Actions/Data/Events/Listeners/Models/Repositories/Services):
 
 - **Entity**: `Lead` — a core record representing a prospective contact,
-  tagged with a `source` (`ad`, `organic`, `referral_hub`, or `partnership`).
+  carrying two hidden fields, `sourceType` (`ad`, `organic`, `referral_hub`,
+  or `partnership`) and `sourceID` (the specific identifier within that
+  type — a partner code, ad campaign ID, etc., or `null` for organic) — see
+  "`Lead.source` as an evolution of `AttributionEngine`" below for how these
+  are computed.
 - **Form configuration** (replaces Gravity Forms' form builder): admin-
   configurable field definitions, validation rules, and notification
   routing, exposed via WP admin.
@@ -67,10 +71,36 @@ same internal shape as the other domains in ADR-0004
 - **Cross-context communication**: `Lead` talks to other bounded contexts
   asynchronously over a queue, not direct calls. Worked example from the
   requirement: `Lead` dispatches a `LeadCompleted` event onto the queue;
-  `PartnerHub` registers a subscriber that consumes it, checks whether the
-  lead's `source` is `referral_hub` (or otherwise matches a tracked
-  partner), and executes the relevant attribution/commission business rules
-  in its own domain.
+  `PartnerHub` registers a subscriber that consumes it, checks the lead's
+  `sourceType`/`sourceID` (see below) against a tracked partner, and
+  executes the relevant attribution/commission business rules in its own
+  domain.
+- **Scheduling runs only after lead creation**: the Calendly/Google
+  Calendar booking flow (`Scheduling`'s `FetchAvailableSlotsAction`,
+  `BookMeetingAction`) is not invoked directly by the booking wizard UI —
+  it is triggered by a `LeadCreated` event dispatched once the `Lead`
+  domain finishes capturing and persisting the lead. `Scheduling` registers
+  a queue subscriber on `LeadCreated` and only then checks availability and
+  creates the appointment, so every booked meeting is guaranteed to
+  reference an already-persisted `Lead`.
+- **`Lead.source` as an evolution of `AttributionEngine`**: `sourceType`/
+  `sourceID` are not manually set — they are computed at lead-creation time
+  by internal lead rules evolved from `Referral`'s existing
+  `AttributionEngine`, reading the same signals it already reads today
+  (`rl_referrer` cookie, `via`/`ref`/`r` query parameters) and reclassifying
+  them into `sourceType` + `sourceID` on the `Lead` record. This requires
+  adaptation in two existing domains:
+  - **`Referral`**: `AttributionEngine`'s rule evaluation is invoked as part
+    of `Lead`'s capture pipeline rather than only running independently at
+    click-time; downstream `Referral` logic that currently derives
+    attribution from the cookie directly (e.g. at payout time) should
+    instead key off the `sourceType`/`sourceID` already stamped on the
+    `Lead`, so there is one attribution decision per lead, not two.
+  - **`PartnerHub`**: its `LeadCompleted` subscriber (above) validates and
+    routes using `sourceType`/`sourceID` directly — e.g. when
+    `sourceType == 'referral_hub'` or `'partnership'`, `sourceID` is looked
+    up against `PartnerHub`'s own partner records — rather than
+    independently re-deriving a partner match from raw request data.
 
 ## Tradeoffs & Impact on Prior Decisions
 
@@ -96,6 +126,17 @@ same internal shape as the other domains in ADR-0004
   capture forms are a natural fit for a Livewire component, consistent with
   the reactive-funnel pattern already used for `MultistepBookingWizard`,
   rather than introducing a second rendering approach for forms.
+- **Weakens a specific claim in [ADR-0003](0003-livewire-4-reactive-ux.md)**:
+  sequencing Calendly/Google Calendar booking behind a queue-consumed
+  `LeadCreated` event means booking confirmation can no longer complete
+  synchronously within the same Livewire request/response cycle. This
+  directly cuts against ADR-0003's "instant client-side validation (zero
+  latency)" framing and the same-request booking flow shown in its
+  sequence diagram — there is now an unavoidable gap, bounded by
+  queue-worker latency, between "lead submitted" and "booking confirmed."
+  The `MultistepBookingWizard` needs an explicit waiting/polling (or
+  broadcast-driven) state for this gap; this is new UX scope the baseline
+  sequence diagram doesn't account for.
 - **Requires infrastructure not covered by [ADR-0002](0002-roots-bedrock-sage-acorn-stack.md)**:
   asynchronous cross-context events need a configured Laravel queue driver
   (database, Redis, or SQS) and at least one persistent queue worker process
@@ -111,14 +152,18 @@ same internal shape as the other domains in ADR-0004
   3-week roadmap without either extending the timeline or displacing other
   Sprint 2/3 scope — it needs to be sized and slotted explicitly.
 - **Creates a new dependency between `Lead` and `Referral`/`PartnerHub`**
-  (ADR-0004): the `LeadCompleted → PartnerHub` subscriber example makes
-  `Lead` an upstream event source for partner attribution. This is separate
-  from — and needs to be reconciled with — the *existing*, cookie-based
-  attribution mechanism already documented under `Referral`
-  (`AttributionEngine`, `ReferralAttributionMiddleware`, the `rl_ref`
-  cookie). Without reconciliation, a referral-sourced lead could be
-  attributed twice (once via cookie, once via `Lead.source`) or the two
-  mechanisms could disagree.
+  (ADR-0004), now partially resolved: making `sourceType`/`sourceID` an
+  evolution of `AttributionEngine` (rather than an independently-computed
+  field) removes the double-attribution risk originally flagged here — one
+  canonical decision is stamped per lead instead of two disagreeing ones.
+  What remains an open question is *which domain owns the rule-evaluation
+  logic itself*: does `AttributionEngine` relocate out of `Referral` into
+  `Lead` (making `Referral` a downstream consumer of `Lead`'s stamped
+  output), or does `Lead`'s capture pipeline call out to `Referral`'s
+  existing `AttributionEngine` as a dependency (making `Lead` depend on
+  `Referral`)? Either direction is workable, but leaving it undecided risks
+  a circular dependency between the two domains — this should be picked
+  explicitly before implementation starts.
 
 ## Consequences
 
@@ -134,6 +179,14 @@ same internal shape as the other domains in ADR-0004
   indefinite persistence today.
 - Adds a new always-on dependency (a queue worker process, e.g.
   `wp acorn queue:work`) whose failure mode — a stalled worker silently
-  dropping cross-context events like `LeadCompleted` — needs monitoring;
-  this pairs with domain-tagged error observability but is not yet covered
-  by any baseline ADR for the `Lead` domain specifically.
+  dropping cross-context events like `LeadCreated`/`LeadCompleted` — needs
+  monitoring; this pairs with domain-tagged error observability but is not
+  yet covered by any baseline ADR for the `Lead` domain specifically. A
+  stalled worker now also means a submitted lead never gets its Calendly/
+  Google Calendar meeting booked, not just a missed analytics event — this
+  raises the severity of that failure mode above what a dropped tracking
+  event alone would be.
+- Every booking is traceable back to a specific `Lead` and its stamped
+  `sourceType`/`sourceID` via `LeadActivityLog`, giving `Referral`/
+  `PartnerHub` a single auditable attribution record per lead instead of
+  reconstructing attribution from cookies at payout time.
