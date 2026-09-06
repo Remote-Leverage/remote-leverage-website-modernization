@@ -61,28 +61,51 @@ same internal shape as the other domains in ADR-0004
   international-aware phone input on the frontend).
 - **Action log/trace** (replaces Gravity Forms' entry notes/history): an
   append-only `LeadActivityLog` recording every state transition against a
-  lead (captured, enriched, routed, matched-to-partner, converted, purged).
+  lead (captured, enriched, routed, matched-to-partner, converted, purged),
+  plus every event dispatched and consumed for that lead — see "Event
+  traceability" below.
 - **Retention**: leads are retained for a default and minimum floor of 30
   days; admins can configure a *longer* window via WP admin, but not shorter
   than 30 days, per "needs to be stored for at least 30 days." A scheduled
   purge job (Acorn/WP-Cron command) enforces the configured window and never
   purges a lead younger than it. *(This 30-day-floor reading is this ADR's
   interpretation of the requirement — flag if a hard floor isn't intended.)*
-- **Cross-context communication**: `Lead` talks to other bounded contexts
-  asynchronously over a queue, not direct calls. Worked example from the
-  requirement: `Lead` dispatches a `LeadCompleted` event onto the queue;
-  `PartnerHub` registers a subscriber that consumes it, checks the lead's
-  `sourceType`/`sourceID` (see below) against a tracked partner, and
-  executes the relevant attribution/commission business rules in its own
-  domain.
+- **Cross-context communication is Event-Driven Design, not a queue
+  mandate**: `Lead` talks to other bounded contexts by publishing domain
+  events and letting each interested context subscribe to what it cares
+  about, rather than calling other domains directly. The Laravel queue
+  system already available via Acorn 5 (ADR-0002) is the default,
+  lowest-friction transport for this, but the decision here is the
+  event-driven pattern itself — a different broker (e.g. Redis Streams,
+  SQS, RabbitMQ) could implement the same contract if a future need
+  outgrows Laravel's queue. Worked example from the requirement: `Lead`
+  publishes a `LeadCompleted` event; `PartnerHub` subscribes to it, checks
+  the lead's `sourceType`/`sourceID` (see below) against a tracked partner,
+  and executes the relevant attribution/commission business rules in its
+  own domain.
 - **Scheduling runs only after lead creation**: the Calendly/Google
   Calendar booking flow (`Scheduling`'s `FetchAvailableSlotsAction`,
   `BookMeetingAction`) is not invoked directly by the booking wizard UI —
-  it is triggered by a `LeadCreated` event dispatched once the `Lead`
-  domain finishes capturing and persisting the lead. `Scheduling` registers
-  a queue subscriber on `LeadCreated` and only then checks availability and
-  creates the appointment, so every booked meeting is guaranteed to
-  reference an already-persisted `Lead`.
+  it is triggered by a `LeadCreated` event published once the `Lead` domain
+  finishes capturing and persisting the lead. `Scheduling` subscribes to
+  `LeadCreated` and only then checks availability and creates the
+  appointment, so every booked meeting is guaranteed to reference an
+  already-persisted `Lead`.
+- **Event traceability — every dispatch and every consumption is logged**:
+  to keep the event-driven flow auditable, two writes to `LeadActivityLog`
+  are mandatory for every `Lead`-related event, not one:
+  1. **At dispatch**: when `Lead` (or any domain) publishes an event
+     against a lead (`LeadCreated`, `LeadCompleted`, etc.), that dispatch
+     itself is written to the lead's history — event name, payload
+     summary, and timestamp.
+  2. **At consumption**: every subscriber that handles the event — whether
+     `Scheduling` booking a meeting, `PartnerHub` validating attribution, or
+     any future subscriber — writes its own record to the same
+     `LeadActivityLog` describing what it did and the outcome (succeeded,
+     failed, skipped), not just that it fired.
+  This makes every cross-domain reaction to a lead visible from the lead's
+  own history, without needing to correlate logs across domains or queue
+  infrastructure.
 - **`Lead.source` as an evolution of `AttributionEngine`**: `sourceType`/
   `sourceID` are not manually set — they are computed at lead-creation time
   by internal lead rules evolved from `Referral`'s existing
@@ -127,9 +150,10 @@ same internal shape as the other domains in ADR-0004
   the reactive-funnel pattern already used for `MultistepBookingWizard`,
   rather than introducing a second rendering approach for forms.
 - **Weakens a specific claim in [ADR-0003](0003-livewire-4-reactive-ux.md)**:
-  sequencing Calendly/Google Calendar booking behind a queue-consumed
-  `LeadCreated` event means booking confirmation can no longer complete
-  synchronously within the same Livewire request/response cycle. This
+  sequencing Calendly/Google Calendar booking behind an asynchronously
+  consumed `LeadCreated` event means booking confirmation can no longer
+  complete synchronously within the same Livewire request/response cycle,
+  regardless of which event transport is chosen. This
   directly cuts against ADR-0003's "instant client-side validation (zero
   latency)" framing and the same-request booking flow shown in its
   sequence diagram — there is now an unavoidable gap, bounded by
@@ -138,12 +162,15 @@ same internal shape as the other domains in ADR-0004
   broadcast-driven) state for this gap; this is new UX scope the baseline
   sequence diagram doesn't account for.
 - **Requires infrastructure not covered by [ADR-0002](0002-roots-bedrock-sage-acorn-stack.md)**:
-  asynchronous cross-context events need a configured Laravel queue driver
-  (database, Redis, or SQS) and at least one persistent queue worker process
-  running in every environment. The baseline stack decision does not
-  specify a queue driver or worker process anywhere — this is new
-  operational surface area (a long-running process to provision and
-  monitor), not just PHP-FPM handling web requests.
+  whichever transport implements the event-driven pattern above — Laravel's
+  own queue system (database/Redis/SQS driver) or an external broker — it
+  needs at least one persistent worker/consumer process running in every
+  environment. The baseline stack decision does not specify a queue driver,
+  broker, or worker process anywhere — this is new operational surface area
+  (a long-running process to provision and monitor), not just PHP-FPM
+  handling web requests. Picking Laravel's built-in queue (the default
+  suggested above) minimizes this to "one more `artisan`-style worker";
+  picking an external broker adds a new service to operate entirely.
 - **Impacts [ADR-0007](0007-three-week-parallelized-sprint-roadmap.md)**:
   a configurable form system, a HubSpot gateway, international phone
   validation, an audit-trail log, a configurable retention+purge job, and
@@ -164,6 +191,20 @@ same internal shape as the other domains in ADR-0004
   `Referral`)? Either direction is workable, but leaving it undecided risks
   a circular dependency between the two domains — this should be picked
   explicitly before implementation starts.
+- **Event traceability is a cross-cutting contract, not just a `Lead`-domain
+  concern**: requiring every subscriber — in `Scheduling`, `PartnerHub`, or
+  any future consumer — to write its own `LeadActivityLog` entry means
+  every domain that listens to a `Lead` event takes on a write dependency
+  against `Lead`'s history mechanism, not just a read dependency on the
+  event payload. This is most safely implemented as a shared
+  listener base/decorator provided by the `Lead` domain (so subscribers log
+  consistently rather than each domain inventing its own logging call), but
+  that shared piece of infrastructure now has to be maintained centrally
+  and adopted by every domain that reacts to a `Lead` event. It also
+  introduces an at-least-once-delivery risk common to queue-based systems:
+  if a subscriber is retried after a transient failure, its handler (and
+  therefore its history write) must be idempotent, or the same lead could
+  accumulate duplicate log entries for a single logical action.
 
 ## Consequences
 
@@ -190,3 +231,15 @@ same internal shape as the other domains in ADR-0004
   `sourceType`/`sourceID` via `LeadActivityLog`, giving `Referral`/
   `PartnerHub` a single auditable attribution record per lead instead of
   reconstructing attribution from cookies at payout time.
+- Because every event dispatch and every subscriber's handling of it are
+  both logged, a lead's `LeadActivityLog` becomes a complete, reconstructible
+  timeline of the entire cross-domain flow (capture → `LeadCreated` →
+  `Scheduling` booked/failed → `LeadCompleted` → `PartnerHub`
+  matched/skipped) from one place — support and debugging no longer require
+  correlating separate logs across `Scheduling`, `PartnerHub`, and queue
+  infrastructure.
+- Leaving the event transport unspecified (Laravel queue vs. an external
+  broker) keeps this ADR's core decision — Event-Driven Design for
+  cross-context communication — stable even if the transport is revisited
+  later; only the "Requires infrastructure" tradeoff above needs
+  re-evaluating if that choice changes.
