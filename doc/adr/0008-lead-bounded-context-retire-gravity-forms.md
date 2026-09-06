@@ -49,12 +49,22 @@ same internal shape as the other domains in ADR-0004
 - **Form configuration** (replaces Gravity Forms' form builder): admin-
   configurable field definitions, validation rules, and notification
   routing, exposed via WP admin.
+- **Extensibility — external rules on `LeadFormSubmitted`**: at the moment a
+  form is submitted, before the lead is finalized/persisted, `Lead`
+  publishes a `LeadFormSubmitted` extension point that lets external code —
+  other domains, admin-configured rules, or future integrations — insert
+  additional rules (extra validation, field enrichment, conditional
+  routing) without modifying `Lead`'s core code. This preserves the
+  hook-based extensibility that today's business rules lean on Gravity
+  Forms for (its `gform_pre_submission`-style custom-logic hooks), even
+  though Gravity Forms itself is retired.
 - **HubSpot integration** (replaces the `gravityformshubspot` add-on): a
   `HubSpotGateway` in `Lead/Services/`, following the same gateway pattern
   as `CustomerIOClient`/`PostHogClient` in `Tracking`.
 - **Cross-context event triggers** (replaces `GravityFormsSubmissionSubscriber`/
-  `GravityFormsHooks`): domain events (e.g. `LeadCompleted`) dispatched onto
-  a queue rather than direct synchronous hook calls.
+  `GravityFormsHooks`): domain events dispatched rather than direct
+  synchronous hook calls — see "Domain events — the Lead lifecycle" below
+  for the specific events.
 - **International phone number support** (replaces the "GP Advanced Phone
   Field" Gravity Perks add-on): a dedicated phone-input/validation library
   (e.g. `giggsey/libphonenumber-for-php` server-side, paired with an
@@ -79,25 +89,50 @@ same internal shape as the other domains in ADR-0004
   event-driven pattern itself — a different broker (e.g. Redis Streams,
   SQS, RabbitMQ) could implement the same contract if a future need
   outgrows Laravel's queue. Worked example from the requirement: `Lead`
-  publishes a `LeadCompleted` event; `PartnerHub` subscribes to it, checks
+  publishes `LeadBookingCompleted`; `PartnerHub` subscribes to it, checks
   the lead's `sourceType`/`sourceID` (see below) against a tracked partner,
   and executes the relevant attribution/commission business rules in its
   own domain.
+- **Domain events — the Lead lifecycle**: four events, published by `Lead`
+  or `Scheduling` as the lead progresses:
+  - `LeadCreated` — the form was submitted, `AttributionEngine` (see below)
+    has stamped `sourceType`/`sourceID`, and the lead is persisted.
+  - `LeadAbandoned` — a lead was created but the booking step was never
+    completed. The mechanism that decides *when* a lead counts as abandoned
+    (e.g. a timeout with no completed booking) is left for implementation.
+  - `LeadBookingCompleted` — `Scheduling` successfully booked the
+    Calendly/Google Calendar meeting for this lead.
+  - `LeadBookingCanceled` — a previously completed booking was canceled at
+    Calendly/Google. This requires `Scheduling` to observe cancellation
+    webhooks/notifications from those providers and translate them into
+    this event.
+
+  **These four events are unrelated to the legacy Gravity-Forms-HubSpot
+  add-on's `Finish`/`Partial` entry field** (`rl-elementor-blocks/src/Integrations/CalendlyIntegration.php:671-675`,
+  which tags a Gravity Forms entry `'Partial'` for "smart integrations
+  (Slack/HubSpot conditional logic)"). They are `Lead`'s own internal
+  lifecycle model, not a renaming of that field. If HubSpot-side
+  segmentation still needs an equivalent "Finish/Partial" signal, mapping
+  these four events onto it is the `HubSpotGateway`'s own translation
+  responsibility — not something these event names define.
 - **Scheduling runs only after lead creation**: the Calendly/Google
   Calendar booking flow (`Scheduling`'s `FetchAvailableSlotsAction`,
   `BookMeetingAction`) is not invoked directly by the booking wizard UI —
-  it is triggered by a `LeadCreated` event published once the `Lead` domain
+  it is triggered by `LeadCreated`, published once the `Lead` domain
   finishes capturing and persisting the lead. `Scheduling` subscribes to
-  `LeadCreated` and only then checks availability and creates the
-  appointment, so every booked meeting is guaranteed to reference an
-  already-persisted `Lead`.
+  `LeadCreated`, checks availability, creates the appointment, and then
+  publishes `LeadBookingCompleted` (or, on a later cancellation,
+  `LeadBookingCanceled`) — so every booked meeting is guaranteed to
+  reference an already-persisted `Lead`, and the outcome is always
+  reflected back onto that lead's own event stream.
 - **Event traceability — every dispatch and every consumption is logged**:
   to keep the event-driven flow auditable, two writes to `LeadActivityLog`
   are mandatory for every `Lead`-related event, not one:
-  1. **At dispatch**: when `Lead` (or any domain) publishes an event
-     against a lead (`LeadCreated`, `LeadCompleted`, etc.), that dispatch
-     itself is written to the lead's history — event name, payload
-     summary, and timestamp.
+  1. **At dispatch**: when `Lead` or `Scheduling` publishes one of the four
+     lifecycle events above (`LeadCreated`, `LeadAbandoned`,
+     `LeadBookingCompleted`, `LeadBookingCanceled`), that dispatch itself
+     is written to the lead's history — event name, payload summary, and
+     timestamp.
   2. **At consumption**: every subscriber that handles the event — whether
      `Scheduling` booking a meeting, `PartnerHub` validating attribution, or
      any future subscriber — writes its own record to the same
@@ -106,21 +141,22 @@ same internal shape as the other domains in ADR-0004
   This makes every cross-domain reaction to a lead visible from the lead's
   own history, without needing to correlate logs across domains or queue
   infrastructure.
-- **`Lead.source` as an evolution of `AttributionEngine`**: `sourceType`/
-  `sourceID` are not manually set — they are computed at lead-creation time
-  by internal lead rules evolved from `Referral`'s existing
-  `AttributionEngine`, reading the same signals it already reads today
-  (`rl_referrer` cookie, `via`/`ref`/`r` query parameters) and reclassifying
-  them into `sourceType` + `sourceID` on the `Lead` record. This requires
-  adaptation in two existing domains:
-  - **`Referral`**: `AttributionEngine`'s rule evaluation is invoked as part
-    of `Lead`'s capture pipeline rather than only running independently at
-    click-time; downstream `Referral` logic that currently derives
-    attribution from the cookie directly (e.g. at payout time) should
-    instead key off the `sourceType`/`sourceID` already stamped on the
-    `Lead`, so there is one attribution decision per lead, not two.
-  - **`PartnerHub`**: its `LeadCompleted` subscriber (above) validates and
-    routes using `sourceType`/`sourceID` directly — e.g. when
+- **`Lead.source` is computed by `AttributionEngine`, which stays owned by
+  `Referral`**: `sourceType`/`sourceID` are not manually set, and
+  `AttributionEngine` does **not** relocate into `Lead` — it remains
+  `Referral`'s, reading the same signals it already reads today
+  (`rl_referrer` cookie, `via`/`ref`/`r` query parameters). `Lead`'s capture
+  pipeline calls into `Referral`'s `AttributionEngine` as a direct
+  dependency at lead-creation time and stamps the result onto `sourceType`
+  + `sourceID`. This requires adaptation in two existing domains:
+  - **`Referral`**: `AttributionEngine` gains a callable entry point that
+    `Lead` invokes at creation time, in addition to its existing click-time
+    role; downstream `Referral` logic that currently derives attribution
+    from the cookie directly (e.g. at payout time) should instead key off
+    the `sourceType`/`sourceID` already stamped on the `Lead`, so there is
+    one attribution decision per lead, not two.
+  - **`PartnerHub`**: its `LeadBookingCompleted` subscriber (above)
+    validates and routes using `sourceType`/`sourceID` directly — e.g. when
     `sourceType == 'referral_hub'` or `'partnership'`, `sourceID` is looked
     up against `PartnerHub`'s own partner records — rather than
     independently re-deriving a partner match from raw request data.
@@ -179,18 +215,20 @@ same internal shape as the other domains in ADR-0004
   3-week roadmap without either extending the timeline or displacing other
   Sprint 2/3 scope — it needs to be sized and slotted explicitly.
 - **Creates a new dependency between `Lead` and `Referral`/`PartnerHub`**
-  (ADR-0004), now partially resolved: making `sourceType`/`sourceID` an
-  evolution of `AttributionEngine` (rather than an independently-computed
-  field) removes the double-attribution risk originally flagged here — one
-  canonical decision is stamped per lead instead of two disagreeing ones.
-  What remains an open question is *which domain owns the rule-evaluation
-  logic itself*: does `AttributionEngine` relocate out of `Referral` into
-  `Lead` (making `Referral` a downstream consumer of `Lead`'s stamped
-  output), or does `Lead`'s capture pipeline call out to `Referral`'s
-  existing `AttributionEngine` as a dependency (making `Lead` depend on
-  `Referral`)? Either direction is workable, but leaving it undecided risks
-  a circular dependency between the two domains — this should be picked
-  explicitly before implementation starts.
+  (ADR-0004), now resolved: `AttributionEngine` stays in `Referral`; `Lead`
+  depends on `Referral`, not the reverse. This removes both the
+  double-attribution risk originally flagged here (one canonical decision
+  stamped per lead) and the circular-dependency risk of the two directions
+  left open in an earlier pass of this ADR. It does introduce a real,
+  synchronous coupling that's architecturally different from `Lead`'s other
+  inter-domain relationships: where `Scheduling` and `PartnerHub` react to
+  `Lead` *asynchronously* via published events (loosely coupled — either
+  can be down without blocking the other), `Lead`'s call into
+  `AttributionEngine` is a direct, synchronous dependency — `Referral` must
+  be available and correctly bootstrapped every time a lead is captured, or
+  lead creation itself fails. This is the first hard synchronous
+  cross-domain dependency in the architecture; ADR-0004's five original
+  domains had none.
 - **Event traceability is a cross-cutting contract, not just a `Lead`-domain
   concern**: requiring every subscriber — in `Scheduling`, `PartnerHub`, or
   any future consumer — to write its own `LeadActivityLog` entry means
@@ -220,8 +258,8 @@ same internal shape as the other domains in ADR-0004
   indefinite persistence today.
 - Adds a new always-on dependency (a queue worker process, e.g.
   `wp acorn queue:work`) whose failure mode — a stalled worker silently
-  dropping cross-context events like `LeadCreated`/`LeadCompleted` — needs
-  monitoring; this pairs with domain-tagged error observability but is not
+  dropping one of the four lifecycle events — needs monitoring; this pairs
+  with domain-tagged error observability but is not
   yet covered by any baseline ADR for the `Lead` domain specifically. A
   stalled worker now also means a submitted lead never gets its Calendly/
   Google Calendar meeting booked, not just a missed analytics event — this
@@ -233,11 +271,12 @@ same internal shape as the other domains in ADR-0004
   reconstructing attribution from cookies at payout time.
 - Because every event dispatch and every subscriber's handling of it are
   both logged, a lead's `LeadActivityLog` becomes a complete, reconstructible
-  timeline of the entire cross-domain flow (capture → `LeadCreated` →
-  `Scheduling` booked/failed → `LeadCompleted` → `PartnerHub`
-  matched/skipped) from one place — support and debugging no longer require
-  correlating separate logs across `Scheduling`, `PartnerHub`, and queue
-  infrastructure.
+  timeline of the entire cross-domain flow (capture → `AttributionEngine`
+  stamps `sourceType`/`sourceID` → `LeadCreated` → `Scheduling`
+  books/fails → `LeadBookingCompleted` or `LeadAbandoned` or (later)
+  `LeadBookingCanceled` → `PartnerHub` matched/skipped) from one place —
+  support and debugging no longer require correlating separate logs across
+  `Referral`, `Scheduling`, `PartnerHub`, and queue infrastructure.
 - Leaving the event transport unspecified (Laravel queue vs. an external
   broker) keeps this ADR's core decision — Event-Driven Design for
   cross-context communication — stable even if the transport is revisited
