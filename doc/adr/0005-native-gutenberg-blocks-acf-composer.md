@@ -36,7 +36,7 @@ and rendered via Laravel Blade templates (`README.md` §5, migration matrix):
 
 - Depends on ADR-0002 (Acorn 5 stack, which brings in `log1x/acf-composer`)
   and shares design tokens with the Tailwind CSS v4 configuration described
-  in `README.md` §3/Phase 3 of `plan.md`.
+  in `README.md` §3.
 - Shares the block/Livewire boundary noted in ADR-0003: several blocks
   (`BookingBlock`, `LiveCallBlock`) are documented as thin wrappers around
   Livewire components (`MultistepBookingWizard`, `InstantLiveCallButton`)
@@ -50,8 +50,5 @@ and rendered via Laravel Blade templates (`README.md` §5, migration matrix):
 
 - Content editors move from Elementor's visual canvas to native Gutenberg
   block insertion for all new content.
-- Per `plan.md`, this phase (Phase 5: Native Gutenberg Blocks Library) is
-  0% complete at time of writing — the blocks are specified in the
-  proposal but not yet implemented, unlike Phases 1–3.
 - Widget-to-block consolidation reduces the number of distinct authoring
   components a content editor must choose from (36 → ~10–16).

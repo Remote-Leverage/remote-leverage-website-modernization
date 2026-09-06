@@ -46,7 +46,3 @@ The complete target folder structure is specified in `README.md` §3
   Composer-driven deployments and PHP 8.3+ (per `composer.json`:
   `"php": ">=8.3"`) rather than traditional FTP/plugin-upload WordPress
   workflows.
-- Per `plan.md` Phase 1, this has already been executed: Bedrock root and
-  Sage 11 theme unified into a single monorepo, git remote connected to
-  `Remote-Leverage/remote-leverage-website-modernization`, `roots/acorn`,
-  `livewire/livewire` (v4.4.3), and `log1x/acf-composer` (v3.4.7) installed.

@@ -39,7 +39,6 @@ cut over once ready (see ADR-0006 for the cutover mechanics).
   "clean-slate" over "incremental," accepted implicitly by the proposal.
 - All 8 legacy plugins' business logic must be re-implemented in the new
   stack (see ADR-0004) rather than gradually modernized in place.
-- The new codebase and CI/CD are established in
-  `Remote-Leverage/remote-leverage-website-modernization`, unify the
-  Bedrock root and Sage 11 theme into a single monorepo (per `plan.md`
-  Phase 1).
+- The new codebase is established in
+  `Remote-Leverage/remote-leverage-website-modernization`, unifying the
+  Bedrock root and Sage 11 theme into a single monorepo.

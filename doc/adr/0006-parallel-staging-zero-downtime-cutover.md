@@ -59,5 +59,3 @@ Risk-specific mitigations recorded in §7:
 - Expected outcomes are quantified in §8: Mobile PageSpeed 42→96+, LCP
   4.8s→<1.2s, CLS 0.28→0.00, TBT 850ms→<50ms, asset payload 4.2MB→<450KB,
   active plugins 27→~10.
-- Per `plan.md`, Phase 8 (Staged Cutover & Production Go-Live) is 0%
-  complete at time of writing.

@@ -26,8 +26,8 @@ context → Calendly/Google Meet API → Customer.io/Gravity Forms.
 
 ## Tradeoffs & Impact on Prior Decisions
 
-- Depends on ADR-0002 (Acorn 5 stack) — Livewire 4 is installed and wired
-  through Acorn's service container per `plan.md` Phase 1.
+- Depends on ADR-0002 (Acorn 5 stack) — Livewire 4 is wired through the
+  Laravel service container Acorn 5 brings into WordPress.
 - Interacts directly with ADR-0004 (DDD bounded contexts): Livewire
   components call into Domain `Actions` (e.g. `BookMeetingAction`) rather
   than containing business logic themselves — the reactive UI layer is kept

@@ -14,8 +14,7 @@ with direct global `$wpdb` calls and no isolation between concerns.
 ## Decision
 
 Re-architect the 8 legacy plugins into 5 cohesive, testable, isolated
-**Bounded Contexts** under `app/Domains/` (`README.md` §1, §3, `plan.md`
-Phase 2):
+**Bounded Contexts** under `app/Domains/` (`README.md` §1, §3):
 
 - **Referral** (from `rl-referral-program`): DTOs (`PartnerData`,
   `ReferralData`, `PayoutData`), migrations for `rl_referral_clicks`,
@@ -57,9 +56,6 @@ where needed (`ReferralAttributionMiddleware`).
 - Business logic becomes unit-testable in isolation from WordPress hooks
   (Actions/DTOs are plain PHP), as opposed to the legacy procedural
   approach.
-- Per `plan.md` Phase 2, this is marked 100% complete: all 5 domains'
-  DTOs, migrations, models/repositories, services/gateways, actions,
-  events/listeners, and providers are implemented.
 - Introduces a new internal API surface (Actions, DTOs, Events) that
   Livewire components, Gutenberg blocks, and WordPress hooks must all be
   written against consistently going forward.
