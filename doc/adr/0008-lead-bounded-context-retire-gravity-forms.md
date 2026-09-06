@@ -80,19 +80,27 @@ same internal shape as the other domains in ADR-0004
   purge job (Acorn/WP-Cron command) enforces the configured window and never
   purges a lead younger than it. *(This 30-day-floor reading is this ADR's
   interpretation of the requirement — flag if a hard floor isn't intended.)*
-- **Cross-context communication is Event-Driven Design, not a queue
-  mandate**: `Lead` talks to other bounded contexts by publishing domain
-  events and letting each interested context subscribe to what it cares
-  about, rather than calling other domains directly. The Laravel queue
-  system already available via Acorn 5 (ADR-0002) is the default,
-  lowest-friction transport for this, but the decision here is the
-  event-driven pattern itself — a different broker (e.g. Redis Streams,
-  SQS, RabbitMQ) could implement the same contract if a future need
-  outgrows Laravel's queue. Worked example from the requirement: `Lead`
-  publishes `LeadBookingCompleted`; `PartnerHub` subscribes to it, checks
-  the lead's `sourceType`/`sourceID` (see below) against a tracked partner,
-  and executes the relevant attribution/commission business rules in its
-  own domain.
+- **Cross-context communication is Event-Driven Design — the transport is
+  an implementation choice, not part of this decision**: `Lead` talks to
+  other bounded contexts by publishing domain events and letting each
+  interested context subscribe to what it cares about, rather than calling
+  other domains directly. Three transports can satisfy this contract, in
+  increasing order of infrastructure cost:
+  1. **Synchronous subscriber (simplest)**: dispatching an event
+     immediately and directly invokes every registered subscriber in the
+     same request/process — e.g. Laravel's default `Event::dispatch()`
+     behavior. No queue, no worker process, no new infrastructure.
+  2. **Laravel queue (deferred)**: subscribers implement `ShouldQueue`; a
+     persistent worker process (available via Acorn 5, ADR-0002) consumes
+     them asynchronously.
+  3. **External broker**: Redis Streams, SQS, or RabbitMQ, if a future need
+     outgrows a single Laravel app's queue.
+  Each trades operational simplicity against reliability isolation — see
+  the Tradeoffs section. Worked example from the requirement, true
+  regardless of transport: `Lead` publishes `LeadBookingCompleted`;
+  `PartnerHub` subscribes to it, checks the lead's `sourceType`/`sourceID`
+  (see below) against a tracked partner, and executes the relevant
+  attribution/commission business rules in its own domain.
 - **Domain events — the Lead lifecycle**: four events, published by `Lead`
   or `Scheduling` as the lead progresses:
   - `LeadCreated` — the form was submitted, `AttributionEngine` (see below)
@@ -185,28 +193,46 @@ same internal shape as the other domains in ADR-0004
   capture forms are a natural fit for a Livewire component, consistent with
   the reactive-funnel pattern already used for `MultistepBookingWizard`,
   rather than introducing a second rendering approach for forms.
-- **Weakens a specific claim in [ADR-0003](0003-livewire-4-reactive-ux.md)**:
-  sequencing Calendly/Google Calendar booking behind an asynchronously
-  consumed `LeadCreated` event means booking confirmation can no longer
-  complete synchronously within the same Livewire request/response cycle,
-  regardless of which event transport is chosen. This
-  directly cuts against ADR-0003's "instant client-side validation (zero
-  latency)" framing and the same-request booking flow shown in its
-  sequence diagram — there is now an unavoidable gap, bounded by
-  queue-worker latency, between "lead submitted" and "booking confirmed."
-  The `MultistepBookingWizard` needs an explicit waiting/polling (or
-  broadcast-driven) state for this gap; this is new UX scope the baseline
-  sequence diagram doesn't account for.
-- **Requires infrastructure not covered by [ADR-0002](0002-roots-bedrock-sage-acorn-stack.md)**:
-  whichever transport implements the event-driven pattern above — Laravel's
-  own queue system (database/Redis/SQS driver) or an external broker — it
-  needs at least one persistent worker/consumer process running in every
-  environment. The baseline stack decision does not specify a queue driver,
-  broker, or worker process anywhere — this is new operational surface area
+- **Weakens a specific claim in [ADR-0003](0003-livewire-4-reactive-ux.md)
+  — but only if a deferred transport is chosen**: if `LeadCreated` is
+  consumed via the queue or external-broker transport, booking confirmation
+  can no longer complete synchronously within the same Livewire
+  request/response cycle — cutting against ADR-0003's "instant client-side
+  validation (zero latency)" framing and the same-request booking flow
+  shown in its sequence diagram, and requiring the `MultistepBookingWizard`
+  to add an explicit waiting/polling (or broadcast-driven) state for the
+  gap. Choosing the **synchronous-subscriber** transport instead avoids
+  this entirely: `Scheduling`'s booking action runs in the same request as
+  lead creation, preserving ADR-0003's original same-request assumption —
+  at the cost described in the new tradeoff below.
+- **Requires infrastructure not covered by [ADR-0002](0002-roots-bedrock-sage-acorn-stack.md)
+  — but only if a deferred transport is chosen**: the queue and
+  external-broker transports both need at least one persistent
+  worker/consumer process running in every environment, which the baseline
+  stack decision does not specify anywhere — new operational surface area
   (a long-running process to provision and monitor), not just PHP-FPM
-  handling web requests. Picking Laravel's built-in queue (the default
-  suggested above) minimizes this to "one more `artisan`-style worker";
-  picking an external broker adds a new service to operate entirely.
+  handling web requests. The **synchronous-subscriber** transport needs
+  none of this — it runs inside the same PHP-FPM request Acorn 5 already
+  handles, with no new infrastructure at all.
+- **Synchronous subscribers trade infrastructure simplicity for reliability
+  isolation**: dispatching synchronously means a slow or failing subscriber
+  becomes the dispatching request's problem — e.g. a Calendly/Google
+  Calendar outage inside `Scheduling`'s `LeadCreated` handler, or a slow
+  HubSpot call, now directly slows down or can fail the very request that
+  captured the lead, instead of being isolated to a retryable background
+  job. It also loses automatic retry: a synchronous subscriber that throws
+  has no built-in second attempt, so a failed side-effect (e.g.
+  `PartnerHub` failing to record attribution) is lost unless the domain
+  itself implements retry logic — whereas a queued subscriber gets
+  Laravel's built-in retry/backoff for free (this is also why the
+  idempotency risk noted below, under "Event traceability is a
+  cross-cutting contract," is specific to the queued/broker transports —
+  synchronous dispatch has no retries, so no duplicate-write risk from
+  them, but a bare failure is unrecovered instead of retried). Neither
+  option is strictly better; the choice can also be made
+  **per subscriber** rather than once for the whole domain — e.g.
+  `PartnerHub`'s fast, DB-only attribution check may be safe synchronous,
+  while `Scheduling`'s external Calendly/Google call may be safer queued.
 - **Impacts [ADR-0007](0007-three-week-parallelized-sprint-roadmap.md)**:
   a configurable form system, a HubSpot gateway, international phone
   validation, an audit-trail log, a configurable retention+purge job, and
@@ -256,15 +282,17 @@ same internal shape as the other domains in ADR-0004
 - Retention/purge becomes a testable, enforced policy (30-day floor, admin-
   configurable ceiling-less extension) instead of Gravity Forms' implicit
   indefinite persistence today.
-- Adds a new always-on dependency (a queue worker process, e.g.
-  `wp acorn queue:work`) whose failure mode — a stalled worker silently
-  dropping one of the four lifecycle events — needs monitoring; this pairs
-  with domain-tagged error observability but is not
-  yet covered by any baseline ADR for the `Lead` domain specifically. A
-  stalled worker now also means a submitted lead never gets its Calendly/
-  Google Calendar meeting booked, not just a missed analytics event — this
-  raises the severity of that failure mode above what a dropped tracking
-  event alone would be.
+- If any subscriber uses the queued or broker transport, it adds a new
+  always-on dependency (a worker process, e.g. `wp acorn queue:work`)
+  whose failure mode — a stalled worker silently dropping one of the four
+  lifecycle events — needs monitoring; this pairs with domain-tagged error
+  observability but is not yet covered by any baseline ADR for the `Lead`
+  domain specifically. A stalled worker now also means a submitted lead
+  never gets its Calendly/Google Calendar meeting booked, not just a missed
+  analytics event — this raises the severity of that failure mode above
+  what a dropped tracking event alone would be. Subscribers on the
+  synchronous transport have no worker to stall, but fail loudly (in the
+  originating request) instead of silently.
 - Every booking is traceable back to a specific `Lead` and its stamped
   `sourceType`/`sourceID` via `LeadActivityLog`, giving `Referral`/
   `PartnerHub` a single auditable attribution record per lead instead of
