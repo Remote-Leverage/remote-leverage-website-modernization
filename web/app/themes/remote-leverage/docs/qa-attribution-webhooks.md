@@ -40,24 +40,34 @@ ORDER BY created_at DESC;
 
 ---
 
-## 2. Lead Capture & Tracking QA
+## 2. Lead Capture & Event-Driven Telemetry QA (ADR-0008)
 
-### 2.1 Gravity Forms to Customer.io Identification
-When any lead form (e.g., Executive Assistant inquiry, Partner application) is submitted:
-1. `GravityFormsSubmissionSubscriber::handleSubmission()` intercepts `gform_after_submission`.
-2. Extracts customer email, full name, and active `rl_ref` referral cookie.
-3. Dispatches `UserProfileData` to `CustomerIOClient::identify()`.
-4. Dispatches `AnalyticsEventData` (`"Form Submitted"`) to PostHog and internal event bus.
+### 2.1 Lead Capture to Customer.io & HubSpot Identification
+When any prospective lead submits the `MultistepBookingWizard` or consultation form:
+1. `CaptureLeadAction::execute()` validates the contact details (including international phone E.164 standardization via `PhoneValidationService`).
+2. `AttributionEngine::resolveLeadSource()` stamps canonical `source_type` (`ad`, `organic`, `referral_hub`, `partnership`) and `source_id`.
+3. Dispatches `LeadCreated` lifecycle event.
+4. Stage 1 write logs the dispatch to `rl_lead_activity_logs`.
+5. `HandleLeadCreatedForTracking` intercepts `LeadCreated`, identifies the profile in Customer.io, records `Lead Captured` event in PostHog, and performs Stage 2 write to `rl_lead_activity_logs`.
+6. `HubSpotGateway` synchronizes the contact with HubSpot CRM and logs the consumption outcome.
+7. `HandleLeadCreatedForBooking` schedules the meeting in Calendly/Google Calendar and dispatches `LeadBookingCompleted`.
 
 **Verification Checklist:**
-- [ ] Submit form at `/book-consultation`.
+- [ ] Submit consultation form in `MultistepBookingWizard` (`/book-consultation`).
+- [ ] Query database:
+  ```sql
+  SELECT id, uuid, email, phone, source_type, source_id, status FROM wp_rl_leads ORDER BY id DESC LIMIT 1;
+  SELECT * FROM wp_rl_lead_activity_logs WHERE lead_id = (SELECT MAX(id) FROM wp_rl_leads);
+  ```
+- [ ] Verify `stage = 'dispatch'` and `stage = 'consumption'` dual-logging records exist.
 - [ ] Open Customer.io People dashboard -> Search by submitted email.
 - [ ] Verify profile traits include:
   - `email`: user's email
-  - `name`: user's name
-  - `referral_code`: attributed partner slug (if present)
-  - `source_form`: Form title
-- [ ] Open PostHog Events dashboard -> Search for event `Form Submitted`.
+  - `name`: user's full name
+  - `source_type`: e.g. `referral_hub`, `partnership`, `ad`, or `organic`
+  - `source_id`: partner slug or campaign ID
+  - `status`: `booked`
+- [ ] Open PostHog Events dashboard -> Search for event `Lead Captured`.
 
 ---
 

@@ -74,4 +74,28 @@ describe('AttributionEngine', function () {
         // Reset
         unset($GLOBALS['_wp_mock_options']['rl_ref_cookie_days']);
     });
+
+    test('resolveLeadSource stamps correct sourceType and sourceID per ADR-0008', function () {
+        $engine = new AttributionEngine;
+
+        // Partnership slug
+        $partnerResult = $engine->resolveLeadSource(referralSlug: 'partner-apex');
+        expect($partnerResult['sourceType'])->toBe('partnership')
+            ->and($partnerResult['sourceID'])->toBe('partner-apex');
+
+        // Referral hub slug
+        $hubResult = $engine->resolveLeadSource(referralSlug: 'chicago-agency');
+        expect($hubResult['sourceType'])->toBe('referral_hub')
+            ->and($hubResult['sourceID'])->toBe('chicago-agency');
+
+        // Paid ad UTM
+        $adResult = $engine->resolveLeadSource(utmSource: 'google', utmCampaign: 'search_q3');
+        expect($adResult['sourceType'])->toBe('ad')
+            ->and($adResult['sourceID'])->toBe('search_q3');
+
+        // Organic fallback
+        $organicResult = $engine->resolveLeadSource();
+        expect($organicResult['sourceType'])->toBe('organic')
+            ->and($organicResult['sourceID'])->toBeNull();
+    });
 });

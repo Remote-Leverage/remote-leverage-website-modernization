@@ -2,95 +2,76 @@
 
 declare(strict_types=1);
 
+use App\Domains\Lead\Events\LeadCreated;
+use App\Domains\Lead\Models\Lead;
+use App\Domains\Lead\Models\LeadActivityLog;
+use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
 use App\Domains\Tracking\Data\AnalyticsEventData;
 use App\Domains\Tracking\Data\UserProfileData;
 use App\Domains\Tracking\Gateways\CustomerIOClient;
-use App\Domains\Tracking\Subscribers\GravityFormsSubmissionSubscriber;
+use App\Domains\Tracking\Listeners\HandleLeadCreatedForTracking;
+use Illuminate\Support\Str;
 
-describe('GravityFormsSubmissionSubscriber', function () {
-    test('captures form submission, identifies user in Customer.io, and records analytics event', function () {
+describe('Tracking Domain LeadCreated Event Listener', function () {
+    beforeEach(function () {
+        LeadActivityLog::truncate();
+        Lead::truncate();
+    });
+
+    test('HandleLeadCreatedForTracking identifies user in Customer.io, records telemetry, and writes activity log', function () {
         $mockCustomerIO = $this->createMock(CustomerIOClient::class);
         $mockRecordAction = $this->createMock(RecordBehaviorEventAction::class);
+        $activityLogger = new LeadActivityLogger;
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Sarah Connor',
+            'first_name' => 'Sarah',
+            'last_name' => 'Connor',
+            'email' => 'sarah.connor@cyberdyne.io',
+            'phone' => '+13055550199',
+            'company' => 'Cyberdyne Resistance',
+            'role_needed' => 'Executive Assistant',
+            'weekly_hours' => '40',
+            'source_type' => 'partnership',
+            'source_id' => 'apex-capital',
+            'status' => 'captured',
+        ]);
 
         // Expect Customer.io identification
         $mockCustomerIO->expects($this->once())
             ->method('identify')
-            ->with($this->callback(function (UserProfileData $profile) {
+            ->with($this->callback(function (UserProfileData $profile) use ($lead) {
                 return $profile->email === 'sarah.connor@cyberdyne.io'
                     && $profile->name === 'Sarah Connor'
-                    && $profile->traits['source_form'] === 'Executive Talent Request Form';
+                    && $profile->traits['source_type'] === 'partnership'
+                    && $profile->traits['source_id'] === 'apex-capital'
+                    && $profile->traits['lead_id'] === $lead->id;
             }));
 
         // Expect behavior event recording
         $mockRecordAction->expects($this->once())
             ->method('execute')
             ->with($this->callback(function (AnalyticsEventData $event) {
-                return $event->event === 'Form Submitted'
+                return $event->event === 'Lead Captured'
                     && $event->distinctId === 'sarah.connor@cyberdyne.io'
-                    && $event->properties['form_id'] === 5
-                    && $event->properties['form_title'] === 'Executive Talent Request Form';
+                    && $event->properties['source_type'] === 'partnership'
+                    && $event->properties['source_id'] === 'apex-capital';
             }));
 
-        $subscriber = new GravityFormsSubmissionSubscriber($mockCustomerIO, $mockRecordAction);
+        $listener = new HandleLeadCreatedForTracking($mockCustomerIO, $mockRecordAction, $activityLogger);
+        $listener->handle(new LeadCreated($lead));
 
-        $form = [
-            'id' => 5,
-            'title' => 'Executive Talent Request Form',
-            'fields' => [
-                (object) ['id' => 1, 'type' => 'name'],
-                (object) ['id' => 2, 'type' => 'email'],
-                (object) ['id' => 3, 'type' => 'textarea'],
-            ],
-        ];
+        // Verify dual logging stage 2 (consumption)
+        $log = LeadActivityLog::query()
+            ->where('lead_id', $lead->id)
+            ->where('actor_domain', 'Tracking')
+            ->where('stage', 'consumption')
+            ->first();
 
-        $entry = [
-            'id' => 999,
-            '1.3' => 'Sarah',
-            '1.6' => 'Connor',
-            '2' => 'sarah.connor@cyberdyne.io',
-            '3' => 'Need 2 senior real estate coordinators immediately.',
-            'source_url' => 'https://remoteleverage.com/hire-talent',
-        ];
-
-        $subscriber->handleSubmission($entry, $form);
-    });
-
-    test('attributes referral code from cookie if present during form submission', function () {
-        $_COOKIE['rl_ref'] = 'apex-capital';
-
-        $mockCustomerIO = $this->createMock(CustomerIOClient::class);
-        $mockRecordAction = $this->createMock(RecordBehaviorEventAction::class);
-
-        $mockCustomerIO->expects($this->once())
-            ->method('identify')
-            ->with($this->callback(function (UserProfileData $profile) {
-                return $profile->referralCode === 'apex-capital';
-            }));
-
-        $mockRecordAction->expects($this->once())
-            ->method('execute')
-            ->with($this->callback(function (AnalyticsEventData $event) {
-                return $event->properties['referral_code'] === 'apex-capital';
-            }));
-
-        $subscriber = new GravityFormsSubmissionSubscriber($mockCustomerIO, $mockRecordAction);
-
-        $form = [
-            'id' => 1,
-            'title' => 'Lead Form',
-            'fields' => [
-                (object) ['id' => 1, 'type' => 'email'],
-            ],
-        ];
-
-        $entry = [
-            'id' => 101,
-            '1' => 'lead@apex.com',
-        ];
-
-        $subscriber->handleSubmission($entry, $form);
-
-        unset($_COOKIE['rl_ref']);
+        expect($log)->not->toBeNull()
+            ->and($log->event_type)->toBe('LeadCreated')
+            ->and($log->outcome)->toBe('succeeded');
     });
 });

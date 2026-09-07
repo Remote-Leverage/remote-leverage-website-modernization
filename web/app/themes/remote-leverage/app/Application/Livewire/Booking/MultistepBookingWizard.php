@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Application\Livewire\Booking;
 
-use App\Domains\Scheduling\Actions\BookMeetingAction;
+use App\Domains\Lead\Actions\CaptureLeadAction;
+use App\Domains\Lead\Data\LeadCaptureData;
+use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Scheduling\Actions\FetchAvailableSlotsAction;
-use App\Domains\Scheduling\Data\BookingRequestData;
 use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
 use App\Domains\Tracking\Data\AnalyticsEventData;
 use Carbon\Carbon;
@@ -215,40 +216,58 @@ class MultistepBookingWizard extends Component
     {
         $this->validate($this->rules[3]);
 
-        try {
-            $bookAction = app(BookMeetingAction::class);
+        // Optional international phone validation check
+        if (! empty($this->phone)) {
+            $phoneValidator = app(PhoneValidationService::class);
+            $validation = $phoneValidator->validateAndFormat($this->phone);
+            if (! $validation['isValid']) {
+                $this->addError('phone', 'Please enter a valid international phone number.');
 
-            $bookingData = BookingRequestData::fromArray([
+                return;
+            }
+        }
+
+        try {
+            $captureAction = app(CaptureLeadAction::class);
+
+            $leadData = LeadCaptureData::fromArray([
                 'name' => $this->name,
                 'email' => $this->email,
-                'start_time' => $this->selectedSlot,
-                'company' => $this->company,
                 'phone' => $this->phone,
+                'company' => $this->company,
+                'role_needed' => $this->roleNeeded,
+                'weekly_hours' => $this->hoursPerWeek,
+                'start_date' => $this->startDate,
                 'notes' => $this->notes,
+                'preferred_slot' => $this->selectedSlot,
                 'timezone' => $this->timezone,
                 'referral_code' => $this->referralCode,
-                'qualification_answers' => [
-                    'Role Needed' => $this->roleNeeded,
-                    'Weekly Hours' => $this->hoursPerWeek,
-                    'Start Timeline' => $this->startDate,
+                'extra_data' => [
+                    'source_form' => 'MultistepBookingWizard',
                 ],
             ]);
 
-            $result = $bookAction->execute($bookingData);
+            // Capture lead, stamp attribution, and trigger event-driven booking
+            $lead = $captureAction->execute($leadData);
+            $lead->refresh();
 
-            if (! empty($result['success'])) {
+            if ($lead->status === 'booked') {
                 $this->isBooked = true;
-                $this->meetingUrl = $result['meet_url'] ?? null;
-                $this->bookingReference = $result['meeting_id'] ?? null;
+                $bookingLog = $lead->activityLogs()->where('event_type', 'LeadCreated')->where('stage', 'consumption')->first();
+                $payload = $bookingLog?->payload ?? [];
+
+                $this->meetingUrl = $payload['meet_url'] ?? null;
+                $this->bookingReference = (string) ($payload['meeting_id'] ?? $lead->uuid);
                 $this->confirmedTime = Carbon::parse($this->selectedSlot, $this->timezone)->format('l, F j, Y \a\t g:i A').' ('.$this->timezone.')';
 
                 $this->trackStepEvent('booking_completed', [
                     'meeting_id' => $this->bookingReference,
                     'role' => $this->roleNeeded,
                     'hours' => $this->hoursPerWeek,
+                    'lead_id' => $lead->id,
                 ]);
             } else {
-                $this->errorMessage = 'We encountered an error securing your time slot. Please choose another slot.';
+                $this->errorMessage = 'Your consultation request has been saved, but we could not lock this specific slot. Our team will reach out directly!';
             }
         } catch (\Throwable $e) {
             Log::error('Error executing booking in wizard: '.$e->getMessage(), ['exception' => $e]);

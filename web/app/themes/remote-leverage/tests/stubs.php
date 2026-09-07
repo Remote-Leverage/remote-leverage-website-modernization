@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Container\Container;
 use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Events\Dispatcher;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Routing\CallableDispatcher;
+use Illuminate\Routing\ControllerDispatcher;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Facade;
 
 // 1. Initialize standalone container for Laravel Facades
@@ -24,6 +28,24 @@ $app->singleton('log', function () {
         public function debug($msg, array $ctx = []): void {}
     };
 });
+
+$app->singleton('events', function ($app) {
+    return new Dispatcher($app);
+});
+
+$app->singleton('router', function ($app) {
+    return new Router($app['events'], $app);
+});
+
+$app->singleton(
+    Illuminate\Routing\Contracts\CallableDispatcher::class,
+    fn ($app) => new CallableDispatcher($app)
+);
+
+$app->singleton(
+    Illuminate\Routing\Contracts\ControllerDispatcher::class,
+    fn ($app) => new ControllerDispatcher($app)
+);
 
 // 2. Set up in-memory SQLite database for Eloquent models
 $capsule = new Capsule($app);
@@ -60,6 +82,43 @@ if (! Capsule::schema()->hasTable('rl_payouts')) {
         $table->string('stripe_transfer_id')->nullable();
         $table->text('notes')->nullable();
         $table->timestamps();
+    });
+}
+
+if (! Capsule::schema()->hasTable('rl_leads')) {
+    Capsule::schema()->create('rl_leads', function ($table) {
+        $table->increments('id');
+        $table->string('uuid')->unique();
+        $table->string('name');
+        $table->string('first_name')->nullable();
+        $table->string('last_name')->nullable();
+        $table->string('email')->index();
+        $table->string('phone')->nullable();
+        $table->string('phone_country', 5)->nullable();
+        $table->string('company')->nullable();
+        $table->string('role_needed')->nullable();
+        $table->string('weekly_hours')->nullable();
+        $table->string('start_date')->nullable();
+        $table->text('notes')->nullable();
+        $table->string('source_type')->default('organic')->index();
+        $table->string('source_id')->nullable()->index();
+        $table->string('status')->default('captured')->index();
+        $table->timestamps();
+        $table->softDeletes();
+    });
+}
+
+if (! Capsule::schema()->hasTable('rl_lead_activity_logs')) {
+    Capsule::schema()->create('rl_lead_activity_logs', function ($table) {
+        $table->increments('id');
+        $table->integer('lead_id')->index();
+        $table->string('event_type')->index();
+        $table->string('actor_domain', 64)->index();
+        $table->string('stage')->default('consumption')->index();
+        $table->string('outcome')->default('succeeded')->index();
+        $table->string('description', 500)->nullable();
+        $table->text('payload')->nullable();
+        $table->timestamp('created_at')->nullable();
     });
 }
 

@@ -18,7 +18,10 @@ class DomainServiceProvider extends ServiceProvider
         ReferralServiceProvider::class,
         SchedulingServiceProvider::class,
         TrackingServiceProvider::class,
+        LeadServiceProvider::class,
+        ContentAuditServiceProvider::class,
         LivewireServiceProvider::class,
+        RouteServiceProvider::class,
     ];
 
     /**

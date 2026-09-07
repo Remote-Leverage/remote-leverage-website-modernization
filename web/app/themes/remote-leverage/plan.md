@@ -94,28 +94,52 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 - [x] **Gateways & Subscribers**
   - [x] `CustomerIOClient.php`: Identify and Track API gateway.
   - [x] `PostHogClient.php`: Capture API and feature flag evaluation gateway.
-  - [x] `GravityFormsSubmissionSubscriber.php`: Server-side form capture.
+  - [x] `HandleLeadCreatedForTracking.php`: Subscribes to `LeadCreated` lifecycle event, identifying profile and logging dual-write to `LeadActivityLog` (Gravity Forms retired per ADR-0008).
 - [x] **Actions & WordPress Adapters**
   - [x] `RecordBehaviorEventAction.php`: Dual-dispatch to PostHog and Customer.io.
   - [x] `EvaluateVariantAction.php`: PostHog feature flag variant resolver.
   - [x] `TrackingHooks.php`: PostHog head snippet and Customer.io footer script injection.
-  - [x] `GravityFormsHooks.php`: Redirect query parameter injection (`cio_id`, `cio_form`, `cio_fid`) and client tracking.
   - [x] `TrackingServiceProvider.php`: Adapter bootstrap.
+
+### Lead Domain (`app/Domains/Lead`) *(Added per ADR-0008)*
+- [x] **Data Transfer Objects (DTOs) & Models**
+  - [x] `LeadCaptureData.php`: Immutable lead submission input payload.
+  - [x] `Lead.php`: Canonical prospective contact entity with typed source attribution.
+  - [x] `LeadActivityLog.php`: Append-only audit trail logging dispatches and consumption.
+- [x] **Database Migrations**
+  - [x] `2026_09_07_000001_create_leads_table.php` (`rl_leads`).
+  - [x] `2026_09_07_000002_create_lead_activity_logs_table.php` (`rl_lead_activity_logs`).
+- [x] **Lifecycle Events & Services**
+  - [x] `LeadFormSubmitted.php`: Pre-persistence extensibility hook.
+  - [x] `LeadCreated.php`, `LeadAbandoned.php`, `LeadBookingCompleted.php`, `LeadBookingCanceled.php`.
+  - [x] `PhoneValidationService.php`: International phone validation and E.164 parsing via `giggsey/libphonenumber-for-php`.
+  - [x] `HubSpotGateway.php`: Direct CRM contact synchronization replacing legacy `GF_HubSpot` add-on.
+  - [x] `LeadActivityLogger.php`: Dual-logging helper enforcing dispatch and consumption audits.
+- [x] **Actions, Commands & Provider**
+  - [x] `CaptureLeadAction.php`: Validates, stamps attribution via `AttributionEngine`, persists `Lead`, and dispatches lifecycle events.
+  - [x] `PurgeOldLeadsAction.php`: Enforces 30-day minimum retention floor.
+  - [x] `PurgeLeadsCommand.php`: Artisan/WP-CLI command `wp acorn lead:purge`.
+  - [x] `LeadServiceProvider.php`: Container bindings, command registration, and event listeners.
 
 ### PartnerHub Domain (`app/Domains/PartnerHub`)
 - [x] **Models & Services**
   - [x] `PartnerProfile.php`: Partner listing model.
   - [x] `NotionSyncService.php`: Notion API integration for partner database.
-- [x] **Actions & WordPress Adapters**
+- [x] **Actions & Listeners**
   - [x] `SyncNotionPartnersAction.php`: 1-hour cached Notion database synchronization.
   - [x] `QueryPartnersAction.php`: Multi-parameter search and category filter.
   - [x] `PartnerPostType.php`: Registers `rl_partner` CPT with `^partners/([^/]+)/([^/]+)/?$` rewrite rule (`rl_tab`).
+  - [x] `HandleLeadBookingCompletedForPartner.php`: Subscribes to `LeadBookingCompleted` and attributes booking to partner.
 
 ### ContentAudit Domain (`app/Domains/ContentAudit`)
 - [x] **Services & Actions**
   - [x] `PrismAiAuditor.php`: Content length, headings, and keyword density analyzer.
   - [x] `AuditMarkdownContentAction.php`: Guide audit execution.
   - [x] `GenerateSignatureHtmlAction.php`: Standardized HTML email signature generator matching `rl-social-kit` (`sig-1-light`).
+  - [x] `ElementorAuditService.php`: Inspects `_elementor_data` AST and maps widgets against Gutenberg matrix (ADR-0005 Amendment).
+  - [x] `ConvertElementorPostAction.php`: Converts Elementor widget trees to native ACF block markup and queues for human editorial review.
+  - [x] `AuditElementorCommand.php`: CLI command `wp acorn content:audit-elementor` for audit and conversion reporting.
+  - [x] `ContentAuditServiceProvider.php`: Provider registration.
 
 ---
 
@@ -192,7 +216,7 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
   - Features: Mobile-responsive sticky table comparison.
 - [x] **`CtaBannerBlock`** (`cta-banner.blade.php`)
   - Replaces: `ContactCTAWidget`, `ArticleLeadFormWidget`.
-  - Features: Embedded Gravity Forms styling with UTM pre-population.
+  - Features: Native lead capture link to booking wizard, ambient glowing brand gradients, and zero legacy plugin dependency.
 
 ---
 
@@ -234,8 +258,10 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
   - Deploy to staging environment with Bedrock `.env` secrets.
   - Run database migrations (`wp acorn migrate`).
   - Build production assets (`npm run build`).
-- [ ] **Staged Content Cutover**
-  - Instant cutover for VA Guides & Blog archives (native `single.blade.php` renders existing post records immediately).
+- [ ] **Staged Content Cutover (ADR-0005 Amendment Gate)**
+  - Execute AI-assisted Elementor audit (`wp acorn content:audit-elementor`) across all posts.
+  - Run automated Gutenberg conversion pass (`ConvertElementorPostAction`) for mapped Elementor widgets.
+  - Complete 100% human editorial review sign-off for all converted posts before production publishing.
   - Review Homepage and primary marketing landing pages.
 - [ ] **Performance Benchmarking**
   - Run Google PageSpeed Insights on Staging (Target: Mobile 96+, LCP < 1.2s, CLS 0.00).

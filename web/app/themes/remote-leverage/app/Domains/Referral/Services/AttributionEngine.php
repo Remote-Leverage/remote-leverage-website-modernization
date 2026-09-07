@@ -44,6 +44,53 @@ class AttributionEngine
     }
 
     /**
+     * Resolve and stamp canonical lead source attribution per ADR-0008.
+     * Evaluates referral slugs, cookies, and ad tracking signals to categorize into
+     * sourceType ('ad', 'organic', 'referral_hub', 'partnership') and sourceID.
+     *
+     * @return array{sourceType: string, sourceID: ?string}
+     */
+    public function resolveLeadSource(
+        ?string $referralSlug = null,
+        ?string $utmSource = null,
+        ?string $utmCampaign = null,
+        ?string $cookie = null
+    ): array {
+        // 1. Resolve active referral slug
+        $resolvedSlug = $this->resolveReferralSlug(viaParam: $referralSlug, cookie: $cookie);
+
+        if ($resolvedSlug) {
+            // Distinguish strategic partnership vs referral hub
+            $isPartnership = str_starts_with($resolvedSlug, 'partner-') ||
+                             str_starts_with($resolvedSlug, 'co-') ||
+                             str_contains($resolvedSlug, 'strategic');
+
+            return [
+                'sourceType' => $isPartnership ? 'partnership' : 'referral_hub',
+                'sourceID' => $resolvedSlug,
+            ];
+        }
+
+        // 2. Paid Ads detection
+        $adSources = ['google', 'facebook', 'linkedin', 'meta', 'twitter', 'tiktok', 'bing', 'cpc'];
+        $isPaidSource = ($utmSource && in_array(strtolower($utmSource), $adSources, true)) ||
+                        ($utmCampaign && trim($utmCampaign) !== '');
+
+        if ($isPaidSource) {
+            return [
+                'sourceType' => 'ad',
+                'sourceID' => $utmCampaign ?: $utmSource,
+            ];
+        }
+
+        // 3. Fallback to organic
+        return [
+            'sourceType' => 'organic',
+            'sourceID' => null,
+        ];
+    }
+
+    /**
      * Validate if a referral slug belongs to a valid registered referrer WP user.
      * Ported from RL_Referral_Tracker::handle_referral_query().
      */
