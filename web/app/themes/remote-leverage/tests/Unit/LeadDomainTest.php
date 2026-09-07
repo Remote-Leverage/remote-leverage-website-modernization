@@ -5,8 +5,11 @@ declare(strict_types=1);
 use App\Domains\Lead\Actions\CaptureLeadAction;
 use App\Domains\Lead\Actions\PurgeOldLeadsAction;
 use App\Domains\Lead\Data\LeadCaptureData;
+use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Events\LeadFormSubmitted;
+use App\Domains\Lead\Listeners\HandleLeadEventsForSlack;
+use App\Domains\Lead\Listeners\HandleLeadEventsForWebhook;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Services\LeadActivityLogger;
@@ -155,5 +158,153 @@ describe('Lead Domain', function () {
         expect($purgedCount)->toBe(1);
         expect(Lead::query()->find($oldLead->id))->toBeNull();
         expect(Lead::query()->find($recentLead->id))->not->toBeNull();
+    });
+
+    test('CaptureLeadAction updates existing lead on final submission without duplicating rows', function () {
+        $attributionEngine = new AttributionEngine;
+        $phoneValidator = new PhoneValidationService;
+        $activityLogger = new LeadActivityLogger;
+        $action = new CaptureLeadAction($attributionEngine, $phoneValidator, $activityLogger);
+
+        // 1. Partial Step 1 submission
+        $step1Dto = LeadCaptureData::fromArray([
+            'name' => 'Sarah Jenkins',
+            'first_name' => 'Sarah',
+            'last_name' => 'Jenkins',
+            'email' => 'sarah@growthco.io',
+            'phone' => '+1 (305) 555-0199',
+            'monthly_revenue' => '$10k to $50k Per Month',
+            'extra_data' => [
+                'source_form' => 'MultistepBookingWizard',
+                'submission_type' => 'Partial',
+            ],
+        ]);
+
+        $partialLead = $action->execute($step1Dto);
+        expect(Lead::query()->count())->toBe(1)
+            ->and($partialLead->status)->toBe('captured');
+
+        // 2. Final Step 4 booking submission using the existing lead ID
+        $step4Dto = LeadCaptureData::fromArray([
+            'name' => 'Sarah Jenkins',
+            'first_name' => 'Sarah',
+            'last_name' => 'Jenkins',
+            'email' => 'sarah@growthco.io',
+            'phone' => '+1 (305) 555-0199',
+            'monthly_revenue' => '$10k to $50k Per Month',
+            'preferred_slot' => '2026-09-15T14:00:00Z',
+            'notes' => 'Looking to hire an executive assistant.',
+            'extra_data' => [
+                'source_form' => 'MultistepBookingWizard',
+                'lead_id' => $partialLead->id,
+            ],
+        ]);
+
+        $finalLead = $action->execute($step4Dto);
+
+        // Verify no duplicate row was created; existing row updated
+        expect(Lead::query()->count())->toBe(1)
+            ->and($finalLead->id)->toBe($partialLead->id)
+            ->and($finalLead->status)->toBe('booking_pending')
+            ->and($finalLead->notes)->toBe('Looking to hire an executive assistant.');
+    });
+
+    test('HandleLeadEventsForSlack dispatches and logs consumption for partial and final events', function () {
+        config(['services.slack.webhook_url' => 'https://hooks.slack.com/services/test/123']);
+        $activityLogger = new LeadActivityLogger;
+        $listener = new HandleLeadEventsForSlack($activityLogger);
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'John Doe',
+            'email' => 'john@startup.com',
+            'monthly_revenue' => '$50k-$100k Per Month',
+            'source_type' => 'ad',
+            'source_id' => 'google',
+            'status' => 'captured',
+        ]);
+
+        // Partial capture event
+        $listener->handleCreated(new LeadCreated($lead, ['preferred_slot' => null]));
+
+        $partialLog = LeadActivityLog::query()
+            ->where('lead_id', $lead->id)
+            ->where('actor_domain', 'Slack')
+            ->where('event_type', 'LeadCreated')
+            ->first();
+
+        expect($partialLog)->not->toBeNull()
+            ->and($partialLog->stage)->toBe('consumption');
+
+        // Final booking event
+        $lead->status = 'booked';
+        $lead->save();
+
+        $bookingCompleted = new LeadBookingCompleted(
+            lead: $lead,
+            meetingId: 'meet-1234',
+            provider: 'calendly',
+            meetUrl: 'https://meet.google.com/abc-def-ghi',
+            startTime: '2026-09-15T15:00:00Z'
+        );
+
+        $listener->handleBookingCompleted($bookingCompleted);
+
+        $finalLog = LeadActivityLog::query()
+            ->where('lead_id', $lead->id)
+            ->where('actor_domain', 'Slack')
+            ->where('event_type', 'LeadBookingCompleted')
+            ->first();
+
+        expect($finalLog)->not->toBeNull()
+            ->and($finalLog->outcome)->toBe('succeeded');
+    });
+
+    test('HandleLeadEventsForWebhook dispatches and logs consumption for partial and final events', function () {
+        config(['services.webhooks.lead_webhook_url' => 'https://api.example.com/webhooks/leads']);
+        $activityLogger = new LeadActivityLogger;
+        $listener = new HandleLeadEventsForWebhook($activityLogger);
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Alice Smith',
+            'email' => 'alice@company.com',
+            'monthly_revenue' => '$100k+ Per Month',
+            'source_type' => 'partnership',
+            'source_id' => 'tech-partner',
+            'status' => 'captured',
+        ]);
+
+        // Partial capture event
+        $listener->handleCreated(new LeadCreated($lead, ['preferred_slot' => null]));
+
+        $partialLog = LeadActivityLog::query()
+            ->where('lead_id', $lead->id)
+            ->where('actor_domain', 'OutgoingWebhook')
+            ->where('event_type', 'LeadCreated')
+            ->first();
+
+        expect($partialLog)->not->toBeNull()
+            ->and($partialLog->stage)->toBe('consumption');
+
+        // Final booking completed event
+        $bookingCompleted = new LeadBookingCompleted(
+            lead: $lead,
+            meetingId: 'meet-5678',
+            provider: 'calendly',
+            meetUrl: 'https://meet.google.com/xyz-123',
+            startTime: '2026-09-16T16:00:00Z'
+        );
+
+        $listener->handleBookingCompleted($bookingCompleted);
+
+        $finalLog = LeadActivityLog::query()
+            ->where('lead_id', $lead->id)
+            ->where('actor_domain', 'OutgoingWebhook')
+            ->where('event_type', 'LeadBookingCompleted')
+            ->first();
+
+        expect($finalLog)->not->toBeNull()
+            ->and($finalLog->outcome)->toBe('succeeded');
     });
 });

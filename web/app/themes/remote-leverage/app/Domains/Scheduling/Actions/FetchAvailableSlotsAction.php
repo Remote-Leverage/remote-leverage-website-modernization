@@ -19,21 +19,35 @@ class FetchAvailableSlotsAction
      *
      * @return array<TimeSlotData>
      */
-    public function execute(?string $startDate = null, ?string $endDate = null, string $timezone = 'UTC'): array
+    public function execute(?string $startDate = null, ?string $endDate = null, string $timezone = 'UTC', ?string $eventTypeId = null): array
     {
-        $start = $startDate ? Carbon::parse($startDate, $timezone)->startOfDay() : Carbon::now($timezone);
-        $end = $endDate ? Carbon::parse($endDate, $timezone)->endOfDay() : Carbon::now($timezone)->addDays(7)->endOfDay();
+        $nowUtc = Carbon::now('UTC')->addMinutes(5);
 
-        $eventTypeId = env('CALENDLY_EVENT_TYPE_ID');
+        $start = $startDate ? Carbon::parse($startDate, $timezone)->utc() : $nowUtc;
+        if ($start->lt($nowUtc)) {
+            $start = $nowUtc;
+        }
+
+        $end = $endDate ? Carbon::parse($endDate, $timezone)->utc() : $start->copy()->addDays(30);
+        if ($end->lte($start)) {
+            $end = $start->copy()->addDays(7);
+        }
+
+        $eventTypeId = $eventTypeId ?: config('services.calendly.default_event_type') ?: env('CALENDLY_DEFAULT_EVENT_TYPE') ?: env('CALENDLY_EVENT_TYPE_ID');
         if (! $eventTypeId) {
             // Fallback generation of realistic mock slots if API key/event type is not yet populated
             return $this->generateDefaultSlots($start, $end, $timezone);
         }
 
+        // Calendly strictly requires UTC Zulu format (Y-m-d\TH:i:s\Z)
+        $startIso = $start->format('Y-m-d\TH:i:s\Z');
+        $endIso = $end->format('Y-m-d\TH:i:s\Z');
+
         $rawSlots = $this->calendlyClient->getAvailableSlots(
             $eventTypeId,
-            $start->toIso8601String(),
-            $end->toIso8601String()
+            $startIso,
+            $endIso,
+            $timezone
         );
 
         $slots = [];
@@ -42,7 +56,7 @@ class FetchAvailableSlotsAction
                 'start_time' => $slot['start_time'],
                 'end_time' => $slot['end_time'] ?? Carbon::parse($slot['start_time'])->addMinutes(30)->toIso8601String(),
                 'timezone' => $timezone,
-                'available' => (bool) ($slot['status'] ?? true),
+                'available' => ($slot['status'] ?? 'available') === 'available',
                 'consultant_name' => 'Remote Leverage Specialist',
             ]);
         }

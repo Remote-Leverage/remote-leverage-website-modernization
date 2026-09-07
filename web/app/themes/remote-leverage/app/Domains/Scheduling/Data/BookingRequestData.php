@@ -16,6 +16,12 @@ readonly class BookingRequestData
         public string $timezone = 'UTC',
         public ?string $referralCode = null,
         public ?array $qualificationAnswers = null,
+        public ?string $utmSource = null,
+        public ?string $utmMedium = null,
+        public ?string $utmCampaign = null,
+        public ?string $utmTerm = null,
+        public ?string $utmContent = null,
+        public ?array $guestEmails = null,
     ) {}
 
     public static function fromArray(array $data): self
@@ -30,6 +36,12 @@ readonly class BookingRequestData
             timezone: $data['timezone'] ?? 'UTC',
             referralCode: $data['referral_code'] ?? $data['referralCode'] ?? null,
             qualificationAnswers: $data['qualification_answers'] ?? $data['qualificationAnswers'] ?? null,
+            utmSource: $data['utm_source'] ?? $data['utmSource'] ?? null,
+            utmMedium: $data['utm_medium'] ?? $data['utmMedium'] ?? null,
+            utmCampaign: $data['utm_campaign'] ?? $data['utmCampaign'] ?? null,
+            utmTerm: $data['utm_term'] ?? $data['utmTerm'] ?? null,
+            utmContent: $data['utm_content'] ?? $data['utmContent'] ?? null,
+            guestEmails: $data['guest_emails'] ?? $data['guestEmails'] ?? null,
         );
     }
 
@@ -45,6 +57,12 @@ readonly class BookingRequestData
             'timezone' => $this->timezone,
             'referral_code' => $this->referralCode,
             'qualification_answers' => $this->qualificationAnswers,
+            'utm_source' => $this->utmSource,
+            'utm_medium' => $this->utmMedium,
+            'utm_campaign' => $this->utmCampaign,
+            'utm_term' => $this->utmTerm,
+            'utm_content' => $this->utmContent,
+            'guest_emails' => $this->guestEmails,
         ];
     }
 }

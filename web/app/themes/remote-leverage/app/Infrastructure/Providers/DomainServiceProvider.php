@@ -34,6 +34,7 @@ class DomainServiceProvider extends ServiceProvider
         }
 
         $this->app->singleton(PartnerPostType::class, fn () => new PartnerPostType);
+        $this->app->singleton(\App\Infrastructure\WordPress\Admin\LeadsAdminDashboard::class, fn () => new \App\Infrastructure\WordPress\Admin\LeadsAdminDashboard);
     }
 
     /**
@@ -42,5 +43,6 @@ class DomainServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->app->make(PartnerPostType::class)->register();
+        $this->app->make(\App\Infrastructure\WordPress\Admin\LeadsAdminDashboard::class)->register();
     }
 }

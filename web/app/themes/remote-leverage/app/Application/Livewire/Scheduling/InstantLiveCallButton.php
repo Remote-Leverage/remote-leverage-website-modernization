@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application\Livewire\Scheduling;
 
+use App\Domains\Lead\Actions\CaptureLeadAction;
+use App\Domains\Lead\Data\LeadCaptureData;
 use App\Domains\Scheduling\Actions\RouteInstantCallAction;
 use App\Domains\Scheduling\Services\LiveCallAvailabilityRouter;
 use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
@@ -14,9 +16,17 @@ use Livewire\Component;
 
 class InstantLiveCallButton extends Component
 {
-    public bool $isAvailable = true;
+    public string $layoutStyle = 'pill'; // 'pill' or 'standard'
 
-    public string $statusLabel = 'Consultants Online Now';
+    public string $buttonText = 'MEET US RIGHT NOW';
+
+    public string $buttonStatusText = 'Available';
+
+    public string $formTitle = 'Talk to Sales Representative';
+
+    public string $formSubtitle = 'Enter your contact details below to be instantly connected to our sales team on Google Meet.';
+
+    public bool $isAvailable = true;
 
     public int $onlineCount = 2;
 
@@ -24,19 +34,26 @@ class InstantLiveCallButton extends Component
 
     public bool $modalOpen = false;
 
-    public string $visitorEmail = '';
+    public bool $isDismissed = false;
+
+    public int $currentStep = 1; // 1: Lead Form, 2: Connecting, 3: Confirmation
 
     public string $visitorName = '';
 
+    public string $visitorEmail = '';
+
+    public string $visitorPhone = '';
+
     public ?string $activeMeetUrl = null;
+
+    public int $countdown = 5;
 
     public ?string $errorMessage = null;
 
-    public string $buttonSize = 'default'; // 'default', 'compact', 'hero'
-
-    public function mount(string $buttonSize = 'default'): void
+    public function mount(string $layoutStyle = 'pill', string $buttonText = 'MEET US RIGHT NOW'): void
     {
-        $this->buttonSize = $buttonSize;
+        $this->layoutStyle = $layoutStyle;
+        $this->buttonText = $buttonText;
         $this->checkAvailability();
     }
 
@@ -47,17 +64,18 @@ class InstantLiveCallButton extends Component
             $status = $router->getStatus();
 
             $this->isAvailable = (bool) ($status['available'] ?? false);
-            $this->statusLabel = $this->isAvailable ? 'Consultants Online Now' : 'Schedule a Call';
+            $this->buttonStatusText = $this->isAvailable ? 'Available' : 'Unavailable';
             $this->onlineCount = (int) ($status['online_count'] ?? ($this->isAvailable ? 2 : 0));
         } catch (\Throwable $e) {
             $this->isAvailable = true;
-            $this->statusLabel = 'Consultants Online Now';
+            $this->buttonStatusText = 'Available';
         }
     }
 
     public function openInstantModal(): void
     {
         $this->errorMessage = null;
+        $this->currentStep = 1;
         $this->modalOpen = true;
     }
 
@@ -65,27 +83,53 @@ class InstantLiveCallButton extends Component
     {
         $this->modalOpen = false;
         $this->isConnecting = false;
+        $this->currentStep = 1;
+    }
+
+    public function dismissPill(): void
+    {
+        $this->isDismissed = true;
     }
 
     public function connectInstantCall(): void
     {
         $this->errorMessage = null;
-        $this->isConnecting = true;
 
         $this->validate([
-            'visitorEmail' => 'required|email|max:150',
             'visitorName' => 'required|string|min:2|max:100',
+            'visitorEmail' => 'required|email|max:150',
+            'visitorPhone' => 'nullable|string|max:30',
         ]);
 
+        $this->currentStep = 2;
+        $this->isConnecting = true;
+
         try {
+            // 1. Capture Lead in Lead Domain (ADR-0008)
+            try {
+                $captureAction = app(CaptureLeadAction::class);
+                $captureAction->execute(new LeadCaptureData(
+                    name: $this->visitorName,
+                    email: $this->visitorEmail,
+                    phone: $this->visitorPhone ?: null,
+                    extraData: ['source' => 'instant_live_call']
+                ));
+            } catch (\Throwable $e) {
+                Log::warning('Lead capture non-fatal failure during instant call: '.$e->getMessage());
+            }
+
+            // 2. Route call to available consultant
             $action = app(RouteInstantCallAction::class);
             $result = $action->execute([
                 'name' => $this->visitorName,
                 'email' => $this->visitorEmail,
+                'phone' => $this->visitorPhone,
             ]);
 
             if (! empty($result['routed']) && ! empty($result['redirect_url'])) {
                 $this->activeMeetUrl = $result['redirect_url'];
+                $this->currentStep = 3;
+                $this->isConnecting = false;
 
                 // Track analytics event
                 try {
@@ -102,16 +146,15 @@ class InstantLiveCallButton extends Component
                 } catch (\Throwable $e) {
                     // Ignore analytics error
                 }
-
-                // Redirect user to the Google Meet session
-                $this->redirect($this->activeMeetUrl);
             } else {
                 $this->errorMessage = $result['message'] ?? 'Unable to connect with a consultant right now.';
+                $this->currentStep = 1;
                 $this->isConnecting = false;
             }
         } catch (\Throwable $e) {
             Log::error('Error launching instant call: '.$e->getMessage(), ['exception' => $e]);
             $this->errorMessage = 'Failed to launch live session. Please use our booking calendar.';
+            $this->currentStep = 1;
             $this->isConnecting = false;
         }
     }

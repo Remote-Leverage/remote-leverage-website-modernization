@@ -23,7 +23,7 @@ class CalendlyClient
      * Fetch event type availability slots from Calendly.
      * Ported from CalendlyIntegration::get_availability().
      */
-    public function getAvailableSlots(string $eventTypeId, string $startTime, string $endTime): array
+    public function getAvailableSlots(string $eventTypeId, string $startTime, string $endTime, ?string $timezone = null): array
     {
         if (! $this->apiKey) {
             Log::warning('CalendlyClient: Missing CALENDLY_API_KEY');
@@ -32,13 +32,19 @@ class CalendlyClient
         }
 
         try {
+            $params = [
+                'event_type' => $eventTypeId,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+            ];
+
+            if ($timezone) {
+                $params['timezone'] = $timezone;
+            }
+
             $response = Http::withToken($this->apiKey)
                 ->timeout(15)
-                ->get('https://api.calendly.com/event_type_available_times', [
-                    'event_type' => $eventTypeId,
-                    'start_time' => $startTime,
-                    'end_time' => $endTime,
-                ]);
+                ->get('https://api.calendly.com/event_type_available_times', $params);
 
             if ($response->failed()) {
                 Log::error('CalendlyClient: Error fetching slots', $response->json() ?? ['body' => $response->body()]);
@@ -55,11 +61,54 @@ class CalendlyClient
     }
 
     /**
+     * Fetch event type details from Calendly.
+     */
+    public function getEventType(string $eventUriOrUuid): ?array
+    {
+        if (! $this->apiKey) {
+            return null;
+        }
+
+        $url = str_starts_with($eventUriOrUuid, 'http')
+            ? $eventUriOrUuid
+            : 'https://api.calendly.com/event_types/'.rawurlencode($eventUriOrUuid);
+
+        try {
+            $response = Http::withToken($this->apiKey)->get($url);
+
+            return $response->successful() ? $response->json('resource') : null;
+        } catch (\Throwable $e) {
+            Log::error('CalendlyClient Event Type Error: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
+     * Fetch custom questions for an event type.
+     */
+    public function getEventQuestions(string $eventUriOrUuid): array
+    {
+        $eventType = $this->getEventType($eventUriOrUuid);
+
+        return $eventType['custom_questions'] ?? [];
+    }
+
+    /**
      * Book appointment by creating invitee on Calendly.
      * Ported from CalendlyIntegration::process_calendly_booking() / api.calendly.com/invitees.
      */
-    public function createInvitee(string $eventUri, string $email, string $name, array $questionsAnswers = [], array $tracking = []): ?array
-    {
+    public function createInvitee(
+        string $eventUri,
+        string $email,
+        string $name,
+        ?string $startTime = null,
+        ?string $timezone = 'America/New_York',
+        ?string $phone = null,
+        array $guestEmails = [],
+        array $questionsAnswers = [],
+        array $tracking = []
+    ): ?array {
         if (! $this->apiKey) {
             Log::warning('CalendlyClient: Missing CALENDLY_API_KEY');
 
@@ -68,17 +117,40 @@ class CalendlyClient
 
         try {
             $payload = [
-                'event' => $eventUri,
-                'email' => $email,
-                'name' => $name,
+                'event_type' => $eventUri,
+                'invitee' => [
+                    'name' => $name,
+                    'email' => $email,
+                    'timezone' => $timezone ?? 'America/New_York',
+                ],
             ];
 
+            if ($startTime) {
+                $payload['start_time'] = $startTime;
+            }
+
+            if ($phone) {
+                $payload['invitee']['text_reminder_number'] = $phone;
+            }
+
+            if (! empty($guestEmails)) {
+                $payload['event_guests'] = array_values(array_filter($guestEmails, fn ($e) => filter_var($e, FILTER_VALIDATE_EMAIL)));
+            }
+
             if (! empty($questionsAnswers)) {
-                $payload['questions_and_answers'] = $questionsAnswers;
+                $payload['questions_and_answers'] = array_values($questionsAnswers);
             }
 
             if (! empty($tracking)) {
-                $payload['tracking'] = $tracking;
+                // Calendly strictly requires: utm_campaign, utm_source, utm_medium, utm_content, utm_term, salesforce_uuid
+                $payload['tracking'] = [
+                    'utm_campaign' => ! empty($tracking['utm_campaign']) ? (string) $tracking['utm_campaign'] : null,
+                    'utm_source' => ! empty($tracking['utm_source']) ? (string) $tracking['utm_source'] : 'remoteleverage_site',
+                    'utm_medium' => ! empty($tracking['utm_medium']) ? (string) $tracking['utm_medium'] : null,
+                    'utm_content' => ! empty($tracking['utm_content']) ? (string) $tracking['utm_content'] : null,
+                    'utm_term' => ! empty($tracking['utm_term']) ? (string) $tracking['utm_term'] : null,
+                    'salesforce_uuid' => ! empty($tracking['salesforce_uuid']) ? (string) $tracking['salesforce_uuid'] : null,
+                ];
             }
 
             $response = Http::withToken($this->apiKey)
@@ -103,17 +175,20 @@ class CalendlyClient
     }
 
     /**
-     * Fetch scheduled event details.
+     * Fetch scheduled event details by URI or UUID.
      */
-    public function getScheduledEvent(string $eventUuid): ?array
+    public function getScheduledEvent(string $eventUriOrUuid): ?array
     {
         if (! $this->apiKey) {
             return null;
         }
 
+        $url = str_starts_with($eventUriOrUuid, 'http')
+            ? $eventUriOrUuid
+            : 'https://api.calendly.com/scheduled_events/'.rawurlencode($eventUriOrUuid);
+
         try {
-            $response = Http::withToken($this->apiKey)
-                ->get('https://api.calendly.com/scheduled_events/'.rawurlencode($eventUuid));
+            $response = Http::withToken($this->apiKey)->get($url);
 
             return $response->successful() ? $response->json('resource') : null;
         } catch (\Throwable $e) {

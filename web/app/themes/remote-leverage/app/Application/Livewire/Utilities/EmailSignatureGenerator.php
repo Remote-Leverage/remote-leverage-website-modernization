@@ -14,6 +14,8 @@ class EmailSignatureGenerator extends Component
 
     public string $title = 'Founder & Managing Director';
 
+    public string $dept = 'Executive';
+
     public string $email = 'adrian@remoteleverage.com';
 
     public string $phone = '+1 (800) 518-9128';
@@ -28,11 +30,19 @@ class EmailSignatureGenerator extends Component
 
     public string $addressLine2 = 'Sheridan, WY 82801';
 
-    public string $logoIconUrl = 'https://remoteleverage.com/wp-content/uploads/logo-icon-white.svg';
+    public string $avatarUrl = '';
 
-    public string $logoUrl = 'https://remoteleverage.com/wp-content/uploads/rl-logo.png';
+    public string $linkedin = 'https://www.linkedin.com/company/remoteleverage';
 
-    public string $bookingUrl = 'https://remoteleverage.com/#booking';
+    public string $twitter = 'https://x.com/remoteleverage';
+
+    public string $facebook = '';
+
+    public string $instagram = '';
+
+    public int $selectedLayout = 1;
+
+    public string $selectedTheme = 'light';
 
     public string $generatedHtml = '';
 
@@ -46,12 +56,31 @@ class EmailSignatureGenerator extends Component
         $this->regenerateSignature();
     }
 
+    public function setLayout(int $layout): void
+    {
+        if (in_array($layout, [1, 2, 3], true)) {
+            $this->selectedLayout = $layout;
+            $this->regenerateSignature();
+        }
+    }
+
+    public function setTheme(string $theme): void
+    {
+        if (in_array($theme, ['light', 'dark'], true)) {
+            $this->selectedTheme = $theme;
+            $this->regenerateSignature();
+        }
+    }
+
     public function regenerateSignature(): void
     {
         $action = app(GenerateSignatureHtmlAction::class);
         $this->generatedHtml = $action->execute([
+            'template' => $this->selectedLayout,
+            'theme' => $this->selectedTheme,
             'name' => $this->name,
             'title' => $this->title,
+            'dept' => $this->dept,
             'email' => $this->email,
             'phone' => $this->phone,
             'mobile' => $this->mobile,
@@ -59,9 +88,11 @@ class EmailSignatureGenerator extends Component
             'website_display' => $this->websiteDisplay,
             'address_line1' => $this->addressLine1,
             'address_line2' => $this->addressLine2,
-            'logo_icon_url' => $this->logoIconUrl,
-            'logo_url' => $this->logoUrl,
-            'booking_url' => $this->bookingUrl,
+            'avatar_url' => $this->avatarUrl,
+            'linkedin' => $this->linkedin,
+            'twitter' => $this->twitter,
+            'facebook' => $this->facebook,
+            'instagram' => $this->instagram,
         ]);
     }
 

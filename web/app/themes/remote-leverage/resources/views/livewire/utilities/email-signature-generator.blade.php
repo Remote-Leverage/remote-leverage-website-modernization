@@ -20,6 +20,17 @@
         this.copiedRaw = true;
         setTimeout(() => this.copiedRaw = false, 2500);
       });
+    },
+    downloadHtml() {
+      const el = document.getElementById('signature-render-container');
+      if (!el) return;
+      const blob = new Blob([el.innerHTML], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'signature-template-{{ $selectedLayout }}-{{ $selectedTheme }}.html';
+      a.click();
+      URL.revokeObjectURL(url);
     }
   }"
   class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
@@ -27,14 +38,60 @@
 
   <div class="mb-8">
     <span class="px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">
-      Internal Tools
+      Internal Tools &bull; RL Social Media Kit
     </span>
     <h2 class="text-3xl font-bold font-display text-brand-hero tracking-tight mt-2">
       Email Signature Generator
     </h2>
     <p class="text-text-muted text-sm mt-1">
-      Create a standardized, brand-compliant HTML email signature for your team or personal client communications.
+      Generate brand-compliant, pixel-perfect HTML email signatures across 3 distinct layouts in Light &amp; Dark modes.
     </p>
+  </div>
+
+  {{-- Template and Theme Chooser Tabs --}}
+  <div class="mb-8 flex flex-wrap items-center justify-between gap-4 p-4 rounded-card-lg bg-surface-white border border-slate-200/80 shadow-card-subtle">
+    <div class="flex items-center gap-2">
+      <span class="text-xs font-bold uppercase text-slate-400 tracking-wider mr-2">Layout:</span>
+      <button 
+        type="button" 
+        wire:click="setLayout(1)"
+        class="px-4 py-2 text-xs font-semibold rounded-card transition cursor-pointer {{ $selectedLayout === 1 ? 'bg-brand-purple text-white shadow-sm' : 'bg-slate-100 text-text-body hover:bg-slate-200' }}"
+      >
+        1. Brand Icon Dome
+      </button>
+      <button 
+        type="button" 
+        wire:click="setLayout(2)"
+        class="px-4 py-2 text-xs font-semibold rounded-card transition cursor-pointer {{ $selectedLayout === 2 ? 'bg-brand-purple text-white shadow-sm' : 'bg-slate-100 text-text-body hover:bg-slate-200' }}"
+      >
+        2. Profile Photo Dome
+      </button>
+      <button 
+        type="button" 
+        wire:click="setLayout(3)"
+        class="px-4 py-2 text-xs font-semibold rounded-card transition cursor-pointer {{ $selectedLayout === 3 ? 'bg-brand-purple text-white shadow-sm' : 'bg-slate-100 text-text-body hover:bg-slate-200' }}"
+      >
+        3. Standalone Icon
+      </button>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <span class="text-xs font-bold uppercase text-slate-400 tracking-wider mr-2">Theme:</span>
+      <button 
+        type="button" 
+        wire:click="setTheme('light')"
+        class="px-4 py-2 text-xs font-semibold rounded-card transition cursor-pointer flex items-center gap-1.5 {{ $selectedTheme === 'light' ? 'bg-brand-orange text-white shadow-sm' : 'bg-slate-100 text-text-body hover:bg-slate-200' }}"
+      >
+        <span>☀️</span> Light
+      </button>
+      <button 
+        type="button" 
+        wire:click="setTheme('dark')"
+        class="px-4 py-2 text-xs font-semibold rounded-card transition cursor-pointer flex items-center gap-1.5 {{ $selectedTheme === 'dark' ? 'bg-brand-midnight text-white shadow-sm' : 'bg-slate-100 text-text-body hover:bg-slate-200' }}"
+      >
+        <span>🌙</span> Dark
+      </button>
+    </div>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -42,30 +99,32 @@
     {{-- Left Column: Form Controls --}}
     <div class="lg:col-span-5 bg-surface-white rounded-card-lg border border-slate-200/80 shadow-card p-6 space-y-4">
       <h3 class="text-base font-bold font-display text-brand-hero border-b border-slate-100 pb-3">
-        Signature Details
+        Employee Details
       </h3>
 
-      <div>
-        <label class="block text-xs font-semibold text-text-slate mb-1">Full Name</label>
-        <input
-          type="text"
-          wire:model.live.debounce.250ms="name"
-          class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2 px-3 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
-        />
-      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-text-body mb-1">Full Name</label>
+          <input
+            type="text"
+            wire:model.live.debounce.250ms="name"
+            class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2 px-3 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
+          />
+        </div>
 
-      <div>
-        <label class="block text-xs font-semibold text-text-slate mb-1">Job Title / Role</label>
-        <input
-          type="text"
-          wire:model.live.debounce.250ms="title"
-          class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2 px-3 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
-        />
+        <div>
+          <label class="block text-xs font-semibold text-text-body mb-1">Job Title</label>
+          <input
+            type="text"
+            wire:model.live.debounce.250ms="title"
+            class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2 px-3 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
+          />
+        </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs font-semibold text-text-slate mb-1">Email</label>
+          <label class="block text-xs font-semibold text-text-body mb-1">Email</label>
           <input
             type="email"
             wire:model.live.debounce.250ms="email"
@@ -74,7 +133,7 @@
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-text-slate mb-1">Office Phone</label>
+          <label class="block text-xs font-semibold text-text-body mb-1">Office Phone</label>
           <input
             type="text"
             wire:model.live.debounce.250ms="phone"
@@ -85,7 +144,7 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs font-semibold text-text-slate mb-1">Mobile (Optional)</label>
+          <label class="block text-xs font-semibold text-text-body mb-1">Mobile (Optional)</label>
           <input
             type="text"
             wire:model.live.debounce.250ms="mobile"
@@ -95,40 +154,62 @@
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-text-slate mb-1">Website URL</label>
+          <label class="block text-xs font-semibold text-text-body mb-1">Avatar Image URL</label>
           <input
             type="text"
-            wire:model.live.debounce.250ms="website"
+            wire:model.live.debounce.250ms="avatarUrl"
+            placeholder="Leave empty for default"
             class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2 px-3 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
           />
         </div>
       </div>
 
-      <div>
-        <label class="block text-xs font-semibold text-text-slate mb-1">Address Line 1</label>
-        <input
-          type="text"
-          wire:model.live.debounce.250ms="addressLine1"
-          class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2 px-3 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
-        />
+      <h3 class="text-xs font-bold uppercase text-slate-400 tracking-wider pt-3 border-t border-slate-100">
+        Social Profiles
+      </h3>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-text-body mb-1">LinkedIn URL</label>
+          <input
+            type="url"
+            wire:model.live.debounce.250ms="linkedin"
+            placeholder="https://linkedin.com/in/..."
+            class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2 px-3 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-text-body mb-1">Twitter / X URL</label>
+          <input
+            type="url"
+            wire:model.live.debounce.250ms="twitter"
+            placeholder="https://x.com/..."
+            class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2 px-3 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
+          />
+        </div>
       </div>
 
-      <div>
-        <label class="block text-xs font-semibold text-text-slate mb-1">Address Line 2</label>
-        <input
-          type="text"
-          wire:model.live.debounce.250ms="addressLine2"
-          class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2 px-3 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
-        />
-      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-text-body mb-1">Facebook URL</label>
+          <input
+            type="url"
+            wire:model.live.debounce.250ms="facebook"
+            placeholder="https://facebook.com/..."
+            class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2 px-3 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
+          />
+        </div>
 
-      <div>
-        <label class="block text-xs font-semibold text-text-slate mb-1">Direct Booking URL</label>
-        <input
-          type="text"
-          wire:model.live.debounce.250ms="bookingUrl"
-          class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2 px-3 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
-        />
+        <div>
+          <label class="block text-xs font-semibold text-text-body mb-1">Instagram URL</label>
+          <input
+            type="url"
+            wire:model.live.debounce.250ms="instagram"
+            placeholder="https://instagram.com/..."
+            class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2 px-3 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
+          />
+        </div>
       </div>
     </div>
 
@@ -137,16 +218,16 @@
       <div class="bg-surface-white rounded-card-lg border border-slate-200/80 shadow-card p-6 sm:p-8">
         <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
           <div class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-status-success animate-pulse"></span>
             <h3 class="text-base font-bold font-display text-brand-hero">
-              Live Signature Preview
+              Live Preview &mdash; {{ $selectedLayout === 1 ? 'Brand Icon Dome' : ($selectedLayout === 2 ? 'Profile Photo Dome' : 'Standalone Icon') }} ({{ ucfirst($selectedTheme) }})
             </h3>
           </div>
-          <span class="text-xs text-text-muted">600 x 200 Standard Table</span>
+          <span class="text-xs text-text-muted font-mono">600 &times; 200 Standard Table</span>
         </div>
 
         {{-- Signature Render Sandbox --}}
-        <div class="overflow-x-auto pb-4 pt-2">
+        <div class="overflow-x-auto pb-4 pt-2 {{ $selectedTheme === 'dark' ? 'bg-brand-midnight p-4 rounded-card' : 'bg-slate-50 p-4 rounded-card' }}">
           <div id="signature-render-container" class="inline-block shadow-sm rounded-card overflow-hidden">
             {!! $generatedHtml !!}
           </div>
@@ -157,9 +238,9 @@
           <button
             type="button"
             @click="copyRichText()"
-            class="px-6 py-3 rounded-cta bg-gradient-to-r from-brand-purple to-brand-magenta hover:opacity-95 text-white text-xs sm:text-sm font-bold shadow-md transition cursor-pointer flex items-center gap-2"
+            class="btn-primary cursor-pointer text-xs sm:text-sm py-2.5 px-5 flex items-center gap-2"
           >
-            <span x-show="!copiedRich">Copy Formatted (For Gmail/Outlook)</span>
+            <span x-show="!copiedRich">Copy Formatted (Gmail/Outlook)</span>
             <span x-show="copiedRich" x-cloak class="flex items-center gap-1.5">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
               Copied to Clipboard!
@@ -169,7 +250,7 @@
           <button
             type="button"
             @click="copyRawHtml()"
-            class="px-5 py-3 rounded-cta border border-slate-200 hover:bg-slate-50 text-text-body text-xs sm:text-sm font-semibold transition cursor-pointer flex items-center gap-2"
+            class="px-4 py-2.5 rounded-card border border-slate-200 hover:bg-slate-50 text-text-body text-xs sm:text-sm font-semibold transition cursor-pointer flex items-center gap-2"
           >
             <span x-show="!copiedRaw">Copy Raw HTML</span>
             <span x-show="copiedRaw" x-cloak class="flex items-center gap-1.5 text-brand-purple">
@@ -177,10 +258,19 @@
               HTML Copied!
             </span>
           </button>
+
+          <button
+            type="button"
+            @click="downloadHtml()"
+            class="px-4 py-2.5 rounded-card border border-slate-200 hover:bg-slate-50 text-text-body text-xs sm:text-sm font-semibold transition cursor-pointer flex items-center gap-2"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Download HTML
+          </button>
         </div>
 
-        <div class="mt-4 p-3.5 rounded-card bg-slate-50 border border-slate-200 text-2xs text-text-muted space-y-1">
-          <p><span class="font-bold text-text-body">How to install:</span> Click "Copy Formatted", then open your email client settings (Gmail Settings &gt; General &gt; Signature or Outlook Signatures) and press <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 font-mono text-text-body">Cmd+V</kbd> or <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 font-mono text-text-body">Ctrl+V</kbd>.</p>
+        <div class="mt-4 p-3.5 rounded-card bg-slate-50 border border-slate-200 text-xs text-text-muted space-y-1">
+          <p><span class="font-bold text-text-body">Setup Instructions:</span> Click <strong>Copy Formatted</strong>, open your email client settings (Gmail Settings &gt; General &gt; Signature or Outlook Signatures) and paste with <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 font-mono text-text-body">Cmd+V</kbd> or <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 font-mono text-text-body">Ctrl+V</kbd>.</p>
         </div>
       </div>
     </div>

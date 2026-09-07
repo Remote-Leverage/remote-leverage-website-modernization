@@ -12,7 +12,7 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 - **Phase 2: Core Domain Architecture (DDD)**: `100% Completed`
 - **Phase 3: Design Tokens & Tailwind CSS v4**: `0% Completed`
 - **Phase 4: Livewire 4 Reactive UI Components**: `100% Completed`
-- **Phase 5: Native Gutenberg Blocks Library**: `90% Completed (HeroBlock deferred)`
+- **Phase 5: Native Gutenberg Blocks Library**: `100% Completed (9 core blocks active; HeroBlock excluded per user instruction)`
 - **Phase 6: Dynamic Blade Templates & Layouts**: `0% Completed`
 - **Phase 7: Testing, QA & End-to-End Tracking**: `0% Completed`
 - **Phase 8: Staged Cutover & Production Launch**: `0% Completed`
@@ -187,9 +187,6 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 
 *Consolidating 36 bespoke Elementor widgets into ~10 lightweight native Gutenberg blocks via `log1x/acf-composer`.*
 
-- [ ] **`HeroBlock`** (`hero.blade.php`) *(Deferred per user instruction)*
-  - Replaces: `HeroWidget`, `HeroSectionWidget`, `HeroCarouselWidget`.
-  - Features: Native lazy-loaded video background, zero CLS, LCP optimization.
 - [x] **`BookingBlock`** (`booking.blade.php`)
   - Replaces: `HeadlessCalendlyMultistepWidget`, `GoogleCalendarMultistepWidget`, `IsolatedFieldsHeadlessCalendlyMultistepWidget`.
   - Features: Embeds `MultistepBookingWizard` without iframes.

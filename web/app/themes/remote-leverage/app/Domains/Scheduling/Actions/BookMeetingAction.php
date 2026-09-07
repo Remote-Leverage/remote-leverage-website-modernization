@@ -29,33 +29,78 @@ class BookMeetingAction
         Log::info('Executing BookMeetingAction', $data->toArray());
 
         // Path A: Calendly Direct Invitee Booking
-        if ($calendlyEventUri) {
+        $eventUri = $calendlyEventUri ?: config('services.calendly.default_event_type');
+
+        if ($eventUri && config('services.calendly.api_key')) {
             $questionsAnswers = [];
-            if (! empty($data->qualificationAnswers)) {
-                foreach ($data->qualificationAnswers as $q => $a) {
-                    $questionsAnswers[] = ['question' => $q, 'answer' => $a];
+            $eventQuestions = $this->calendlyClient->getEventQuestions($eventUri);
+
+            if (! empty($eventQuestions)) {
+                foreach ($eventQuestions as $q) {
+                    $qName = $q['name'] ?? '';
+                    $pos = $q['position'] ?? 0;
+                    $ans = null;
+
+                    // Match against lead attributes
+                    if (stripos($qName, 'phone') !== false || stripos($qName, 'cell') !== false || stripos($qName, 'whatsapp') !== false) {
+                        $ans = $data->phone;
+                    } elseif (stripos($qName, 'website') !== false || stripos($qName, 'company') !== false) {
+                        $ans = $data->company ?: 'remoteleverage.com';
+                    } elseif (stripos($qName, 'prepare') !== false || stripos($qName, 'help') !== false) {
+                        $ans = $data->notes ?: 'VA Consultation';
+                    } elseif (stripos($qName, 'role') !== false || stripos($qName, 'position') !== false) {
+                        $ans = $data->qualificationAnswers['Role Needed'] ?? 'Virtual Assistant';
+                    }
+
+                    if (! empty($ans)) {
+                        $questionsAnswers[] = [
+                            'question' => $qName,
+                            'answer' => (string) $ans,
+                            'position' => (int) $pos,
+                        ];
+                    }
                 }
             }
 
             $tracking = [
-                'utm_campaign' => $data->referralCode ? 'ref_'.$data->referralCode : null,
-                'utm_source' => 'remoteleverage_site',
+                'utm_source' => $data->utmSource ?: 'remoteleverage_site',
+                'utm_medium' => $data->utmMedium,
+                'utm_campaign' => $data->utmCampaign ?: ($data->referralCode ? 'ref_'.$data->referralCode : null),
+                'utm_term' => $data->utmTerm,
+                'utm_content' => $data->utmContent,
             ];
 
             $invitee = $this->calendlyClient->createInvitee(
-                eventUri: $calendlyEventUri,
+                eventUri: $eventUri,
                 email: $data->email,
                 name: $data->name,
+                startTime: $startTime->toIso8601String(),
+                timezone: $data->timezone,
+                phone: $data->phone,
+                guestEmails: $data->guestEmails ?? [],
                 questionsAnswers: $questionsAnswers,
                 tracking: array_filter($tracking),
             );
 
             if ($invitee) {
+                $scheduledEventUri = $invitee['event'] ?? null;
+                $meetUrl = null;
+
+                if ($scheduledEventUri) {
+                    $eventDetails = $this->calendlyClient->getScheduledEvent($scheduledEventUri);
+                    if ($eventDetails) {
+                        $location = $eventDetails['location'] ?? [];
+                        $meetUrl = $location['join_url'] ?? $location['location'] ?? null;
+                    }
+                }
+
+                $meetUrl = $meetUrl ?: ($invitee['scheduling_url'] ?? 'https://meet.google.com/rl-strategy-'.substr(md5($data->email), 0, 8));
+
                 return [
                     'success' => true,
                     'provider' => 'calendly',
                     'meeting_id' => $invitee['uri'] ?? uniqid('cal_', true),
-                    'meet_url' => $invitee['scheduling_url'] ?? null,
+                    'meet_url' => $meetUrl,
                     'start_time' => $startTime->toIso8601String(),
                     'end_time' => $endTime->toIso8601String(),
                     'client_name' => $data->name,

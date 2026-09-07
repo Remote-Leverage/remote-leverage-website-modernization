@@ -9,6 +9,8 @@ use App\Domains\Lead\Actions\PurgeOldLeadsAction;
 use App\Domains\Lead\Commands\PurgeLeadsCommand;
 use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
+use App\Domains\Lead\Listeners\HandleLeadEventsForSlack;
+use App\Domains\Lead\Listeners\HandleLeadEventsForWebhook;
 use App\Domains\Lead\Services\HubSpotGateway;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\PhoneValidationService;
@@ -26,6 +28,8 @@ class LeadServiceProvider extends ServiceProvider
         $this->app->singleton(PhoneValidationService::class, fn () => new PhoneValidationService);
         $this->app->singleton(HubSpotGateway::class, fn () => new HubSpotGateway);
         $this->app->singleton(LeadActivityLogger::class, fn () => new LeadActivityLogger);
+        $this->app->singleton(HandleLeadEventsForSlack::class);
+        $this->app->singleton(HandleLeadEventsForWebhook::class);
         $this->app->singleton(CaptureLeadAction::class);
         $this->app->singleton(PurgeOldLeadsAction::class);
 
@@ -41,7 +45,7 @@ class LeadServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Automatically sync to HubSpot on LeadCreated
+        // 1. Automatically sync to HubSpot on LeadCreated
         Event::listen(LeadCreated::class, function (LeadCreated $event) {
             $gateway = $this->app->make(HubSpotGateway::class);
             $logger = $this->app->make(LeadActivityLogger::class);
@@ -58,7 +62,15 @@ class LeadServiceProvider extends ServiceProvider
             );
         });
 
-        // Attribute completed bookings to partners in PartnerHub
+        // 2. Dispatch Slack notification on LeadCreated (partial) and LeadBookingCompleted (final)
+        Event::listen(LeadCreated::class, [HandleLeadEventsForSlack::class, 'handleCreated']);
+        Event::listen(LeadBookingCompleted::class, [HandleLeadEventsForSlack::class, 'handleBookingCompleted']);
+
+        // 3. Dispatch Outgoing Webhook on LeadCreated (partial) and LeadBookingCompleted (final)
+        Event::listen(LeadCreated::class, [HandleLeadEventsForWebhook::class, 'handleCreated']);
+        Event::listen(LeadBookingCompleted::class, [HandleLeadEventsForWebhook::class, 'handleBookingCompleted']);
+
+        // 4. Attribute completed bookings to partners in PartnerHub
         Event::listen(
             LeadBookingCompleted::class,
             [HandleLeadBookingCompletedForPartner::class, 'handle']

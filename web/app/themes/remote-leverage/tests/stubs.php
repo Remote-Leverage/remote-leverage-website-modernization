@@ -9,12 +9,27 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\CallableDispatcher;
 use Illuminate\Routing\ControllerDispatcher;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Facade;
+use Illuminate\Translation\ArrayLoader;
+use Illuminate\Translation\Translator;
+use Illuminate\Validation\Factory;
 
 // 1. Initialize standalone container for Laravel Facades
 $app = new Container;
 Container::setInstance($app);
 Facade::setFacadeApplication($app);
+
+if (! function_exists('app')) {
+    function app($abstract = null, array $parameters = [])
+    {
+        if ($abstract === null) {
+            return Container::getInstance();
+        }
+
+        return Container::getInstance()->make($abstract, $parameters);
+    }
+}
 
 $app->singleton('log', function () {
     return new class
@@ -46,6 +61,15 @@ $app->singleton(
     Illuminate\Routing\Contracts\ControllerDispatcher::class,
     fn ($app) => new ControllerDispatcher($app)
 );
+
+$app->singleton('validator', function ($app) {
+    $translator = new Translator(
+        new ArrayLoader,
+        'en'
+    );
+
+    return new Factory($translator, $app);
+});
 
 // 2. Set up in-memory SQLite database for Eloquent models
 $capsule = new Capsule($app);
@@ -98,8 +122,20 @@ if (! Capsule::schema()->hasTable('rl_leads')) {
         $table->string('company')->nullable();
         $table->string('role_needed')->nullable();
         $table->string('weekly_hours')->nullable();
+        $table->string('monthly_revenue', 100)->nullable();
         $table->string('start_date')->nullable();
         $table->text('notes')->nullable();
+        $table->string('utm_source', 100)->nullable();
+        $table->string('utm_medium', 100)->nullable();
+        $table->string('utm_campaign', 100)->nullable();
+        $table->string('utm_term', 100)->nullable();
+        $table->string('utm_content', 100)->nullable();
+        $table->string('gclid', 150)->nullable();
+        $table->string('fbclid', 150)->nullable();
+        $table->string('referral_code', 100)->nullable();
+        $table->string('landing_url', 500)->nullable();
+        $table->string('referrer_url', 500)->nullable();
+        $table->string('session_id', 100)->nullable();
         $table->string('source_type')->default('organic')->index();
         $table->string('source_id')->nullable()->index();
         $table->string('status')->default('captured')->index();
@@ -178,5 +214,28 @@ if (! function_exists('now')) {
     function now()
     {
         return new DateTimeImmutable;
+    }
+}
+
+if (! isset($GLOBALS['_app_config'])) {
+    $GLOBALS['_app_config'] = [];
+}
+
+if (! function_exists('config')) {
+    function config($key = null, $default = null)
+    {
+        if (is_array($key)) {
+            foreach ($key as $k => $v) {
+                Arr::set($GLOBALS['_app_config'], $k, $v);
+            }
+
+            return;
+        }
+
+        if ($key === null) {
+            return $GLOBALS['_app_config'] ?? [];
+        }
+
+        return Arr::get($GLOBALS['_app_config'] ?? [], $key, $default);
     }
 }

@@ -47,10 +47,26 @@ class HandleLeadCreatedForBooking
                     'Role Needed' => $lead->role_needed,
                     'Weekly Hours' => $lead->weekly_hours,
                     'Start Timeline' => $lead->start_date,
+                    'Monthly Revenue' => $lead->monthly_revenue,
                 ],
+                'utm_source' => $lead->utm_source,
+                'utm_medium' => $lead->utm_medium,
+                'utm_campaign' => $lead->utm_campaign,
+                'utm_term' => $lead->utm_term,
+                'utm_content' => $lead->utm_content,
+                'guest_emails' => $event->context['extra_data']['guest_emails'] ?? [],
             ]);
 
-            $result = $this->bookMeetingAction->execute($bookingData);
+            $extraData = $event->context['extra_data'] ?? [];
+            $calendlyEventUri = $extraData['event_uri'] ?? null;
+            if (! $calendlyEventUri && $lead->monthly_revenue) {
+                $isUnder10k = in_array($lead->monthly_revenue, ['$0 to $5k Per Month', '$5k to $10k Per Month', '<10k', 'under_10k'], true);
+                $calendlyEventUri = $isUnder10k
+                    ? config('services.calendly.t0_event_type')
+                    : config('services.calendly.t10_event_type');
+            }
+
+            $result = $this->bookMeetingAction->execute($bookingData, $calendlyEventUri);
 
             if (! empty($result['success'])) {
                 // Update lead status
