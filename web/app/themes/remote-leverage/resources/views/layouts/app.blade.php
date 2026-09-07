@@ -48,6 +48,17 @@
     @php(wp_head())
     @livewireStyles
 
+    <script>
+      window.APP_ENV = '{{ env('APP_ENV', 'production') }}';
+      @if (config('sentry.dsn'))
+        window.SENTRY_DSN = '{{ config('sentry.dsn') }}';
+      @endif
+      @if (config('services.posthog.api_key'))
+        window.POSTHOG_API_KEY = '{{ config('services.posthog.api_key') }}';
+        window.POSTHOG_HOST = '{{ config('services.posthog.host', 'https://us.i.posthog.com') }}';
+      @endif
+    </script>
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
   </head>
 
