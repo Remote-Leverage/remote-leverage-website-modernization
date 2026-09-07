@@ -16,13 +16,13 @@
 
     {{-- 1. Profile Header --}}
     <div class="flex items-center gap-4 p-6 sm:p-7 border-b border-slate-100 bg-white">
-      <img src="{{ !empty($profileImage) && $profileImage !== '/images/avatar1.jpg' ? $profileImage : Vite::asset('resources/images/avatar1.jpg') }}" alt="Host Profile" class="w-13 h-13 rounded-full object-cover shrink-0 ring-2 ring-brand-purple/10" />
+      <img src="{{ !empty($profileImage) && $profileImage !== '/images/avatar1.jpg' ? $profileImage : Vite::asset('resources/images/avatar1.jpg') }}" alt="Host Profile" width="52" height="52" loading="lazy" decoding="async" class="w-13 h-13 rounded-full object-cover shrink-0 ring-2 ring-brand-purple/10" />
       <div>
         @if ($profileEyebrow)
-          <div class="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">{{ $profileEyebrow }}</div>
+          <div class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-0.5">{{ $profileEyebrow }}</div>
         @endif
         <div class="text-lg font-bold font-display text-brand-hero tracking-tight">{{ $profileName }}</div>
-        <div class="text-xs text-text-muted flex items-center gap-1.5 mt-0.5 font-medium">
+        <div class="text-xs text-slate-600 flex items-center gap-1.5 mt-0.5 font-medium">
           <svg class="w-3.5 h-3.5 text-brand-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
@@ -76,7 +76,7 @@
         <div class="p-6 sm:p-8 space-y-4">
           <div class="space-y-1 mb-6">
             <h3 class="text-xl font-bold font-display text-brand-hero tracking-tight">Your Contact Information</h3>
-            <p class="text-xs text-text-muted">Provide your contact details so our advisor can review your company requirements.</p>
+            <p class="text-xs text-slate-600">Provide your contact details so our advisor can review your company requirements.</p>
           </div>
 
           {{-- 1. Work Email (First) --}}
@@ -122,6 +122,7 @@
             <div class="flex rounded-card border border-slate-200 focus-within:ring-2 focus-within:ring-brand-purple/20 focus-within:border-brand-purple overflow-hidden bg-white transition">
               <select 
                 wire:model="phoneCountry"
+                aria-label="Country Calling Code"
                 class="bg-slate-50 border-0 border-r border-slate-200 text-xs font-semibold text-text-body px-3 py-2.5 focus:ring-0 focus:outline-none cursor-pointer shrink-0"
               >
                 @foreach ($countryCodes as $code => $country)

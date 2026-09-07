@@ -8,6 +8,8 @@
           <img 
             src="{{ Vite::asset('resources/images/logo.svg') }}" 
             alt="{{ $siteName ?? 'Remote Leverage' }}" 
+            width="168"
+            height="28"
             class="h-6 sm:h-7 w-auto transition-transform group-hover:scale-[1.02]"
             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
           />

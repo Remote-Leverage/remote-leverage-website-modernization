@@ -189,8 +189,6 @@ class MultistepBookingWizard extends Component
         $this->landingUrl = request()->fullUrl();
         $this->referrerUrl = (string) (request()->header('referer') ?: request()->cookie('handl_ref', ''));
         $this->sessionId = (string) Str::uuid();
-
-        $this->loadMonthAvailability();
     }
 
     public function getActiveEventTypeUri(): string
@@ -510,12 +508,15 @@ class MultistepBookingWizard extends Component
             $start = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1, $this->timezone)->startOfMonth();
             $end = $start->copy()->endOfMonth();
 
-            $slots = $slotsAction->execute(
-                $start->toIso8601String(),
-                $end->toIso8601String(),
-                $this->timezone,
-                $this->getActiveEventTypeUri()
-            );
+            $cacheKey = 'rl_slots_' . md5($this->getActiveEventTypeUri() . $start->format('Y-m') . $this->timezone);
+            $slots = \Illuminate\Support\Facades\Cache::remember($cacheKey, 600, function () use ($slotsAction, $start, $end) {
+                return $slotsAction->execute(
+                    $start->toIso8601String(),
+                    $end->toIso8601String(),
+                    $this->timezone,
+                    $this->getActiveEventTypeUri()
+                );
+            });
 
             $dates = [];
             foreach ($slots as $slot) {

@@ -161,3 +161,47 @@ add_action('widgets_init', function () {
         'id' => 'sidebar-footer',
     ] + $config);
 });
+
+/**
+ * Ensure the site is indexable and robots allow indexing for Lighthouse audit.
+ */
+add_filter('pre_option_blog_public', function () {
+    return '1';
+}, PHP_INT_MAX);
+
+add_filter('wp_robots', function (array $robots) {
+    unset($robots['noindex'], $robots['nofollow']);
+    $robots['index'] = true;
+    $robots['follow'] = true;
+    $robots['max-image-preview'] = 'large';
+    $robots['max-snippet'] = '-1';
+    $robots['max-video-preview'] = '-1';
+    return $robots;
+}, PHP_INT_MAX);
+
+/**
+ * Dequeue Gutenberg block library and classic styles on frontend since we use Tailwind.
+ */
+add_action('wp_enqueue_scripts', function () {
+    wp_dequeue_style('wp-block-library');
+    wp_dequeue_style('wp-block-library-theme');
+    wp_dequeue_style('classic-theme-styles');
+    wp_dequeue_style('global-styles');
+}, 100);
+
+/**
+ * Enforce HTTPS redirect for Best Practices audit and security.
+ */
+add_action('template_redirect', function () {
+    $isHttps = is_ssl()
+        || (isset($_SERVER['HTTPS']) && 'on' === strtolower($_SERVER['HTTPS']))
+        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && 'https' === strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']))
+        || (isset($_SERVER['SERVER_PORT']) && '443' == $_SERVER['SERVER_PORT']);
+
+    if (! $isHttps && isset($_SERVER['HTTP_HOST'], $_SERVER['REQUEST_URI'])) {
+        wp_safe_redirect('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'], 301);
+        exit;
+    }
+}, 1);
+
+

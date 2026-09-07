@@ -9,6 +9,10 @@
             <img 
               src="{{ Vite::asset('resources/images/logo.svg') }}" 
               alt="{{ $siteName ?? 'Remote Leverage' }}" 
+              width="140"
+              height="24"
+              loading="lazy"
+              decoding="async"
               class="h-6 w-auto brightness-0 invert" 
               onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
             />
@@ -142,7 +146,7 @@
     @endif
 
     <!-- Bottom Legal Bar -->
-    <div class="mt-16 pt-8 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+    <div class="mt-16 pt-8 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
       <p>
         &copy; {{ date('Y') }} {{ $siteName ?? 'Remote Leverage' }}. {{ __('All rights reserved.', 'remote-leverage') }}
       </p>
