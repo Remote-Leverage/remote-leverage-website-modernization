@@ -71,7 +71,7 @@ class NavWalker extends Walker_Nav_Menu
         $attributes = '';
         foreach ($atts as $attr => $value) {
             if (! empty($value)) {
-                $value = ('href' === $attr) ? esc_url($value) : esc_attr($value);
+                $value = ($attr === 'href') ? esc_url($value) : esc_attr($value);
                 $attributes .= " {$attr}=\"{$value}\"";
             }
         }
@@ -80,7 +80,7 @@ class NavWalker extends Walker_Nav_Menu
 
         $item_output = $args->before ?? '';
         $item_output .= "<a{$attributes}>";
-        $item_output .= ($args->link_before ?? '') . $title . ($args->link_after ?? '');
+        $item_output .= ($args->link_before ?? '').$title.($args->link_after ?? '');
 
         if ($depth === 0 && $has_children) {
             $item_output .= ' <svg class="w-4 h-4 text-slate-700 group-hover:text-brand-purple transition-transform duration-200" :class="{ \'rotate-180\': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>';

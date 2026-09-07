@@ -1,0 +1,63 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  lint-and-test:
+    name: Code Quality & Automated Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, bcmath, json
+          coverage: none
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run Laravel Pint (Code Style Check)
+        run: vendor/bin/pint --test
+
+      - name: Run Pest Automated Test Suite
+        run: vendor/bin/pest
+
+  build-assets:
+    name: Frontend Asset Compilation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Node Dependencies
+        run: npm ci
+
+      - name: Build Vite Assets (Production)
+        run: npm run build

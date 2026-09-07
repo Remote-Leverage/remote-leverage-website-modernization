@@ -61,7 +61,7 @@ class MobileNavWalker extends Walker_Nav_Menu
         $attributes = '';
         foreach ($atts as $attr => $value) {
             if (! empty($value)) {
-                $value = ('href' === $attr) ? esc_url($value) : esc_attr($value);
+                $value = ($attr === 'href') ? esc_url($value) : esc_attr($value);
                 $attributes .= " {$attr}=\"{$value}\"";
             }
         }
@@ -70,7 +70,7 @@ class MobileNavWalker extends Walker_Nav_Menu
 
         $item_output = $args->before ?? '';
         $item_output .= "<a{$attributes}>";
-        $item_output .= '<span>' . ($args->link_before ?? '') . $title . ($args->link_after ?? '') . '</span>';
+        $item_output .= '<span>'.($args->link_before ?? '').$title.($args->link_after ?? '').'</span>';
 
         if ($depth === 0 && $has_children) {
             $item_output .= ' <svg class="w-4 h-4 text-slate-500 transition-transform duration-200" :class="{ \'rotate-180\': mobileSubOpen }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>';

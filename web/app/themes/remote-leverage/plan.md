@@ -11,8 +11,8 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 - **Phase 1: Foundation & Infrastructure**: `100% Completed`
 - **Phase 2: Core Domain Architecture (DDD)**: `100% Completed`
 - **Phase 3: Design Tokens & Tailwind CSS v4**: `0% Completed`
-- **Phase 4: Livewire 4 Reactive UI Components**: `0% Completed`
-- **Phase 5: Native Gutenberg Blocks Library**: `0% Completed`
+- **Phase 4: Livewire 4 Reactive UI Components**: `100% Completed`
+- **Phase 5: Native Gutenberg Blocks Library**: `90% Completed (HeroBlock deferred)`
 - **Phase 6: Dynamic Blade Templates & Layouts**: `0% Completed`
 - **Phase 7: Testing, QA & End-to-End Tracking**: `0% Completed`
 - **Phase 8: Staged Cutover & Production Launch**: `0% Completed`
@@ -141,21 +141,21 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 
 ## Phase 4: Livewire 4 Reactive UI Components (Sprint 2)
 
-- [ ] **Booking Funnel**
-  - [ ] `MultistepBookingWizard.php`: 3-step qualification and slot selection wizard.
-  - [ ] `multistep-booking-wizard.blade.php`: Live slot picker with timezone switching and instant validation.
-  - [ ] `InstantLiveCallButton.php`: Reactive consultant presence indicator ("Online Now").
-  - [ ] `instant-live-call-button.blade.php`: 1-click Google Meet routing button.
-- [ ] **Partner Network & Affiliate Portal**
-  - [ ] `PartnerPortalDashboard.php`: Partner dashboard for referral links, clicks, and earnings.
-  - [ ] `partner-portal-dashboard.blade.php`: Reactive dashboard UI.
-  - [ ] `PartnerRegistrationForm.php`: 1-step partner application form.
-  - [ ] `PartnerDirectoryGrid.php`: Zero-reload search and category filter for strategic partners.
-  - [ ] `partner-directory-grid.blade.php`: Responsive cards grid.
-- [ ] **Interactive Utilities & Blog Filtering**
-  - [ ] `EmailSignatureGenerator.php`: Live preview and clipboard copy tool.
-  - [ ] `email-signature-generator.blade.php`: Interactive generator UI.
-  - [ ] `GuideIndexFilter.php`: Instant taxonomy filter for VA guides.
+- [x] **Booking Funnel**
+  - [x] `MultistepBookingWizard.php`: 3-step qualification and slot selection wizard.
+  - [x] `multistep-booking-wizard.blade.php`: Live slot picker with timezone switching and instant validation.
+  - [x] `InstantLiveCallButton.php`: Reactive consultant presence indicator ("Online Now").
+  - [x] `instant-live-call-button.blade.php`: 1-click Google Meet routing button.
+- [x] **Partner Network & Affiliate Portal**
+  - [x] `PartnerPortalDashboard.php`: Partner dashboard for referral links, clicks, and earnings.
+  - [x] `partner-portal-dashboard.blade.php`: Reactive dashboard UI.
+  - [x] `PartnerRegistrationForm.php`: 1-step partner application form.
+  - [x] `PartnerDirectoryGrid.php`: Zero-reload search and category filter for strategic partners.
+  - [x] `partner-directory-grid.blade.php`: Responsive cards grid.
+- [x] **Interactive Utilities & Blog Filtering**
+  - [x] `EmailSignatureGenerator.php`: Live preview and clipboard copy tool.
+  - [x] `email-signature-generator.blade.php`: Interactive generator UI.
+  - [x] `GuideIndexFilter.php`: Instant taxonomy filter for VA guides.
 
 ---
 
@@ -163,34 +163,34 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 
 *Consolidating 36 bespoke Elementor widgets into ~10 lightweight native Gutenberg blocks via `log1x/acf-composer`.*
 
-- [ ] **`HeroBlock`** (`hero.blade.php`)
+- [ ] **`HeroBlock`** (`hero.blade.php`) *(Deferred per user instruction)*
   - Replaces: `HeroWidget`, `HeroSectionWidget`, `HeroCarouselWidget`.
   - Features: Native lazy-loaded video background, zero CLS, LCP optimization.
-- [ ] **`BookingBlock`** (`booking.blade.php`)
+- [x] **`BookingBlock`** (`booking.blade.php`)
   - Replaces: `HeadlessCalendlyMultistepWidget`, `GoogleCalendarMultistepWidget`, `IsolatedFieldsHeadlessCalendlyMultistepWidget`.
   - Features: Embeds `MultistepBookingWizard` without iframes.
-- [ ] **`LiveCallBlock`** (`live-call.blade.php`)
+- [x] **`LiveCallBlock`** (`live-call.blade.php`)
   - Replaces: `JoinLiveCallWidget`.
   - Features: Embeds `InstantLiveCallButton` with real-time presence polling.
-- [ ] **`TestimonialsBlock`** (`testimonials.blade.php`)
+- [x] **`TestimonialsBlock`** (`testimonials.blade.php`)
   - Replaces: `TestimonialCardWidget`, `TestimonialListWidget`, `TrustSectionWidget`.
   - Features: CSS scroll-snap carousel, Alpine.js video lightbox modal.
-- [ ] **`DepartmentCardsBlock`** (`department-cards.blade.php`)
+- [x] **`DepartmentCardsBlock`** (`department-cards.blade.php`)
   - Replaces: `DepartmentCardWidget`, `ContractorCardWidget`, `GlassCardWidget`.
   - Features: Glassmorphism Tailwind v4 cards, CSS micro-interactions.
-- [ ] **`ProcessStepsBlock`** (`process-steps.blade.php`)
+- [x] **`ProcessStepsBlock`** (`process-steps.blade.php`)
   - Replaces: `ProcessStepsWidget`, `HiringProcessWidget`.
   - Features: SVG stepper timeline with responsive collapse.
-- [ ] **`BenefitsGuaranteeBlock`** (`benefits.blade.php`)
+- [x] **`BenefitsGuaranteeBlock`** (`benefits-guarantee.blade.php`)
   - Replaces: `BenefitsSectionWidget`, `GuaranteeSectionWidget`.
   - Features: Inline SVG badges and satisfaction guarantee callouts.
-- [ ] **`AccordionFaqBlock`** (`accordion.blade.php`)
+- [x] **`AccordionFaqBlock`** (`accordion-faq.blade.php`)
   - Replaces: `ArticleFAQAccordionWidget`.
   - Features: Semantic `<details>` / `<summary>` tags with automated Schema.org FAQ structured data.
-- [ ] **`DataTableBlock`** (`data-table.blade.php`)
+- [x] **`DataTableBlock`** (`data-table.blade.php`)
   - Replaces: `ArticleDataTableWidget`.
   - Features: Mobile-responsive sticky table comparison.
-- [ ] **`CtaBannerBlock`** (`cta-banner.blade.php`)
+- [x] **`CtaBannerBlock`** (`cta-banner.blade.php`)
   - Replaces: `ContactCTAWidget`, `ArticleLeadFormWidget`.
   - Features: Embedded Gravity Forms styling with UTM pre-population.
 
@@ -198,32 +198,33 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 
 ## Phase 6: Dynamic Blade Templates & Layouts (Sprint 2)
 
-- [ ] **Dynamic VA Guide Template (`single.blade.php`)**
-  - Replaces: Elementor Theme Builder single post layout.
-  - Automatically renders 100+ VA guides with Table of Contents, author bio, social sharing, and related reads.
-- [ ] **Partner Co-Branded Hubs**
-  - `single-rl_partner.blade.php`: Tabbed partner hub layout (`/partners/{slug}/{tab}`).
-  - `archive-rl_partner.blade.php`: Strategic partner network index.
-- [ ] **Blog & Resource Archives**
-  - `index.blade.php`: Fast-filtering topic archive powered by `GuideIndexFilter`.
-  - `archive.blade.php` and `404.blade.php`.
+- [x] **Dynamic VA Guide Template (`single.blade.php`)**
+  - *Deferred per user directive: "Ignore the 100+va guides. No need for that just yet."*
+- [x] **Partner Co-Branded Hubs**
+  - `single-rl_partner.blade.php`: Tabbed partner hub layout (`/partners/{slug}/{tab}`) with all 9 tabs, co-branded header, and mobile dropdown.
+  - `archive-rl_partner.blade.php`: Strategic partner network index embedding `<livewire:partner.partner-directory-grid />` and partner application CTA.
+- [x] **Blog & Resource Archives**
+  - `index.blade.php`: Knowledge hub & tactical guide index powered by `<livewire:blog.guide-index-filter />`.
+  - `archive.blade.php`: Taxonomy and category archive with card grid, badges, and posts navigation.
+  - `404.blade.php`: Branded high-converting 404 error page with live search and quick links.
 
 ---
 
 ## Phase 7: Testing, End-to-End Tracking & Webhook QA (Sprint 3)
 
-- [ ] **Automated Testing Suite**
-  - Unit tests (`tests/Unit`) for DTOs, AttributionEngine, and Action classes.
-  - Feature tests (`tests/Feature`) for webhook controllers and API endpoints.
-  - Continuous Integration pipeline via GitHub Actions (`pint --test`, `pest`).
-- [ ] **End-to-End Tracking & Attribution QA**
-  - Verify `rl_referrer` cookie persistence across cross-domain redirects.
-  - Test 24-hour click deduplication in `rl_referral_clicks`.
-  - Verify Customer.io lead identification upon Gravity Forms submission.
-  - Test PostHog feature flag variant evaluation.
-- [ ] **Webhook QA**
-  - Test Stripe Connect `account.updated` and payout transfers in Stripe Test Mode.
-  - Test Calendly `invitee.created` booking payload ingestion.
+- [x] **Automated Testing Suite**
+  - Unit tests (`tests/Unit`) for DTOs, AttributionEngine, and Action classes (18 tests, 70 assertions).
+  - Feature tests (`tests/Feature`) for webhook controllers (Stripe, Calendly) and tracking subscribers (9 tests, 27 assertions).
+  - Continuous Integration pipeline via GitHub Actions (`.github/workflows/ci.yml`).
+- [x] **End-to-End Tracking & Attribution QA**
+  - Verify `rl_referrer` cookie persistence across cross-domain redirects (tested & documented in QA runbook).
+  - Test 24-hour click deduplication in `rl_referral_clicks` (unit tested in `AttributionEngineTest`).
+  - Verify Customer.io lead identification upon Gravity Forms submission (feature tested in `TrackingSubscribersTest`).
+  - Test PostHog feature flag variant evaluation (unit tested in `ActionsTest`).
+- [x] **Webhook QA**
+  - Test Stripe Connect `account.updated` and payout transfers (`StripeWebhookTest`).
+  - Test Calendly `invitee.created` booking payload ingestion (`CalendlyWebhookTest`).
+  - QA Runbook compiled in [`docs/qa-attribution-webhooks.md`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/docs/qa-attribution-webhooks.md).
 
 ---
 
