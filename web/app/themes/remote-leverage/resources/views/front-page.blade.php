@@ -1027,22 +1027,29 @@
         {{-- ═══════════════════════════════════════════════════════════ --}}
         {{-- SECTION 8 · READY TO SCALE (BOOKING FOOTER)               --}}
         {{-- ═══════════════════════════════════════════════════════════ --}}
-        <section id="booking-footer" class="relative bg-brand-dark-violet py-24 lg:py-28 text-white overflow-hidden">
-            <div class="absolute inset-0 bg-cover bg-center opacity-25 pointer-events-none"
-                style="background-image: url('{{ $imgBase }}/Union-5.webp');"></div>
-            <div class="relative z-10 max-w-4xl mx-auto px-6 lg:px-10">
-                <div class="text-center mb-12">
-                    <h2
-                        class="font-display text-4xl sm:text-5xl lg:text-[56px] font-bold leading-[1.05] tracking-[-0.03em] text-white mb-5">
-                        Ready to scale your<br>global team?
-                    </h2>
-                    <p class="text-base sm:text-lg leading-relaxed text-white/80 max-w-xl mx-auto">
-                        During this meeting we will go over the role you're planning to hire for, what the process looks
-                        like, answer any questions you have, and proceed to next steps.
-                    </p>
-                </div>
-                <div class="bg-white rounded-2xl p-8 lg:p-10 shadow-[0_20px_80px_rgba(0,0,0,0.3)]">
-                    <livewire:booking.multistep-booking-wizard />
+        <section id="booking-footer" class="relative bg-brand-dark-violet py-20 lg:py-28 text-white overflow-hidden">
+            {{-- Map in the bottom --}}
+            <div class="absolute inset-x-0 bottom-0 h-full max-h-[640px] bg-no-repeat bg-bottom bg-contain opacity-25 pointer-events-none"
+                style="background-image: url('{{ $imgBase }}/Map.webp');"></div>
+
+            <div class="relative z-10 max-w-[1380px] mx-auto px-6 lg:px-10">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+                    {{-- Left Column --}}
+                    <div class="lg:col-span-6 xl:col-span-7 max-w-xl">
+                        <h2
+                            class="font-display text-4xl sm:text-5xl lg:text-[56px] xl:text-[62px] font-bold leading-[1.05] tracking-[-0.03em] text-white mb-6">
+                            Ready to scale your<br>global team?
+                        </h2>
+                        <p class="text-[16px] sm:text-[18px] leading-relaxed text-white/80 max-w-lg">
+                            During this meeting we will go over the role you're planning to hire for, what the process looks
+                            like, answer any questions you have, and proceed to next steps.
+                        </p>
+                    </div>
+
+                    {{-- Right Column: Form --}}
+                    <div class="lg:col-span-6 xl:col-span-5 w-full">
+                        <livewire:booking.multistep-booking-wizard :skin="'glass'" />
+                    </div>
                 </div>
             </div>
         </section>

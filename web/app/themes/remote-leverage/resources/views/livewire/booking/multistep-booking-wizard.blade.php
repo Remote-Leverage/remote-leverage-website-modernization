@@ -1,5 +1,266 @@
-<div class="w-full max-w-[580px] mx-auto">
-  <div class="w-full bg-surface-white rounded-card-lg border border-slate-200/80 shadow-card overflow-hidden">
+<div class="w-full">
+  @if ($skin === 'glass')
+    <div class="w-full max-w-[500px] mx-auto lg:ml-auto">
+      <div class="w-full rounded-[28px] bg-white/[0.08] backdrop-blur-md border border-white/15 p-6 sm:p-8 md:p-9 shadow-2xl text-white">
+
+        {{-- Hidden Acquisition & UTM Tracking Fields --}}
+        <input type="hidden" name="utm_source" wire:model="utmSource" value="{{ $utmSource }}" id="rl_utm_source_glass">
+        <input type="hidden" name="utm_medium" wire:model="utmMedium" value="{{ $utmMedium }}" id="rl_utm_medium_glass">
+        <input type="hidden" name="utm_campaign" wire:model="utmCampaign" value="{{ $utmCampaign }}" id="rl_utm_campaign_glass">
+        <input type="hidden" name="utm_term" wire:model="utmTerm" value="{{ $utmTerm }}" id="rl_utm_term_glass">
+        <input type="hidden" name="utm_content" wire:model="utmContent" value="{{ $utmContent }}" id="rl_utm_content_glass">
+        <input type="hidden" name="gclid" wire:model="gclid" value="{{ $gclid }}" id="rl_gclid_glass">
+        <input type="hidden" name="fbclid" wire:model="fbclid" value="{{ $fbclid }}" id="rl_fbclid_glass">
+        <input type="hidden" name="referral_code" wire:model="referralCode" value="{{ $referralCode }}" id="rl_referral_code_glass">
+        <input type="hidden" name="landing_url" wire:model="landingUrl" value="{{ $landingUrl }}" id="rl_landing_url_glass">
+        <input type="hidden" name="referrer_url" wire:model="referrerUrl" value="{{ $referrerUrl }}" id="rl_referrer_url_glass">
+        <input type="hidden" name="session_id" wire:model="sessionId" value="{{ $sessionId }}" id="rl_session_id_glass">
+
+        @if ($errorMessage)
+          <div class="p-3.5 mb-5 rounded-xl bg-red-500/20 border border-red-400 text-red-200 text-xs flex items-center gap-2.5">
+            <svg class="w-4 h-4 shrink-0 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{{ $errorMessage }}</span>
+          </div>
+        @endif
+
+        @if ($currentStep === 1 && ! $isBooked)
+          <div class="space-y-4">
+            {{-- 1. Monthly Revenue --}}
+            <div>
+              <label class="block text-xs sm:text-[13px] font-bold text-white mb-2.5">
+                What is your company's current monthly revenue? <span class="text-[#EF4444]">*</span>
+              </label>
+              <div class="space-y-2">
+                @foreach ([
+                  '$0 to $5k Per Month',
+                  '$5k to $10k Per Month',
+                  '$10k to $50k Per Month',
+                  '$50k-$100k Per Month',
+                  '$100k+ Per Month',
+                ] as $revOption)
+                  <label class="flex items-center gap-2.5 cursor-pointer text-xs sm:text-[13px] text-white font-medium select-none group">
+                    <input 
+                      type="radio" 
+                      name="monthlyRevenue" 
+                      value="{{ $revOption }}" 
+                      wire:model.live="monthlyRevenue"
+                      class="w-4 h-4 rounded-full border-0 bg-white text-brand-purple focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                    />
+                    <span class="group-hover:text-white/90">{{ $revOption }}</span>
+                  </label>
+                @endforeach
+              </div>
+              @error('monthlyRevenue') <span class="text-red-400 text-xs block mt-1">{{ $message }}</span> @enderror
+            </div>
+
+            {{-- 2. Name: First & Last --}}
+            <div>
+              <label class="block text-xs sm:text-[13px] font-bold text-white mb-1">
+                Name <span class="text-[#EF4444]">*</span>
+              </label>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <input 
+                    type="text" 
+                    wire:model="firstName"
+                    class="w-full h-10 sm:h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition"
+                  />
+                  <span class="block text-[11px] text-white/60 mt-1">First</span>
+                  @error('firstName') <span class="text-red-400 text-xs block mt-0.5">{{ $message }}</span> @enderror
+                </div>
+                <div>
+                  <input 
+                    type="text" 
+                    wire:model="lastName"
+                    class="w-full h-10 sm:h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition"
+                  />
+                  <span class="block text-[11px] text-white/60 mt-1">Last</span>
+                  @error('lastName') <span class="text-red-400 text-xs block mt-0.5">{{ $message }}</span> @enderror
+                </div>
+              </div>
+            </div>
+
+            {{-- 3. Business Email --}}
+            <div>
+              <label class="block text-xs sm:text-[13px] font-bold text-white mb-1">
+                Business Email <span class="text-[#EF4444]">*</span>
+              </label>
+              <input 
+                type="email" 
+                wire:model="email"
+                class="w-full h-10 sm:h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition"
+              />
+              @error('email') <span class="text-red-400 text-xs block mt-1">{{ $message }}</span> @enderror
+            </div>
+
+            {{-- 4. Phone --}}
+            <div>
+              <label class="block text-xs sm:text-[13px] font-bold text-white mb-1">
+                Phone <span class="text-[#EF4444]">*</span>
+              </label>
+              <div class="relative flex items-center w-full h-10 sm:h-11 rounded-lg bg-[#F0F3FA] px-3 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-purple transition">
+                <div class="flex items-center gap-1 pr-2 border-r border-slate-300 shrink-0">
+                  <select wire:model.live="phoneCountry" class="bg-transparent text-xs font-semibold text-slate-700 cursor-pointer focus:outline-none appearance-none pr-3">
+                    @foreach ($countryCodes as $cc => $data)
+                      <option value="{{ $cc }}" class="text-slate-900">{{ $data['label'] }}</option>
+                    @endforeach
+                  </select>
+                  <svg class="w-3 h-3 text-slate-500 pointer-events-none -ml-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                <input 
+                  type="tel" 
+                  wire:model="phone"
+                  placeholder="(201) 555-0123" 
+                  class="w-full h-full pl-3 bg-transparent text-slate-900 text-sm placeholder-slate-400 focus:outline-none"
+                />
+              </div>
+              @error('phone') <span class="text-red-400 text-xs block mt-1">{{ $message }}</span> @enderror
+            </div>
+
+            {{-- 5. Consent Checkbox --}}
+            <div class="pt-1">
+              <label class="flex items-start gap-2.5 cursor-pointer text-[10.5px] sm:text-[11px] leading-[1.4] text-white/80 select-none">
+                <input 
+                  type="checkbox" 
+                  required 
+                  checked 
+                  class="mt-0.5 w-4 h-4 rounded bg-[#F0F3FA] text-brand-purple border-0 focus:ring-0 focus:ring-offset-0 shrink-0 cursor-pointer"
+                />
+                <span>
+                  I agree to receive SMS appointment reminders from Remote Leverage about the consultation I'm booking, and to be contacted by phone and email. Messaging frequency varies. Standard message and data rates may apply. Reply STOP to unsubscribe, HELP for help, or call (650) 668-0728 / email paula@remoteleverage.com. By consenting I acknowledge I have read and agree to Remote Leverage’s <a href="/terms-of-use" class="underline hover:text-white">Terms &amp; Conditions</a> and <a href="/privacy-policy" class="underline hover:text-white">Privacy Policy</a>. I can withdraw consent at any time.
+                </span>
+              </label>
+            </div>
+
+            {{-- 6. Submit Button --}}
+            <div class="pt-2">
+              <button 
+                type="button" 
+                wire:click="goToStep(2)"
+                wire:loading.attr="disabled"
+                class="w-full py-3.5 px-6 rounded-full bg-[#E0E5EC] hover:bg-white text-[#4A5568] hover:text-black font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all duration-200 shadow-md cursor-pointer disabled:opacity-50"
+              >
+                <span wire:loading.remove>Book a Call</span>
+                <span wire:loading>Processing...</span>
+                <svg wire:loading.remove class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        @elseif ($isBooked)
+          {{-- Booking Confirmation --}}
+          <div class="p-4 sm:p-6 text-center space-y-4">
+            <div class="w-14 h-14 rounded-full bg-status-success/20 text-status-success flex items-center justify-center mx-auto">
+              <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <h3 class="text-xl font-bold font-display text-white">Call Confirmed!</h3>
+            <p class="text-xs sm:text-sm text-white/80">We've reserved your strategy session. Check your email for calendar invite details.</p>
+            <div class="text-2xs text-white/60">Reference: <code class="font-mono text-white">{{ $bookingReference }}</code></div>
+          </div>
+        @else
+          {{-- Calendar / Slots Selection (Step 2, 3, 4) in light container --}}
+          <div class="bg-white rounded-2xl p-5 sm:p-6 text-slate-900 shadow-lg">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+              <button 
+                type="button" 
+                wire:click="goToStep({{ $currentStep - 1 }})"
+                class="text-xs font-semibold text-slate-500 hover:text-black inline-flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                <span>Back</span>
+              </button>
+              <span class="text-xs font-bold text-brand-purple">Step {{ $currentStep }} of {{ $totalSteps }}</span>
+            </div>
+
+            @if ($currentStep === 2)
+              {{-- Month Navigation Header --}}
+              <div class="flex items-center justify-between mb-3 px-1">
+                <h4 class="text-sm font-bold text-slate-900">{{ $monthTitle }}</h4>
+                <div class="flex items-center gap-1">
+                  <button type="button" wire:click="prevMonth" class="p-1.5 rounded-full hover:bg-slate-100 text-slate-600 transition cursor-pointer" aria-label="Previous Month">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                  </button>
+                  <button type="button" wire:click="nextMonth" class="p-1.5 rounded-full hover:bg-slate-100 text-slate-600 transition cursor-pointer" aria-label="Next Month">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                  </button>
+                </div>
+              </div>
+
+              {{-- Day Name Column Headers --}}
+              <div class="grid grid-cols-7 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                <span>SUN</span><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span>
+              </div>
+
+              {{-- Dates Grid --}}
+              <div class="grid grid-cols-7 gap-1 text-center">
+                @foreach ($daysGrid as $cell)
+                  @if ($cell['empty'])
+                    <div class="h-8 w-8"></div>
+                  @else
+                    <button
+                      type="button"
+                      wire:click="selectDate('{{ $cell['date'] }}')"
+                      @disabled($cell['isPast'] || ! $cell['hasAvailability'])
+                      class="mx-auto h-8 w-8 rounded-full text-xs font-semibold flex items-center justify-center transition-all duration-150
+                        {{ $cell['isSelected'] ? 'bg-brand-purple text-white font-bold shadow-md scale-105' : '' }}
+                        {{ $cell['hasAvailability'] && ! $cell['isSelected'] ? 'hover:bg-brand-purple/10 text-slate-900 font-bold hover:text-brand-purple cursor-pointer' : '' }}
+                        {{ ! $cell['hasAvailability'] || $cell['isPast'] ? 'text-slate-300 cursor-not-allowed' : '' }}
+                      "
+                    >
+                      <span>{{ $cell['day'] }}</span>
+                    </button>
+                  @endif
+                @endforeach
+              </div>
+            @elseif ($currentStep === 3)
+              {{-- Time slots --}}
+              <h4 class="text-sm font-bold text-slate-900 mb-2">Select a Time for {{ \Carbon\Carbon::parse($selectedDate)->format('D, M j') }}</h4>
+              <div class="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                @forelse ($availableSlots as $slot)
+                  <button
+                    type="button"
+                    wire:click="selectSlot('{{ $slot['time'] }}')"
+                    class="py-2 px-3 rounded-lg border text-xs font-semibold transition cursor-pointer {{ $selectedSlot === $slot['time'] ? 'border-brand-purple bg-brand-purple text-white' : 'border-slate-200 hover:border-brand-purple text-slate-800' }}"
+                  >
+                    {{ $slot['time'] }}
+                  </button>
+                @empty
+                  <p class="text-xs text-slate-500 col-span-2 py-4 text-center">No times available for this date.</p>
+                @endforelse
+              </div>
+              @if ($selectedSlot)
+                <div class="pt-3 flex justify-end">
+                  <button type="button" wire:click="goToStep(4)" class="py-2.5 px-5 rounded-full bg-brand-purple hover:bg-brand-purple-deep text-white font-bold text-xs tracking-wide transition cursor-pointer">
+                    Confirm Time
+                  </button>
+                </div>
+              @endif
+            @elseif ($currentStep === 4)
+              {{-- Final submit --}}
+              <div class="space-y-3">
+                <h4 class="text-sm font-bold text-slate-900">Final Confirmation</h4>
+                <p class="text-xs text-slate-600">Meeting: <strong>{{ \Carbon\Carbon::parse($selectedDate)->format('M j, Y') }} at {{ $selectedSlot }}</strong></p>
+                <textarea wire:model="notes" rows="2" placeholder="Any specific requirements or notes?" class="w-full p-2.5 rounded-lg border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-purple"></textarea>
+                <button type="button" wire:click="submitBooking" wire:loading.attr="disabled" class="w-full py-3 rounded-full bg-brand-purple hover:bg-brand-purple-deep text-white font-bold text-sm tracking-wide transition cursor-pointer">
+                  <span wire:loading.remove>Complete Booking</span>
+                  <span wire:loading>Reserving...</span>
+                </button>
+              </div>
+            @endif
+          </div>
+        @endif
+
+      </div>
+    </div>
+  @else
+    {{-- Default Skin for /book-consultation --}}
+    <div class="w-full max-w-[580px] mx-auto">
+      <div class="w-full bg-surface-white rounded-card-lg border border-slate-200/80 shadow-card overflow-hidden">
     
     {{-- Hidden Acquisition & UTM Tracking Fields (matches rl-testing forms & handl-utm-grabber) --}}
     <input type="hidden" name="utm_source" wire:model="utmSource" value="{{ $utmSource }}" id="rl_utm_source">
@@ -494,7 +755,9 @@
       </div>
     @endif
 
-  </div>
+      </div>
+    </div>
+  @endif
 
   @script
   <script>
