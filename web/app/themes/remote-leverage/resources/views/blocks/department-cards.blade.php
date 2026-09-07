@@ -16,9 +16,9 @@
     </div>
 
     {{-- Cards Grid --}}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-card">
       @foreach ($cards as $card)
-        <div class="group relative rounded-card-lg bg-surface-white border border-slate-200/80 hover:border-brand-purple/50 shadow-card hover:shadow-2xl transition-all duration-300 flex flex-col justify-between overflow-hidden">
+        <div class="group relative rounded-card bg-surface-white border border-slate-200/80 hover:border-brand-purple/50 shadow-card hover:shadow-2xl transition-all duration-300 flex flex-col justify-between overflow-hidden">
           
           {{-- Card Visual / Top Dome Area --}}
           <div class="relative h-48 bg-gradient-to-br from-brand-midnight via-brand-navy to-brand-dark-violet overflow-hidden flex items-center justify-center p-6">
@@ -59,7 +59,7 @@
           </div>
 
           {{-- Card Body --}}
-          <div class="p-6 space-y-4 flex-1 flex flex-col justify-between">
+          <div class="p-card space-y-4 flex-1 flex flex-col justify-between">
             <p class="text-text-muted text-xs sm:text-sm leading-relaxed">
               {{ $card['description'] }}
             </p>
@@ -92,7 +92,7 @@
           </div>
 
           {{-- Card Footer CTA --}}
-          <div class="p-4 bg-slate-50/70 border-t border-slate-100">
+          <div class="p-card bg-slate-50/70 border-t border-slate-100">
             <a
               href="#booking-wizard"
               class="w-full py-2.5 rounded-cta bg-brand-purple/10 hover:bg-brand-purple text-brand-purple hover:text-white text-xs font-bold transition flex items-center justify-center gap-2 group-hover:bg-brand-purple group-hover:text-white"

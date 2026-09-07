@@ -54,10 +54,10 @@
     {{-- Testimonials Container --}}
     <div 
       x-ref="carousel"
-      class="{{ $layout === 'carousel' ? 'flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-6 scrollbar-none' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-' . $columns . ' gap-6' }}"
+      class="{{ $layout === 'carousel' ? 'flex gap-card overflow-x-auto scroll-smooth snap-x snap-mandatory pb-6 scrollbar-none' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-' . $columns . ' gap-card' }}"
     >
       @foreach ($testimonials as $t)
-        <div class="group relative bg-bg-light rounded-card-lg border border-slate-200/80 hover:border-brand-purple/40 shadow-card hover:shadow-xl transition-all duration-300 p-6 sm:p-8 flex flex-col justify-between {{ $layout === 'carousel' ? 'w-80 sm:w-96 shrink-0 snap-start' : 'w-full' }}">
+        <div class="group relative bg-bg-light rounded-card border border-slate-200/80 hover:border-brand-purple/40 shadow-card hover:shadow-xl transition-all duration-300 p-card flex flex-col justify-between {{ $layout === 'carousel' ? 'w-80 sm:w-96 shrink-0 snap-start' : 'w-full' }}">
           
           <div class="space-y-4">
             {{-- Star Rating --}}

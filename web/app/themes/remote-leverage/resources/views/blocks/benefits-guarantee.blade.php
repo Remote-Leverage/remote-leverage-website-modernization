@@ -17,10 +17,10 @@
     </div>
 
     {{-- Main Grid --}}
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-card items-stretch">
       
       {{-- Guarantee Card (Left Column - 5 cols) --}}
-      <div class="lg:col-span-5 rounded-card-lg bg-gradient-to-br from-brand-midnight via-brand-navy to-brand-dark-violet text-white p-8 sm:p-10 shadow-glow-purple border border-purple-900/40 flex flex-col justify-between relative overflow-hidden">
+      <div class="lg:col-span-5 rounded-card bg-gradient-to-br from-brand-midnight via-brand-navy to-brand-dark-violet text-white p-card shadow-glow-purple border border-purple-900/40 flex flex-col justify-between relative overflow-hidden">
         <div class="absolute -right-16 -bottom-16 w-64 h-64 bg-brand-magenta/20 rounded-full blur-3xl pointer-events-none"></div>
 
         <div class="space-y-6 relative z-10">
@@ -55,9 +55,9 @@
       </div>
 
       {{-- Benefits Grid (Right Column - 7 cols) --}}
-      <div class="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <div class="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-card">
         @foreach ($benefits as $benefit)
-          <div class="bg-surface-white rounded-card-lg border border-slate-200/80 p-6 sm:p-7 shadow-card hover:shadow-xl hover:border-brand-purple/40 transition-all duration-300 flex flex-col justify-between">
+          <div class="bg-surface-white rounded-card border border-slate-200/80 p-card shadow-card hover:shadow-xl hover:border-brand-purple/40 transition-all duration-300 flex flex-col justify-between">
             <div class="space-y-3">
               <div class="w-9 h-9 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

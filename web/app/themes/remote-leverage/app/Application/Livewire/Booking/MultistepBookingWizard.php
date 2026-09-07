@@ -32,6 +32,8 @@ class MultistepBookingWizard extends Component
 
     public ?string $profileImage = null;
 
+    public string $skin = 'default';
+
     // Step 1: Contact / Qualification Details
     public string $email = '';
 
@@ -164,11 +166,12 @@ class MultistepBookingWizard extends Component
         ],
     ];
 
-    public function mount(?string $roleNeeded = null): void
+    public function mount(?string $roleNeeded = null, string $skin = 'default'): void
     {
         if ($roleNeeded) {
             $this->roleNeeded = $roleNeeded;
         }
+        $this->skin = $skin;
 
         $now = Carbon::now($this->timezone);
         $this->currentMonth = (int) $now->format('n');
