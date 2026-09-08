@@ -42,6 +42,7 @@ class DomainServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
         $this->app->make(PartnerPostType::class)->register();
         $this->app->make(\App\Infrastructure\WordPress\Admin\LeadsAdminDashboard::class)->register();
     }

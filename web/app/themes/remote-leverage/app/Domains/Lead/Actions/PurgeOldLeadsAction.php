@@ -46,6 +46,8 @@ class PurgeOldLeadsAction
             ]);
         }
 
+        \Illuminate\Support\Facades\Cache::forget('rl_lead_dashboard_kpi_metrics');
+
         return $count;
     }
 }

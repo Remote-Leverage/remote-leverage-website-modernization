@@ -15,6 +15,7 @@ use App\Domains\Lead\Services\HubSpotGateway;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\PartnerHub\Listeners\HandleLeadBookingCompletedForPartner;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -75,5 +76,10 @@ class LeadServiceProvider extends ServiceProvider
             LeadBookingCompleted::class,
             [HandleLeadBookingCompletedForPartner::class, 'handle']
         );
+
+        // 5. Invalidate admin dashboard KPI cache on lead lifecycle events
+        Event::listen([LeadCreated::class, LeadBookingCompleted::class], function () {
+            Cache::forget('rl_lead_dashboard_kpi_metrics');
+        });
     }
 }

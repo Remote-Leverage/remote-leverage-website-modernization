@@ -71,6 +71,40 @@ $app->singleton('validator', function ($app) {
     return new Factory($translator, $app);
 });
 
+$app->singleton('cache', function () {
+    return new class {
+        protected array $storage = [];
+
+        public function get($key, $default = null)
+        {
+            return $this->storage[$key] ?? $default;
+        }
+
+        public function put($key, $value, $ttl = null)
+        {
+            $this->storage[$key] = $value;
+
+            return true;
+        }
+
+        public function remember($key, $ttl, $callback)
+        {
+            if (! isset($this->storage[$key])) {
+                $this->storage[$key] = $callback();
+            }
+
+            return $this->storage[$key];
+        }
+
+        public function forget($key)
+        {
+            unset($this->storage[$key]);
+
+            return true;
+        }
+    };
+});
+
 // 2. Set up in-memory SQLite database for Eloquent models
 $capsule = new Capsule($app);
 $capsule->addConnection([

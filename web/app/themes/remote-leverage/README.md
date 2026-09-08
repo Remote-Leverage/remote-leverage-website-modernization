@@ -103,7 +103,14 @@ Under **ADR-0008**, legacy Gravity Forms plugins (`GF_HubSpot`, `gform_after_sub
   - **Stage 2: Consumption** (`consumed_by_tracking`, `consumed_by_crm`, `consumed_by_webhook`)
 - **`PhoneValidationService`**: Uses `libphonenumber-for-php` to parse and validate international phone numbers against country codes, outputting standardized E.164 strings.
 - **`HubSpotGateway`**: Direct API integration syncing lead contacts and lifecycle stages directly to HubSpot.
-- **`PurgeOldLeadsAction`**: GDPR and compliance maintenance enforcing a 30-day minimum retention floor via `wp acorn lead:purge`.
+- **`PurgeOldLeadsAction`**: GDPR and compliance maintenance enforcing a 30-day minimum retention floor via `wp acorn lead:purge` or 1-click admin action.
+- **`LeadsAdminDashboard` (`app/Infrastructure/WordPress/Admin/LeadsAdminDashboard.php`)**: Full-featured WordPress Admin Command Center (`/wp/wp-admin/admin.php?page=rl-leads`) providing:
+  - **Live KPI Metric Badges**: Total leads, booked consultations, high-tier MRR counts ($\ge \$10\text{k}$), partial form drops, and total audit log volume.
+  - **Filter & Search Bar**: Search across name, email, phone, company, and UTM source, with status filter pills (`captured`, `booked`, `partial`, `abandoned`, `qualified`, `canceled`).
+  - **Direct Actions**: Instant CSV export of filtered leads, 1-click 30-day retention purge with safety check, and manual status updates.
+  - **Consultation Links**: Inline clickable Google Meet room URLs for fast consultant onboarding.
+  - **Lead Dossier & Dual-Logging Audit Viewer**: Single lead drill-down (`view_lead=ID`) displaying contact info, revenue tier, full UTM/attribution click IDs (`gclid`, `fbclid`), and a chronological execution timeline comparing Stage 1 Dispatch vs Stage 2 Consumption with expandable formatted JSON payloads.
+  - **Global Audit Activity Stream**: Live feed across all leads (`page=rl-leads-activity`) with filterable stages and outcomes.
 
 ---
 
@@ -330,22 +337,32 @@ The Lead Domain handles form submission ingestion, international phone validatio
 - Verifies `PurgeOldLeadsAction` respects the 30-day retention floor.
 - Verifies Slack and outbound webhook listener consumption logging.
 
-#### B. Manual Browser Verification
+#### B. Manual Browser Verification (WordPress Admin Dashboard)
 1. Navigate to any page containing a booking funnel (e.g. `https://remoteleverage-v2.test/hire-va-4-preview/` or `/book-consultation`).
 2. Fill out Step 1 (Email, Full Name, Phone, and Monthly Revenue tier).
 3. Click **Next: Pick a Date**.
-4. Check the database to confirm the partial lead was persisted:
-   ```bash
-   wp db query "SELECT id, email, first_name, last_name, phone, monthly_revenue, status FROM rl_leads ORDER BY id DESC LIMIT 1;"
-   ```
-5. Check the activity audit log to verify the dual-logging contract:
-   ```bash
-   wp db query "SELECT id, lead_id, stage, action, status, created_at FROM rl_lead_activity_logs WHERE lead_id = (SELECT MAX(id) FROM rl_leads) ORDER BY id ASC;"
-   ```
-   - Expect: `stage = 'dispatch'` / `action = 'dispatch_initiated'`
-   - Expect: `stage = 'consumption'` / `action = 'consumed_by_tracking'`
+4. Open the WordPress Admin **Lead Dashboard**:
+   - URL: `https://remoteleverage-v2.test/wp/wp-admin/admin.php?page=rl-leads`
+   - Confirm the new lead appears at the top of the table with status `partial` (amber badge), formatted E.164 phone, email, and revenue tier indicator (`T10 High-Tier` or `T0 Standard`).
+5. Verify the Dual-Logging Audit Contract:
+   - Click **View Audit** or click the lead's email to open the **Lead Dossier & Audit Trail**.
+   - Check the **Execution & Audit Trail** card to verify the dual-write contract in real-time:
+     - **`STAGE 1: DISPATCH`** (`dispatch_initiated`) — outbound lead payload stamped with timestamps.
+     - **`STAGE 2: CONSUMPTION`** (`consumed_by_tracking`) — downstream analytics subscribers.
+     - Click **View Full Payload JSON** on any event to inspect the full serialized JSON payload without leaving the browser.
+   - Alternatively, inspect the live audit event stream across all leads at:
+     `https://remoteleverage-v2.test/wp/wp-admin/admin.php?page=rl-leads-activity`
 
-#### C. CLI Retention Purge Test
+*(Optional WP-CLI Database Verification)*:
+```bash
+wp db query "SELECT id, email, first_name, last_name, phone, monthly_revenue, status FROM wp_rl_leads ORDER BY id DESC LIMIT 1;"
+wp db query "SELECT id, lead_id, stage, action, status, created_at FROM wp_rl_lead_activity_logs WHERE lead_id = (SELECT MAX(id) FROM wp_rl_leads) ORDER BY id ASC;"
+```
+*(Note: table names use WordPress table prefix `wp_`, e.g. `wp_rl_leads`)*
+
+#### C. Retention Purge Test (1-Click Admin or CLI)
+- **Via WordPress Admin**: Navigate to **Leads** in WP Admin and click the **Run Retention Purge (30+ Days)** button in the top toolbar. It will execute `PurgeOldLeadsAction`, prune leads older than 30 days that are not active customers, and show an admin notice with the purged count.
+- **Via WP-CLI**:
 ```bash
 wp acorn lead:purge
 ```
@@ -384,9 +401,14 @@ The Scheduling Domain manages real-time appointment availability, revenue-tiered
 5. Click **Confirm**:
    - Verify immediate transition to the **You're All Set!** confirmation screen.
    - Verify Google Meet video link is displayed with Add-to-Calendar buttons (Google, Outlook, Apple).
-6. Verify DB record:
+6. Verify in WordPress Admin Lead Dashboard:
+   - Go to `https://remoteleverage-v2.test/wp/wp-admin/admin.php?page=rl-leads`.
+   - The lead's status badge will have dynamically transitioned to **`booked`** (green badge).
+   - In the "Consultation" column, click the direct **Google Meet** button (`video.google.com/...`) to launch the scheduled video room.
+   - Click into the lead's detail view to inspect the **Consultation Booking & Video Call** card displaying the booked slot, customer timezone, and meeting URL.
+   *(Optional CLI verification)*:
    ```bash
-   wp db query "SELECT id, email, status, preferred_slot, timezone, meeting_id, meeting_url FROM rl_leads ORDER BY id DESC LIMIT 1;"
+   wp db query "SELECT id, email, status, preferred_slot, timezone, meeting_id, meeting_url FROM wp_rl_leads ORDER BY id DESC LIMIT 1;"
    ```
 
 #### C. Testing Webhook Reconciliation via cURL
@@ -454,8 +476,13 @@ Handles referral link tracking, 24-hour IP deduplication, commission calculation
    - Confirm cookie `rl_referrer` is set with value `testpartner`.
 3. Fill out any consultation or contact form and submit.
 4. Verify lead is stamped with partner attribution:
+   - In WP Admin **Lead Dashboard** (`/wp/wp-admin/admin.php?page=rl-leads`), check the **Referral / UTM Source** column on the new lead row.
+   - Or click into the lead's detail view under **Attribution & Campaign Tracking** to confirm:
+     - `Referral Slug: testpartner`
+     - `Source Type: referral_hub`
+   *(Optional CLI verification)*:
    ```bash
-   wp db query "SELECT id, email, source_type, source_id, referral_code FROM rl_leads ORDER BY id DESC LIMIT 1;"
+   wp db query "SELECT id, email, source_type, source_id, referral_code FROM wp_rl_leads ORDER BY id DESC LIMIT 1;"
    ```
    - Expect: `referral_code = 'testpartner'`, `source_type = 'referral_hub'`
 

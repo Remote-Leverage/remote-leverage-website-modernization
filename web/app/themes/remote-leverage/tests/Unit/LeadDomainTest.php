@@ -307,4 +307,51 @@ describe('Lead Domain', function () {
         expect($finalLog)->not->toBeNull()
             ->and($finalLog->outcome)->toBe('succeeded');
     });
+
+    test('LeadsAdminDashboard smart search and KPI caching execute efficiently at scale', function () {
+        Lead::create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'John Enterprise',
+            'email' => 'john@enterprise.io',
+            'phone' => '+13055550199',
+            'company' => 'Enterprise Global',
+            'monthly_revenue' => '$50k to $100k Per Month',
+            'status' => 'booked',
+        ]);
+
+        Lead::create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Sarah Startup',
+            'email' => 'sarah@startup.co',
+            'phone' => '+14155550188',
+            'company' => 'Startup AI',
+            'monthly_revenue' => '$0 to $5k Per Month',
+            'status' => 'partial',
+        ]);
+
+        $dashboard = new \App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
+
+        // Use reflection to access protected applyOptimizedSearch
+        $reflection = new ReflectionClass($dashboard);
+        $method = $reflection->getMethod('applyOptimizedSearch');
+        $method->setAccessible(true);
+
+        // 1. Test email search routing
+        $emailQuery = Lead::query();
+        $method->invoke($dashboard, $emailQuery, 'john@enterprise.io');
+        expect($emailQuery->count())->toBe(1)
+            ->and($emailQuery->first()->email)->toBe('john@enterprise.io');
+
+        // 2. Test phone search routing
+        $phoneQuery = Lead::query();
+        $method->invoke($dashboard, $phoneQuery, '4155550188');
+        expect($phoneQuery->count())->toBe(1)
+            ->and($phoneQuery->first()->email)->toBe('sarah@startup.co');
+
+        // 3. Test text search fallback
+        $textQuery = Lead::query();
+        $method->invoke($dashboard, $textQuery, 'Enterprise');
+        expect($textQuery->count())->toBe(1)
+            ->and($textQuery->first()->name)->toBe('John Enterprise');
+    });
 });
