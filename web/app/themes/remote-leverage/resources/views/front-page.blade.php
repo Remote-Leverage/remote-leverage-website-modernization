@@ -2,7 +2,7 @@
 
 @section('content')
     @php
-        $imgBase = get_template_directory_uri() . '/public/images/home';
+        $imgBase = set_url_scheme(get_template_directory_uri() . '/public/images/home', 'https');
     @endphp
 
     @while (have_posts())

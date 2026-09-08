@@ -57,26 +57,36 @@
 
             {{-- 2. Name: First & Last --}}
             <div>
-              <label class="block text-xs sm:text-[13px] font-bold text-white mb-1">
+              <span class="block text-xs sm:text-[13px] font-bold text-white mb-1">
                 Name <span class="text-[#EF4444]">*</span>
-              </label>
+              </span>
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <input 
                     type="text" 
+                    id="booking-first-name"
+                    name="first_name"
+                    autocomplete="given-name"
+                    aria-label="First Name"
+                    aria-required="true"
                     wire:model="firstName"
                     class="w-full h-10 sm:h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
                   />
-                  <span class="block text-[11px] text-white/60 mt-1">First</span>
+                  <label for="booking-first-name" class="block text-[11px] text-white/60 mt-1 cursor-pointer">First</label>
                   @error('firstName') <span class="text-red-400 text-xs block mt-0.5">{{ $message }}</span> @enderror
                 </div>
                 <div>
                   <input 
                     type="text" 
+                    id="booking-last-name"
+                    name="last_name"
+                    autocomplete="family-name"
+                    aria-label="Last Name"
+                    aria-required="true"
                     wire:model="lastName"
                     class="w-full h-10 sm:h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
                   />
-                  <span class="block text-[11px] text-white/60 mt-1">Last</span>
+                  <label for="booking-last-name" class="block text-[11px] text-white/60 mt-1 cursor-pointer">Last</label>
                   @error('lastName') <span class="text-red-400 text-xs block mt-0.5">{{ $message }}</span> @enderror
                 </div>
               </div>
@@ -84,11 +94,16 @@
 
             {{-- 3. Business Email --}}
             <div>
-              <label class="block text-xs sm:text-[13px] font-bold text-white mb-1">
+              <label for="booking-email" class="block text-xs sm:text-[13px] font-bold text-white mb-1 cursor-pointer">
                 Business Email <span class="text-[#EF4444]">*</span>
               </label>
               <input 
                 type="email" 
+                id="booking-email"
+                name="email"
+                autocomplete="email"
+                aria-label="Business Email"
+                aria-required="true"
                 wire:model="email"
                 class="w-full h-10 sm:h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
               />
@@ -97,7 +112,7 @@
 
             {{-- 4. Phone --}}
             <div>
-              <label class="block text-xs sm:text-[13px] font-bold text-white mb-1">
+              <label for="booking-phone-input" class="block text-xs sm:text-[13px] font-bold text-white mb-1 cursor-pointer">
                 Phone <span class="text-[#EF4444]">*</span>
               </label>
               <div 
@@ -191,6 +206,9 @@
                   type="tel"
                   id="booking-phone-input"
                   name="phone"
+                  autocomplete="tel"
+                  aria-label="Phone Number"
+                  aria-required="true"
                   value="{{ $phone }}"
                   placeholder="(201) 555-0123"
                   class="w-full h-10 sm:h-11 rounded-lg bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
@@ -201,9 +219,12 @@
 
             {{-- 5. Consent Checkbox --}}
             <div class="pt-1">
-              <label class="flex items-start gap-2.5 cursor-pointer text-[10.5px] sm:text-[11px] leading-[1.4] text-white/80 select-none">
+              <label for="booking-consent-checkbox" class="flex items-start gap-2.5 cursor-pointer text-[10.5px] sm:text-[11px] leading-[1.4] text-white/80 select-none">
                 <input 
                   type="checkbox" 
+                  id="booking-consent-checkbox"
+                  name="consent"
+                  aria-label="Consent to receive SMS appointment reminders"
                   required 
                   checked 
                   class="mt-0.5 w-4 h-4 rounded bg-[#F0F3FA] text-brand-purple border-0 focus:ring-0 focus:ring-offset-0 shrink-0 cursor-pointer"
