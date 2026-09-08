@@ -232,7 +232,7 @@
                         class="font-display text-4xl sm:text-5xl lg:text-[50px] font-bold leading-[1.08] tracking-[-0.03em] text-black max-w-xl">
                         World's Best Talent,<br>Hired Directly for You
                     </h2>
-                    <p class="max-w-[480px] text-[15px] sm:text-base leading-relaxed text-black/80 lg:pt-1">
+                    <p class="max-w-[480px] text-[15px] sm:text-base leading-relaxed text-black lg:pt-1">
                         You hire talent directly into your business – no subscriptions, no monthly fees, and no markups on
                         salary. Just deep-vetted, skilled professionals helping you run operations, manage communication,
                         and stay organized.
@@ -293,7 +293,7 @@
                                     <h3
                                         class="font-display text-[22px] sm:text-[23px] font-bold text-black tracking-[-0.025em] leading-[1.2] mb-3.5">
                                         {!! $b['title'] !!}</h3>
-                                    <p class="text-[14px] sm:text-[15px] leading-[1.6] text-text-secondary">
+                                    <p class="text-[14px] sm:text-[15px] leading-[1.6] text-black">
                                         {{ $b['desc'] }}</p>
                                 </div>
                             </div>
@@ -313,7 +313,7 @@
                         class="font-display text-4xl lg:text-5xl font-bold leading-[1.1] tracking-[-0.03em] text-black mb-4">
                         Beyond the "Virtual Assistant."
                     </h2>
-                    <p class="text-base leading-relaxed text-text-dim">
+                    <p class="text-base leading-relaxed text-black">
                         We specialize in globally sourcing English-fluent professionals<br class="hidden sm:block"> for
                         roles that require high-level execution.
                     </p>
@@ -362,114 +362,148 @@
         </section>
 
         {{-- ═══════════════════════════════════════════════════════════ --}}
+        {{-- ═══════════════════════════════════════════════════════════ --}}
         {{-- SECTION 4 · 2,000+ BUSINESSES (MAP & TRUST)               --}}
         {{-- ═══════════════════════════════════════════════════════════ --}}
-        <section class="relative bg-bg-map py-24 lg:py-28 overflow-hidden">
-            <div class="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none"
-                style="background-image: url('{{ $imgBase }}/Map.webp');"></div>
-
-            <div class="relative z-10 max-w-[1380px] mx-auto px-6 lg:px-10">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-20 items-center">
+        <section id="trust-section" class="relative bg-[#E4ECFC] py-20 lg:py-28 overflow-hidden">
+            <div class="relative z-10 max-w-[1240px] mx-auto px-6 lg:px-10">
+                <div class="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-12 lg:gap-20">
 
                     {{-- Left: Stats Cards --}}
-                    <div class="rl-trust-cards flex flex-col gap-card">
+                    <div class="w-full max-w-[370px] sm:max-w-[400px] flex flex-col gap-4 shrink-0">
                         {{-- Card 1: VAs Onboarded --}}
-                        <div class="rl-trust-card rl-trust-card-onboarded">
-                            <span class="rl-trust-card-title">VAs Onboarded</span>
-                            <div class="rl-trust-card-avatars-group">
-                                <div class="rl-trust-card-avatars">
-                                    <div class="rl-trust-card-avatar"><img src="{{ $imgBase }}/person_01.webp"
-                                            alt="Remote Assistant" width="40" height="40" loading="lazy"
-                                            decoding="async"></div>
-                                    <div class="rl-trust-card-avatar"><img src="{{ $imgBase }}/person_02.webp"
-                                            alt="Remote Assistant" width="40" height="40" loading="lazy"
-                                            decoding="async"></div>
-                                    <div class="rl-trust-card-avatar"><img src="{{ $imgBase }}/Person_03.webp"
-                                            alt="Remote Assistant" width="40" height="40" loading="lazy"
-                                            decoding="async"></div>
-                                    <div class="rl-trust-card-avatar"><img src="{{ $imgBase }}/Person_04.webp"
-                                            alt="Remote Assistant" width="40" height="40" loading="lazy"
-                                            decoding="async"></div>
+                        <div
+                            class="w-full bg-white rounded-[24px] px-6 py-4.5 sm:px-7 sm:py-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)] flex items-center justify-between">
+                            <span class="font-display font-bold text-[15px] sm:text-base text-black">VAs Onboarded</span>
+                            <div class="flex items-center">
+                                <div class="flex items-center -space-x-2">
+                                    <img src="{{ $imgBase }}/person_01.webp" alt="Remote Assistant" width="36"
+                                        height="36" class="w-9 h-9 rounded-full border-2 border-white object-cover"
+                                        loading="lazy" decoding="async">
+                                    <img src="{{ $imgBase }}/person_02.webp" alt="Remote Assistant" width="36"
+                                        height="36" class="w-9 h-9 rounded-full border-2 border-white object-cover"
+                                        loading="lazy" decoding="async">
+                                    <img src="{{ $imgBase }}/Person_03.webp" alt="Remote Assistant" width="36"
+                                        height="36" class="w-9 h-9 rounded-full border-2 border-white object-cover"
+                                        loading="lazy" decoding="async">
+                                    <img src="{{ $imgBase }}/Person_04.webp" alt="Remote Assistant" width="36"
+                                        height="36" class="w-9 h-9 rounded-full border-2 border-white object-cover"
+                                        loading="lazy" decoding="async">
                                 </div>
-                                <span class="rl-trust-card-extra">+2500</span>
+                                <span class="font-display font-extrabold text-base text-black ml-3">+2500</span>
                             </div>
                         </div>
 
                         {{-- Card 2: Countries & Economic Impact --}}
-                        <div class="rl-trust-card rl-trust-card-payments">
-                            <div class="rl-trust-card-bg-media">
-                                <img src="{{ $imgBase }}/globe.webp" alt="Global Coverage" width="120"
-                                    height="120" loading="lazy" decoding="async">
+                        <div
+                            class="w-full bg-white rounded-[24px] sm:rounded-[28px] p-6 sm:p-7 shadow-[0_15px_35px_rgba(0,0,0,0.04)] relative overflow-hidden flex flex-col justify-between min-h-[300px] sm:min-h-[330px]">
+                            {{-- Wireframe Globe Background Graphic --}}
+                            <div
+                                class="absolute -right-12 -bottom-16 w-[300px] sm:w-[340px] pointer-events-none opacity-25 select-none">
+                                <img src="{{ $imgBase }}/globe.webp" alt="Global Coverage" width="340"
+                                    height="340" class="w-full h-auto object-contain" loading="lazy" decoding="async">
                             </div>
-                            <div>
-                                <div class="rl-trust-card-header">
-                                    <span class="rl-trust-card-title">Countries</span>
-                                    <div class="rl-trust-card-flags">
-                                        <div class="rl-trust-card-flag"><img src="{{ $imgBase }}/costa-rica.webp"
-                                                alt="Costa Rica" width="20" height="15" loading="lazy"
-                                                decoding="async"></div>
-                                        <div class="rl-trust-card-flag"><img src="{{ $imgBase }}/equador.webp"
-                                                alt="Ecuador" width="20" height="15" loading="lazy"
-                                                decoding="async"></div>
-                                        <div class="rl-trust-card-flag"><img src="{{ $imgBase }}/chile.webp"
-                                                alt="Chile" width="20" height="15" loading="lazy"
-                                                decoding="async"></div>
-                                        <div class="rl-trust-card-flag"><img src="{{ $imgBase }}/paraguai.webp"
-                                                alt="Paraguay" width="20" height="15" loading="lazy"
-                                                decoding="async"></div>
-                                        <div class="rl-trust-card-flag"><img src="{{ $imgBase }}/brazil.webp"
-                                                alt="Brazil" width="20" height="15" loading="lazy"
-                                                decoding="async"></div>
-                                        <div class="rl-trust-card-flag"><img src="{{ $imgBase }}/colombia.webp"
-                                                alt="Colombia" width="20" height="15" loading="lazy"
-                                                decoding="async"></div>
-                                        <div class="rl-trust-card-flag"><img src="{{ $imgBase }}/argentina.webp"
-                                                alt="Argentina" width="20" height="15" loading="lazy"
-                                                decoding="async"></div>
-                                        <div class="rl-trust-card-flag"><img src="{{ $imgBase }}/mexico.webp"
-                                                alt="Mexico" width="20" height="15" loading="lazy"
-                                                decoding="async"></div>
+
+                            {{-- Top Row: Countries & Flags --}}
+                            <div class="relative z-10 flex items-center justify-between mb-8">
+                                <span class="text-sm sm:text-[15px] font-bold text-black">Countries</span>
+                                <div class="flex items-center">
+                                    <div class="flex items-center -space-x-1.5">
+                                        <img src="{{ $imgBase }}/costa-rica.webp" alt="Costa Rica" width="22"
+                                            height="22"
+                                            class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
+                                            loading="lazy" decoding="async">
+                                        <img src="{{ $imgBase }}/equador.webp" alt="Ecuador" width="22"
+                                            height="22"
+                                            class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
+                                            loading="lazy" decoding="async">
+                                        <img src="{{ $imgBase }}/chile.webp" alt="Chile" width="22"
+                                            height="22"
+                                            class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
+                                            loading="lazy" decoding="async">
+                                        <img src="{{ $imgBase }}/paraguai.webp" alt="Paraguay" width="22"
+                                            height="22"
+                                            class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
+                                            loading="lazy" decoding="async">
+                                        <img src="{{ $imgBase }}/brazil.webp" alt="Brazil" width="22"
+                                            height="22"
+                                            class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
+                                            loading="lazy" decoding="async">
+                                        <img src="{{ $imgBase }}/colombia.webp" alt="Colombia" width="22"
+                                            height="22"
+                                            class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
+                                            loading="lazy" decoding="async">
+                                        <img src="{{ $imgBase }}/argentina.webp" alt="Argentina" width="22"
+                                            height="22"
+                                            class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
+                                            loading="lazy" decoding="async">
+                                        <img src="{{ $imgBase }}/mexico.webp" alt="Mexico" width="22"
+                                            height="22"
+                                            class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
+                                            loading="lazy" decoding="async">
                                     </div>
-                                    <span class="font-display font-extrabold text-base text-black">+50</span>
+                                    <span
+                                        class="font-display font-extrabold text-sm sm:text-base text-black ml-2.5">+50</span>
                                 </div>
                             </div>
-                            <div class="mt-auto">
-                                <span
-                                    class="font-display text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted block mb-2.5">Economic
-                                    Impact Created</span>
-                                <div class="rl-trust-card-progress">
-                                    <div class="rl-trust-card-progress-fill w-[53%]"></div>
+
+                            {{-- Bottom Block: Economic Impact --}}
+                            <div class="relative z-10 mt-auto">
+                                <span class="font-display text-[15px] sm:text-base font-bold text-black block mb-2">
+                                    Economic Impact Created
+                                </span>
+
+                                {{-- Underline & Divider Row --}}
+                                <div class="w-full flex items-center mb-3">
+                                    <div class="h-[2.5px] bg-black w-[170px] shrink-0"></div>
+                                    <div class="h-[1px] bg-black/10 w-full"></div>
                                 </div>
-                                <div class="rl-trust-card-amount-row">
-                                    <span class="rl-trust-card-amount">USD 41,920,000</span>
-                                    <span class="rl-trust-card-status">Last 12 Months</span>
+
+                                {{-- Amount & Timeline --}}
+                                <div class="flex items-baseline justify-between pt-0.5">
+                                    <span
+                                        class="font-display font-extrabold text-2xl sm:text-[28px] lg:text-[30px] text-black tracking-tight">
+                                        USD 41,920,000
+                                    </span>
+                                    <span class="text-[11px] sm:text-xs font-bold text-black leading-tight text-right">
+                                        Last 12<br>Months
+                                    </span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {{-- Right: Content --}}
-                    <div class="rl-trust-content">
-                        <div class="rl-trust-stars" role="img" aria-label="5 out of 5 stars rating">
+                    <div class="w-full max-w-[480px] lg:pt-8">
+                        {{-- 5 Purple Stars --}}
+                        <div class="flex items-center gap-2 mb-5 sm:mb-6" role="img"
+                            aria-label="5 out of 5 stars rating">
                             @for ($i = 0; $i < 5; $i++)
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="black"
+                                <svg class="w-4.5 h-4.5 text-[#9F53E7]" viewBox="0 0 24 24" fill="currentColor"
                                     aria-hidden="true">
                                     <path
                                         d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                 </svg>
                             @endfor
                         </div>
-                        <h2 class="rl-trust-headline">
-                            We've helped more than 2,000 businesses hire exceptional talent from Latin America, the
-                            Caribbean, and Europe.
+
+                        {{-- Headline --}}
+                        <h2
+                            class="font-display text-3xl sm:text-[36px] lg:text-[38px] font-extrabold text-black leading-[1.18] tracking-tight mb-8">
+                            We've helped more than<br class="hidden sm:inline"> 2,000 businesses hire<br
+                                class="hidden sm:inline"> exceptional talent from<br class="hidden sm:inline"> Latin
+                            America, the<br class="hidden sm:inline"> Caribbean, and Europe.
                         </h2>
-                        <a href="#testimonials" class="rl-trust-cta">
+
+                        {{-- Purple Pill CTA Button --}}
+                        <a href="#testimonials"
+                            class="inline-flex items-center gap-6 py-4 px-7 sm:px-8 bg-[#8A2BE2] hover:bg-brand-purple-deep rounded-full text-white font-bold text-xs uppercase tracking-wider shadow-lg hover:shadow-purple-500/25 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] group">
                             <span>Watch client testimonials</span>
-                            <span class="rl-cta-arrow">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                    aria-hidden="true">
-                                    <path d="M9 18l6-6-6-6" stroke="#000" stroke-width="2.5" stroke-linecap="round"
-                                        stroke-linejoin="round" />
+                            <span
+                                class="w-7 h-7 rounded-full border border-white/60 flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:translate-x-0.5">
+                                <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                                 </svg>
                             </span>
                         </a>
@@ -493,7 +527,7 @@
                 </div>
 
                 {{-- 4 Metric Cards --}}
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-card mb-12 sm:mb-16">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-card mb-[12px]">
                     @php
                         $metrics = [
                             [
@@ -527,15 +561,15 @@
                             class="bg-white rounded-card p-card flex flex-col justify-between border border-black/[0.04] shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300">
                             <div>
                                 <div class="w-full overflow-hidden rounded-xl mb-5 bg-[#f7f8fc]">
-                                    <img src="{{ $m['img'] }}" alt="{{ $m['title'] }}" width="248" height="190"
-                                        loading="lazy" decoding="async"
+                                    <img src="{{ $m['img'] }}" alt="{{ $m['title'] }}" width="248"
+                                        height="190" loading="lazy" decoding="async"
                                         class="w-full h-auto aspect-[248/190] object-cover rounded-xl">
                                 </div>
                                 <div class="p-3">
                                     <h3
                                         class="font-display text-xl sm:text-[22px] font-bold text-black tracking-[-0.02em] leading-snug mb-3">
                                         {{ $m['title'] }}</h3>
-                                    <p class="text-[14px] leading-relaxed text-text-secondary">{{ $m['desc'] }}</p>
+                                    <p class="text-[14px] leading-relaxed text-black">{{ $m['desc'] }}</p>
                                 </div>
                             </div>
                         </div>
@@ -626,7 +660,7 @@
                         class="font-display text-4xl sm:text-5xl lg:text-[50px] font-bold leading-[1.08] tracking-[-0.03em] text-black max-w-xl">
                         From Vacancy to<br>Onboarded in 4 Days
                     </h2>
-                    <p class="max-w-[480px] text-[15px] sm:text-base leading-relaxed text-black/80 lg:pt-1">
+                    <p class="max-w-[480px] text-[15px] sm:text-base leading-relaxed text-black lg:pt-1">
                         Tell us who you need. We source, screen, and present qualified candidates within days, helping you
                         move from an open role to a productive team member faster than traditional hiring.
                     </p>
@@ -711,7 +745,8 @@
                     <div class="flex justify-center lg:justify-end self-start w-full pb-12 lg:pb-0">
                         <img src="{{ $imgBase }}/Group-59-1-e1780958571501.webp"
                             alt="12-Month Replacement Guarantee" width="578" height="545" loading="lazy"
-                            decoding="async" class="w-full max-w-[460px] sm:max-w-[500px] lg:max-w-[560px] h-auto object-contain">
+                            decoding="async"
+                            class="w-full max-w-[460px] sm:max-w-[500px] lg:max-w-[560px] h-auto object-contain">
                     </div>
                 </div>
             </div>
@@ -728,7 +763,7 @@
                         class="font-display text-4xl sm:text-5xl lg:text-[50px] font-bold leading-[1.08] tracking-[-0.03em] text-black">
                         Results, Not Promises
                     </h2>
-                    <p class="max-w-[460px] text-[15px] sm:text-base leading-relaxed text-black/80 lg:pt-1">
+                    <p class="max-w-[460px] text-[15px] sm:text-base leading-relaxed text-black lg:pt-1">
                         Don't just take our word for it, hear from business owners who've hired through Remote Leverage. See
                         why quality makes all the difference!
                     </p>
@@ -888,7 +923,7 @@
                                 </div>
                             </div>
                             <div class="pb-1 mt-auto text-right">
-                                <span class="text-[11px] sm:text-[12px] text-text-secondary font-medium">
+                                <span class="text-[11px] sm:text-[12px] text-black font-medium">
                                     {{ $t['company'] }}
                                 </span>
                             </div>
@@ -969,20 +1004,21 @@
                                         :aria-expanded="activeFaq === {{ $idx }} ? 'true' : 'false'"
                                         @click="activeFaq = (activeFaq === {{ $idx }} ? null : {{ $idx }})"
                                         class="w-full py-6 sm:py-7 text-left flex items-center justify-between gap-4 cursor-pointer focus:outline-none group">
-                                        <span class="font-display text-[16.5px] sm:text-[18px] font-bold text-black leading-[1.3] group-hover:opacity-75 transition-opacity pr-3">
+                                        <span
+                                            class="font-display text-[16.5px] sm:text-[18px] font-bold text-black leading-[1.3] group-hover:opacity-75 transition-opacity pr-3">
                                             {{ $faq['q'] }}
                                         </span>
                                         <div class="w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-full border border-black flex items-center justify-center shrink-0 transition-transform duration-300"
                                             :class="activeFaq === {{ $idx }} ? 'rotate-180' : ''">
                                             <svg class="w-3.5 h-3.5 text-black" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
-                                                aria-hidden="true">
+                                                stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                                                stroke-linejoin="round" aria-hidden="true">
                                                 <path d="M19 9l-7 7-7-7" />
                                             </svg>
                                         </div>
                                     </button>
                                     <div x-show="activeFaq === {{ $idx }}" x-collapse style="display:none;">
-                                        <div class="pb-7 pt-1 text-[15px] sm:text-base leading-relaxed text-text-secondary">
+                                        <div class="pb-7 pt-1 text-[15px] sm:text-base leading-relaxed text-black">
                                             {!! $faq['a'] !!}
                                         </div>
                                     </div>
@@ -998,20 +1034,21 @@
                                         :aria-expanded="activeFaq === {{ $idx }} ? 'true' : 'false'"
                                         @click="activeFaq = (activeFaq === {{ $idx }} ? null : {{ $idx }})"
                                         class="w-full py-6 sm:py-7 text-left flex items-center justify-between gap-4 cursor-pointer focus:outline-none group">
-                                        <span class="font-display text-[16.5px] sm:text-[18px] font-bold text-black leading-[1.3] group-hover:opacity-75 transition-opacity pr-3">
+                                        <span
+                                            class="font-display text-[16.5px] sm:text-[18px] font-bold text-black leading-[1.3] group-hover:opacity-75 transition-opacity pr-3">
                                             {{ $faq['q'] }}
                                         </span>
                                         <div class="w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-full border border-black flex items-center justify-center shrink-0 transition-transform duration-300"
                                             :class="activeFaq === {{ $idx }} ? 'rotate-180' : ''">
                                             <svg class="w-3.5 h-3.5 text-black" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
-                                                aria-hidden="true">
+                                                stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                                                stroke-linejoin="round" aria-hidden="true">
                                                 <path d="M19 9l-7 7-7-7" />
                                             </svg>
                                         </div>
                                     </button>
                                     <div x-show="activeFaq === {{ $idx }}" x-collapse style="display:none;">
-                                        <div class="pb-7 pt-1 text-[15px] sm:text-base leading-relaxed text-text-secondary">
+                                        <div class="pb-7 pt-1 text-[15px] sm:text-base leading-relaxed text-black">
                                             {!! $faq['a'] !!}
                                         </div>
                                     </div>

@@ -213,4 +213,34 @@ describe('Booking Wizard MRR Routing & Tracking Parity', function () {
         expect($passedEventUri)->toBe('https://api.calendly.com/event_types/5c82a248-c65a-4fb1-bdc6-aefd6e89fbfb')
             ->and($lead->fresh()->status)->toBe('booked');
     });
+
+    test('Wizard month navigation up and back retains accurate availability without mock weekdays', function () {
+        $wizard = new MultistepBookingWizard;
+        $wizard->mount('test', 'glass');
+        $wizard->email = 'test@example.com';
+        $wizard->firstName = 'John';
+        $wizard->lastName = 'Doe';
+        $wizard->monthlyRevenue = '$10k to $25k Per Month';
+        $wizard->roleNeeded = 'Executive Assistant';
+
+        $wizard->goToStep(2);
+        $initialDates = $wizard->availableDates;
+
+        // Navigate forward a month
+        $wizard->nextMonth();
+        expect($wizard->currentMonth)->toBe(10)
+            ->and($wizard->currentYear)->toBe(2026);
+
+        // Navigate back to current month
+        $wizard->prevMonth();
+        expect($wizard->currentMonth)->toBe(9)
+            ->and($wizard->currentYear)->toBe(2026)
+            ->and($wizard->availableDates)->toEqual($initialDates);
+
+        // Cannot navigate before current month
+        $wizard->prevMonth();
+        expect($wizard->currentMonth)->toBe(9)
+            ->and($wizard->currentYear)->toBe(2026);
+    });
 });
+

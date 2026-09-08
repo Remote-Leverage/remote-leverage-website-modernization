@@ -26,7 +26,7 @@
         @endif
 
         @if ($currentStep === 1 && ! $isBooked)
-          <div class="space-y-4">
+          <div wire:key="glass-step-1" class="space-y-4 animate-wizard-step">
             {{-- 1. Monthly Revenue --}}
             <div>
               <label class="block text-xs sm:text-[13px] font-bold text-white mb-2.5">
@@ -46,9 +46,9 @@
                       name="monthlyRevenue" 
                       value="{{ $revOption }}" 
                       wire:model.live="monthlyRevenue"
-                      class="w-4 h-4 rounded-full border-0 bg-white text-brand-purple focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                      class="w-4 h-4 rounded-full border-0 bg-white text-brand-purple focus:ring-0 focus:ring-offset-0 cursor-pointer transition-transform duration-150 group-hover:scale-110"
                     />
-                    <span class="group-hover:text-white/90">{{ $revOption }}</span>
+                    <span class="group-hover:text-white/90 transition-colors duration-150">{{ $revOption }}</span>
                   </label>
                 @endforeach
               </div>
@@ -65,7 +65,7 @@
                   <input 
                     type="text" 
                     wire:model="firstName"
-                    class="w-full h-10 sm:h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition"
+                    class="w-full h-10 sm:h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
                   />
                   <span class="block text-[11px] text-white/60 mt-1">First</span>
                   @error('firstName') <span class="text-red-400 text-xs block mt-0.5">{{ $message }}</span> @enderror
@@ -74,7 +74,7 @@
                   <input 
                     type="text" 
                     wire:model="lastName"
-                    class="w-full h-10 sm:h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition"
+                    class="w-full h-10 sm:h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
                   />
                   <span class="block text-[11px] text-white/60 mt-1">Last</span>
                   @error('lastName') <span class="text-red-400 text-xs block mt-0.5">{{ $message }}</span> @enderror
@@ -90,7 +90,7 @@
               <input 
                 type="email" 
                 wire:model="email"
-                class="w-full h-10 sm:h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition"
+                class="w-full h-10 sm:h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
               />
               @error('email') <span class="text-red-400 text-xs block mt-1">{{ $message }}</span> @enderror
             </div>
@@ -193,7 +193,7 @@
                   name="phone"
                   value="{{ $phone }}"
                   placeholder="(201) 555-0123"
-                  class="w-full h-10 sm:h-11 rounded-lg bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple transition"
+                  class="w-full h-10 sm:h-11 rounded-lg bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
                 />
               </div>
               @error('phone') <span class="text-red-400 text-xs block mt-1">{{ $message }}</span> @enderror
@@ -209,7 +209,7 @@
                   class="mt-0.5 w-4 h-4 rounded bg-[#F0F3FA] text-brand-purple border-0 focus:ring-0 focus:ring-offset-0 shrink-0 cursor-pointer"
                 />
                 <span>
-                  I agree to receive SMS appointment reminders from Remote Leverage about the consultation I'm booking, and to be contacted by phone and email. Messaging frequency varies. Standard message and data rates may apply. Reply STOP to unsubscribe, HELP for help, or call (650) 668-0728 / email paula@remoteleverage.com. By consenting I acknowledge I have read and agree to Remote Leverage’s <a href="/terms-of-use" class="underline hover:text-white">Terms &amp; Conditions</a> and <a href="/privacy-policy" class="underline hover:text-white">Privacy Policy</a>. I can withdraw consent at any time.
+                  I agree to receive SMS appointment reminders from Remote Leverage about the consultation I'm booking, and to be contacted by phone and email. Messaging frequency varies. Standard message and data rates may apply. Reply STOP to unsubscribe, HELP for help, or call (650) 668-0728 / email paula@remoteleverage.com. By consenting I acknowledge I have read and agree to Remote Leverage’s <a href="/terms-of-use" class="underline hover:text-white transition-colors duration-150">Terms &amp; Conditions</a> and <a href="/privacy-policy" class="underline hover:text-white transition-colors duration-150">Privacy Policy</a>. I can withdraw consent at any time.
                 </span>
               </label>
             </div>
@@ -220,11 +220,11 @@
                 type="button" 
                 wire:click="goToStep(2)"
                 wire:loading.attr="disabled"
-                class="w-full py-3.5 px-6 rounded-full bg-[#E0E5EC] hover:bg-white text-[#4A5568] hover:text-black font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all duration-200 shadow-md cursor-pointer disabled:opacity-50"
+                class="w-full py-3.5 px-6 rounded-full bg-[#E0E5EC] hover:bg-white text-[#4A5568] hover:text-black font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all duration-200 shadow-md hover:shadow-xl hover:scale-[1.01] active:scale-[0.98] cursor-pointer disabled:opacity-50"
               >
                 <span wire:loading.remove>Book a Call</span>
                 <span wire:loading>Processing...</span>
-                <svg wire:loading.remove class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <svg wire:loading.remove class="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
               </button>
@@ -232,8 +232,8 @@
           </div>
         @elseif ($isBooked)
           {{-- Booking Confirmation --}}
-          <div class="p-4 sm:p-6 text-center space-y-4">
-            <div class="w-14 h-14 rounded-full bg-status-success/20 text-status-success flex items-center justify-center mx-auto">
+          <div wire:key="glass-step-booked" class="p-4 sm:p-6 text-center space-y-4 animate-wizard-step">
+            <div class="w-14 h-14 rounded-full bg-status-success/20 text-status-success flex items-center justify-center mx-auto transition-transform duration-300 hover:scale-110">
               <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
             <h3 class="text-xl font-bold font-display text-white">Call Confirmed!</h3>
@@ -241,96 +241,177 @@
             <div class="text-2xs text-white/60">Reference: <code class="font-mono text-white">{{ $bookingReference }}</code></div>
           </div>
         @else
-          {{-- Calendar / Slots Selection (Step 2, 3, 4) in light container --}}
-          <div class="bg-white rounded-2xl p-5 sm:p-6 text-slate-900 shadow-lg">
-            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-              <button 
-                type="button" 
-                wire:click="goToStep({{ $currentStep - 1 }})"
-                class="text-xs font-semibold text-slate-500 hover:text-black inline-flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                <span>Back</span>
-              </button>
-              <span class="text-xs font-bold text-brand-purple">Step {{ $currentStep }} of {{ $totalSteps }}</span>
-            </div>
+          {{-- Steps 2 & 3 in Glass Skin --}}
+          @if ($currentStep === 2)
+            {{-- Step 2: Date Picker Calendar --}}
+            <div wire:key="glass-step-2" class="animate-wizard-step">
+              {{-- Top Bar: Circular Back Button (Left) & Nav/Month Title (Right) --}}
+              <div class="flex items-center justify-between mb-8">
+                <button 
+                  type="button" 
+                  wire:click="goToStep(1)"
+                  class="w-12 h-12 rounded-full bg-white text-brand-purple flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all duration-200 ease-out cursor-pointer shrink-0"
+                  aria-label="Back to Step 1"
+                >
+                  <svg class="w-5 h-5 text-brand-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                  </svg>
+                </button>
 
-            @if ($currentStep === 2)
-              {{-- Month Navigation Header --}}
-              <div class="flex items-center justify-between mb-3 px-1">
-                <h4 class="text-sm font-bold text-slate-900">{{ $monthTitle }}</h4>
-                <div class="flex items-center gap-1">
-                  <button type="button" wire:click="prevMonth" class="p-1.5 rounded-full hover:bg-slate-100 text-slate-600 transition cursor-pointer" aria-label="Previous Month">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                  </button>
-                  <button type="button" wire:click="nextMonth" class="p-1.5 rounded-full hover:bg-slate-100 text-slate-600 transition cursor-pointer" aria-label="Next Month">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                  </button>
+                <div class="flex items-center gap-5">
+                  <div class="flex items-center gap-3 text-white/70">
+                    <button type="button" wire:click="prevMonth" class="p-1.5 hover:text-white hover:scale-125 active:scale-90 transition-all duration-200 cursor-pointer text-base" aria-label="Previous Month">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+                      </svg>
+                    </button>
+                    <button type="button" wire:click="nextMonth" class="p-1.5 hover:text-white hover:scale-125 active:scale-90 transition-all duration-200 cursor-pointer text-base" aria-label="Next Month">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                      </svg>
+                    </button>
+                  </div>
+                  <h3 class="text-xl font-bold text-white tracking-tight transition-all duration-200">{{ $monthTitle }}</h3>
                 </div>
               </div>
 
               {{-- Day Name Column Headers --}}
-              <div class="grid grid-cols-7 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+              <div class="grid grid-cols-7 text-center text-xs sm:text-sm font-semibold text-white/80 uppercase tracking-wider mb-5">
                 <span>SUN</span><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span>
               </div>
 
               {{-- Dates Grid --}}
-              <div class="grid grid-cols-7 gap-1 text-center">
+              <div wire:key="glass-grid-{{ $currentYear }}-{{ $currentMonth }}" class="grid grid-cols-7 gap-y-3 sm:gap-y-4 text-center items-center justify-items-center animate-grid-month">
                 @foreach ($daysGrid as $cell)
                   @if ($cell['empty'])
-                    <div class="h-8 w-8"></div>
+                    <div class="w-11 h-11 sm:w-12 sm:h-12"></div>
                   @else
-                    <button
-                      type="button"
-                      wire:click="selectDate('{{ $cell['date'] }}')"
-                      @disabled($cell['isPast'] || ! $cell['hasAvailability'])
-                      class="mx-auto h-8 w-8 rounded-full text-xs font-semibold flex items-center justify-center transition-all duration-150
-                        {{ $cell['isSelected'] ? 'bg-brand-purple text-white font-bold shadow-md scale-105' : '' }}
-                        {{ $cell['hasAvailability'] && ! $cell['isSelected'] ? 'hover:bg-brand-purple/10 text-slate-900 font-bold hover:text-brand-purple cursor-pointer' : '' }}
-                        {{ ! $cell['hasAvailability'] || $cell['isPast'] ? 'text-slate-300 cursor-not-allowed' : '' }}
-                      "
-                    >
-                      <span>{{ $cell['day'] }}</span>
-                    </button>
+                    @if ($cell['hasAvailability'])
+                      <button
+                        type="button"
+                        wire:click="selectDate('{{ $cell['date'] }}')"
+                        class="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white text-brand-purple font-bold text-base sm:text-lg flex items-center justify-center shadow-lg hover:scale-115 active:scale-95 transition-all duration-200 ease-out cursor-pointer hover:shadow-2xl"
+                      >
+                        <span>{{ $cell['day'] }}</span>
+                      </button>
+                    @else
+                      <div class="w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center text-white/60 text-base sm:text-lg font-normal select-none transition-opacity duration-200">
+                        <span>{{ $cell['day'] }}</span>
+                      </div>
+                    @endif
                   @endif
                 @endforeach
               </div>
-            @elseif ($currentStep === 3)
-              {{-- Time slots --}}
-              <h4 class="text-sm font-bold text-slate-900 mb-2">Select a Time for {{ \Carbon\Carbon::parse($selectedDate)->format('D, M j') }}</h4>
-              <div class="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-                @forelse ($availableSlots as $slot)
-                  <button
-                    type="button"
-                    wire:click="selectSlot('{{ $slot['time'] }}')"
-                    class="py-2 px-3 rounded-lg border text-xs font-semibold transition cursor-pointer {{ $selectedSlot === $slot['time'] ? 'border-brand-purple bg-brand-purple text-white' : 'border-slate-200 hover:border-brand-purple text-slate-800' }}"
-                  >
-                    {{ $slot['time'] }}
-                  </button>
-                @empty
-                  <p class="text-xs text-slate-500 col-span-2 py-4 text-center">No times available for this date.</p>
-                @endforelse
-              </div>
-              @if ($selectedSlot)
-                <div class="pt-3 flex justify-end">
-                  <button type="button" wire:click="goToStep(4)" class="py-2.5 px-5 rounded-full bg-brand-purple hover:bg-brand-purple-deep text-white font-bold text-xs tracking-wide transition cursor-pointer">
-                    Confirm Time
-                  </button>
-                </div>
-              @endif
-            @elseif ($currentStep === 4)
-              {{-- Final submit --}}
-              <div class="space-y-3">
-                <h4 class="text-sm font-bold text-slate-900">Final Confirmation</h4>
-                <p class="text-xs text-slate-600">Meeting: <strong>{{ \Carbon\Carbon::parse($selectedDate)->format('M j, Y') }} at {{ $selectedSlot }}</strong></p>
-                <textarea wire:model="notes" rows="2" placeholder="Any specific requirements or notes?" class="w-full p-2.5 rounded-lg border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-purple"></textarea>
-                <button type="button" wire:click="submitBooking" wire:loading.attr="disabled" class="w-full py-3 rounded-full bg-brand-purple hover:bg-brand-purple-deep text-white font-bold text-sm tracking-wide transition cursor-pointer">
-                  <span wire:loading.remove>Complete Booking</span>
-                  <span wire:loading>Reserving...</span>
+            </div>
+
+          @elseif ($currentStep === 3)
+            {{-- Step 3: Time Slot Selection --}}
+            <div wire:key="glass-step-3" class="animate-wizard-step">
+              {{-- Top Bar: Circular Back Button --}}
+              <div class="mb-2">
+                <button 
+                  type="button" 
+                  wire:click="goToStep(2)"
+                  class="w-12 h-12 rounded-full bg-white text-brand-purple flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all duration-200 ease-out cursor-pointer shrink-0"
+                  aria-label="Back to Calendar"
+                >
+                  <svg class="w-5 h-5 text-brand-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                  </svg>
                 </button>
               </div>
-            @endif
-          </div>
+
+              {{-- Date & Timezone Header --}}
+              <div class="text-center">
+                <h3 class="text-xl font-bold text-white tracking-tight">{{ \Carbon\Carbon::parse($selectedDate)->format('l') }}</h3>
+                <p class="text-sm font-medium text-white/90 mt-0.5">{{ \Carbon\Carbon::parse($selectedDate)->format('F j, Y') }}</p>
+                
+                <div class="mt-3">
+                  <span class="text-xs text-white/70 block">Time zone</span>
+                  <div class="relative inline-block mt-0.5 group cursor-pointer">
+                    <select wire:model.live="timezone" class="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10">
+                      <option value="America/Bogota">America, Bogota ({{ \Carbon\Carbon::now('America/Bogota')->format('H:i') }})</option>
+                      <option value="America/New_York">America, New York ({{ \Carbon\Carbon::now('America/New_York')->format('H:i') }})</option>
+                      <option value="America/Chicago">America, Chicago ({{ \Carbon\Carbon::now('America/Chicago')->format('H:i') }})</option>
+                      <option value="America/Denver">America, Denver ({{ \Carbon\Carbon::now('America/Denver')->format('H:i') }})</option>
+                      <option value="America/Los_Angeles">America, Los Angeles ({{ \Carbon\Carbon::now('America/Los_Angeles')->format('H:i') }})</option>
+                      <option value="Europe/London">Europe, London ({{ \Carbon\Carbon::now('Europe/London')->format('H:i') }})</option>
+                      <option value="UTC">UTC ({{ \Carbon\Carbon::now('UTC')->format('H:i') }})</option>
+                    </select>
+                    <div class="inline-flex items-center gap-1.5 text-sm font-semibold text-white group-hover:text-white/90 transition-colors duration-150 pointer-events-none">
+                      <svg class="w-4 h-4 text-white/80 transition-transform duration-200 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                        <path stroke-width="2" d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                      </svg>
+                      <span class="underline decoration-white/40 underline-offset-4">{{ str_replace('_', ' ', $timezone) }} ({{ \Carbon\Carbon::now($timezone)->format('H:i') }})</span>
+                      <svg class="w-3.5 h-3.5 text-white/70 transition-transform duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {{-- Thin Divider --}}
+              <hr class="border-t border-white/20 my-6 w-full" />
+
+              {{-- Section Title --}}
+              <div class="text-center mb-5">
+                <h4 class="text-lg font-bold text-white">Select a Time</h4>
+                <p class="text-xs font-medium text-white/80 mt-0.5">Duration: 30 min</p>
+              </div>
+
+              {{-- Slot Options Stack --}}
+              <div class="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                @forelse ($availableSlots as $slot)
+                  @if ($selectedSlot === $slot['iso'])
+                    <div wire:key="slot-selected-{{ $slot['iso'] }}" class="grid grid-cols-2 gap-3 transition-all duration-200">
+                      <div class="w-full py-3.5 px-4 rounded-xl bg-brand-purple border border-white/30 text-white font-bold text-base text-center shadow flex items-center justify-center transition-all duration-200">
+                        {{ $slot['time'] }}
+                      </div>
+                      <button
+                        type="button"
+                        wire:click="submitBooking"
+                        wire:loading.attr="disabled"
+                        class="w-full py-3.5 px-4 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-base text-center shadow-lg hover:shadow-orange-500/30 hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 ease-out cursor-pointer flex items-center justify-center gap-2 animate-confirm-pop"
+                      >
+                        <span wire:loading.remove>Confirm</span>
+                        <span wire:loading class="flex items-center gap-1.5">
+                          <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>Reserving...</span>
+                        </span>
+                      </button>
+                    </div>
+                  @else
+                    <button
+                      type="button"
+                      wire:key="slot-opt-{{ $slot['iso'] }}"
+                      wire:click="selectSlot('{{ $slot['iso'] }}')"
+                      class="w-full py-3.5 px-4 rounded-xl bg-white hover:bg-white/95 text-brand-purple font-bold text-base text-center shadow hover:shadow-md hover:scale-[1.015] active:scale-[0.985] transition-all duration-200 ease-out cursor-pointer block"
+                    >
+                      {{ $slot['time'] }}
+                    </button>
+                  @endif
+                @empty
+                  <p class="text-sm text-white/70 py-6 text-center animate-wizard-step">No times available for this date.</p>
+                @endforelse
+              </div>
+            </div>
+
+          @elseif ($currentStep === 4)
+            {{-- Final Confirmation (Fallback if step 4 reached) --}}
+            <div wire:key="glass-step-4" class="space-y-4 text-center animate-wizard-step">
+              <h4 class="text-lg font-bold text-white">Final Confirmation</h4>
+              <p class="text-sm text-white/80">Meeting: <strong>{{ \Carbon\Carbon::parse($selectedDate)->format('M j, Y') }} at {{ $selectedSlot }}</strong></p>
+              <button type="button" wire:click="submitBooking" wire:loading.attr="disabled" class="w-full py-3.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-base hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 cursor-pointer shadow-lg hover:shadow-orange-500/30">
+                <span wire:loading.remove>Complete Booking</span>
+                <span wire:loading>Reserving...</span>
+              </button>
+            </div>
+          @endif
         @endif
 
       </div>

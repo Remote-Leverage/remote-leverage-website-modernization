@@ -178,19 +178,20 @@ class MultistepBookingWizard extends Component
         $this->currentYear = (int) $now->format('Y');
 
         // Acquisition & UTM tracking extraction (parity with rl-testing)
-        $this->utmSource = (string) (request()->query('utm_source') ?: request()->cookie('utm_source', request()->cookie('handl_utm_source', '')));
-        $this->utmMedium = (string) (request()->query('utm_medium') ?: request()->cookie('utm_medium', request()->cookie('handl_utm_medium', '')));
-        $this->utmCampaign = (string) (request()->query('utm_campaign') ?: request()->cookie('utm_campaign', request()->cookie('handl_utm_campaign', '')));
-        $this->utmTerm = (string) (request()->query('utm_term') ?: request()->cookie('utm_term', request()->cookie('handl_utm_term', '')));
-        $this->utmContent = (string) (request()->query('utm_content') ?: request()->cookie('utm_content', request()->cookie('handl_utm_content', '')));
-        $this->gclid = (string) (request()->query('gclid') ?: request()->cookie('gclid', ''));
-        $this->fbclid = (string) (request()->query('fbclid') ?: request()->cookie('fbclid', ''));
-        $this->referralCode = request()->query('via')
-            ?: request()->query('ref')
-            ?: request()->query('r')
-            ?: request()->cookie('rl_referrer');
-        $this->landingUrl = request()->fullUrl();
-        $this->referrerUrl = (string) (request()->header('referer') ?: request()->cookie('handl_ref', ''));
+        $req = app()->bound('request') ? app('request') : null;
+        $this->utmSource = (string) ($req?->query('utm_source') ?: $req?->cookie('utm_source', $req?->cookie('handl_utm_source', '')));
+        $this->utmMedium = (string) ($req?->query('utm_medium') ?: $req?->cookie('utm_medium', $req?->cookie('handl_utm_medium', '')));
+        $this->utmCampaign = (string) ($req?->query('utm_campaign') ?: $req?->cookie('utm_campaign', $req?->cookie('handl_utm_campaign', '')));
+        $this->utmTerm = (string) ($req?->query('utm_term') ?: $req?->cookie('utm_term', $req?->cookie('handl_utm_term', '')));
+        $this->utmContent = (string) ($req?->query('utm_content') ?: $req?->cookie('utm_content', $req?->cookie('handl_utm_content', '')));
+        $this->gclid = (string) ($req?->query('gclid') ?: $req?->cookie('gclid', ''));
+        $this->fbclid = (string) ($req?->query('fbclid') ?: $req?->cookie('fbclid', ''));
+        $this->referralCode = $req?->query('via')
+            ?: $req?->query('ref')
+            ?: $req?->query('r')
+            ?: $req?->cookie('rl_referrer');
+        $this->landingUrl = (string) ($req?->fullUrl() ?? '');
+        $this->referrerUrl = (string) ($req?->header('referer') ?: $req?->cookie('handl_ref', ''));
         $this->sessionId = (string) Str::uuid();
     }
 
@@ -355,7 +356,13 @@ class MultistepBookingWizard extends Component
 
     public function prevMonth(): void
     {
-        $date = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1)->subMonth();
+        $today = Carbon::today($this->timezone);
+        $currentFirst = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1, $this->timezone);
+        if ($currentFirst->isSameMonth($today) || $currentFirst->isPast()) {
+            return;
+        }
+
+        $date = $currentFirst->copy()->subMonth();
         $this->currentMonth = (int) $date->format('n');
         $this->currentYear = (int) $date->format('Y');
         $this->loadMonthAvailability();
@@ -382,7 +389,9 @@ class MultistepBookingWizard extends Component
     public function selectSlot(string $slot): void
     {
         $this->selectedSlot = $slot;
-        $this->goToStep(4);
+        if ($this->skin !== 'glass') {
+            $this->goToStep(4);
+        }
     }
 
     public function addGuest(): void
@@ -511,35 +520,26 @@ class MultistepBookingWizard extends Component
             $start = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1, $this->timezone)->startOfMonth();
             $end = $start->copy()->endOfMonth();
 
-            $cacheKey = 'rl_slots_' . md5($this->getActiveEventTypeUri() . $start->format('Y-m') . $this->timezone);
-            $slots = \Illuminate\Support\Facades\Cache::remember($cacheKey, 600, function () use ($slotsAction, $start, $end) {
-                return $slotsAction->execute(
+            $cacheKey = 'rl_avail_dates_' . md5($this->getActiveEventTypeUri() . $start->format('Y-m') . $this->timezone);
+            $this->availableDates = \Illuminate\Support\Facades\Cache::remember($cacheKey, 600, function () use ($slotsAction, $start, $end) {
+                $slots = $slotsAction->execute(
                     $start->toIso8601String(),
                     $end->toIso8601String(),
                     $this->timezone,
                     $this->getActiveEventTypeUri()
                 );
-            });
 
-            $dates = [];
-            foreach ($slots as $slot) {
-                $dateKey = Carbon::parse($slot->startTime)->setTimezone($this->timezone)->format('Y-m-d');
-                $dates[$dateKey] = true;
-            }
-
-            $this->availableDates = array_keys($dates);
-        } catch (\Throwable $e) {
-            // Fallback generation for weekdays in current month
-            $daysInMonth = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1)->daysInMonth;
-            $dates = [];
-            $today = Carbon::today($this->timezone);
-            for ($d = 1; $d <= $daysInMonth; $d++) {
-                $dateObj = Carbon::createFromDate($this->currentYear, $this->currentMonth, $d, $this->timezone);
-                if ($dateObj->isWeekday() && ! $dateObj->isPast()) {
-                    $dates[] = $dateObj->format('Y-m-d');
+                $dates = [];
+                foreach ($slots as $slot) {
+                    $dateKey = Carbon::parse($slot->startTime)->setTimezone($this->timezone)->format('Y-m-d');
+                    $dates[$dateKey] = true;
                 }
-            }
-            $this->availableDates = $dates;
+
+                return array_keys($dates);
+            });
+        } catch (\Throwable $e) {
+            Log::warning('Failed to load month availability: '.$e->getMessage());
+            $this->availableDates = [];
         }
     }
 
@@ -550,33 +550,28 @@ class MultistepBookingWizard extends Component
             $start = Carbon::parse($date, $this->timezone)->startOfDay();
             $end = $start->copy()->endOfDay();
 
-            $slots = $slotsAction->execute(
-                $start->toIso8601String(),
-                $end->toIso8601String(),
-                $this->timezone,
-                $this->getActiveEventTypeUri()
-            );
+            $cacheKey = 'rl_avail_slots_' . md5($this->getActiveEventTypeUri() . $date . $this->timezone);
+            $this->availableSlots = \Illuminate\Support\Facades\Cache::remember($cacheKey, 600, function () use ($slotsAction, $start, $end) {
+                $slots = $slotsAction->execute(
+                    $start->toIso8601String(),
+                    $end->toIso8601String(),
+                    $this->timezone,
+                    $this->getActiveEventTypeUri()
+                );
 
-            $times = [];
-            foreach ($slots as $slot) {
-                $times[] = [
-                    'iso' => $slot->startTime,
-                    'time' => Carbon::parse($slot->startTime, $this->timezone)->format('g:i A'),
-                ];
-            }
+                $times = [];
+                foreach ($slots as $slot) {
+                    $times[] = [
+                        'iso' => $slot->startTime,
+                        'time' => Carbon::parse($slot->startTime, $this->timezone)->format('g:ia'),
+                    ];
+                }
 
-            $this->availableSlots = $times;
+                return $times;
+            });
         } catch (\Throwable $e) {
-            // Default slots
-            $this->availableSlots = [
-                ['iso' => "{$date} 09:00:00", 'time' => '9:00 AM'],
-                ['iso' => "{$date} 10:00:00", 'time' => '10:00 AM'],
-                ['iso' => "{$date} 11:00:00", 'time' => '11:00 AM'],
-                ['iso' => "{$date} 13:00:00", 'time' => '1:00 PM'],
-                ['iso' => "{$date} 14:00:00", 'time' => '2:00 PM'],
-                ['iso' => "{$date} 15:00:00", 'time' => '3:00 PM'],
-                ['iso' => "{$date} 16:00:00", 'time' => '4:00 PM'],
-            ];
+            Log::warning('Failed to load slots for date: '.$e->getMessage());
+            $this->availableSlots = [];
         }
     }
 
@@ -655,6 +650,7 @@ class MultistepBookingWizard extends Component
         return view('livewire.booking.multistep-booking-wizard', [
             'monthTitle' => $monthTitle,
             'daysGrid' => $this->daysGrid,
+            'skin' => $this->skin,
         ]);
     }
 }
