@@ -32,6 +32,6 @@
     </div>
     <!-- /wp:columns -->
 
-    <!-- wp:acf/department-cards {"name":"acf/department-cards","data":{},"align":"","mode":"preview"} /-->
+    <?php echo \App\Support\BlockDefaults::renderDepartmentCards(); ?>
 </div>
 <!-- /wp:group -->

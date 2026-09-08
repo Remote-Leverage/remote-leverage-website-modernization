@@ -7,7 +7,6 @@
  */
 ?>
 <!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"2rem","bottom":"2.5rem"}}},"backgroundColor":"bg-light","layout":{"type":"constrained","contentSize":"1380px"}} -->
-<div class="wp-block-group alignfull has-bg-light-background-color has-background" style="padding-top:2rem;padding-bottom:2.5rem">
-    <!-- wp:acf/client-logos-marquee {"name":"acf/client-logos-marquee","data":{},"align":"","mode":"preview"} /-->
+    <?php echo \App\Support\BlockDefaults::renderClientLogosMarquee(); ?>
 </div>
 <!-- /wp:group -->

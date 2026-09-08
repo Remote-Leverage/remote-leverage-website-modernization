@@ -12,7 +12,7 @@
     <div class="wp-block-columns are-vertically-aligned-center">
         <!-- wp:column {"width":"48%"} -->
         <div class="wp-block-column" style="flex-basis:48%">
-            <!-- wp:acf/trust-stats {"name":"acf/trust-stats","data":{},"align":"","mode":"preview"} /-->
+            <?php echo \App\Support\BlockDefaults::renderTrustStats(); ?>
         </div>
         <!-- /wp:column -->
 

@@ -32,6 +32,6 @@
     </div>
     <!-- /wp:columns -->
 
-    <!-- wp:acf/process-steps {"name":"acf/process-steps","data":{},"align":"","mode":"preview"} /-->
+    <?php echo \App\Support\BlockDefaults::renderProcessSteps(); ?>
 </div>
 <!-- /wp:group -->

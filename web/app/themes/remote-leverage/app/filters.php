@@ -14,3 +14,6 @@ namespace App;
 add_filter('excerpt_more', function () {
     return sprintf(' &hellip; <a href="%s">%s</a>', get_permalink(), __('Continued', 'sage'));
 });
+
+// Initialize default demo content hooks for ACF blocks and patterns
+\App\Support\BlockDefaults::init();

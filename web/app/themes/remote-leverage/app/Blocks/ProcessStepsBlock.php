@@ -66,22 +66,6 @@ class ProcessStepsBlock extends Block
             return $items;
         }
 
-        return [
-            [
-                'num' => '01',
-                'title' => 'Tell us your<br>ideal hire',
-                'desc' => 'Tell us who you need. We handle sourcing, screening, and vetting candidates so you can focus on choosing the right person.',
-            ],
-            [
-                'num' => '02',
-                'title' => 'Meet your<br>top 1% shortlist',
-                'desc' => 'Within 48–72 hours, receive 4–6 candidates pre-vetted for skill, experience, and fit. You interview, you choose. No commitments, no pressure.',
-            ],
-            [
-                'num' => '03',
-                'title' => 'Make your<br>selection',
-                'desc' => 'Make your selection and get back to growing your business. We handle the details so your new hire can hit the ground running.',
-            ],
-        ];
+        return \App\Support\BlockDefaults::steps();
     }
 }

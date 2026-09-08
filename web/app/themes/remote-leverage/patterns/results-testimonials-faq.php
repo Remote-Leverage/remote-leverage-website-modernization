@@ -32,8 +32,8 @@
     </div>
     <!-- /wp:columns -->
 
-    <!-- wp:acf/testimonials {"name":"acf/testimonials","data":{},"align":"","mode":"preview"} /-->
+    <?php echo \App\Support\BlockDefaults::renderTestimonials(); ?>
 
-    <!-- wp:acf/accordion-faq {"name":"acf/accordion-faq","data":{},"align":"","mode":"preview"} /-->
+    <?php echo \App\Support\BlockDefaults::renderAccordionFaq(); ?>
 </div>
 <!-- /wp:group -->

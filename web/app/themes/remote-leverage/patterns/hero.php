@@ -34,6 +34,6 @@ $imgBase = get_template_directory_uri() . '/public/images/home';
     </div>
     <!-- /wp:group -->
 
-    <!-- wp:acf/talent-marquee {"name":"acf/talent-marquee","data":{},"align":"full","mode":"preview"} /-->
+    <?= \App\Support\BlockDefaults::renderTalentMarquee() ?>
 </div>
 <!-- /wp:group -->

@@ -56,29 +56,6 @@ class DepartmentCardsBlock extends Block
             return $items;
         }
 
-        $imgBase = get_template_directory_uri() . '/public/images/home';
-
-        return [
-            [
-                'img' => $imgBase . '/magnific_half-body-shot-of-a-young_SOmwQLyUb8-1.webp',
-                'title' => 'Administrative &amp;<br>Executive Assistants',
-                'desc' => 'Executive support for busy founders and teams.',
-            ],
-            [
-                'img' => $imgBase . '/magnific_wPmw8Jk7EI-1.webp',
-                'title' => 'Healthcare &amp;<br>Medical Assistants',
-                'desc' => 'Healthcare professionals supporting clinics and practices.',
-            ],
-            [
-                'img' => $imgBase . '/magnific_ubzu0aUQLD-1.webp',
-                'title' => 'Sales &amp; Growth<br>Marketing Talents',
-                'desc' => 'Professionals focused on growth, leads, and revenue.',
-            ],
-            [
-                'img' => $imgBase . '/magnific_YVjYLdkWeC-1.webp',
-                'title' => 'Operations &amp;<br>Finance Professionals',
-                'desc' => 'Experts in finance, operations, and business support.',
-            ],
-        ];
+        return \App\Support\BlockDefaults::departmentCards();
     }
 }

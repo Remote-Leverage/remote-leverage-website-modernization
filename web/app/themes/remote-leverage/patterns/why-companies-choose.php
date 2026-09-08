@@ -14,8 +14,8 @@
     </h2>
     <!-- /wp:heading -->
 
-    <!-- wp:acf/feature-cards {"name":"acf/feature-cards","data":{"columns":"4"},"align":"","mode":"preview"} /-->
+    <?php echo \App\Support\BlockDefaults::renderFeatureCards('4'); ?>
 
-    <!-- wp:acf/data-table {"name":"acf/data-table","data":{},"align":"","mode":"preview"} /-->
+    <?php echo \App\Support\BlockDefaults::renderDataTable(); ?>
 </div>
 <!-- /wp:group -->

@@ -32,6 +32,6 @@
     </div>
     <!-- /wp:columns -->
 
-    <!-- wp:acf/feature-cards {"name":"acf/feature-cards","data":{"columns":"3"},"align":"","mode":"preview"} /-->
+    <?php echo \App\Support\BlockDefaults::renderFeatureCards('3'); ?>
 </div>
 <!-- /wp:group -->
