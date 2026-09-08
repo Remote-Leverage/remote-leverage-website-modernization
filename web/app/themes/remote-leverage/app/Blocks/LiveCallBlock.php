@@ -30,6 +30,8 @@ class LiveCallBlock extends Block
             'description' => get_field('description') ?: 'No need to wait days for an appointment. If our team is green, jump into a private 1-on-1 strategy call immediately.',
             'buttonSize' => get_field('button_size') ?: 'hero',
             'showCardWrapper' => get_field('show_card_wrapper') ?? true,
+            'buttonOnly' => (bool) (get_field('button_only') ?? false),
+            'alignment' => get_field('alignment') ?: 'center',
         ];
     }
 
@@ -38,6 +40,20 @@ class LiveCallBlock extends Block
         $fields = Builder::make('live_call_block');
 
         $fields
+            ->addTrueFalse('button_only', [
+                'label' => 'Button Only Mode (No Header / Wrapper)',
+                'default_value' => false,
+                'ui' => 1,
+            ])
+            ->addSelect('alignment', [
+                'label' => 'Alignment',
+                'choices' => [
+                    'left' => 'Left',
+                    'center' => 'Center',
+                    'right' => 'Right',
+                ],
+                'default_value' => 'center',
+            ])
             ->addText('headline', [
                 'label' => 'Headline',
                 'default_value' => 'Speak with our Staffing Director Right Now',

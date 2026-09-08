@@ -1,6 +1,11 @@
+@if ($buttonOnly ?? false)
+  <div class="{{ ($alignment ?? 'center') === 'left' ? 'text-left' : (($alignment ?? 'center') === 'right' ? 'text-right' : 'text-center') }}">
+    <livewire:scheduling.instant-live-call-button :buttonSize="$buttonSize" />
+  </div>
+@else
 <div class="py-12 px-4 sm:px-6 lg:px-8">
   @if ($showCardWrapper)
-    <div class="max-w-4xl mx-auto rounded-card-lg bg-gradient-to-r from-brand-midnight to-brand-hero text-white p-8 sm:p-12 shadow-glow-purple border border-purple-900/40 relative overflow-hidden">
+    <div class="max-w-4xl mx-auto rounded-card-lg bg-linear-to-r from-brand-midnight to-brand-hero text-white p-8 sm:p-12 shadow-glow-purple border border-purple-900/40 relative overflow-hidden">
       {{-- Ambient lights --}}
       <div class="absolute -right-20 -top-20 w-80 h-80 bg-brand-purple/20 rounded-full blur-3xl pointer-events-none"></div>
       <div class="absolute -left-20 -bottom-20 w-80 h-80 bg-brand-magenta/20 rounded-full blur-3xl pointer-events-none"></div>
@@ -38,3 +43,4 @@
     </div>
   @endif
 </div>
+@endif

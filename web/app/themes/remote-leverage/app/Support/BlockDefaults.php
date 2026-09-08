@@ -139,6 +139,7 @@ class BlockDefaults
             'cards' => match ($fieldKey) {
                 'field_department_cards_block_cards' => self::formatRepeaterForAcf('field_department_cards_block_cards', self::departmentCards()),
                 'field_feature_cards_block_cards' => self::formatRepeaterForAcf('field_feature_cards_block_cards', self::featureCards('3')),
+                'field_roles_grid_block_cards' => self::formatRepeaterForAcf('field_roles_grid_block_cards', self::rolesGridCards()),
                 default => $value,
             },
             'rows' => self::formatRepeaterForAcf('field_data_table_block_rows', self::dataTableRows()),
@@ -687,5 +688,269 @@ class BlockDefaults
         $data = [];
         self::encodeRepeater('talent_cards', 'field_talent_marquee_block_talent_cards', self::talentCards(), $data);
         return self::patternBlock('talent-marquee', array_merge($data, $overrides), ['align' => 'full']);
+    }
+
+    public static function imgBaseHireVa4(): string
+    {
+        return get_template_directory_uri() . '/public/images/hire-va-4';
+    }
+
+    // --- HIRE-VA-4: ROLES GRID ---
+    public static function rolesGridCards(): array
+    {
+        $img = self::imgBaseHireVa4();
+        return [
+            [
+                'title' => 'Administrative',
+                'desc' => 'Inbox, calendar, invoices, data entry. The daily upkeep taken off your plate.',
+                'img' => $img . '/Woman_looking_camera_smiling_2K_202607171433-1.png',
+            ],
+            [
+                'title' => 'Lead Generation',
+                'desc' => 'Outreach calls, emails, texting, and follow-up that keeps your pipeline full.',
+                'img' => $img . '/Frame-1092.png',
+            ],
+            [
+                'title' => 'Sales (SDR)',
+                'desc' => 'Qualifies leads, runs demos, and follows through until it\'s a closed deal.',
+                'img' => $img . '/Screenshot-2026-07-17-at-2.03.18-p.m.-1.png',
+            ],
+            [
+                'title' => 'Social Media',
+                'desc' => 'Posts, replies, and community management that keeps your brand active.',
+                'img' => $img . '/Screenshot-2026-07-17-at-2.02.42-p.m.-1.png',
+            ],
+            [
+                'title' => 'Marketing',
+                'desc' => 'Runs and optimizes your paid campaigns across Meta, Google, and LinkedIn.',
+                'img' => $img . '/Frame-1092-1.png',
+            ],
+            [
+                'title' => 'Graphic Design',
+                'desc' => 'Social creative, decks, and brand assets that look like an in-house hire made them.',
+                'img' => $img . '/Screenshot-2026-07-17-at-2.01.07-p.m.-1.png',
+            ],
+            [
+                'title' => 'Customer Support',
+                'desc' => 'Tickets, questions, and vendor calls handled so your customers stay happy.',
+                'img' => $img . '/man-dressed-casual-wearing-glasses-studio-shot-copy-space-2.png',
+            ],
+            [
+                'title' => 'Custom Role',
+                'desc' => 'Something specific in mind? Tell us the role — we\'ve likely filled it before.',
+                'img' => $img . '/Frame-216.png',
+            ],
+        ];
+    }
+
+    public static function renderRolesGrid(array $overrides = []): string
+    {
+        $data = [];
+        self::encodeRepeater('cards', 'field_roles_grid_block_cards', self::rolesGridCards(), $data);
+        return self::patternBlock('roles-grid', array_merge($data, $overrides));
+    }
+
+    // --- HIRE-VA-4: PROCESS STEPS ---
+    public static function hireVa4ProcessSteps(): array
+    {
+        return [
+            [
+                'num' => '01',
+                'title' => 'Tell us your<br>ideal hire',
+                'desc' => 'Book a 15-minute consultation. Describe the role, skills, and experience you need. Remote Leverage handles posting, screening, and interviewing candidates on your behalf.',
+            ],
+            [
+                'num' => '02',
+                'title' => 'Meet your<br>top 1% shortlist',
+                'desc' => 'Within 48–72 hours, receive 4–6 pre-vetted, fluent English-speaking candidates. You interview, you choose. No contracts, no commitments — you only pay if you hire.',
+            ],
+            [
+                'num' => '03',
+                'title' => 'We handle pay<br>& compliance',
+                'desc' => 'You hire your favorite, and they are immediately integrated into your Lano payroll and compliance dashboard. No misclassification risk. No surprises.',
+            ],
+        ];
+    }
+
+    public static function renderHireVa4ProcessSteps(array $overrides = []): string
+    {
+        $data = [];
+        self::encodeRepeater('steps', 'field_process_steps_block_steps', self::hireVa4ProcessSteps(), $data);
+        return self::patternBlock('process-steps', array_merge($data, $overrides));
+    }
+
+    // --- HIRE-VA-4: TESTIMONIALS ---
+    public static function hireVa4Testimonials(): array
+    {
+        $img = self::imgBaseHireVa4();
+        return [
+            [
+                'company' => 'PRES Property Management',
+                'quote' => '“I can\'t say enough about how every step of the way it just wowed me.”',
+                'video_url' => 'https://vimeo.com/1067577208',
+                'image' => $img . '/PRES-Property-Management.jpg',
+                'duration' => '00:38',
+            ],
+            [
+                'company' => 'Coldwell Banker',
+                'quote' => '“I’m very impressed with the quality of my VA, she’s very intelligent and she aims to please.”',
+                'video_url' => 'https://vimeo.com/1067577369',
+                'image' => $img . '/Coldwell-Banker.jpg',
+                'duration' => '00:19',
+            ],
+            [
+                'company' => 'Carbon Solutions Group',
+                'quote' => '“I really recommend Remote Leverage; it was a fast process, and the results are good.”',
+                'video_url' => 'https://vimeo.com/1067577665',
+                'image' => $img . '/Carbon-Solutions-Group.jpg',
+                'duration' => '00:55',
+            ],
+            [
+                'company' => 'The Zen Zone Wellness',
+                'quote' => '“I got to talk to five amazing virtual assistants, and they all were good; it was kind of hard to make a choice at first.”',
+                'video_url' => 'https://vimeo.com/1067577549',
+                'image' => $img . '/The-Zen-Zone-Wellness.jpg',
+                'duration' => '04:06',
+            ],
+            [
+                'company' => 'Color Job',
+                'quote' => '“The transition of working with you guys was absolutely smooth and amazing.”',
+                'video_url' => 'https://vimeo.com/1067577688',
+                'image' => $img . '/Color-Job.jpg',
+                'duration' => '01:56',
+            ],
+            [
+                'company' => 'Connect Church Colorado',
+                'quote' => '“She was just perfect, everything that we were looking for we found it in her.”',
+                'video_url' => 'https://vimeo.com/1067577383',
+                'image' => $img . '/Connect-Church-Colorado.jpg',
+                'duration' => '02:45',
+            ],
+            [
+                'company' => 'Cash is King',
+                'quote' => '“Honestly, the reason why we keep hiring is because it is so incredibly easy.”',
+                'video_url' => 'https://vimeo.com/1067577489',
+                'image' => $img . '/Cash-is-King.jpg',
+                'duration' => '02:39',
+            ],
+            [
+                'company' => 'Liberty Hill',
+                'quote' => '“If somebody were asking me why they should work with Remote Leverage, I would say it\'s because of the quality of the candidates”',
+                'video_url' => 'https://vimeo.com/1067577248',
+                'image' => $img . '/Liberty-Hill.jpg',
+                'duration' => '02:31',
+            ],
+            [
+                'company' => 'RE / MAX',
+                'quote' => '“Its been about a year and a half since I\'ve been with them so far, I would definitely say go for it, it’s been a game changer for me.”',
+                'video_url' => 'https://vimeo.com/1067577464',
+                'image' => $img . '/RE-MAX.jpg',
+                'duration' => '01:02',
+            ],
+            [
+                'company' => 'Realty One Group',
+                'quote' => '“As I look back, I was on the fence about it, It\'s probably one of the best decisions I ever made if not the best to help grow my business.”',
+                'video_url' => 'https://vimeo.com/1067577620',
+                'image' => $img . '/Realty-One-Group.jpg',
+                'duration' => '01:43',
+            ],
+            [
+                'company' => 'OneUp Sportz',
+                'quote' => '“Very Very happy with the system, you guys system worked well and it was efficient.”',
+                'video_url' => 'https://vimeo.com/1067577228',
+                'image' => $img . '/OneUp-Sportz-01.jpg',
+                'duration' => '01:06',
+            ],
+            [
+                'company' => 'Greener Hill Psychiatric',
+                'quote' => '“Remote Leverage, presented six candidates and I did interview all of those very in depth, and I thought all of them were phenomenal.”',
+                'video_url' => 'https://vimeo.com/1067577293',
+                'image' => $img . '/Greener-Hill-Psychiatric.jpg',
+                'duration' => '05:59',
+            ],
+            [
+                'company' => 'Diamond Detox',
+                'quote' => '“I\'m very impressed with the english, the capability, qualification, timeliness, they were all very timely, patient.”',
+                'video_url' => 'https://vimeo.com/1067577442',
+                'image' => $img . '/Diamond-Detox.jpg',
+                'duration' => '00:43',
+            ],
+            [
+                'company' => 'Ad Center 360',
+                'quote' => '“It was awesome the best experience I\'ve ever had as far as hiring.”',
+                'video_url' => 'https://vimeo.com/1067577645',
+                'image' => $img . '/Ad-Center-360.jpg',
+                'duration' => '00:36',
+            ],
+        ];
+    }
+
+    public static function renderHireVa4Testimonials(array $overrides = []): string
+    {
+        $data = [];
+        self::encodeRepeater('testimonials', 'field_testimonials_block_testimonials', self::hireVa4Testimonials(), $data);
+        return self::patternBlock('testimonials', array_merge($data, $overrides));
+    }
+
+    // --- HIRE-VA-4: FAQS ---
+    public static function hireVa4Faqs(): array
+    {
+        return [
+            [
+                'q' => 'What countries do you hire from?',
+                'a' => '<p>We focus on four key regions:</p><ul><li>Latin America and The Caribbean</li><li>The Philippines</li><li>South Africa</li><li>Egypt</li></ul><p>Our Latin American Virtual Assistants are especially popular with US businesses, thanks to their exceptional English fluency with minimal accents, strong cultural alignment with US business practices, and convenient time zone overlap with North America.</p>',
+            ],
+            [
+                'q' => 'How do taxes & payroll work when hiring Virtual Assistants?',
+                'a' => '<p>Our partner company takes care of all payroll and compliance requirements for your Virtual Assistant. This means you can focus on growing your business while they handle tax compliance, payroll processing, legal requirements, and international payment regulations.</p>',
+            ],
+            [
+                'q' => 'How do you get paid?',
+                'a' => '<p>It’s simple – we charge a one-time flat fee, but only after you’ve found your perfect match. Whatever hourly pay you decide to pay goes directly to the Virtual Assistant you hire.</p>',
+            ],
+            [
+                'q' => 'What\'s the difference between Staffing and Recruiting Agencies?',
+                'a' => '<p>Staffing agencies charge monthly fees but only pay a small portion to Virtual Assistants. At Remote Leverage, we charge just one flat fee after you hire. Your Virtual Assistant receives 100% of what you pay them directly. This attracts higher-quality talent and eliminates ongoing middleman costs.</p>',
+            ],
+            [
+                'q' => 'What if I have questions and need help after hiring?',
+                'a' => '<p>After hiring your Virtual Assistant, you’ll have access to a dedicated Customer Success Manager who will help ensure your success with reviewing performance, monitoring progress, training guidance, and any other questions.</p>',
+            ],
+            [
+                'q' => 'What if they don\'t turn out to be a good fit?',
+                'a' => '<p>While it’s rare to have issues since candidates are thoroughly vetted by both our team and you, we offer a 12-month replacement guarantee at no extra cost and unlimited candidate interviews to ensure you find the best match.</p>',
+            ],
+            [
+                'q' => 'How is their English and Communication skills?',
+                'a' => '<p>We maintain extremely high standards for English fluency. All candidates must submit an English voice recording, and we only select those with fluent English and minimal accents. Only the best communicators make it through our screening.</p>',
+            ],
+            [
+                'q' => 'Can I start with Part-time?',
+                'a' => '<p>Yes, you can start with either part-time or full-time. The minimum is 20 hours per week, as our most qualified Virtual Assistants prefer stable positions with consistent hours.</p>',
+            ],
+            [
+                'q' => 'What time zone will they be working in?',
+                'a' => '<p>Your Virtual Assistant will work according to your schedule and time zone. They’re accustomed to US hours, and you get to set the working hours that best fit your needs.</p>',
+            ],
+            [
+                'q' => 'How much does the average Virtual Assistant cost?',
+                'a' => '<p>Virtual Assistant hourly rates depend on their skills and experience: Entry Level is $6-$10 per hour, and Highly Experienced is $11-$15 per hour. The hourly rate you agree to pay goes directly to your Virtual Assistant.</p>',
+            ],
+        ];
+    }
+
+    public static function renderHireVa4Faq(array $overrides = []): string
+    {
+        $data = [];
+        $faqs = self::hireVa4Faqs();
+        $data['faqs'] = count($faqs);
+        $data['_faqs'] = 'field_accordion_faq_block_faqs';
+        foreach ($faqs as $i => $item) {
+            $data["faqs_{$i}_question"] = $item['q'];
+            $data["_faqs_{$i}_question"] = 'field_accordion_faq_block_faqs_question';
+            $data["faqs_{$i}_answer"] = $item['a'];
+            $data["_faqs_{$i}_answer"] = 'field_accordion_faq_block_faqs_answer';
+        }
+        return self::patternBlock('accordion-faq', array_merge($data, $overrides));
     }
 }

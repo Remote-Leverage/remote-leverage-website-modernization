@@ -213,6 +213,31 @@ add_action('init', function () {
         'label' => __('Remote Leverage', 'remote-leverage'),
     ]);
 
+    // Register theme block patterns from patterns/ directory
+    $patternFiles = glob(get_theme_file_path('patterns/*.php'));
+    if (!empty($patternFiles)) {
+        foreach ($patternFiles as $patternFile) {
+            $headers = get_file_data($patternFile, [
+                'title' => 'Title',
+                'slug' => 'Slug',
+                'categories' => 'Categories',
+                'description' => 'Description',
+            ]);
+            if (!empty($headers['slug']) && !empty($headers['title'])) {
+                ob_start();
+                include $patternFile;
+                $patternContent = ob_get_clean();
+
+                register_block_pattern($headers['slug'], [
+                    'title' => $headers['title'],
+                    'content' => $patternContent,
+                    'categories' => !empty($headers['categories']) ? array_map('trim', explode(',', $headers['categories'])) : ['remote-leverage'],
+                    'description' => $headers['description'] ?? '',
+                ]);
+            }
+        }
+    }
+
     // Register Button Block Styles
     register_block_style('core/button', [
         'name' => 'pill-purple',
@@ -271,6 +296,30 @@ add_action('init', function () {
         'feature-cards' => [
             'class' => \App\Blocks\FeatureCardsBlock::class,
             'view' => 'blocks.feature-cards',
+        ],
+        'roles-grid' => [
+            'class' => \App\Blocks\RolesGridBlock::class,
+            'view' => 'blocks.roles-grid',
+        ],
+        'hire-va-hero' => [
+            'class' => \App\Blocks\HireVaHeroBlock::class,
+            'view' => 'blocks.hire-va-hero',
+        ],
+        'why-hire' => [
+            'class' => \App\Blocks\WhyHireBlock::class,
+            'view' => 'blocks.why-hire',
+        ],
+        'guarantee-card' => [
+            'class' => \App\Blocks\GuaranteeCardBlock::class,
+            'view' => 'blocks.guarantee-card',
+        ],
+        'comparison-matrix' => [
+            'class' => \App\Blocks\ComparisonMatrixBlock::class,
+            'view' => 'blocks.comparison-matrix',
+        ],
+        'booking-footer' => [
+            'class' => \App\Blocks\BookingFooterBlock::class,
+            'view' => 'blocks.booking-footer',
         ],
     ];
 

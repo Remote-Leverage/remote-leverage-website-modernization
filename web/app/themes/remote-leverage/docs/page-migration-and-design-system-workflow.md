@@ -19,6 +19,46 @@ All pages and blocks in Remote Leverage v2 follow these foundational pillars:
 
 ---
 
+## Non-Negotiable Core Directives
+
+> [!IMPORTANT]
+> **1. Canonical Container Width is ALWAYS 1380px**:
+> - Every main section container on every migrated page MUST be constrained to **1380px**.
+> - In Gutenberg Block Patterns: Every root `wp:group` MUST declare `"layout":{"type":"constrained","contentSize":"1380px"}`.
+> - In Blade Views & Tailwind Classes: Section content wrappers MUST use `w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8`.
+> - **Prohibited**: NEVER use `max-w-4xl`, `max-w-5xl`, `max-w-6xl`, `max-w-7xl`, `1140px`, or `1200px` for main content wrappers.
+
+> [!IMPORTANT]
+> **2. Strict 1:1 Copy Fidelity (Zero Creative Deviation)**:
+> - When given a target page, produce an **exact 1:1 visual and structural copy** using our design system tokens.
+> - **Do NOT Redesign**: Do not re-imagine the layout, omit elements, alter section ordering, change background colors, or replace bespoke components with generic equivalents.
+> - **Inspect Production CSS**: Always fetch the production page's compiled stylesheet (`post-<id>.css`) to inspect the exact background colors, gradients, background images, borders, and paddings.
+> - **Replicate All Elements**: Every eyebrow pill, trust counter, 5-star rating, checklist item, comparison card, badge graphic, video modal, and form field must be present in the exact relative arrangement.
+> - **Extend Design System Tokens**: Map all styles to theme tokens (`brand-midnight`, `brand-hero`, `brand-purple`, `bg-light`, `rounded-card`, etc.). If a token does not exist for an exact production value (e.g. a specific radial gradient, overlay image, or card border), **extend the design system tokens** in `theme.json` or `resources/css/app.css` rather than altering the design.
+
+> [!IMPORTANT]
+> **3. Zero "Unexpected or Invalid Content" Errors (Strict Gutenberg Block Grammar)**:
+> - Patterns and pages MUST NEVER trigger Gutenberg's `"Block contains unexpected or invalid content. [Attempt recovery]"` modal in the block editor.
+> - **Why This Error Occurs**:
+>   - Gutenberg validates blocks by comparing the saved HTML in `post_content` against the block's JavaScript `save({ attributes })` output.
+>   - Core container blocks (`core/columns`, `core/column`, `core/group`) use `<InnerBlocks.Content />` and expect **only valid Gutenberg block comments** (`<!-- wp:... -->`) as their children.
+>   - When arbitrary raw HTML tags (e.g. `<div class="pill">`, `<div class="grid">`, raw `<h1>`, or un-bracketed SVG markup) are injected directly inside `<!-- wp:column -->` or `<!-- wp:group -->`, Gutenberg flags them as unexpected/invalid content chunks.
+>   - Wrapping a child block inside raw HTML (e.g. `<div class="my-wrapper"><!-- wp:acf/booking /--></div>`) corrupts the block tree because Gutenberg cannot associate the wrapping DOM nodes with any registered block.
+> - **The Core Commandments**:
+>   1. **ACF Block First for Bespoke/Complex Sections (MANDATORY)**:
+>      - Whenever a section contains split columns with custom styling, trust pills, checklist grids, bespoke cards, or embedded Livewire/Alpine components (e.g. Split Hero, Comparison Matrix, 3-Step Process, Guarantee with Overlapping Badges), **DO NOT stitch it together using raw HTML inside `core/columns` or `core/column`**.
+>      - **Build a dedicated code-first ACF Block** (`Log1x\AcfComposer\Block`) with a Blade template (`resources/views/blocks/*.blade.php`).
+>      - Blade gives 100% control over Tailwind CSS v4 classes, semantic HTML, Alpine.js, and Livewire without any Gutenberg block validation restrictions.
+>      - Gutenberg stores a single server-rendered comment (`<!-- wp:acf/section-slug {...} /-->`), which **can NEVER fail Gutenberg client-side block validation**.
+>   2. **If Core Blocks Are Used, Follow Strict Grammar**:
+>      - EVERY visual element MUST be a native block comment (`wp:heading`, `wp:paragraph`, `wp:group`, `wp:list`).
+>      - Custom raw HTML MUST be wrapped in `<!-- wp:html --><div>...</div><!-- /wp:html -->`. NEVER leave raw HTML outside a block comment inside a container block.
+>      - NEVER wrap a block comment inside an arbitrary unclosed or closed HTML `<div>` tag.
+>   3. **Automated Validation in QA**:
+>      - Run the `parse_blocks()` validation audit before reporting completion. Any block with `blockName === null` containing non-whitespace `innerHTML` inside a container block is an error that MUST be eliminated before delivery.
+
+---
+
 ## 2. End-to-End Migration Procedure
 
 When given a URL from a production site (e.g. `https://remoteleverage.com/sample-landing-page`), execute the following workflow:
