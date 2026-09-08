@@ -522,9 +522,14 @@
 
           {{-- 1. Work Email (First) --}}
           <div class="space-y-1">
-            <label class="block text-xs font-bold uppercase tracking-wider text-text-body">Work Email *</label>
+            <label for="default-email" class="block text-xs font-bold uppercase tracking-wider text-text-body cursor-pointer">Work Email *</label>
             <input 
               type="email" 
+              id="default-email"
+              name="email"
+              autocomplete="email"
+              aria-label="Work Email"
+              aria-required="true"
               wire:model="email"
               placeholder="sarah@company.com"
               class="w-full px-4 py-2.5 rounded-card border border-slate-200 focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple text-sm text-text-body bg-white transition"
@@ -535,9 +540,14 @@
           {{-- 2. First Name & Last Name (Two Separate Fields) --}}
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="space-y-1">
-              <label class="block text-xs font-bold uppercase tracking-wider text-text-body">First Name *</label>
+              <label for="default-first-name" class="block text-xs font-bold uppercase tracking-wider text-text-body cursor-pointer">First Name *</label>
               <input 
                 type="text" 
+                id="default-first-name"
+                name="first_name"
+                autocomplete="given-name"
+                aria-label="First Name"
+                aria-required="true"
                 wire:model="firstName"
                 placeholder="e.g. Sarah"
                 class="w-full px-4 py-2.5 rounded-card border border-slate-200 focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple text-sm text-text-body bg-white transition"
@@ -546,9 +556,14 @@
             </div>
 
             <div class="space-y-1">
-              <label class="block text-xs font-bold uppercase tracking-wider text-text-body">Last Name *</label>
+              <label for="default-last-name" class="block text-xs font-bold uppercase tracking-wider text-text-body cursor-pointer">Last Name *</label>
               <input 
                 type="text" 
+                id="default-last-name"
+                name="last_name"
+                autocomplete="family-name"
+                aria-label="Last Name"
+                aria-required="true"
                 wire:model="lastName"
                 placeholder="e.g. Jenkins"
                 class="w-full px-4 py-2.5 rounded-card border border-slate-200 focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple text-sm text-text-body bg-white transition"
@@ -559,7 +574,7 @@
 
           {{-- 3. Phone Number with Country Selector --}}
           <div class="space-y-1">
-            <label class="block text-xs font-bold uppercase tracking-wider text-text-body">Phone Number</label>
+            <label for="default-phone-input" class="block text-xs font-bold uppercase tracking-wider text-text-body cursor-pointer">Phone Number</label>
             <div 
               wire:ignore 
               x-data="{
@@ -877,12 +892,15 @@
 
           {{-- Guest Invitee Repeater --}}
           <div class="space-y-2">
-            <label class="block text-xs font-bold uppercase tracking-wider text-text-body">Add Guests (Optional)</label>
+            <label for="default-guest-email" class="block text-xs font-bold uppercase tracking-wider text-text-body cursor-pointer">Add Guests (Optional)</label>
             <p class="text-xs text-text-muted">Add colleagues or partners who should receive the Google Meet invitation:</p>
             
             <div class="flex items-center gap-2">
               <input 
                 type="email" 
+                id="default-guest-email"
+                name="guest_email"
+                aria-label="Add Guest Email"
                 wire:model="newGuestEmail"
                 wire:keydown.enter.prevent="addGuest"
                 placeholder="colleague@company.com" 
