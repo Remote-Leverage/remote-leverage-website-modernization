@@ -23,6 +23,10 @@ class TalentMarqueeBlock extends Block
 
     public $view = 'blocks.talent-marquee';
 
+    public $supports = [
+        'align' => ['full', 'wide'],
+    ];
+
     public function with(): array
     {
         return [

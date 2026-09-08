@@ -13,7 +13,7 @@
         <!-- wp:column {"width":"55%"} -->
         <div class="wp-block-column" style="flex-basis:55%">
             <!-- wp:heading {"level":2,"style":{"typography":{"lineHeight":"1.08","letterSpacing":"-0.03em"}},"fontSize":"huge"} -->
-            <h2 class="wp-block-heading has-huge-font-size" style="letter-spacing:-0.03em;line-height:1.08;font-weight:700;color:#000000">
+            <h2 class="wp-block-heading has-huge-font-size" style="letter-spacing:-0.03em;line-height:1.08">
                 Results, Not Promises
             </h2>
             <!-- /wp:heading -->
@@ -23,7 +23,7 @@
         <!-- wp:column {"width":"45%"} -->
         <div class="wp-block-column" style="flex-basis:45%">
             <!-- wp:paragraph {"style":{"typography":{"lineHeight":"1.6"}}} -->
-            <p style="line-height:1.6;color:#000000">
+            <p style="line-height:1.6">
                 See what founders and operations leaders say about scaling their companies with dedicated Remote Leverage talent.
             </p>
             <!-- /wp:paragraph -->

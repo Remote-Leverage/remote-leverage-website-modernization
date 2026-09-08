@@ -1,10 +1,10 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Inter+Display:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=League+Spartan:wght@600;700;800&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
-@import "tailwindcss";
+@import "./app.css";
 
 .editor-styles-wrapper {
-  font-family: "Inter Display", "Inter", system-ui, -apple-system, sans-serif;
-  color: #000000;
-  background-color: #F4F6FC;
+  font-family: var(--font-display);
+  color: var(--color-text-body);
+  background-color: var(--color-bg-light);
 }
 
 .editor-styles-wrapper h1,
@@ -12,9 +12,9 @@
 .editor-styles-wrapper h3,
 .editor-styles-wrapper h4,
 .editor-styles-wrapper .wp-block-heading {
-  font-family: "Inter Display", "Inter", system-ui, -apple-system, sans-serif !important;
+  font-family: var(--font-display) !important;
   font-weight: 700 !important;
-  color: #000000 !important;
+  color: var(--color-text-body) !important;
   letter-spacing: -0.03em !important;
 }
 
@@ -33,17 +33,17 @@
 }
 
 .editor-styles-wrapper p {
-  color: #000000;
+  color: var(--color-text-body);
 }
 
 .editor-styles-wrapper p.has-large-font-size {
   font-size: 1.375rem !important; /* 22px */
   line-height: 34px !important;
   letter-spacing: -0.015em !important;
-  color: #000000 !important;
+  color: var(--color-text-body) !important;
 }
 
-/* Button styles in block editor */
+/* Button styles in block editor using design tokens */
 .editor-styles-wrapper .is-style-pill-purple .wp-block-button__link,
 .editor-styles-wrapper .wp-block-button.is-style-pill-purple > a,
 .editor-styles-wrapper .wp-block-button.is-style-pill-purple .wp-element-button {
@@ -51,17 +51,17 @@
   align-items: center !important;
   justify-content: center !important;
   gap: 0.75rem !important;
-  background-color: #8A2BE2 !important;
-  color: #ffffff !important;
-  font-family: "Inter Display", "Inter", sans-serif !important;
+  background-color: var(--color-brand-purple) !important;
+  color: var(--color-surface-white) !important;
+  font-family: var(--font-display) !important;
   font-weight: 800 !important;
   font-size: 0.875rem !important;
   line-height: 1.25rem !important;
   text-transform: uppercase !important;
   letter-spacing: 0.06em !important;
   padding: 1rem 2rem !important;
-  border-radius: 9999px !important;
-  box-shadow: 0 10px 25px rgba(138, 43, 226, 0.3) !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: var(--shadow-btn-primary) !important;
   border: none !important;
   text-decoration: none !important;
 }
@@ -74,7 +74,7 @@
   width: 1.25rem !important;
   height: 1.25rem !important;
   flex-shrink: 0 !important;
-  background-color: #ffffff !important;
+  background-color: var(--color-surface-white) !important;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' stroke-width='2'/%3E%3Cpath d='M10 8l4 4-4 4'/%3E%3C/svg%3E") no-repeat center / contain !important;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' stroke-width='2'/%3E%3Cpath d='M10 8l4 4-4 4'/%3E%3C/svg%3E") no-repeat center / contain !important;
 }
@@ -87,16 +87,16 @@
   justify-content: center !important;
   gap: 0.75rem !important;
   background-color: transparent !important;
-  color: #000000 !important;
-  font-family: "Inter Display", "Inter", sans-serif !important;
+  color: var(--color-text-body) !important;
+  font-family: var(--font-display) !important;
   font-weight: 800 !important;
   font-size: 0.875rem !important;
   line-height: 1.25rem !important;
   text-transform: uppercase !important;
   letter-spacing: 0.06em !important;
   padding: 0.875rem 2rem !important;
-  border-radius: 9999px !important;
-  border: 2px solid #000000 !important;
+  border-radius: var(--radius-pill) !important;
+  border: 2px solid var(--color-surface-black) !important;
   text-decoration: none !important;
 }
 
@@ -107,17 +107,70 @@
   align-items: center !important;
   justify-content: center !important;
   gap: 0.75rem !important;
-  background-color: #000000 !important;
-  color: #ffffff !important;
-  font-family: "Inter Display", "Inter", sans-serif !important;
+  background-color: var(--color-surface-black) !important;
+  color: var(--color-surface-white) !important;
+  font-family: var(--font-display) !important;
   font-weight: 800 !important;
   font-size: 0.875rem !important;
   line-height: 1.25rem !important;
   text-transform: uppercase !important;
   letter-spacing: 0.06em !important;
   padding: 1rem 2rem !important;
-  border-radius: 9999px !important;
-  border: 1px solid #000000 !important;
+  border-radius: var(--radius-pill) !important;
+  border: 1px solid var(--color-surface-black) !important;
   text-decoration: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* EDITOR DARK SECTIONS & TYPOGRAPHY FIDELITY                  */
+/* ═══════════════════════════════════════════════════════════ */
+.editor-styles-wrapper .has-brand-dark-violet-background-color,
+.editor-styles-wrapper .has-brand-dark-violet-background-color h1,
+.editor-styles-wrapper .has-brand-dark-violet-background-color h2,
+.editor-styles-wrapper .has-brand-dark-violet-background-color h3,
+.editor-styles-wrapper .has-brand-dark-violet-background-color .wp-block-heading,
+.editor-styles-wrapper .has-white-color {
+  color: var(--color-surface-white) !important;
+}
+
+.editor-styles-wrapper .has-brand-dark-violet-background-color p,
+.editor-styles-wrapper .has-brand-dark-violet-background-color .wp-block-paragraph {
+  color: var(--color-text-card-desc) !important;
+}
+
+/* Talent cards and department cards text in editor */
+.editor-styles-wrapper .rl-department-card h3,
+.editor-styles-wrapper .rl-department-card p,
+.editor-styles-wrapper .rl-department-card .rl-department-card__title,
+.editor-styles-wrapper .rl-department-card .rl-department-card__subtitle,
+.editor-styles-wrapper .rl-department-card .rl-department-card__description,
+.editor-styles-wrapper .rl-talent-card h3,
+.editor-styles-wrapper .rl-talent-card p,
+.editor-styles-wrapper .rl-talent-card .rl-department-card__title,
+.editor-styles-wrapper .rl-talent-card .rl-department-card__subtitle,
+.editor-styles-wrapper .rl-talent-card .rl-department-card__description {
+  color: var(--color-surface-white) !important;
+}
+
+/* Talent Marquee fidelity in editor */
+.editor-styles-wrapper .wp-block-acf-talent-marquee {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.editor-styles-wrapper .rl-talent-card-wrapper {
+  flex-shrink: 0 !important;
+}
+
+/* Guarantee Section fidelity in editor */
+.editor-styles-wrapper .rl-guarantee-group .wp-block-column:first-child {
+  padding-top: 4.5rem !important;
+  padding-bottom: 2rem !important;
+}
+
+.editor-styles-wrapper .rl-guarantee-group figure.wp-block-image img {
+  width: 100% !important;
+  max-width: 560px !important;
+  height: auto !important;
 }
 

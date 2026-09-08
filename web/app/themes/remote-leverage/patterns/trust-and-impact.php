@@ -25,7 +25,7 @@
             <!-- /wp:paragraph -->
 
             <!-- wp:heading {"level":2,"style":{"typography":{"lineHeight":"1.18","letterSpacing":"-0.02em"}},"fontSize":"huge"} -->
-            <h2 class="wp-block-heading has-huge-font-size" style="letter-spacing:-0.02em;line-height:1.18;font-weight:700;color:#000000;margin-bottom:2rem">
+            <h2 class="wp-block-heading has-huge-font-size" style="letter-spacing:-0.02em;line-height:1.18">
                 We've helped more than 2,000 businesses hire exceptional talent from Latin America, the Caribbean, and Europe.
             </h2>
             <!-- /wp:heading -->

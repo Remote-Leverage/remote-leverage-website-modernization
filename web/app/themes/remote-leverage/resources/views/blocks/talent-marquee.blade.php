@@ -1,4 +1,4 @@
-<div class="w-full overflow-hidden">
+<div class="w-full overflow-hidden alignfull">
     <h2 class="sr-only">Pre-Vetted Remote Professionals</h2>
     <div class="animate-marquee-left gap-card py-2 pb-6">
         @foreach (array_merge($cards, $cards) as $card)

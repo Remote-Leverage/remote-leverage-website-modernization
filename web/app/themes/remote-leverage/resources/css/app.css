@@ -18,7 +18,7 @@
   --color-brand-purple-deep: #6200A4;
   --color-brand-navy: #342567;
   --color-brand-midnight: #18112C;
-  --color-brand-dark-violet: #250D4A;
+  --color-brand-dark-violet: #25104A;
   --color-brand-hero: #13132F;
   --color-brand-magenta: #F90066;
   --color-brand-magenta-hover: #D90057;
@@ -964,7 +964,7 @@
 }
 
 /* ==========================================================================
-   Gutenberg Core Block Styles & Overrides
+   Gutenberg Core Block Styles & Overrides (Using Design Tokens)
    ========================================================================== */
 
 .wp-block-buttons {
@@ -989,21 +989,20 @@
   font-size: 0.9375rem;
   line-height: 1.25rem;
   padding: 0.875rem 1.75rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   text-decoration: none !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  background-color: #342567;
-  color: #ffffff !important;
+  transition: var(--transition-standard);
+  background-color: var(--color-brand-navy);
+  color: var(--color-surface-white) !important;
   border: 1px solid transparent;
 }
 
 .wp-block-button__link:hover {
-  background-color: #000000;
-  color: #ffffff !important;
+  background-color: var(--color-surface-black);
+  color: var(--color-surface-white) !important;
   transform: translateY(-1px);
 }
-
 
 /* Pill Purple Style: Primary CTA Button */
 .is-style-pill-purple .wp-block-button__link,
@@ -1013,18 +1012,18 @@
   align-items: center !important;
   justify-content: center !important;
   gap: 0.75rem !important;
-  background-color: #8A2BE2 !important;
-  color: #ffffff !important;
-  font-family: var(--font-display), "Inter Display", "Inter", sans-serif !important;
+  background-color: var(--color-brand-purple) !important;
+  color: var(--color-surface-white) !important;
+  font-family: var(--font-display) !important;
   font-weight: 800 !important;
   font-size: 0.875rem !important;
   line-height: 1.25rem !important;
   text-transform: uppercase !important;
   letter-spacing: 0.06em !important;
   padding: 1rem 2rem !important;
-  border-radius: 9999px !important;
-  box-shadow: 0 10px 25px rgba(138, 43, 226, 0.3) !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: var(--shadow-btn-primary) !important;
+  transition: var(--transition-standard) !important;
   border: none !important;
   text-decoration: none !important;
 }
@@ -1032,10 +1031,10 @@
 .is-style-pill-purple .wp-block-button__link:hover,
 .wp-block-button.is-style-pill-purple > a:hover,
 .wp-block-button.is-style-pill-purple .wp-element-button:hover {
-  background-color: #000000 !important;
-  color: #ffffff !important;
+  background-color: var(--color-surface-black) !important;
+  color: var(--color-surface-white) !important;
   transform: scale(1.05) !important;
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.35) !important;
+  box-shadow: var(--shadow-btn-primary-hover) !important;
 }
 
 /* Arrow in circle icon for pill purple */
@@ -1047,7 +1046,7 @@
   width: 1.25rem !important;
   height: 1.25rem !important;
   flex-shrink: 0 !important;
-  background-color: #ffffff !important;
+  background-color: var(--color-surface-white) !important;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' stroke-width='2'/%3E%3Cpath d='M10 8l4 4-4 4'/%3E%3C/svg%3E") no-repeat center / contain !important;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' stroke-width='2'/%3E%3Cpath d='M10 8l4 4-4 4'/%3E%3C/svg%3E") no-repeat center / contain !important;
   transition: transform 0.2s ease !important;
@@ -1067,25 +1066,25 @@
   justify-content: center !important;
   gap: 0.75rem !important;
   background-color: transparent !important;
-  color: #000000 !important;
-  font-family: var(--font-display), "Inter Display", "Inter", sans-serif !important;
+  color: var(--color-text-body) !important;
+  font-family: var(--font-display) !important;
   font-weight: 800 !important;
   font-size: 0.875rem !important;
   line-height: 1.25rem !important;
   text-transform: uppercase !important;
   letter-spacing: 0.06em !important;
   padding: 0.875rem 2rem !important;
-  border-radius: 9999px !important;
-  border: 2px solid #000000 !important;
-  transition: all 0.2s ease-in-out !important;
+  border-radius: var(--radius-pill) !important;
+  border: 2px solid var(--color-surface-black) !important;
+  transition: var(--transition-standard) !important;
   text-decoration: none !important;
 }
 
 .is-style-pill-outline .wp-block-button__link:hover,
 .wp-block-button.is-style-pill-outline > a:hover,
 .wp-block-button.is-style-pill-outline .wp-element-button:hover {
-  background-color: #000000 !important;
-  color: #ffffff !important;
+  background-color: var(--color-surface-black) !important;
+  color: var(--color-surface-white) !important;
   transform: scale(1.05) !important;
 }
 
@@ -1110,27 +1109,49 @@
   align-items: center !important;
   justify-content: center !important;
   gap: 0.75rem !important;
-  background-color: #000000 !important;
-  color: #ffffff !important;
-  font-family: var(--font-display), "Inter Display", "Inter", sans-serif !important;
+  background-color: var(--color-surface-black) !important;
+  color: var(--color-surface-white) !important;
+  font-family: var(--font-display) !important;
   font-weight: 800 !important;
   font-size: 0.875rem !important;
   line-height: 1.25rem !important;
   text-transform: uppercase !important;
   letter-spacing: 0.06em !important;
   padding: 1rem 2rem !important;
-  border-radius: 9999px !important;
-  border: 1px solid #000000 !important;
-  transition: all 0.2s ease-in-out !important;
+  border-radius: var(--radius-pill) !important;
+  border: 1px solid var(--color-surface-black) !important;
+  transition: var(--transition-standard) !important;
   text-decoration: none !important;
 }
 
 .is-style-pill-black .wp-block-button__link:hover,
 .wp-block-button.is-style-pill-black > a:hover {
-  background-color: #8A2BE2 !important;
-  border-color: #8A2BE2 !important;
+  background-color: var(--color-brand-purple) !important;
+  border-color: var(--color-brand-purple) !important;
   transform: scale(1.05) !important;
 }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* WORDPRESS THEME PALETTE & BLOCK PRESET UTILITIES           */
+/* ═══════════════════════════════════════════════════════════ */
+
+.has-brand-purple-color                 { color: var(--color-brand-purple) !important; }
+.has-brand-purple-background-color      { background-color: var(--color-brand-purple) !important; }
+
+.has-brand-dark-violet-color            { color: var(--color-brand-dark-violet) !important; }
+.has-brand-dark-violet-background-color  { background-color: var(--color-brand-dark-violet) !important; }
+
+.has-bg-light-color                     { color: var(--color-bg-light) !important; }
+.has-bg-light-background-color          { background-color: var(--color-bg-light) !important; }
+
+.has-bg-map-color                       { color: var(--color-bg-map) !important; }
+.has-bg-map-background-color            { background-color: var(--color-bg-map) !important; }
+
+.has-black-color                        { color: var(--color-text-body) !important; }
+.has-black-background-color             { background-color: var(--color-surface-black) !important; }
+
+.has-white-color                        { color: var(--color-surface-white) !important; }
+.has-white-background-color             { background-color: var(--color-surface-white) !important; }
 
 /* ═══════════════════════════════════════════════════════════ */
 /* TYPOGRAPHY: HEADINGS & SUBHEADINGS                          */
@@ -1141,8 +1162,8 @@
 .entry-content h3,
 .entry-content h4,
 .wp-block-heading {
-  font-family: var(--font-display), "Inter Display", "Inter", sans-serif !important;
-  color: #000000 !important;
+  font-family: var(--font-display) !important;
+  color: var(--color-text-body) !important;
   letter-spacing: -0.03em !important;
   font-weight: 700 !important;
 }
@@ -1155,7 +1176,7 @@ h1.wp-block-heading,
   line-height: 54px !important;
   font-weight: 700 !important;
   letter-spacing: -0.03em !important;
-  color: #000000 !important;
+  color: var(--color-text-body) !important;
   margin-bottom: 1.5rem !important;
 }
 
@@ -1176,7 +1197,7 @@ h2.wp-block-heading,
   line-height: 1.15 !important;
   font-weight: 700 !important;
   letter-spacing: -0.03em !important;
-  color: #000000 !important;
+  color: var(--color-text-body) !important;
   margin-bottom: 1rem !important;
 }
 
@@ -1190,13 +1211,20 @@ h2.wp-block-heading,
 }
 
 /* Headings inside dark containers or with white text */
+.has-brand-dark-violet-background-color,
 .has-brand-dark-violet-background-color h1,
 .has-brand-dark-violet-background-color h2,
 .has-brand-dark-violet-background-color h3,
+.has-brand-dark-violet-background-color h4,
 .has-white-color,
 .wp-block-heading.has-white-color,
 .entry-content .has-white-color {
-  color: #ffffff !important;
+  color: var(--color-surface-white) !important;
+}
+
+.has-brand-dark-violet-background-color p,
+.has-brand-dark-violet-background-color .wp-block-paragraph {
+  color: var(--color-text-card-desc) !important;
 }
 
 /* Subheadings / Large Paragraphs */
@@ -1206,7 +1234,7 @@ h2.wp-block-heading,
   font-size: 1.375rem !important; /* 22px */
   line-height: 34px !important;
   letter-spacing: -0.015em !important;
-  color: #000000 !important;
+  color: var(--color-text-body) !important;
   font-weight: 400 !important;
 }
 
@@ -1218,9 +1246,18 @@ h2.wp-block-heading,
   }
 }
 
-.has-brand-dark-violet-background-color p,
-.has-brand-dark-violet-background-color .wp-block-paragraph {
-  color: rgba(255, 255, 255, 0.85) !important;
+/* Department and Talent Cards white text protection */
+.rl-department-card h3,
+.rl-department-card p,
+.rl-department-card .rl-department-card__title,
+.rl-department-card .rl-department-card__subtitle,
+.rl-department-card .rl-department-card__description,
+.rl-talent-card h3,
+.rl-talent-card p,
+.rl-talent-card .rl-department-card__title,
+.rl-talent-card .rl-department-card__subtitle,
+.rl-talent-card .rl-department-card__description {
+  color: var(--color-surface-white) !important;
 }
 
 /* Core columns */
@@ -1243,3 +1280,106 @@ h2.wp-block-heading,
   word-break: break-word;
 }
 
+/* ═══════════════════════════════════════════════════════════ */
+/* FULL-BLEED TALENT MARQUEE & PATTERN UTILITIES               */
+/* ═══════════════════════════════════════════════════════════ */
+
+.wp-block-acf-talent-marquee,
+.alignfull.w-full,
+.entry-content > .wp-block-group > .wp-block-acf-talent-marquee,
+.entry-content > .wp-block-group.alignfull > .wp-block-acf-talent-marquee,
+[class*="wp-container-core-group"] > .alignfull.w-full,
+[class*="wp-container-core-group"] > .w-full.overflow-hidden.alignfull {
+  max-width: 100% !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Hero Pattern */
+.rl-hero-group {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.rl-hero-group::before {
+  content: "";
+  position: absolute;
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1400px;
+  max-width: 96vw;
+  height: 540px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.45;
+  background: url('/app/themes/remote-leverage/public/images/home/Map.webp') no-repeat center / contain;
+}
+
+/* Booking Footer Pattern */
+.rl-booking-footer-group {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.rl-booking-footer-group::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  max-height: 640px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.25;
+  background: url('/app/themes/remote-leverage/public/images/home/Map.webp') no-repeat bottom / contain;
+}
+
+.rl-booking-footer-group .wp-block-columns {
+  position: relative;
+  z-index: 10;
+}
+
+/* 12-Month Replacement Guarantee Pattern */
+.rl-guarantee-group {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.rl-guarantee-group .wp-block-columns {
+  align-items: flex-start !important;
+}
+
+.rl-guarantee-group .wp-block-column:first-child {
+  padding-top: 4.5rem;
+  padding-bottom: 2rem;
+}
+
+.rl-guarantee-group .wp-block-column:last-child {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+@media (min-width: 1024px) {
+  .rl-guarantee-group .wp-block-column:last-child {
+    justify-content: flex-end;
+  }
+}
+
+.rl-guarantee-group figure.wp-block-image {
+  margin: 0 !important;
+  max-width: 560px;
+  width: 100%;
+}
+
+.rl-guarantee-group figure.wp-block-image img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
