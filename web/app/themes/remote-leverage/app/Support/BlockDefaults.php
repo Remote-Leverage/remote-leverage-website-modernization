@@ -78,6 +78,22 @@ class BlockDefaults
     }
 
     /**
+     * Resolve any image in public/images/ to its canonical HTTPS URL.
+     */
+    public static function themeImg(string $path): string
+    {
+        return esc_url(set_url_scheme(get_template_directory_uri() . '/public/images/' . ltrim($path, '/'), 'https'));
+    }
+
+    /**
+     * Resolve a hire-va-4 image to its canonical HTTPS URL.
+     */
+    public static function hireVaImg(string $file): string
+    {
+        return self::themeImg('hire-va-4/' . ltrim($file, '/'));
+    }
+
+    /**
      * Resolve an image value (attachment ID, URL string, or ACF image array) to a valid URL string.
      */
     public static function resolveImageUrl(mixed $image): string
@@ -120,14 +136,14 @@ class BlockDefaults
     /**
      * Provide default rows when a block repeater field has never been populated.
      */
-    public static function filterLoadValue(mixed $value, int|string $postId, array $field): mixed
+    public static function filterLoadValue(mixed $value, int|string|null $postId, array $field): mixed
     {
         if ($value !== null && $value !== '' && $value !== false) {
             return $value;
         }
 
         // If user explicitly deleted all rows and saved, ACF metadata is '0'
-        if (function_exists('acf_get_metadata') && acf_get_metadata($postId, $field['name']) === '0') {
+        if (! empty($postId) && function_exists('acf_get_metadata') && acf_get_metadata($postId, $field['name']) === '0') {
             return [];
         }
 

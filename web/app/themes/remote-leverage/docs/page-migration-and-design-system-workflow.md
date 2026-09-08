@@ -57,6 +57,13 @@ All pages and blocks in Remote Leverage v2 follow these foundational pillars:
 >   3. **Automated Validation in QA**:
 >      - Run the `parse_blocks()` validation audit before reporting completion. Any block with `blockName === null` containing non-whitespace `innerHTML` inside a container block is an error that MUST be eliminated before delivery.
 
+> [!IMPORTANT]
+> **4. Typography Font Weights: Bold is the Maximum (NEVER Use Extra Bold or Black)**:
+> - NEVER use text extra bold (`font-extrabold`, `font-black`, `font-[800]`, `font-[900]`).
+> - **Bold (`font-bold` / 700) is the absolute maximum weight you will ever use**.
+> - Hero titles, section headings, numbers, and badges should use `font-bold` (or `font-semibold`), never `font-extrabold` or `font-black`.
+
+
 ---
 
 ## 2. End-to-End Migration Procedure

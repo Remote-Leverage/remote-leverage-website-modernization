@@ -18,10 +18,10 @@ use Livewire\Component;
 
 class MultistepBookingWizard extends Component
 {
-    // Step progression (1: Details, 2: Date, 3: Time, 4: Guests/Confirmation)
+    // Step progression (1: Details, 2: Date, 3: Time & Confirm)
     public int $currentStep = 1;
 
-    public int $totalSteps = 4;
+    public int $totalSteps = 3;
 
     // Profile & Meeting Header Information (matching HeadlessCalendlyMultistepWidget)
     public string $profileEyebrow = 'STRATEGY SESSION';
@@ -33,6 +33,16 @@ class MultistepBookingWizard extends Component
     public ?string $profileImage = null;
 
     public string $skin = 'default';
+
+    public bool $enableIsolatedFields = false;
+
+    public array $isolatedSteps = [];
+
+    public bool $hideProfileHeader = false;
+
+    public bool $hideProgressBar = false;
+
+    public string $buttonText = 'Next: Pick a Date';
 
     // Step 1: Contact / Qualification Details
     public string $email = '';
@@ -143,7 +153,6 @@ class MultistepBookingWizard extends Component
         1 => 'Your Details',
         2 => 'Pick a Date',
         3 => 'Select a Time',
-        4 => 'Additional Info',
     ];
 
     protected array $validationRules = [
@@ -160,18 +169,91 @@ class MultistepBookingWizard extends Component
         3 => [
             'selectedSlot' => 'required|string',
         ],
-        4 => [
-            'guestEmails.*' => 'email',
-            'notes' => 'nullable|string|max:500',
-        ],
     ];
 
-    public function mount(?string $roleNeeded = null, string $skin = 'default'): void
-    {
+    public function mount(
+        ?string $roleNeeded = null,
+        string $skin = 'default',
+        bool $enableIsolatedFields = false,
+        array $isolatedSteps = [],
+        bool $hideProfileHeader = false,
+        bool $hideProgressBar = false,
+        string $buttonText = 'Next: Pick a Date',
+        ...$rest
+    ): void {
+        if (isset($rest['enable-isolated-fields'])) {
+            $enableIsolatedFields = (bool) $rest['enable-isolated-fields'];
+        }
+        if (isset($rest['enableIsolatedFields'])) {
+            $enableIsolatedFields = (bool) $rest['enableIsolatedFields'];
+        }
+        if (isset($rest['isolated-steps'])) {
+            $isolatedSteps = (array) $rest['isolated-steps'];
+        }
+        if (isset($rest['isolatedSteps'])) {
+            $isolatedSteps = (array) $rest['isolatedSteps'];
+        }
+        if (isset($rest['hide-profile-header'])) {
+            $hideProfileHeader = (bool) $rest['hide-profile-header'];
+        }
+        if (isset($rest['hideProfileHeader'])) {
+            $hideProfileHeader = (bool) $rest['hideProfileHeader'];
+        }
+        if (isset($rest['hide-progress-bar'])) {
+            $hideProgressBar = (bool) $rest['hide-progress-bar'];
+        }
+        if (isset($rest['hideProgressBar'])) {
+            $hideProgressBar = (bool) $rest['hideProgressBar'];
+        }
+        if (isset($rest['button-text'])) {
+            $buttonText = (string) $rest['button-text'];
+        }
+        if (isset($rest['buttonText'])) {
+            $buttonText = (string) $rest['buttonText'];
+        }
+
+        if (!empty($isolatedSteps)) {
+            $enableIsolatedFields = true;
+        }
+
         if ($roleNeeded) {
             $this->roleNeeded = $roleNeeded;
         }
         $this->skin = $skin;
+        $this->enableIsolatedFields = $enableIsolatedFields;
+        $this->isolatedSteps = $isolatedSteps;
+        $this->hideProfileHeader = $hideProfileHeader;
+        $this->hideProgressBar = $hideProgressBar;
+        $this->buttonText = $buttonText;
+
+        if ($this->enableIsolatedFields) {
+            if (empty($this->isolatedSteps)) {
+                $this->isolatedSteps = [
+                    ['step_label' => 'Email', 'step_fields' => ['email']],
+                    ['step_label' => 'Complete First Step', 'step_fields' => ['monthly_revenue', 'name', 'phone', 'consent']],
+                ];
+            } else {
+                $configuredFields = [];
+                foreach ($this->isolatedSteps as $st) {
+                    foreach ($st['step_fields'] ?? [] as $f) {
+                        $configuredFields[] = $f;
+                    }
+                }
+                $allStandardFields = ['monthly_revenue', 'name', 'phone', 'consent'];
+                $missing = array_diff($allStandardFields, $configuredFields);
+                if (!empty($missing)) {
+                    if (count($this->isolatedSteps) === 1) {
+                        $this->isolatedSteps[] = [
+                            'step_label' => 'Remaining Details',
+                            'step_fields' => array_values($missing),
+                        ];
+                    } else {
+                        $lastIdx = count($this->isolatedSteps) - 1;
+                        $this->isolatedSteps[$lastIdx]['step_fields'] = array_values(array_unique(array_merge($this->isolatedSteps[$lastIdx]['step_fields'], $missing)));
+                    }
+                }
+            }
+        }
 
         $now = Carbon::now($this->timezone);
         $this->currentMonth = (int) $now->format('n');
@@ -389,9 +471,6 @@ class MultistepBookingWizard extends Component
     public function selectSlot(string $slot): void
     {
         $this->selectedSlot = $slot;
-        if ($this->skin !== 'glass') {
-            $this->goToStep(4);
-        }
     }
 
     public function addGuest(): void

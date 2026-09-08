@@ -102,9 +102,100 @@ export function phoneInputComponent(config = {}) {
 
 window.phoneInputComponent = phoneInputComponent;
 
+export function rlBookingWizardIsolated(config = {}) {
+  return {
+    isolated: Boolean(config.isolated),
+    steps: Array.isArray(config.steps) ? config.steps : [],
+    currentSubStep: 0,
+    emailVal: config.email || '',
+    firstNameVal: config.firstName || '',
+    lastNameVal: config.lastName || '',
+    phoneVal: config.phone || '',
+    monthlyRevenueVal: config.monthlyRevenue || '',
+    consentChecked: true,
+
+    isFieldValid(f) {
+      if (f === 'email') {
+        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return typeof this.emailVal === 'string' && re.test(this.emailVal.trim());
+      }
+      if (f === 'name') {
+        return typeof this.firstNameVal === 'string' && this.firstNameVal.trim().length > 0 && typeof this.lastNameVal === 'string' && this.lastNameVal.trim().length > 0;
+      }
+      if (f === 'phone') {
+        return true;
+      }
+      if (f === 'monthly_revenue') {
+        return typeof this.monthlyRevenueVal === 'string' && this.monthlyRevenueVal.trim().length > 0;
+      }
+      if (f === 'consent') {
+        return this.consentChecked === true;
+      }
+      return true;
+    },
+
+    isSubStepValid(idx) {
+      if (!this.isolated || !this.steps || !this.steps[idx]) return true;
+      const fields = this.steps[idx].step_fields || [];
+      return fields.every(f => this.isFieldValid(f));
+    },
+
+    advanceIfValid(fromIdx) {
+      if (!this.isolated) return;
+      if (this.isSubStepValid(fromIdx)) {
+        if (this.currentSubStep <= fromIdx) {
+          this.currentSubStep = fromIdx + 1;
+          this.$nextTick(() => {
+            const nextContainer = this.$el.querySelector('[data-substep="' + this.currentSubStep + '"]');
+            if (nextContainer) {
+              const input = nextContainer.querySelector('input:not([type="hidden"]), select, textarea');
+              if (input) input.focus();
+            }
+          });
+        }
+      }
+    },
+
+    onFieldInput(field, stepIdx) {
+      if (!this.isolated) return;
+      if (this.isSubStepValid(stepIdx)) {
+        this.advanceIfValid(stepIdx);
+      }
+    },
+
+    canShowStep(stepIdx) {
+      return !this.isolated || this.currentSubStep >= stepIdx;
+    },
+
+    canShowContinue(stepIdx) {
+      return this.isolated && this.currentSubStep === stepIdx;
+    },
+
+    canShowFinalButton() {
+      const lastIdx = Array.isArray(this.steps) && this.steps.length > 0 ? this.steps.length - 1 : 1;
+      return !this.isolated || this.currentSubStep >= lastIdx;
+    },
+
+    isStepRevealed(stepIdx) {
+      return this.currentSubStep >= stepIdx;
+    },
+
+    init() {
+      if (this.isolated && Array.isArray(this.steps) && this.steps.length > 0) {
+        if (this.isSubStepValid(0)) {
+          this.currentSubStep = 1;
+        }
+      }
+    },
+  };
+}
+
+window.rlBookingWizardIsolated = rlBookingWizardIsolated;
+
 const registerAlpine = () => {
   if (window.Alpine) {
     window.Alpine.data('phoneInputComponent', phoneInputComponent);
+    window.Alpine.data('rlBookingWizardIsolated', rlBookingWizardIsolated);
   }
 };
 

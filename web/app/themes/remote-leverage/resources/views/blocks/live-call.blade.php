@@ -16,7 +16,7 @@
             <span class="w-2 h-2 rounded-full bg-status-success animate-ping"></span>
             <span>Real-Time Video Matching</span>
           </div>
-          <h3 class="text-2xl sm:text-3xl font-extrabold font-display tracking-tight text-white">
+          <h3 class="text-2xl sm:text-3xl font-bold font-display tracking-tight text-white">
             {{ $headline }}
           </h3>
           @if ($description)

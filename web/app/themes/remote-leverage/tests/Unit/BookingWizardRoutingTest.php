@@ -242,5 +242,94 @@ describe('Booking Wizard MRR Routing & Tracking Parity', function () {
         expect($wizard->currentMonth)->toBe(9)
             ->and($wizard->currentYear)->toBe(2026);
     });
+
+    test('Wizard isolated fields mount defaults and custom configuration', function () {
+        $wizard = new MultistepBookingWizard;
+        $wizard->mount(
+            roleNeeded: 'Sales Assistant',
+            skin: 'naked',
+            enableIsolatedFields: true,
+            isolatedSteps: [],
+            hideProfileHeader: true,
+            hideProgressBar: true,
+            buttonText: 'Find me an Assistant'
+        );
+
+        expect($wizard->skin)->toBe('naked')
+            ->and($wizard->enableIsolatedFields)->toBeTrue()
+            ->and($wizard->hideProfileHeader)->toBeTrue()
+            ->and($wizard->hideProgressBar)->toBeTrue()
+            ->and($wizard->buttonText)->toBe('Find me an Assistant')
+            ->and($wizard->isolatedSteps)->toHaveCount(2)
+            ->and($wizard->isolatedSteps[0]['step_fields'])->toBe(['email'])
+            ->and($wizard->isolatedSteps[1]['step_fields'])->toContain('monthly_revenue', 'name', 'phone', 'consent');
+    });
+
+    test('Wizard isolated fields automatically adds unassigned fields to step 2 when only email is isolated', function () {
+        $wizard = new MultistepBookingWizard;
+        $wizard->mount(
+            roleNeeded: null,
+            skin: 'naked',
+            enableIsolatedFields: true,
+            isolatedSteps: [
+                ['step_label' => 'Email', 'step_fields' => ['email']],
+            ]
+        );
+
+        // Missing fields (revenue, name, phone, consent) should automatically be added to step 2
+        expect($wizard->isolatedSteps)->toHaveCount(2)
+            ->and($wizard->isolatedSteps[0]['step_fields'])->toBe(['email'])
+            ->and($wizard->isolatedSteps[1]['step_fields'])->toContain('monthly_revenue', 'name', 'phone', 'consent');
+    });
+
+    test('Wizard mount handles kebab-case attributes from Blade and auto-enables isolated fields', function () {
+        $wizard = new MultistepBookingWizard;
+        $wizard->mount(
+            ...[
+                'enable-isolated-fields' => true,
+                'isolated-steps' => [
+                    ['step_label' => 'Email', 'step_fields' => ['email']],
+                    ['step_label' => 'Details', 'step_fields' => ['monthly_revenue', 'name', 'phone', 'consent']],
+                ],
+                'hide-profile-header' => true,
+                'hide-progress-bar' => true,
+                'button-text' => 'Get Started',
+            ]
+        );
+
+        expect($wizard->enableIsolatedFields)->toBeTrue()
+            ->and($wizard->hideProfileHeader)->toBeTrue()
+            ->and($wizard->hideProgressBar)->toBeTrue()
+            ->and($wizard->buttonText)->toBe('Get Started')
+            ->and($wizard->isolatedSteps)->toHaveCount(2);
+    });
+
+    test('Wizard enforces a strict 3-step flow across all skins', function () {
+        $wizard = new MultistepBookingWizard;
+        $wizard->mount(skin: 'default');
+
+        expect($wizard->totalSteps)->toBe(3)
+            ->and($wizard->stepTitles)->toHaveCount(3)
+            ->and(array_keys($wizard->stepTitles))->toBe([1, 2, 3]);
+
+        $wizard->email = 'founder@acme.com';
+        $wizard->name = 'Alice Smith';
+        $wizard->phone = '+1 305 555 0199';
+        $wizard->phoneCountry = 'US';
+        $wizard->monthlyRevenue = '$10k to $25k Per Month';
+
+        $wizard->goToStep(2);
+        expect($wizard->currentStep)->toBe(2);
+
+        $date = Carbon\Carbon::now()->addDay()->format('Y-m-d');
+        $wizard->selectDate($date);
+        expect($wizard->currentStep)->toBe(3);
+
+        // Selecting a slot sets selectedSlot and stays on step 3 for confirmation
+        $wizard->selectSlot($date . 'T14:00:00Z');
+        expect($wizard->selectedSlot)->toBe($date . 'T14:00:00Z')
+            ->and($wizard->currentStep)->toBe(3);
+    });
 });
+
 

@@ -26,3 +26,7 @@ If arbitrary raw HTML tags (e.g. `<div class="badge">`, `<div class="grid">`, or
 
 4. **Container Width**:
    - The canonical container width is always **1380px** (`"contentSize":"1380px"` / `max-w-[1380px] mx-auto`).
+
+5. **Typography Font Weights: Bold is the Maximum**:
+   - NEVER use text extra bold (`font-extrabold`, `font-black`, `font-[800]`, `font-[900]`).
+   - Bold (`font-bold` / 700) is the absolute maximum weight allowed.

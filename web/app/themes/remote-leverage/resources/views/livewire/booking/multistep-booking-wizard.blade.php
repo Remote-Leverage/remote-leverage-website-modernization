@@ -340,26 +340,15 @@
                 @endforelse
               </div>
             </div>
-
-          @elseif ($currentStep === 4)
-            {{-- Final Confirmation (Fallback if step 4 reached) --}}
-            <div wire:key="glass-step-4" class="space-y-4 text-center animate-wizard-step">
-              <h4 class="text-lg font-bold text-white">Final Confirmation</h4>
-              <p class="text-sm text-white/80">Meeting: <strong>{{ \Carbon\Carbon::parse($selectedDate)->format('M j, Y') }} at {{ $selectedSlot }}</strong></p>
-              <button type="button" wire:click="submitBooking" wire:loading.attr="disabled" class="w-full py-3.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-base hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 cursor-pointer shadow-lg hover:shadow-orange-500/30">
-                <span wire:loading.remove>Complete Booking</span>
-                <span wire:loading>Reserving...</span>
-              </button>
-            </div>
           @endif
         @endif
 
       </div>
     </div>
   @else
-    {{-- Default Skin for /book-consultation --}}
-    <div class="w-full max-w-[580px] mx-auto">
-      <div class="w-full bg-surface-white rounded-card-lg border border-slate-200/80 shadow-card overflow-hidden">
+    {{-- Default / Naked Skin for /book-consultation and Hero Blocks --}}
+    <div class="w-full {{ $skin === 'naked' ? '' : 'max-w-[580px] mx-auto' }}">
+      <div class="w-full {{ $skin === 'naked' ? 'bg-transparent' : 'bg-surface-white rounded-card-lg border border-slate-200/80 shadow-card overflow-hidden' }}">
     
     {{-- Hidden Acquisition & UTM Tracking Fields (matches rl-testing forms & handl-utm-grabber) --}}
     <input type="hidden" name="utm_source" wire:model="utmSource" value="{{ $utmSource }}" id="rl_utm_source">
@@ -374,6 +363,7 @@
     <input type="hidden" name="referrer_url" wire:model="referrerUrl" value="{{ $referrerUrl }}" id="rl_referrer_url">
     <input type="hidden" name="session_id" wire:model="sessionId" value="{{ $sessionId }}" id="rl_session_id">
 
+    @if (! $hideProfileHeader)
     {{-- 1. Profile Header --}}
     <div class="flex items-center gap-4 p-6 sm:p-7 border-b border-slate-100 bg-white">
       <img src="{{ !empty($profileImage) && $profileImage !== '/images/avatar1.jpg' ? $profileImage : Vite::asset('resources/images/avatar1.jpg') }}" alt="Host Profile" width="52" height="52" loading="lazy" decoding="async" class="w-13 h-13 rounded-full object-cover shrink-0 ring-2 ring-brand-purple/10" />
@@ -391,8 +381,10 @@
         </div>
       </div>
     </div>
+    @endif
 
     @if (! $isBooked)
+      @if (! $hideProgressBar)
       {{-- 2. Progress Bar with Connected Dots --}}
       <div class="flex items-center justify-between px-6 sm:px-8 py-4 border-b border-slate-100 bg-slate-50/50">
         @for ($i = 1; $i <= $totalSteps; $i++)
@@ -418,6 +410,7 @@
           @endif
         @endfor
       </div>
+      @endif
 
       {{-- Error Notification Banner --}}
       @if ($errorMessage)
@@ -430,124 +423,233 @@
       @endif
 
       {{-- ────────────────────────────────────────────────────────── --}}
-      {{-- STEP 1: Your Details                                       --}}
+      {{-- STEP 1: Your Details (with Progressive Isolated Fields)    --}}
       {{-- ────────────────────────────────────────────────────────── --}}
       @if ($currentStep === 1)
-        <div class="p-6 sm:p-8 space-y-4">
-          <div class="space-y-1 mb-6">
-            <h3 class="text-xl font-bold font-display text-brand-hero tracking-tight">Your Contact Information</h3>
-            <p class="text-xs text-slate-600">Provide your contact details so our advisor can review your company requirements.</p>
-          </div>
-
-          {{-- 1. Work Email (First) --}}
-          <div class="space-y-1">
-            <label for="default-email" class="block text-xs font-bold uppercase tracking-wider text-text-body cursor-pointer">Work Email *</label>
-            <input 
-              type="email" 
-              id="default-email"
-              name="email"
-              autocomplete="email"
-              aria-label="Work Email"
-              aria-required="true"
-              wire:model="email"
-              placeholder="sarah@company.com"
-              class="w-full px-4 py-2.5 rounded-card border border-slate-200 focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple text-sm text-text-body bg-white transition"
-            />
-            @error('email') <span class="text-status-alert text-xs block mt-1">{{ $message }}</span> @enderror
-          </div>
-
-          {{-- 2. First Name & Last Name (Two Separate Fields) --}}
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="space-y-1">
-              <label for="default-first-name" class="block text-xs font-bold uppercase tracking-wider text-text-body cursor-pointer">First Name *</label>
-              <input 
-                type="text" 
-                id="default-first-name"
-                name="first_name"
-                autocomplete="given-name"
-                aria-label="First Name"
-                aria-required="true"
-                wire:model="firstName"
-                placeholder="e.g. Sarah"
-                class="w-full px-4 py-2.5 rounded-card border border-slate-200 focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple text-sm text-text-body bg-white transition"
-              />
-              @error('firstName') <span class="text-status-alert text-xs block mt-1">{{ $message }}</span> @enderror
+        <div 
+          class="{{ $skin === 'naked' ? 'p-0 space-y-4' : 'p-6 sm:p-8 space-y-4' }}"
+          x-data="rlBookingWizardIsolated(@js(['isolated' => (bool) $enableIsolatedFields, 'steps' => $isolatedSteps, 'email' => $email, 'firstName' => $firstName, 'lastName' => $lastName, 'phone' => $phone, 'monthlyRevenue' => $monthlyRevenue]))"
+        >
+          @if ($skin !== 'naked')
+            <div class="space-y-1 mb-6">
+              <h3 class="text-xl font-bold font-display text-brand-hero tracking-tight">Your Contact Information</h3>
+              <p class="text-xs text-slate-600">Provide your contact details so our advisor can review your company requirements.</p>
             </div>
+          @endif
 
-            <div class="space-y-1">
-              <label for="default-last-name" class="block text-xs font-bold uppercase tracking-wider text-text-body cursor-pointer">Last Name *</label>
-              <input 
-                type="text" 
-                id="default-last-name"
-                name="last_name"
-                autocomplete="family-name"
-                aria-label="Last Name"
-                aria-required="true"
-                wire:model="lastName"
-                placeholder="e.g. Jenkins"
-                class="w-full px-4 py-2.5 rounded-card border border-slate-200 focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple text-sm text-text-body bg-white transition"
-              />
-              @error('lastName') <span class="text-status-alert text-xs block mt-1">{{ $message }}</span> @enderror
-            </div>
-          </div>
+          @php
+            $renderedSteps = !empty($isolatedSteps) ? $isolatedSteps : [
+              ['step_label' => 'Email', 'step_fields' => ['email']],
+              ['step_label' => 'Complete First Step', 'step_fields' => ['name', 'phone', 'monthly_revenue', 'consent']],
+            ];
+          @endphp
 
-          {{-- 3. Phone Number with Country Selector --}}
-          <div class="space-y-1">
-            <label for="default-phone-input" class="block text-xs font-bold uppercase tracking-wider text-text-body cursor-pointer">Phone Number</label>
+          @foreach ($renderedSteps as $stepIdx => $subStep)
             <div 
-              wire:ignore 
-              x-data="phoneInputComponent({ initialCountry: '{{ strtolower($phoneCountry ?: 'us') }}' })"
-              class="relative w-full"
+              wire:key="isolated-substep-{{ $stepIdx }}"
+              data-substep="{{ $stepIdx }}"
+              x-show="canShowStep({{ $stepIdx }})"
+              x-transition:enter="transition ease-out duration-400 transform"
+              x-transition:enter-start="opacity-0 translate-y-3"
+              x-transition:enter-end="opacity-100 translate-y-0"
+              class="space-y-4 {{ $stepIdx > 0 ? 'pt-2' : '' }}"
+              :class="{ 'rl-isolated-step-revealed': isStepRevealed({{ $stepIdx }}) }"
+              style="{{ $enableIsolatedFields && $stepIdx > 0 ? 'display: none;' : '' }}"
             >
-              <input 
-                x-ref="phoneInput"
-                type="tel" 
-                id="default-phone-input"
-                name="phone"
-                value="{{ $phone }}"
-                placeholder="(555) 000-0000"
-                class="w-full px-4 py-2.5 rounded-card border border-slate-200 text-sm text-text-body bg-white focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple focus:outline-none transition"
-              />
-            </div>
-            @error('phone') <span class="text-status-alert text-xs block mt-1">{{ $message }}</span> @enderror
-          </div>
+              @foreach ($subStep['step_fields'] as $fieldKey)
+                @if ($fieldKey === 'email')
+                  {{-- 1. Work Email --}}
+                  <div class="space-y-1.5">
+                    <label for="default-email" class="block text-[13.5px] font-medium text-slate-900 cursor-pointer">
+                      Email: <span class="text-slate-900">*</span>
+                    </label>
+                    <input 
+                      type="email" 
+                      id="default-email"
+                      name="email"
+                      autocomplete="email"
+                      aria-label="Email"
+                      aria-required="true"
+                      x-model="emailVal"
+                      wire:model.live.debounce.300ms="email"
+                      @input="onFieldInput('email', {{ $stepIdx }})"
+                      @blur="advanceIfValid({{ $stepIdx }})"
+                      @keydown.enter.prevent="advanceIfValid({{ $stepIdx }})"
+                      placeholder="name@company.com"
+                      class="w-full px-4 py-2.5 h-[48px] rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#F8248A]/15 focus:border-[#F8248A] text-sm text-slate-900 bg-[#F8F9FA] transition placeholder-slate-400"
+                    />
+                    @error('email') <span class="text-status-alert text-xs block mt-1">{{ $message }}</span> @enderror
+                  </div>
 
-          {{-- 4. Monthly Company Revenue (MRR) - Radio Select (Low to High) --}}
-          <div class="space-y-2">
-            <label class="block text-xs font-bold uppercase tracking-wider text-text-body">Monthly Company Revenue (MRR) *</label>
-            <div class="space-y-2">
-              @foreach ([
-                '$0 to $5k Per Month' => '$0 to $5k Per Month',
-                '$5k to $10k Per Month' => '$5k to $10k Per Month',
-                '$10k to $50k Per Month' => '$10k to $50k Per Month',
-                '$50k-$100k Per Month' => '$50k-$100k Per Month',
-                '$100k+ Per Month' => '$100k+ Per Month',
-              ] as $val => $label)
-                <label 
-                  class="flex items-center gap-3 px-4 py-3 rounded-card border transition cursor-pointer {{ $monthlyRevenue === $val ? 'border-brand-purple bg-brand-purple/5 ring-1 ring-brand-purple/20 text-brand-hero' : 'border-slate-200 bg-white hover:border-slate-300 text-text-body' }}"
-                >
-                  <input 
-                    type="radio" 
-                    name="monthlyRevenue" 
-                    value="{{ $val }}" 
-                    wire:model.live="monthlyRevenue"
-                    class="w-4 h-4 text-brand-purple border-slate-300 focus:ring-brand-purple/20 focus:ring-offset-0 cursor-pointer"
-                  />
-                  <span class="text-xs sm:text-sm font-medium">{{ $label }}</span>
-                </label>
+                @elseif ($fieldKey === 'monthly_revenue')
+                  {{-- 2. Monthly Company Revenue (MRR) - Horizontal Interactive Pills --}}
+                  <div class="space-y-2 pt-0.5">
+                    <label class="block text-[13.5px] font-medium text-slate-900">
+                      What's your company's monthly revenue?
+                    </label>
+                    <div class="flex flex-wrap gap-2.5 pt-0.5">
+                      @foreach ([
+                        '$0 to $5k Per Month' => '$0k to $5k',
+                        '$5k to $10k Per Month' => '$5k to $10k',
+                        '$10k to $50k Per Month' => '$10k to $50k',
+                        '$50k-$100k Per Month' => '$50k-$100k',
+                        '$100k+ Per Month' => '$100k+',
+                      ] as $val => $label)
+                        <label 
+                          class="cursor-pointer inline-flex items-center justify-center px-4 py-2 rounded-full border text-xs sm:text-sm font-medium transition-all duration-150 select-none"
+                          :class="monthlyRevenueVal === '{{ $val }}' 
+                            ? 'border-2 border-[#F8248A] text-[#F8248A] bg-white ring-1 ring-[#F8248A]/20 font-semibold shadow-xs' 
+                            : 'border border-slate-200 bg-[#F8F9FA] text-slate-800 hover:border-slate-300 hover:bg-slate-100/80'"
+                        >
+                          <input 
+                            type="radio" 
+                            name="monthlyRevenue" 
+                            value="{{ $val }}" 
+                            x-model="monthlyRevenueVal"
+                            wire:model.live="monthlyRevenue"
+                            @change="onFieldInput('monthly_revenue', {{ $stepIdx }})"
+                            class="sr-only"
+                          />
+                          <span>{{ $label }}</span>
+                        </label>
+                      @endforeach
+                    </div>
+                    @error('monthlyRevenue') <span class="text-status-alert text-xs block mt-1">{{ $message }}</span> @enderror
+                  </div>
+
+                @elseif ($fieldKey === 'name')
+                  {{-- 3. Name (First & Last - Full-Width Stacked) --}}
+                  <div class="space-y-4">
+                    <div class="space-y-1.5">
+                      <label for="default-first-name" class="block text-[13.5px] font-medium text-slate-900 cursor-pointer">
+                        First Name: <span class="text-slate-900">*</span>
+                      </label>
+                      <input 
+                        type="text" 
+                        id="default-first-name"
+                        name="first_name"
+                        autocomplete="given-name"
+                        aria-label="First Name"
+                        aria-required="true"
+                        x-model="firstNameVal"
+                        wire:model="firstName"
+                        @input="onFieldInput('name', {{ $stepIdx }})"
+                        @blur="onFieldInput('name', {{ $stepIdx }})"
+                        placeholder="First Name"
+                        class="w-full px-4 py-2.5 h-[48px] rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#F8248A]/15 focus:border-[#F8248A] text-sm text-slate-900 bg-[#F8F9FA] transition placeholder-slate-400"
+                      />
+                      @error('firstName') <span class="text-status-alert text-xs block mt-1">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div class="space-y-1.5">
+                      <label for="default-last-name" class="block text-[13.5px] font-medium text-slate-900 cursor-pointer">
+                        Last Name: <span class="text-slate-900">*</span>
+                      </label>
+                      <input 
+                        type="text" 
+                        id="default-last-name"
+                        name="last_name"
+                        autocomplete="family-name"
+                        aria-label="Last Name"
+                        aria-required="true"
+                        x-model="lastNameVal"
+                        wire:model="lastName"
+                        @input="onFieldInput('name', {{ $stepIdx }})"
+                        @blur="onFieldInput('name', {{ $stepIdx }})"
+                        placeholder="Last Name"
+                        class="w-full px-4 py-2.5 h-[48px] rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#F8248A]/15 focus:border-[#F8248A] text-sm text-slate-900 bg-[#F8F9FA] transition placeholder-slate-400"
+                      />
+                      @error('lastName') <span class="text-status-alert text-xs block mt-1">{{ $message }}</span> @enderror
+                    </div>
+                  </div>
+
+                @elseif ($fieldKey === 'phone')
+                  {{-- 4. Phone Number with Country Selector --}}
+                  <div class="space-y-1.5">
+                    <label for="default-phone-input" class="block text-[13.5px] font-medium text-slate-900 cursor-pointer">
+                      Phone: <span class="text-slate-900">*</span>
+                    </label>
+                    <div 
+                      wire:ignore 
+                      x-data="phoneInputComponent({ initialCountry: '{{ strtolower($phoneCountry ?: 'us') }}' })"
+                      class="relative w-full"
+                    >
+                      <input 
+                        x-ref="phoneInput"
+                        type="tel" 
+                        id="default-phone-input"
+                        name="phone"
+                        value="{{ $phone }}"
+                        x-model="phoneVal"
+                        placeholder="(201) 555-0123"
+                        class="w-full px-4 py-2.5 h-[48px] rounded-xl border border-slate-200 text-sm text-slate-900 bg-[#F8F9FA] focus:ring-2 focus:ring-[#F8248A]/15 focus:border-[#F8248A] focus:outline-none transition placeholder-slate-400"
+                      />
+                    </div>
+                    @error('phone') <span class="text-status-alert text-xs block mt-1">{{ $message }}</span> @enderror
+                  </div>
+
+                @elseif ($fieldKey === 'consent')
+                  {{-- 5. Terms & SMS Consent Checkbox --}}
+                  <div class="pt-1">
+                    <label for="default-consent-checkbox" class="flex items-start gap-2.5 cursor-pointer text-[11px] sm:text-[11.5px] leading-[1.45] text-slate-500 select-none">
+                      <input 
+                        type="checkbox" 
+                        id="default-consent-checkbox"
+                        name="consent"
+                        aria-label="Consent to receive SMS appointment reminders"
+                        required 
+                        checked 
+                        x-model="consentChecked"
+                        class="mt-0.5 w-4 h-4 rounded bg-[#E5E7EB] text-[#F8248A] border-slate-300 focus:ring-0 focus:ring-offset-0 shrink-0 cursor-pointer"
+                      />
+                      <span>
+                        I consent to Remote Leverage contacting me by phone, SMS, and email. Messaging frequency varies. Standard message and data rates may apply. To unsubscribe, reply STOP anytime. For help, call (650) 668-0728 or email paula@remoteleverage.com. By consenting I acknowledge I have read and agree to Remote Leverage’s <a href="/terms-of-use" class="underline hover:text-[#F8248A] transition-colors">Terms &amp; Conditions</a> and <a href="/privacy-policy" class="underline hover:text-[#F8248A] transition-colors">Privacy Policy</a>. I can withdraw consent at any time.
+                      </span>
+                    </label>
+                  </div>
+                @endif
               @endforeach
-            </div>
-            @error('monthlyRevenue') <span class="text-status-alert text-xs block mt-1">{{ $message }}</span> @enderror
-          </div>
 
-          <div class="pt-6 border-t border-slate-100 flex justify-end">
+              @if ($stepIdx < count($renderedSteps) - 1)
+                <div 
+                  x-show="canShowContinue({{ $stepIdx }})" 
+                  class="pt-3"
+                  style="{{ $enableIsolatedFields && $stepIdx === 0 ? '' : 'display: none;' }}"
+                >
+                  <button 
+                    type="button" 
+                    @click="advanceIfValid({{ $stepIdx }})"
+                    :disabled="!isSubStepValid({{ $stepIdx }})"
+                    class="w-full py-3.5 sm:py-4 px-6 rounded-full bg-[#F8248A] hover:bg-[#D81575] text-white font-bold text-sm sm:text-base tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <span>{{ $buttonText ?: 'Find me an Assistant' }}</span>
+                    <svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                    </svg>
+                  </button>
+                </div>
+              @endif
+            </div>
+          @endforeach
+
+          {{-- Step 1 Completion Button --}}
+          <div 
+            x-show="canShowFinalButton()"
+            x-transition:enter="transition ease-out duration-300 transform"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            class="pt-3"
+            style="{{ $enableIsolatedFields ? 'display: none;' : '' }}"
+          >
             <button 
               type="button" 
               wire:click="goToStep(2)"
-              class="btn-primary cursor-pointer inline-flex items-center gap-2"
+              class="w-full py-3.5 sm:py-4 px-6 rounded-full bg-[#F8248A] hover:bg-[#D81575] text-white font-bold text-sm sm:text-base tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg cursor-pointer"
             >
-              <span>Next: Pick a Date</span>
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+              <span>{{ $buttonText ?: 'Find me an Assistant' }}</span>
+              <svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+              </svg>
             </button>
           </div>
         </div>
@@ -557,7 +659,7 @@
       {{-- STEP 2: Pick a Date (Calendar Grid)                        --}}
       {{-- ────────────────────────────────────────────────────────── --}}
       @if ($currentStep === 2)
-        <div class="p-6 sm:p-8">
+        <div class="{{ $skin === 'naked' ? 'p-0' : 'p-6 sm:p-8' }}">
           <div class="flex items-center justify-between mb-4">
             <button 
               type="button" 
@@ -632,7 +734,7 @@
       {{-- STEP 3: Select a Time                                      --}}
       {{-- ────────────────────────────────────────────────────────── --}}
       @if ($currentStep === 3)
-        <div class="p-6 sm:p-8 space-y-6">
+        <div class="{{ $skin === 'naked' ? 'p-0 space-y-6' : 'p-6 sm:p-8 space-y-6' }}">
           <div class="flex items-center justify-between border-b border-slate-100 pb-4">
             <button 
               type="button" 
@@ -669,21 +771,43 @@
             </h3>
             <p class="text-xs text-text-muted mb-4">Select the 30-minute consultation slot that works best for your schedule:</p>
 
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+            <div class="space-y-3 max-h-[380px] overflow-y-auto pr-1">
               @forelse ($availableSlots as $slot)
-                <button 
-                  type="button"
-                  wire:click="selectSlot('{{ $slot['iso'] }}')"
-                  class="py-2.5 px-3 text-center rounded-card border text-xs font-semibold transition cursor-pointer
-                    {{ $selectedSlot === $slot['iso'] ? 'bg-brand-purple border-brand-purple text-white shadow-md shadow-brand-purple/20 font-bold' : 'border-slate-200 hover:border-brand-purple text-text-body hover:bg-brand-purple/5' }}
-                  "
-                >
-                  {{ $slot['time'] }}
-                </button>
+                @if ($selectedSlot === $slot['iso'])
+                  <div wire:key="slot-selected-{{ $slot['iso'] }}" class="grid grid-cols-2 gap-3 transition-all duration-200">
+                    <div class="w-full py-3 px-4 rounded-card bg-brand-purple border border-brand-purple text-white text-xs sm:text-sm font-bold text-center shadow flex items-center justify-center transition-all duration-200">
+                      {{ $slot['time'] }}
+                    </div>
+                    <button
+                      type="button"
+                      wire:click="submitBooking"
+                      wire:loading.attr="disabled"
+                      class="w-full py-3 px-4 rounded-card bg-[#F8248A] hover:bg-[#E91E63] text-white text-xs sm:text-sm font-bold text-center shadow-lg hover:shadow-pink-500/25 hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 ease-out cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <span wire:loading.remove>Confirm</span>
+                      <span wire:loading class="flex items-center gap-1.5">
+                        <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Reserving...</span>
+                      </span>
+                    </button>
+                  </div>
+                @else
+                  <button 
+                    type="button"
+                    wire:key="slot-opt-{{ $slot['iso'] }}"
+                    wire:click="selectSlot('{{ $slot['iso'] }}')"
+                    class="w-full py-3 px-4 rounded-card border border-slate-200 hover:border-brand-purple hover:bg-brand-purple/5 text-text-body font-semibold text-xs sm:text-sm transition-all duration-200 ease-out cursor-pointer block text-center"
+                  >
+                    {{ $slot['time'] }}
+                  </button>
+                @endif
               @empty
-                <div class="col-span-3 text-center py-6 text-xs text-slate-400">
-                  No direct slots remaining on this day. Please click Back to select another date.
-                </div>
+                <p class="text-xs sm:text-sm text-text-muted py-6 text-center">
+                  No direct slots remaining on this day. Please click Change Date to select another day.
+                </p>
               @endforelse
             </div>
           </div>
@@ -694,113 +818,11 @@
         </div>
       @endif
 
-      {{-- ────────────────────────────────────────────────────────── --}}
-      {{-- STEP 4: Additional Info & Guests (Confirmation Review)     --}}
-      {{-- ────────────────────────────────────────────────────────── --}}
-      @if ($currentStep === 4)
-        <div class="p-6 sm:p-8 space-y-6">
-          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-            <button 
-              type="button" 
-              wire:click="goToStep(3)"
-              class="text-xs font-semibold text-text-muted hover:text-brand-hero inline-flex items-center gap-1.5 transition cursor-pointer"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-              <span>Back to Times</span>
-            </button>
-            <span class="text-xs font-bold uppercase tracking-wider text-brand-purple">Final Review</span>
-          </div>
-
-          {{-- Selected Meeting Summary Card --}}
-          <div class="p-4 rounded-card bg-lavender-surface border border-brand-purple/20 space-y-2">
-            <div class="flex items-center gap-2 text-brand-midnight font-bold text-sm">
-              <svg class="w-4 h-4 text-brand-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-              <span>{{ Carbon\Carbon::parse($selectedSlot, $timezone)->format('l, F j, Y \a\t g:i A') }} ({{ $timezone }})</span>
-            </div>
-            <div class="text-xs text-slate-600 flex items-center gap-4">
-              <span>Attendee: <strong>{{ $name }}</strong> ({{ $email }})</span>
-              @if ($company) <span>&bull; Company: <strong>{{ $company }}</strong></span> @endif
-            </div>
-          </div>
-
-          {{-- Guest Invitee Repeater --}}
-          <div class="space-y-2">
-            <label for="default-guest-email" class="block text-xs font-bold uppercase tracking-wider text-text-body cursor-pointer">Add Guests (Optional)</label>
-            <p class="text-xs text-text-muted">Add colleagues or partners who should receive the Google Meet invitation:</p>
-            
-            <div class="flex items-center gap-2">
-              <input 
-                type="email" 
-                id="default-guest-email"
-                name="guest_email"
-                aria-label="Add Guest Email"
-                wire:model="newGuestEmail"
-                wire:keydown.enter.prevent="addGuest"
-                placeholder="colleague@company.com" 
-                class="flex-1 px-4 py-2 rounded-card border border-slate-200 text-xs text-text-body focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple"
-              />
-              <button 
-                type="button" 
-                wire:click="addGuest"
-                class="px-4 py-2 rounded-card bg-slate-100 hover:bg-slate-200 text-text-body text-xs font-bold transition cursor-pointer"
-              >
-                + Add Guest
-              </button>
-            </div>
-
-            @if (! empty($guestEmails))
-              <div class="flex flex-wrap gap-2 pt-2">
-                @foreach ($guestEmails as $idx => $guestEmail)
-                  <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-slate-100 text-slate-700 text-xs font-medium">
-                    <span>{{ $guestEmail }}</span>
-                    <button type="button" wire:click="removeGuest({{ $idx }})" class="text-slate-400 hover:text-red-500 font-bold">&times;</button>
-                  </span>
-                @endforeach
-              </div>
-            @endif
-          </div>
-
-          {{-- Notes / Specific Bottlenecks --}}
-          <div class="space-y-1">
-            <label class="block text-xs font-bold uppercase tracking-wider text-text-body">Notes / Objectives for this Call</label>
-            <textarea 
-              wire:model="notes" 
-              rows="2" 
-              placeholder="Tell us what candidate profiles or specific skills you need..."
-              class="w-full px-4 py-2 rounded-card border border-slate-200 text-xs text-text-body focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple"
-            ></textarea>
-          </div>
-
-          <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
-            <div class="text-2xs text-text-muted">
-              Instant calendar invite will be emailed to you.
-            </div>
-            <button 
-              type="button" 
-              wire:click="submitBooking"
-              wire:loading.attr="disabled"
-              class="btn-magenta cursor-pointer shadow-lg inline-flex items-center gap-2"
-            >
-              <span wire:loading.remove>Confirm Consultation</span>
-              <span wire:loading class="inline-flex items-center gap-2">
-                <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-                Booking Slot...
-              </span>
-            </button>
-          </div>
-        </div>
-      @endif
-
     @else
       {{-- ────────────────────────────────────────────────────────── --}}
       {{-- BOOKING CONFIRMED (Summary Card & Add to Calendar)         --}}
       {{-- ────────────────────────────────────────────────────────── --}}
-      <div class="p-8 sm:p-10 text-center space-y-6">
+      <div class="{{ $skin === 'naked' ? 'p-0 text-center space-y-6' : 'p-8 sm:p-10 text-center space-y-6' }}">
         <div class="w-16 h-16 rounded-full bg-status-success/10 text-status-success mx-auto flex items-center justify-center">
           <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>

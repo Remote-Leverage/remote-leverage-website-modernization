@@ -63,46 +63,84 @@ This skill teaches the agent how to receive a production landing page URL, disse
   3. **Automated Validation in QA**:
      - Run the `parse_blocks()` validation audit before reporting completion. Any block with `blockName === null` containing non-whitespace `innerHTML` inside a container block is an error that MUST be eliminated before delivery.
 
+### 4. Typography & Font Weights: Bold is the Maximum (NEVER Use Extra Bold or Black)
+- **Strict Rule**: NEVER use text extra bold (`font-extrabold`, `font-black`, or `font-weight: 800/900`). **Bold (`font-bold` / 700) is the absolute maximum weight you will ever use**.
+- **Headings & Hero Titles**: Always use `font-bold` (or `font-semibold`), never `font-extrabold` or `font-black`.
+- **Badges, Pills, Buttons, Counters**: Use `font-bold` or `font-semibold` or `font-medium`.
+- **Prohibited Classes**: `font-extrabold`, `font-black`, `font-[800]`, `font-[900]`.
+
+### 5. The 6 Structural Invariants (Never Flatten, Homogenize, or Invert)
+Never approximate a bespoke page with generic components. Every section must be verified against these 6 invariants before and during implementation:
+1. **Background Theme Invariant (Dark vs Light)**:
+   - Always check the production computed background. If the original is dark (`#250D4A`, deep gradient, midnight purple), the migrated section MUST be dark with white typography and appropriately themed inputs/pills.
+   - **NEVER** default a dark hero or dark section to `bg-bg-light` or white!
+2. **Layout Topology Invariant (Masonry & Bento Stacking vs Nested Splitting)**:
+   - Identify whether the layout is a true vertical column-stack masonry versus a CSS subgrid or uniform table.
+   - In a 3-column masonry grid (`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6`), each column is an independent vertical flex container (`flex flex-col gap-6`). Cards inside each column span the **full column width** — do **NOT** subdivide a column into mini horizontal `grid-cols-2` subgrids unless explicitly shown in the original screenshot.
+   - **Counter-Balanced Bento Heights**:
+     - Column 1: **Tall card on top** (e.g. Administrative dark card with cutout woman), followed by **2 medium cards** vertically stacked below (e.g. Marketing lavender, Graphic Design soft blue).
+     - Column 2: **2 medium cards on top** vertically stacked (e.g. Lead Gen lavender, Sales SDR soft blue), followed by **Tall card at bottom** (e.g. Customer Support dark card with cutout man).
+     - Column 3: **Medium card on top** (e.g. Social Media), followed by **Tall card at bottom** (e.g. Custom Role with orbital avatar network).
+   - **Card Background & Inversion Fidelity**:
+     - Inspect each individual card's background. For example, in the Roles section, Custom Role is an all-**white** card (`bg-white`), NOT dark purple.
+     - Replicate the exact pastel tints (`#F2EDF9` lavender, `#E1ECF7` soft blue, `#250D4A` dark purple, `#FFFFFF` white).
+3. **Container Boundary Invariant (Single Unified Card vs Multi-Box)**:
+   - Check whether comparison sides (e.g., "Hiring on your own" vs "Hiring with Remote Leverage") or grouped content live inside **one single enclosing container card** or separate detached cards.
+   - If the original encloses them inside a single outer card with an arrow/divider, build it as **one unified container**.
+4. **Bleed & Attachment Invariant (Zero-Padding Edges)**:
+   - Check if graphics (medal ribbons, globe illustrations, candidate cutouts) bleed directly off the top, bottom, or side edges of their container.
+   - **NEVER** float an edge-bleeding graphic inside internal padding. Ribbon graphics must be stuck flush to the top edge (`pt-0`, negative margin, or absolute top pinning).
+5. **Surface Material Invariant (Frosted Glass vs Solid White)**:
+   - Check if cards or form containers use glassmorphism (`backdrop-blur`, semi-transparent background e.g. `bg-white/10`, translucent border `border-white/20`, dark glass inputs).
+   - **NEVER** replace a glassmorphic container or glass lead form with a flat opaque white card.
+6. **Card Asymmetry & Tint Invariant**:
+   - Replicate individual card tinting (e.g. lavender, soft blue, deep purple) and cutouts. Do not homogenize distinct cards into identical plain white boxes.
+
 ---
 
 ## Workflow Phases
 
-When given a production URL, execute these 7 phases systematically:
+When given a production URL, execute these 8 phases systematically:
 
 ```
-1. Reconnaissance ──> 2. Dissection ──> 3. Media Sideload ──> 4. Block Composer ──> 5. Patterns & Defaults ──> 6. Testing Page ──> 7. QA Check
+0. Visual Ingestion ──> 1. Spec Table ──> 2. Media Sideload ──> 3. Block Architecture ──> 4. Defaults & Patterns ──> 5. Testing Page ──> 6. Code Validation ──> 7. Side-by-Side Visual Diff
 ```
 
 ---
 
-### Phase 1: Intake & Reconnaissance
+### Phase 0: Visual Ingestion & Ground Truth Capture (MANDATORY FIRST STEP)
 
-1. **Extract Production Content**:
-   - Use `read_url_content` or `browser_subagent` to fetch the complete text, headings, and images of the target URL.
-   - If the page has interactive elements (calendars, sliders, accordions), inspect their HTML structure and underlying data.
-2. **Download Page Images**:
-   - Save production images to `public/images/<page-slug>/`.
-   - Maintain modern web formats (`.webp`, `.png`, `.svg`).
+DO NOT start by scraping text or parsing DOM trees. DOM scrapes are visually blind and cause catastrophic layout and theme errors.
+
+1. **Capture Desktop Screenshots of EVERY Section**:
+   - Use `browser_subagent` to navigate to the production URL.
+   - Scroll section-by-section and capture high-resolution screenshots of every distinct section (Hero, Logobar, Roles, Why Hire, Comparison, Guarantee, Process, FAQ, Footer/Lead Form).
+   - Save these screenshot artifacts for direct visual reference throughout development.
+2. **Inspect Computed Styles via CSS**:
+   - Inspect the production stylesheet (`post-<id>.css`) for exact background colors, gradients (`radial-gradient(...)`), border-radii, card colors, and paddings.
 
 ---
 
-### Phase 2: Section Dissection & Block Mapping
+### Phase 1: Section Dissection & Visual Spec Table
 
-Dissect the page into modular sections and map each to the design system:
+Before writing any Blade template or registering any block, compile and print the **Visual Spec Table**:
 
-| Section Type | Common Elements | Existing Block / Pattern to Reuse | Action if Missing |
-| :--- | :--- | :--- | :--- |
-| **Hero** | H1, Subhead, CTA button, visual marquee | `remote-leverage/hero`<br>`acf/talent-marquee` | Create new hero block if layout differs |
-| **Social Proof Ticker** | Client / partner logos in infinite marquee | `remote-leverage/client-logos`<br>`acf/client-logos-marquee` | Reuse with updated logo array |
-| **Feature Grid (3-4 Col)** | 3 or 4 benefit cards with title, text, image | `remote-leverage/worlds-best-talent`<br>`acf/feature-cards` (`columns: '3'|'4'`) | Reuse with custom card presets |
-| **Department / Role Cards** | Specialty cards with photo background & blur overlay | `remote-leverage/beyond-virtual-assistant`<br>`acf/department-cards` | Reuse with new role data |
-| **Trust & Impact Stats** | Placed counter, country count, economic impact | `remote-leverage/trust-and-impact`<br>`acf/trust-stats` | Reuse or adapt fields |
-| **Comparison Matrix** | DIY vs Remote Leverage comparison rows | `remote-leverage/why-companies-choose`<br>`acf/data-table` | Reuse with new criterion rows |
-| **Process Steps** | 3-step numbered sequence (`01`, `02`, `03`) | `remote-leverage/process-steps`<br>`acf/process-steps` | Reuse with step copy |
-| **Guarantee Card** | 12-month replacement guarantee card | `remote-leverage/replacement-guarantee`<br>(Core blocks: `wp:group`, `wp:columns`) | Pure core Gutenberg block pattern |
-| **Video Testimonials** | Client quotes, Vimeo modal trigger, duration badge | `remote-leverage/results-testimonials-faq`<br>`acf/testimonials` | Reuse with client video IDs & quotes |
-| **Accordion FAQ** | Expandable Q&A items + Schema.org JSON-LD | `remote-leverage/results-testimonials-faq`<br>`acf/accordion-faq` | Reuse with page FAQ items |
-| **Booking Footer / Funnel** | Multistep calendar qualification wizard | `remote-leverage/booking-footer`<br>`acf/booking` | Reuse embedded funnel |
+| Section Name | Theme (Dark/Light) | Background (Hex/Gradient) | Layout Topology | Container Boundary | Bleed Graphics | Surface Style |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| *e.g. Hero* | *Dark* | *#250D4A gradient* | *Split: Text L / Card R* | *Full width canvas* | *Talent marquee backdrop* | *Dark canvas, white text* |
+| *e.g. Roles* | *Light* | *#F9F9FB* | *3-Col Asymmetric Bento* | *Separate tinted cards* | *Cutout persons* | *Tinted lavender/blue/purple* |
+| *e.g. Why Hire*| *Split* | *#250D4A / #F9F9FB* | *Asymmetric Split* | *Large card L, Stack R*| *Globe bleeding off bottom* | *Dark card L, Soft cards R* |
+| *e.g. Headache*| *Light* | *#F9F9FB* | *Side-by-side comparison* | ***Single unified white card***| *Center pink arrow* | *Solid white card, border* |
+| *e.g. Guarantee*|*Light* | *#FFFFFF* | *2-Col Split* | *Single outer card* | ***Medals flush to top edge (pt-0)***| *Solid white, soft shadow* |
+| *e.g. Footer* | *Dark* | *Deep purple gradient* | *Split: Text L / Form R* | *Glass container* | *N/A* | ***Frosted glass (backdrop-blur)*** |
+
+---
+
+### Phase 2: Bespoke Block Modeling (No Sloppy Slotting)
+
+- **Do NOT shoehorn content into generic theme blocks** if the visual topology does not match 100%.
+- If a section has a bespoke layout (e.g. Bento grid, Asymmetric split with bleeding globe, Unified single-box comparison, Frosted glass footer card), **create a dedicated code-first ACF Block** (`Log1x\AcfComposer\Block`) with a dedicated Blade template.
+- Blade allows full expression of Tailwind CSS v4, custom grid spans, exact background tints, and image positioning without fighting Gutenberg's block validation.
 
 ---
 
@@ -260,6 +298,17 @@ Execute these 4 automated tests before reporting the URL to the user:
    ```bash
    npm run build
    ```
+5. **Mandatory Side-by-Side Visual Diff QA (NO SIGNOFF WITHOUT THIS)**:
+   - Use `browser_subagent` to capture full-resolution screenshots of each section on the local preview URL (`http://remoteleverage-v2.test/<slug>-preview/`).
+   - Visually compare every local screenshot against the corresponding production screenshot captured in Phase 0.
+   - Explicitly verify the **6 Invariants** for each section:
+     1. **Theme Match**: Is the background dark or light matching the original?
+     2. **Topology Match**: Is the Bento grid intact with correct row/col spans and card heights?
+     3. **Container Match**: Are comparison lists or side-by-side modules in a single unified box?
+     4. **Bleed Match**: Are medals ribbons, globes, or cutouts flush to container edges without unwanted padding?
+     5. **Surface Match**: Is glassmorphism (`backdrop-blur`, translucent border, dark inputs) properly applied?
+     6. **Weight Match**: Are all headings and text constrained to `font-bold` (700 max)?
+   - If any section fails any of these 6 checks, it is an automatic rejection that MUST be corrected before reporting to the user.
 
 ---
 

@@ -7,7 +7,6 @@
  */
 ?>
 <!-- wp:pattern {"slug":"remote-leverage/hire-va-4-hero"} /-->
-<!-- wp:pattern {"slug":"remote-leverage/client-logos"} /-->
 <!-- wp:pattern {"slug":"remote-leverage/hire-va-4-roles"} /-->
 <!-- wp:pattern {"slug":"remote-leverage/hire-va-4-why-hire"} /-->
 <!-- wp:pattern {"slug":"remote-leverage/hire-va-4-testimonials"} /-->

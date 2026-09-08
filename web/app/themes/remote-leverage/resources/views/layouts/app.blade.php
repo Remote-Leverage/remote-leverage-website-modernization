@@ -70,7 +70,9 @@
         {{ __('Skip to content', 'remote-leverage') }}
       </a>
 
-      @include('sections.header')
+      @if (get_page_template_slug() !== 'template-landing.blade.php' && ! is_page_template('template-landing.blade.php'))
+        @include('sections.header')
+      @endif
 
       <main id="main" class="main flex-1 w-full">
         @yield('content')
