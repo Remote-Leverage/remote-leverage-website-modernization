@@ -51,11 +51,15 @@ class DepartmentCardsBlock extends Block
     public function cards(): array
     {
         $items = function_exists('get_field') ? get_field('cards') : null;
+        $cards = (! empty($items) && is_array($items))
+            ? $items
+            : \App\Support\BlockDefaults::departmentCards();
 
-        if (! empty($items) && is_array($items)) {
-            return $items;
-        }
-
-        return \App\Support\BlockDefaults::departmentCards();
+        return array_map(function ($card) {
+            $card['title'] = \App\Support\BlockDefaults::cleanText($card['title'] ?? '');
+            $card['desc'] = \App\Support\BlockDefaults::cleanText($card['desc'] ?? '');
+            $card['img'] = \App\Support\BlockDefaults::resolveImageUrl($card['img'] ?? '');
+            return $card;
+        }, $cards);
     }
 }

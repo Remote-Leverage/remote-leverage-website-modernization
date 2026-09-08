@@ -65,8 +65,8 @@ class AccordionFaqBlock extends Block
         if (! empty($items) && is_array($items)) {
             return array_map(function ($item) {
                 return [
-                    'q' => $item['question'] ?? ($item['q'] ?? ''),
-                    'a' => $item['answer'] ?? ($item['a'] ?? ''),
+                    'q' => \App\Support\BlockDefaults::cleanText($item['question'] ?? ($item['q'] ?? '')),
+                    'a' => \App\Support\BlockDefaults::cleanText($item['answer'] ?? ($item['a'] ?? '')),
                 ];
             }, $items);
         }

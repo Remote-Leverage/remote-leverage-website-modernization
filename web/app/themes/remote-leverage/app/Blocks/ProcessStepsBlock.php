@@ -61,11 +61,14 @@ class ProcessStepsBlock extends Block
     public function steps(): array
     {
         $items = function_exists('get_field') ? get_field('steps') : null;
+        $steps = (! empty($items) && is_array($items))
+            ? $items
+            : \App\Support\BlockDefaults::steps();
 
-        if (! empty($items) && is_array($items)) {
-            return $items;
-        }
-
-        return \App\Support\BlockDefaults::steps();
+        return array_map(function ($step) {
+            $step['title'] = \App\Support\BlockDefaults::cleanText($step['title'] ?? '');
+            $step['desc'] = \App\Support\BlockDefaults::cleanText($step['desc'] ?? '');
+            return $step;
+        }, $steps);
     }
 }

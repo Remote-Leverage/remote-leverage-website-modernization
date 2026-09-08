@@ -12,6 +12,109 @@ class BlockDefaults
     public static function init(): void
     {
         add_filter('acf/load_value', [self::class, 'filterLoadValue'], 10, 3);
+        add_filter('acf/format_value/type=image', [self::class, 'filterImageFormatValue'], 20, 3);
+    }
+
+    /**
+     * Prevent ACF from stripping direct image URL strings to false when attachment ID is not used.
+     */
+    public static function filterImageFormatValue(mixed $value, int|string $postId, array $field): mixed
+    {
+        if (empty($value)) {
+            $raw = function_exists('acf_get_value') ? acf_get_value($postId, $field) : null;
+            if (is_string($raw) && (str_starts_with($raw, 'http') || str_starts_with($raw, '/'))) {
+                return $raw;
+            }
+        }
+
+        return $value;
+    }
+
+    /**
+     * Static cache of filename => attachment ID.
+     */
+    protected static ?array $attachmentMap = null;
+
+    public static function attachmentMap(): array
+    {
+        if (self::$attachmentMap !== null) {
+            return self::$attachmentMap;
+        }
+
+        self::$attachmentMap = [];
+        global $wpdb;
+        if ($wpdb) {
+            $rows = $wpdb->get_results("SELECT ID, guid FROM {$wpdb->posts} WHERE post_type = 'attachment'", defined('ARRAY_A') ? \ARRAY_A : 'ARRAY_A');
+            if (is_array($rows)) {
+                foreach ($rows as $row) {
+                    $fn = basename($row['guid']);
+                    self::$attachmentMap[$fn] = (int) $row['ID'];
+                }
+            }
+        }
+
+        return self::$attachmentMap;
+    }
+
+    /**
+     * If a value is an image path/URL that matches an existing WP media attachment, return its ID.
+     */
+    public static function getAttachmentId(mixed $value): mixed
+    {
+        if (! is_string($value) || empty($value)) {
+            return $value;
+        }
+
+        $parsedPath = parse_url($value, PHP_URL_PATH) ?? '';
+        $ext = strtolower(pathinfo($parsedPath, PATHINFO_EXTENSION));
+        if (! in_array($ext, ['webp', 'png', 'jpg', 'jpeg', 'svg', 'gif'], true)) {
+            return $value;
+        }
+
+        $filename = basename($parsedPath);
+        $map = self::attachmentMap();
+
+        return $map[$filename] ?? $value;
+    }
+
+    /**
+     * Resolve an image value (attachment ID, URL string, or ACF image array) to a valid URL string.
+     */
+    public static function resolveImageUrl(mixed $image): string
+    {
+        if (empty($image)) {
+            return '';
+        }
+
+        if (is_numeric($image)) {
+            return (string) (wp_get_attachment_url((int) $image) ?: '');
+        }
+
+        if (is_array($image)) {
+            return (string) ($image['url'] ?? '');
+        }
+
+        return (string) $image;
+    }
+
+    /**
+     * Decode and clean text that might contain HTML entities or unslashed JSON unicode escapes (e.g. u003c, u0026).
+     */
+    public static function cleanText(mixed $text): string
+    {
+        if (! is_string($text) || empty($text)) {
+            return (string) $text;
+        }
+
+        if (str_contains($text, 'u003c') || str_contains($text, 'u0026') || str_contains($text, 'u0022')) {
+            $text = str_replace(
+                ['u0026amp;', 'u0026', 'u0022', 'u003c', 'u003e'],
+                ['&', '&', '"', '<', '>'],
+                $text
+            );
+        }
+
+        return $text;
     }
 
     /**
@@ -53,8 +156,9 @@ class BlockDefaults
         foreach ($rows as $row) {
             $formattedRow = [];
             foreach ($row as $k => $v) {
-                $formattedRow[$k] = $v;
-                $formattedRow["{$parentKey}_{$k}"] = $v;
+                $encodedVal = self::getAttachmentId($v);
+                $formattedRow[$k] = $encodedVal;
+                $formattedRow["{$parentKey}_{$k}"] = $encodedVal;
             }
             $formatted[] = $formattedRow;
         }
@@ -67,7 +171,8 @@ class BlockDefaults
         $data['_' . $fieldName] = $fieldKey;
         foreach ($rows as $i => $row) {
             foreach ($row as $subfield => $val) {
-                $data["{$fieldName}_{$i}_{$subfield}"] = $val;
+                $encodedVal = self::getAttachmentId($val);
+                $data["{$fieldName}_{$i}_{$subfield}"] = $encodedVal;
                 $data["_{$fieldName}_{$i}_{$subfield}"] = "{$fieldKey}_{$subfield}";
             }
         }
@@ -127,22 +232,22 @@ class BlockDefaults
         return [
             [
                 'img' => $img . '/magnific_half-body-shot-of-a-young_SOmwQLyUb8-1.webp',
-                'title' => 'Administrative &amp;<br>Executive Assistants',
+                'title' => 'Administrative &<br>Executive Assistants',
                 'desc' => 'Executive support for busy founders and teams.',
             ],
             [
                 'img' => $img . '/magnific_wPmw8Jk7EI-1.webp',
-                'title' => 'Healthcare &amp;<br>Medical Assistants',
+                'title' => 'Healthcare &<br>Medical Assistants',
                 'desc' => 'Healthcare professionals supporting clinics and practices.',
             ],
             [
                 'img' => $img . '/magnific_ubzu0aUQLD-1.webp',
-                'title' => 'Sales &amp; Growth<br>Marketing Talents',
+                'title' => 'Sales & Growth<br>Marketing Talents',
                 'desc' => 'Professionals focused on growth, leads, and revenue.',
             ],
             [
                 'img' => $img . '/magnific_YVjYLdkWeC-1.webp',
-                'title' => 'Operations &amp;<br>Finance Professionals',
+                'title' => 'Operations &<br>Finance Professionals',
                 'desc' => 'Experts in finance, operations, and business support.',
             ],
         ];

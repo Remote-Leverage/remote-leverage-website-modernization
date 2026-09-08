@@ -50,10 +50,13 @@ class ClientLogosMarqueeBlock extends Block
     public function logos(): array
     {
         $custom = function_exists('get_field') ? get_field('logos') : null;
-        if (! empty($custom) && is_array($custom)) {
-            return $custom;
-        }
+        $logos = (! empty($custom) && is_array($custom))
+            ? $custom
+            : \App\Support\BlockDefaults::logos();
 
-        return \App\Support\BlockDefaults::logos();
+        return array_map(function ($logo) {
+            $logo['src'] = \App\Support\BlockDefaults::resolveImageUrl($logo['src'] ?? '');
+            return $logo;
+        }, $logos);
     }
 }

@@ -63,11 +63,15 @@ class DataTableBlock extends Block
     public function rows(): array
     {
         $items = function_exists('get_field') ? get_field('rows') : null;
+        $rows = (! empty($items) && is_array($items))
+            ? $items
+            : \App\Support\BlockDefaults::dataTableRows();
 
-        if (! empty($items) && is_array($items)) {
-            return $items;
-        }
-
-        return \App\Support\BlockDefaults::dataTableRows();
+        return array_map(function ($row) {
+            $row['feature'] = \App\Support\BlockDefaults::cleanText($row['feature'] ?? '');
+            $row['diy'] = \App\Support\BlockDefaults::cleanText($row['diy'] ?? '');
+            $row['rl'] = \App\Support\BlockDefaults::cleanText($row['rl'] ?? '');
+            return $row;
+        }, $rows);
     }
 }

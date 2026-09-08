@@ -69,11 +69,13 @@ class TestimonialsBlock extends Block
     public function testimonials(): array
     {
         $items = function_exists('get_field') ? get_field('testimonials') : null;
+        $testimonials = (! empty($items) && is_array($items))
+            ? $items
+            : \App\Support\BlockDefaults::testimonials();
 
-        if (! empty($items) && is_array($items)) {
-            return $items;
-        }
-
-        return \App\Support\BlockDefaults::testimonials();
+        return array_map(function ($item) {
+            $item['image'] = \App\Support\BlockDefaults::resolveImageUrl($item['image'] ?? '');
+            return $item;
+        }, $testimonials);
     }
 }

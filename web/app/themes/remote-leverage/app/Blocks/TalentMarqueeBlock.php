@@ -57,10 +57,14 @@ class TalentMarqueeBlock extends Block
     public function cards(): array
     {
         $custom = function_exists('get_field') ? get_field('talent_cards') : null;
-        if (! empty($custom) && is_array($custom)) {
-            return $custom;
-        }
+        $cards = (! empty($custom) && is_array($custom))
+            ? $custom
+            : \App\Support\BlockDefaults::talentCards();
 
-        return \App\Support\BlockDefaults::talentCards();
+        return array_map(function ($card) {
+            $card['bg'] = \App\Support\BlockDefaults::resolveImageUrl($card['bg'] ?? '');
+            $card['logo'] = \App\Support\BlockDefaults::resolveImageUrl($card['logo'] ?? '');
+            return $card;
+        }, $cards);
     }
 }

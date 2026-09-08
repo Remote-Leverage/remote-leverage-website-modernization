@@ -62,11 +62,15 @@ class FeatureCardsBlock extends Block
     public function cards(string $columns): array
     {
         $custom = function_exists('get_field') ? get_field('cards') : null;
+        $cards = (! empty($custom) && is_array($custom))
+            ? $custom
+            : \App\Support\BlockDefaults::featureCards($columns);
 
-        if (! empty($custom) && is_array($custom)) {
-            return $custom;
-        }
-
-        return \App\Support\BlockDefaults::featureCards($columns);
+        return array_map(function ($card) {
+            $card['title'] = \App\Support\BlockDefaults::cleanText($card['title'] ?? '');
+            $card['desc'] = \App\Support\BlockDefaults::cleanText($card['desc'] ?? '');
+            $card['img'] = \App\Support\BlockDefaults::resolveImageUrl($card['img'] ?? '');
+            return $card;
+        }, $cards);
     }
 }
