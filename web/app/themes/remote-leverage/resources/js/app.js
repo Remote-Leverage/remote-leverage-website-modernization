@@ -1,3 +1,6 @@
+import intlTelInput from 'intl-tel-input/intlTelInputWithUtils';
+window.intlTelInput = intlTelInput;
+
 // Expose global placeholders so early callers don't throw
 window.Sentry = window.Sentry || null;
 window.posthog = window.posthog || null;

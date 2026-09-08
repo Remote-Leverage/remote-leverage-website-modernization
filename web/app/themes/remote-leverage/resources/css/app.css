@@ -1,4 +1,5 @@
 @import "tailwindcss" theme(static);
+@import "intl-tel-input/build/css/intlTelInput.css";
 
 @source "../../app/**/*.php";
 @source "../**/*.blade.php";
@@ -980,4 +981,124 @@
     grid-template-columns: 1fr;
     gap: 48px;
   }
+}
+
+/* ───────────────────────────────────────────────────────────
+   Intl-tel-input (rl-elementor-blocks parity)
+─────────────────────────────────────────────────────────── */
+:root {
+  --iti-hover-color: transparent !important;
+  --iti-path-flags-1x: url("https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/img/flags.png?1");
+  --iti-path-flags-2x: url("https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/img/flags@2x.png?1");
+  --iti-path-globe-1x: url("https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/img/globe.png");
+  --iti-path-globe-2x: url("https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/img/globe@2x.png");
+}
+
+.iti {
+  width: 100% !important;
+  position: relative !important;
+  display: block !important;
+}
+
+.iti input.iti__tel-input {
+  width: 100% !important;
+  padding-left: 60px !important;
+  box-sizing: border-box !important;
+}
+
+.iti__country-container {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-top-left-radius: 8px !important;
+  border-bottom-left-radius: 8px !important;
+}
+
+.iti__selected-country,
+.iti__selected-country-primary {
+  padding: 0 4px 0 12px !important;
+  border-top-left-radius: 8px !important;
+  border-bottom-left-radius: 8px !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.iti__selected-country:hover,
+.iti__selected-country-primary:hover,
+.iti--allow-dropdown .iti__country-container:not(:has(+ input[disabled])):not(:has(+ input[readonly])) .iti__selected-country-primary:hover,
+.iti--allow-dropdown .iti__country-container:not(:has(+ input[disabled])):not(:has(+ input[readonly])) .iti__selected-country:has(+ .iti__dropdown-content:hover) .iti__selected-country-primary {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.iti__arrow {
+  border-top-color: #64748b !important;
+  margin-left: 6px !important;
+  margin-right: 4px !important;
+}
+
+.iti__arrow--up {
+  border-bottom-color: #64748b !important;
+}
+
+.iti__dropdown-content {
+  border-radius: 8px !important;
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.25), 0 4px 12px -2px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid #e2e8f0 !important;
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+  z-index: 9999 !important;
+  margin-top: 4px !important;
+}
+
+.iti__search-input {
+  width: 100% !important;
+  padding: 9px 12px !important;
+  font-size: 13px !important;
+  color: #1e293b !important;
+  background: #f8fafc !important;
+  border: none !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-top-left-radius: 8px !important;
+  border-top-right-radius: 8px !important;
+  outline: none !important;
+}
+
+.iti__search-input:focus {
+  background: #ffffff !important;
+}
+
+.iti__country-list {
+  max-height: 220px !important;
+  overflow-y: auto !important;
+  color: #1e293b !important;
+}
+
+.iti__country {
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  color: #1e293b !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.iti__country:hover,
+.iti__country.iti__highlight {
+  background-color: #f1f5f9 !important;
+}
+
+.iti__country-name {
+  font-size: 13px !important;
+  color: #1e293b !important;
+}
+
+.iti__dial-code {
+  font-size: 12px !important;
+  color: #64748b !important;
+  margin-left: auto !important;
 }

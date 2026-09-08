@@ -100,22 +100,100 @@
               <label class="block text-xs sm:text-[13px] font-bold text-white mb-1">
                 Phone <span class="text-[#EF4444]">*</span>
               </label>
-              <div class="relative flex items-center w-full h-10 sm:h-11 rounded-lg bg-[#F0F3FA] px-3 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-purple transition">
-                <div class="flex items-center gap-1 pr-2 border-r border-slate-300 shrink-0">
-                  <select wire:model.live="phoneCountry" class="bg-transparent text-xs font-semibold text-slate-700 cursor-pointer focus:outline-none appearance-none pr-3">
-                    @foreach ($countryCodes as $cc => $data)
-                      <option value="{{ $cc }}" class="text-slate-900">{{ $data['label'] }}</option>
-                    @endforeach
-                  </select>
-                  <svg class="w-3 h-3 text-slate-500 pointer-events-none -ml-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+              <div 
+                wire:ignore 
+                x-data="{
+                  iti: null,
+                  initIti() {
+                    const input = this.$refs.phoneInput;
+                    if (!input || !window.intlTelInput) return;
+
+                    this.iti = window.intlTelInput(input, {
+                      initialCountry: '{{ strtolower($phoneCountry ?: "us") }}',
+                      countryOrder: ['us', 'gb', 'ca', 'co', 'mx', 'au'],
+                      separateDialCode: false,
+                      strictMode: true,
+                      autoPlaceholder: 'aggressive',
+                      geoIpLookup: (callback) => {
+                        fetch('https://ipapi.co/json')
+                          .then(res => res.json())
+                          .then(data => callback(data.country_code))
+                          .catch(() => callback('us'));
+                      }
+                    });
+
+                    const sync = () => {
+                      const country = this.iti.getSelectedCountryData();
+                      if (country && country.iso2) {
+                        $wire.phoneCountry = country.iso2.toUpperCase();
+                      }
+                      $wire.phone = this.iti.getNumber() || input.value;
+                    };
+
+                    const adjustPhonePadding = () => {
+                      const selectedCountry = this.$el.querySelector('.iti__selected-country');
+                      if (selectedCountry && input) {
+                        const width = selectedCountry.offsetWidth || 0;
+                        if (width > 0) {
+                          input.style.setProperty('padding-left', (width + 12) + 'px', 'important');
+                        }
+                      }
+                    };
+
+                    adjustPhonePadding();
+                    setTimeout(adjustPhonePadding, 50);
+                    setTimeout(adjustPhonePadding, 250);
+
+                    // Hide browser tooltip on country flag
+                    const flag = this.$el.querySelector('.iti__selected-country');
+                    if (flag) {
+                      const observer = new MutationObserver(() => {
+                        if (flag.getAttribute('title')) {
+                          flag.removeAttribute('title');
+                        }
+                        adjustPhonePadding();
+                      });
+                      observer.observe(flag, { attributes: true });
+                      flag.removeAttribute('title');
+                    }
+
+                    input.addEventListener('countrychange', () => {
+                      sync();
+                      setTimeout(adjustPhonePadding, 10);
+                    });
+                    input.addEventListener('input', sync);
+                    input.addEventListener('change', sync);
+                    input.addEventListener('blur', sync);
+
+                    if ($wire.phone && this.iti) {
+                      this.iti.setNumber($wire.phone);
+                      setTimeout(adjustPhonePadding, 10);
+                    }
+                  },
+                  init() {
+                    if (window.intlTelInput) {
+                      this.initIti();
+                    } else {
+                      const check = setInterval(() => {
+                        if (window.intlTelInput) {
+                          clearInterval(check);
+                          this.initIti();
+                        }
+                      }, 30);
+                      setTimeout(() => clearInterval(check), 3000);
+                    }
+                  }
+                }"
+                class="relative w-full"
+              >
                 <input 
-                  type="tel" 
-                  wire:model="phone"
-                  placeholder="(201) 555-0123" 
-                  class="w-full h-full pl-3 bg-transparent text-slate-900 text-sm placeholder-slate-400 focus:outline-none"
+                  x-ref="phoneInput"
+                  type="tel"
+                  id="booking-phone-input"
+                  name="phone"
+                  value="{{ $phone }}"
+                  placeholder="(201) 555-0123"
+                  class="w-full h-10 sm:h-11 rounded-lg bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple transition"
                 />
               </div>
               @error('phone') <span class="text-red-400 text-xs block mt-1">{{ $message }}</span> @enderror
@@ -380,21 +458,100 @@
           {{-- 3. Phone Number with Country Selector --}}
           <div class="space-y-1">
             <label class="block text-xs font-bold uppercase tracking-wider text-text-body">Phone Number</label>
-            <div class="flex rounded-card border border-slate-200 focus-within:ring-2 focus-within:ring-brand-purple/20 focus-within:border-brand-purple overflow-hidden bg-white transition">
-              <select 
-                wire:model="phoneCountry"
-                aria-label="Country Calling Code"
-                class="bg-slate-50 border-0 border-r border-slate-200 text-xs font-semibold text-text-body px-3 py-2.5 focus:ring-0 focus:outline-none cursor-pointer shrink-0"
-              >
-                @foreach ($countryCodes as $code => $country)
-                  <option value="{{ $code }}">{{ $country['label'] }}</option>
-                @endforeach
-              </select>
+            <div 
+              wire:ignore 
+              x-data="{
+                iti: null,
+                initIti() {
+                  const input = this.$refs.phoneInput;
+                  if (!input || !window.intlTelInput) return;
+
+                  this.iti = window.intlTelInput(input, {
+                    initialCountry: '{{ strtolower($phoneCountry ?: "us") }}',
+                    countryOrder: ['us', 'gb', 'ca', 'co', 'mx', 'au'],
+                    separateDialCode: false,
+                    strictMode: true,
+                    autoPlaceholder: 'aggressive',
+                    geoIpLookup: (callback) => {
+                      fetch('https://ipapi.co/json')
+                        .then(res => res.json())
+                        .then(data => callback(data.country_code))
+                        .catch(() => callback('us'));
+                    }
+                  });
+
+                  const sync = () => {
+                    const country = this.iti.getSelectedCountryData();
+                    if (country && country.iso2) {
+                      $wire.phoneCountry = country.iso2.toUpperCase();
+                    }
+                    $wire.phone = this.iti.getNumber() || input.value;
+                  };
+
+                  const adjustPhonePadding = () => {
+                    const selectedCountry = this.$el.querySelector('.iti__selected-country');
+                    if (selectedCountry && input) {
+                      const width = selectedCountry.offsetWidth || 0;
+                      if (width > 0) {
+                        input.style.setProperty('padding-left', (width + 12) + 'px', 'important');
+                      }
+                    }
+                  };
+
+                  adjustPhonePadding();
+                  setTimeout(adjustPhonePadding, 50);
+                  setTimeout(adjustPhonePadding, 250);
+
+                  // Hide browser tooltip on country flag
+                  const flag = this.$el.querySelector('.iti__selected-country');
+                  if (flag) {
+                    const observer = new MutationObserver(() => {
+                      if (flag.getAttribute('title')) {
+                        flag.removeAttribute('title');
+                      }
+                      adjustPhonePadding();
+                    });
+                    observer.observe(flag, { attributes: true });
+                    flag.removeAttribute('title');
+                  }
+
+                  input.addEventListener('countrychange', () => {
+                    sync();
+                    setTimeout(adjustPhonePadding, 10);
+                  });
+                  input.addEventListener('input', sync);
+                  input.addEventListener('change', sync);
+                  input.addEventListener('blur', sync);
+
+                  if ($wire.phone && this.iti) {
+                    this.iti.setNumber($wire.phone);
+                    setTimeout(adjustPhonePadding, 10);
+                  }
+                },
+                init() {
+                  if (window.intlTelInput) {
+                    this.initIti();
+                  } else {
+                    const check = setInterval(() => {
+                      if (window.intlTelInput) {
+                        clearInterval(check);
+                        this.initIti();
+                      }
+                    }, 30);
+                    setTimeout(() => clearInterval(check), 3000);
+                  }
+                }
+              }"
+              class="relative w-full"
+            >
               <input 
+                x-ref="phoneInput"
                 type="tel" 
-                wire:model="phone"
+                id="default-phone-input"
+                name="phone"
+                value="{{ $phone }}"
                 placeholder="(555) 000-0000"
-                class="w-full px-4 py-2.5 border-0 text-sm text-text-body bg-transparent focus:ring-0 focus:outline-none"
+                class="w-full px-4 py-2.5 rounded-card border border-slate-200 text-sm text-text-body bg-white focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple focus:outline-none transition"
               />
             </div>
             @error('phone') <span class="text-status-alert text-xs block mt-1">{{ $message }}</span> @enderror
