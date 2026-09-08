@@ -1,142 +1,82 @@
-<section 
-  x-data="{
+<div x-data="{
     activeVideo: null,
-    openVideo(url) {
-      if (!url) return;
-      this.activeVideo = url;
+    openModal(url) {
+        this.activeVideo = url;
+        document.body.style.overflow = 'hidden';
     },
-    closeVideo() {
-      this.activeVideo = null;
+    closeModal() {
+        this.activeVideo = null;
+        document.body.style.overflow = '';
     }
-  }"
-  class="py-16 sm:py-24 bg-surface-white"
->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{-- Header --}}
-    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
-      <div class="max-w-xl">
-        <span class="px-3.5 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">
-          Proven Track Record
-        </span>
-        <h2 class="text-3xl sm:text-4xl font-extrabold font-display text-brand-hero tracking-tight mt-3">
-          {{ $title }}
-        </h2>
-        @if ($description)
-          <p class="text-text-muted text-sm sm:text-base mt-2 leading-relaxed">
-            {{ $description }}
-          </p>
-        @endif
-      </div>
-
-      {{-- Carousel Nav Arrows --}}
-      @if ($layout === 'carousel')
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            @click="$refs.carousel.scrollBy({ left: -360, behavior: 'smooth' })"
-            class="p-2.5 rounded-full border border-slate-200 hover:border-brand-purple hover:bg-brand-purple/5 text-text-body transition cursor-pointer"
-            aria-label="Previous testimonials"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-          </button>
-          <button
-            type="button"
-            @click="$refs.carousel.scrollBy({ left: 360, behavior: 'smooth' })"
-            class="p-2.5 rounded-full border border-slate-200 hover:border-brand-purple hover:bg-brand-purple/5 text-text-body transition cursor-pointer"
-            aria-label="Next testimonials"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-          </button>
-        </div>
-      @endif
-    </div>
-
-    {{-- Testimonials Container --}}
-    <div 
-      x-ref="carousel"
-      class="{{ $layout === 'carousel' ? 'flex gap-card overflow-x-auto scroll-smooth snap-x snap-mandatory pb-6 scrollbar-none' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-' . $columns . ' gap-card' }}"
-    >
-      @foreach ($testimonials as $t)
-        <div class="group relative bg-bg-light rounded-card border border-slate-200/80 hover:border-brand-purple/40 shadow-card hover:shadow-xl transition-all duration-300 p-card flex flex-col justify-between {{ $layout === 'carousel' ? 'w-80 sm:w-96 shrink-0 snap-start' : 'w-full' }}">
-          
-          <div class="space-y-4">
-            {{-- Star Rating --}}
-            <div class="flex items-center gap-1 text-amber-400">
-              @for ($i = 0; $i < ($t['rating'] ?? 5); $i++)
-                <svg class="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-              @endfor
+}" class="w-full">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-card mb-20">
+        @foreach ($testimonials as $t)
+            <div class="bg-transparent hover:bg-white rounded-card p-card flex flex-col justify-between border border-transparent hover:border-black/4 hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
+                @click="openModal('{{ $t['video_url'] }}')">
+                <div>
+                    <div class="relative w-full aspect-4/3 rounded-xl overflow-hidden mb-4 bg-slate-900">
+                        <img src="{{ $t['image'] }}" alt="{{ $t['company'] }}" width="314"
+                            height="214" loading="lazy" decoding="async"
+                            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                        {{-- Center Glass Play Button --}}
+                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div
+                                class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/45 backdrop-blur-xs flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110">
+                                <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white translate-x-0.5"
+                                    fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z" />
+                                </svg>
+                            </div>
+                        </div>
+                        {{-- Duration Badge (bottom right) --}}
+                        @if (! empty($t['duration']))
+                            <span
+                                class="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded bg-black/60 backdrop-blur-xs text-white text-[10px] sm:text-[11px] font-medium font-mono pointer-events-none">
+                                {{ $t['duration'] }}
+                            </span>
+                        @endif
+                    </div>
+                    <div class="pt-1 pb-2">
+                        <h3
+                            class="font-display text-[16px] sm:text-[17px] font-bold text-black leading-[1.35] tracking-[-0.01em] mb-4">
+                            {{ $t['quote'] }}
+                        </h3>
+                    </div>
+                </div>
+                <div class="pb-1 mt-auto text-right">
+                    <span class="text-[11px] sm:text-[12px] text-black font-medium">
+                        {{ $t['company'] }}
+                    </span>
+                </div>
             </div>
+        @endforeach
+    </div>
 
-            {{-- Quote --}}
-            <p class="text-text-body text-sm sm:text-base leading-relaxed italic">
-              &ldquo;{{ $t['quote'] }}&rdquo;
-            </p>
-          </div>
-
-          {{-- Author Info & Video Trigger --}}
-          <div class="pt-6 mt-6 border-t border-slate-200/60 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              {{-- Avatar --}}
-              <div class="w-11 h-11 rounded-full bg-brand-purple/10 border border-brand-purple/20 overflow-hidden flex items-center justify-center shrink-0">
-                @if (! empty($t['avatar']))
-                  <img src="{{ $t['avatar'] }}" alt="{{ $t['author_name'] ?? 'Client' }}" class="w-full h-full object-cover" />
-                @else
-                  <span class="font-bold text-brand-purple text-xs">{{ substr($t['author_name'] ?? 'Client', 0, 2) }}</span>
-                @endif
-              </div>
-
-              <div>
-                <h4 class="text-sm font-bold text-brand-hero">{{ $t['author_name'] }}</h4>
-                <p class="text-2xs text-text-muted">
-                  {{ $t['role'] }} @if (! empty($t['company'])) &bull; {{ $t['company'] }} @endif
-                </p>
-              </div>
-            </div>
-
-            {{-- Video Play Button if present --}}
-            @if (! empty($t['video_url']))
-              <button
-                type="button"
-                @click="openVideo('{{ $t['video_url'] }}')"
-                class="flex items-center gap-1.5 px-3 py-1.5 rounded-pill bg-brand-magenta/10 hover:bg-brand-magenta text-brand-magenta hover:text-white text-2xs font-bold transition cursor-pointer shrink-0"
-              >
-                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                <span>{{ $t['duration'] ?: 'Watch' }}</span>
-              </button>
-            @endif
-          </div>
-
+    {{-- Self-Contained Modal for Vimeo Playback --}}
+    <div x-show="activeVideo" x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/88 backdrop-blur-sm"
+        style="display:none;" @keydown.escape.window="closeModal()">
+        <div class="relative w-full max-w-4xl aspect-video bg-black rounded-2xl overflow-hidden"
+            @click.outside="closeModal()">
+            <button type="button" @click="closeModal()"
+                class="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-colors focus:outline-none"
+                aria-label="Close video player modal">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </button>
+            <template x-if="activeVideo">
+                <iframe
+                    :src="'https://player.vimeo.com/video/' + activeVideo.split('/').pop() +
+                        '?autoplay=1&badge=0&autopause=0&player_id=0&app_id=58479'"
+                    title="Vimeo video player" class="w-full h-full border-0"
+                    allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+            </template>
         </div>
-      @endforeach
     </div>
-  </div>
-
-  {{-- Video Modal Player --}}
-  <div 
-    x-show="activeVideo" 
-    x-cloak 
-    @keydown.escape.window="closeVideo()"
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
-  >
-    <div class="relative w-full max-w-3xl bg-black rounded-card-lg overflow-hidden shadow-2xl" @click.outside="closeVideo()">
-      <button 
-        type="button" 
-        @click="closeVideo()" 
-        class="absolute top-3 right-3 z-10 text-white/80 hover:text-white p-2 rounded-full bg-black/40 transition"
-      >
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
-
-      <div class="aspect-video w-full">
-        <template x-if="activeVideo">
-          <iframe 
-            :src="activeVideo.includes('watch?v=') ? activeVideo.replace('watch?v=', 'embed/') : activeVideo" 
-            class="w-full h-full border-0" 
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-            allowfullscreen
-          ></iframe>
-        </template>
-      </div>
-    </div>
-  </div>
-</section>
+</div>

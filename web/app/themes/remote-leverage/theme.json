@@ -4,34 +4,57 @@
   "version": 3,
   "settings": {
     "layout": {
-      "contentSize": "48rem"
+      "contentSize": "1380px",
+      "wideSize": "1380px"
     },
     "background": {
       "backgroundImage": true
     },
     "color": {
-      "custom": false,
+      "custom": true,
       "customDuotone": false,
-      "customGradient": false,
-      "defaultDuotone": false,
-      "defaultGradients": false,
-      "defaultPalette": false,
-      "duotone": []
-    },
-    "custom": {
-      "spacing": {},
-      "typography": {
-        "font-size": {},
-        "line-height": {}
-      }
+      "customGradient": true,
+      "palette": [
+        {
+          "slug": "brand-purple",
+          "color": "#8A2BE2",
+          "name": "Brand Purple"
+        },
+        {
+          "slug": "brand-dark-violet",
+          "color": "#1B1234",
+          "name": "Brand Dark Violet"
+        },
+        {
+          "slug": "bg-light",
+          "color": "#F4F6FC",
+          "name": "Background Light"
+        },
+        {
+          "slug": "bg-map",
+          "color": "#E4ECFC",
+          "name": "Background Map Blue"
+        },
+        {
+          "slug": "black",
+          "color": "#000000",
+          "name": "Absolute Black"
+        },
+        {
+          "slug": "white",
+          "color": "#FFFFFF",
+          "name": "White"
+        }
+      ]
     },
     "spacing": {
       "padding": true,
+      "margin": true,
       "units": ["px", "%", "em", "rem", "vw", "vh"]
     },
     "typography": {
-      "defaultFontSizes": false,
-      "customFontSize": false
+      "defaultFontSizes": true,
+      "customFontSize": true
     }
   }
 }

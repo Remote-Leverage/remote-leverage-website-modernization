@@ -204,4 +204,114 @@ add_action('template_redirect', function () {
     }
 }, 1);
 
+/**
+ * Register custom Gutenberg block styles and pattern categories.
+ */
+add_action('init', function () {
+    // Register Remote Leverage Pattern Category
+    register_block_pattern_category('remote-leverage', [
+        'label' => __('Remote Leverage', 'remote-leverage'),
+    ]);
+
+    // Register Button Block Styles
+    register_block_style('core/button', [
+        'name' => 'pill-purple',
+        'label' => __('Pill Purple (Primary)', 'remote-leverage'),
+        'is_default' => true,
+    ]);
+
+    register_block_style('core/button', [
+        'name' => 'pill-outline',
+        'label' => __('Pill Outline (Consultation)', 'remote-leverage'),
+    ]);
+
+    register_block_style('core/button', [
+        'name' => 'pill-black',
+        'label' => __('Pill Black', 'remote-leverage'),
+    ]);
+
+    // Register Remote Leverage Smart Blocks with server render callbacks
+    $smartBlocks = [
+        'talent-marquee' => [
+            'class' => \App\Blocks\TalentMarqueeBlock::class,
+            'view' => 'blocks.talent-marquee',
+        ],
+        'client-logos-marquee' => [
+            'class' => \App\Blocks\ClientLogosMarqueeBlock::class,
+            'view' => 'blocks.client-logos-marquee',
+        ],
+        'trust-stats' => [
+            'class' => \App\Blocks\TrustStatsBlock::class,
+            'view' => 'blocks.trust-stats',
+        ],
+        'department-cards' => [
+            'class' => \App\Blocks\DepartmentCardsBlock::class,
+            'view' => 'blocks.department-cards',
+        ],
+        'data-table' => [
+            'class' => \App\Blocks\DataTableBlock::class,
+            'view' => 'blocks.data-table',
+        ],
+        'process-steps' => [
+            'class' => \App\Blocks\ProcessStepsBlock::class,
+            'view' => 'blocks.process-steps',
+        ],
+        'testimonials' => [
+            'class' => \App\Blocks\TestimonialsBlock::class,
+            'view' => 'blocks.testimonials',
+        ],
+        'accordion-faq' => [
+            'class' => \App\Blocks\AccordionFaqBlock::class,
+            'view' => 'blocks.accordion-faq',
+        ],
+        'booking' => [
+            'class' => \App\Blocks\BookingBlock::class,
+            'view' => 'blocks.booking',
+        ],
+        'feature-cards' => [
+            'class' => \App\Blocks\FeatureCardsBlock::class,
+            'view' => 'blocks.feature-cards',
+        ],
+    ];
+
+    foreach ($smartBlocks as $slug => $config) {
+        $renderCallback = function ($attributes = [], $content = '') use ($config) {
+            $data = [];
+            if (isset($config['class']) && class_exists($config['class'])) {
+                try {
+                    $instance = app($config['class']);
+                    if (method_exists($instance, 'with')) {
+                        $data = $instance->with();
+                    }
+                    if (isset($attributes['data']['columns']) && method_exists($instance, 'cards')) {
+                        $data['columns'] = (string) $attributes['data']['columns'];
+                        $data['cards'] = $instance->cards($data['columns']);
+                    }
+                } catch (\Throwable $e) {
+                    // Fallback
+                }
+            }
+            if (! empty($attributes['data']) && is_array($attributes['data'])) {
+                $data = array_merge($data, $attributes['data']);
+            }
+
+            return view($config['view'], $data)->render();
+        };
+
+        if (! \WP_Block_Type_Registry::get_instance()->is_registered("remote-leverage/{$slug}")) {
+            register_block_type("remote-leverage/{$slug}", [
+                'render_callback' => $renderCallback,
+                'category' => 'remote-leverage',
+            ]);
+        }
+        if (! \WP_Block_Type_Registry::get_instance()->is_registered("acf/{$slug}")) {
+            register_block_type("acf/{$slug}", [
+                'render_callback' => $renderCallback,
+                'category' => 'remote-leverage',
+            ]);
+        }
+    }
+});
+
+
 

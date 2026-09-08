@@ -13,7 +13,7 @@ class ProcessStepsBlock extends Block
 
     public $slug = 'process-steps';
 
-    public $description = 'Numbered hiring timeline and onboarding steps with connecting SVG paths.';
+    public $description = 'Numbered 3-step hiring timeline with connected progress line.';
 
     public $category = 'remote-leverage';
 
@@ -26,8 +26,6 @@ class ProcessStepsBlock extends Block
     public function with(): array
     {
         return [
-            'headline' => get_field('headline') ?: 'How Remote Leverage Works',
-            'subheadline' => get_field('subheadline') ?: 'From initial strategy session to a dedicated full-time specialist in your Slack within 7 days.',
             'steps' => $this->steps(),
         ];
     }
@@ -37,38 +35,23 @@ class ProcessStepsBlock extends Block
         $fields = Builder::make('process_steps_block');
 
         $fields
-            ->addText('headline', [
-                'label' => 'Headline',
-                'default_value' => 'How Remote Leverage Works',
-            ])
-            ->addTextarea('subheadline', [
-                'label' => 'Subheadline',
-                'default_value' => 'From initial strategy session to a dedicated full-time specialist in your Slack within 7 days.',
-                'rows' => 2,
-            ])
             ->addRepeater('steps', [
-                'label' => 'Steps Timeline',
+                'label' => 'Steps Timeline (Leave empty for default 3 steps)',
                 'layout' => 'block',
                 'button_label' => 'Add Step',
             ])
-            ->addText('step_number', [
+            ->addText('num', [
                 'label' => 'Step Number (e.g. 01)',
                 'default_value' => '01',
             ])
             ->addText('title', [
-                'label' => 'Step Title',
-                'default_value' => 'Solve the Hiring Bottleneck',
+                'label' => 'Step Title (supports HTML like <br>)',
+                'default_value' => 'Tell us your<br>ideal hire',
             ])
-            ->addTextarea('description', [
+            ->addTextarea('desc', [
                 'label' => 'Step Description',
-                'default_value' => 'Tell us about your operational bottlenecks and required toolstack during a quick 30-minute discovery consultation.',
-                'rows' => 3,
-            ])
-            ->addText('cta_label', [
-                'label' => 'CTA Button Label (Optional)',
-            ])
-            ->addUrl('cta_url', [
-                'label' => 'CTA Link URL (Optional)',
+                'default_value' => 'Tell us who you need. We handle sourcing, screening, and vetting candidates so you can focus on choosing the right person.',
+                'rows' => 2,
             ])
             ->endRepeater();
 
@@ -77,41 +60,27 @@ class ProcessStepsBlock extends Block
 
     public function steps(): array
     {
-        $items = get_field('steps');
+        $items = function_exists('get_field') ? get_field('steps') : null;
 
         if (! empty($items) && is_array($items)) {
             return $items;
         }
 
-        // Realistic fallback matching original Elementor ProcessStepsWidget
         return [
             [
-                'step_number' => '01',
-                'title' => 'Discovery & Role Scoping',
-                'description' => 'We define your required technical competencies, software stack, and weekly deliverables to calibrate the ideal candidate profile.',
-                'cta_label' => 'Book Discovery Call',
-                'cta_url' => '#booking-wizard',
+                'num' => '01',
+                'title' => 'Tell us your<br>ideal hire',
+                'desc' => 'Tell us who you need. We handle sourcing, screening, and vetting candidates so you can focus on choosing the right person.',
             ],
             [
-                'step_number' => '02',
-                'title' => 'Vetting & Top 1% Matching',
-                'description' => 'Our proprietary assessment tests English fluency, cognitive reasoning, and role-specific skills. You receive the top 2-3 matched candidates.',
-                'cta_label' => null,
-                'cta_url' => null,
+                'num' => '02',
+                'title' => 'Meet your<br>top 1% shortlist',
+                'desc' => 'Within 48–72 hours, receive 4–6 candidates pre-vetted for skill, experience, and fit. You interview, you choose. No commitments, no pressure.',
             ],
             [
-                'step_number' => '03',
-                'title' => 'Live Interviews & Selection',
-                'description' => 'Interview your top candidates directly. Choose the exact person you want on your team with zero upfront placement fees.',
-                'cta_label' => null,
-                'cta_url' => null,
-            ],
-            [
-                'step_number' => '04',
-                'title' => 'Seamless Onboarding & Guarantee',
-                'description' => 'Your assistant joins your Slack, Notion, and email workspace backed by our 6-month free replacement guarantee.',
-                'cta_label' => null,
-                'cta_url' => null,
+                'num' => '03',
+                'title' => 'Make your<br>selection',
+                'desc' => 'Make your selection and get back to growing your business. We handle the details so your new hire can hit the ground running.',
             ],
         ];
     }

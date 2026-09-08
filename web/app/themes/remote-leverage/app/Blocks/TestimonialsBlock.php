@@ -13,7 +13,7 @@ class TestimonialsBlock extends Block
 
     public $slug = 'testimonials';
 
-    public $description = 'Video and quote client review cards with video playback modals.';
+    public $description = 'Video and quote client review cards with self-contained Vimeo playback modal.';
 
     public $category = 'remote-leverage';
 
@@ -26,10 +26,6 @@ class TestimonialsBlock extends Block
     public function with(): array
     {
         return [
-            'title' => get_field('title') ?: 'Client Reviews & Case Studies',
-            'description' => get_field('description') ?: "Don't just take our word for it—hear from founders and operators who scale their businesses with Remote Leverage specialists.",
-            'layout' => get_field('layout') ?: 'carousel',
-            'columns' => get_field('columns') ?: '3',
             'testimonials' => $this->testimonials(),
         ];
     }
@@ -39,78 +35,31 @@ class TestimonialsBlock extends Block
         $fields = Builder::make('testimonials_block');
 
         $fields
-            ->addText('title', [
-                'label' => 'Section Title',
-                'default_value' => 'Client Reviews & Case Studies',
-            ])
-            ->addTextarea('description', [
-                'label' => 'Description',
-                'default_value' => "Don't just take our word for it—hear from founders and operators who scale their businesses with Remote Leverage specialists.",
-                'rows' => 2,
-            ])
-            ->addSelect('layout', [
-                'label' => 'Layout Style',
-                'choices' => [
-                    'carousel' => 'Swipeable Carousel / Scroll Snap',
-                    'grid' => 'Multi-Column Grid',
-                ],
-                'default_value' => 'carousel',
-            ])
-            ->addSelect('columns', [
-                'label' => 'Columns (Desktop)',
-                'choices' => [
-                    '2' => '2 Columns',
-                    '3' => '3 Columns',
-                    '4' => '4 Columns',
-                ],
-                'default_value' => '3',
-            ])
             ->addRepeater('testimonials', [
                 'label' => 'Testimonials List',
                 'layout' => 'block',
                 'button_label' => 'Add Testimonial',
             ])
-            ->addText('author_name', [
-                'label' => 'Author Name',
-                'default_value' => 'Marcus Vance',
-            ])
-            ->addText('role', [
-                'label' => 'Role / Title',
-                'default_value' => 'Founder & CEO',
-            ])
             ->addText('company', [
                 'label' => 'Company Name',
-                'default_value' => 'Vance Media Group',
-            ])
-            ->addImage('avatar', [
-                'label' => 'Author Avatar / Photo',
-                'return_format' => 'url',
-            ])
-            ->addSelect('avatar_shape', [
-                'label' => 'Avatar Shape',
-                'choices' => [
-                    'circle' => 'Circle',
-                    'rounded' => 'Rounded Rectangle',
-                    'arch' => 'Dome Arch',
-                ],
-                'default_value' => 'circle',
+                'default_value' => 'Liberty Hill',
             ])
             ->addTextarea('quote', [
                 'label' => 'Client Quote',
-                'default_value' => 'Hiring our executive assistant through Remote Leverage was the highest ROI decision we made this year. She hit the ground running on day one with zero training required.',
-                'rows' => 3,
+                'default_value' => '“If somebody were asking me why they should work with Remote Leverage, I would say it\'s because of the quality of the candidates.”',
+                'rows' => 2,
             ])
             ->addUrl('video_url', [
-                'label' => 'Video Review URL (Optional)',
+                'label' => 'Vimeo Video URL',
+                'default_value' => 'https://vimeo.com/1067577532',
+            ])
+            ->addImage('image', [
+                'label' => 'Video Thumbnail Poster',
+                'return_format' => 'url',
             ])
             ->addText('duration', [
-                'label' => 'Video Duration (e.g. 1:42)',
-            ])
-            ->addNumber('rating', [
-                'label' => 'Star Rating (1 - 5)',
-                'default_value' => 5,
-                'min' => 1,
-                'max' => 5,
+                'label' => 'Duration (e.g. 01:21)',
+                'default_value' => '01:21',
             ])
             ->endRepeater();
 
@@ -119,46 +68,70 @@ class TestimonialsBlock extends Block
 
     public function testimonials(): array
     {
-        $items = get_field('testimonials');
+        $items = function_exists('get_field') ? get_field('testimonials') : null;
 
         if (! empty($items) && is_array($items)) {
             return $items;
         }
 
-        // Realistic fallback matching original Elementor testimonials
+        $imgBase = get_template_directory_uri() . '/public/images/home';
+
         return [
             [
-                'author_name' => 'Sarah Lin',
-                'role' => 'Managing Partner',
-                'company' => 'Acro Growth Agency',
-                'avatar' => null,
-                'avatar_shape' => 'circle',
-                'quote' => 'Our bilingual project coordinator in Colombia manages all 15 client accounts across Slack, Asana, and Loom. Absolute game-changer.',
-                'video_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-                'duration' => '2:15',
-                'rating' => 5,
+                'video_url' => 'https://vimeo.com/1067577532',
+                'image' => $imgBase . '/Liberty-Hill.jpg',
+                'duration' => '01:21',
+                'quote' => '“If somebody were asking me why they should work with Remote Leverage, I would say it\'s because of the quality of the candidates.”',
+                'company' => 'Liberty Hill',
             ],
             [
-                'author_name' => 'David Miller',
-                'role' => 'Broker & Owner',
-                'company' => 'Miller Capital Realty',
-                'avatar' => null,
-                'avatar_shape' => 'circle',
-                'quote' => 'We tried hiring offshore in the Philippines before, but the 13-hour time difference killed collaboration. Remote Leverage’s LatAm coordinators work our exact hours.',
-                'video_url' => null,
-                'duration' => null,
-                'rating' => 5,
+                'video_url' => 'https://vimeo.com/1067577464',
+                'image' => $imgBase . '/RE-MAX.jpg',
+                'duration' => '01:02',
+                'quote' => '“Its been about a year and a half since I\'ve been with them so far, I would definitely say go for it, it\'s been a game changer for me.”',
+                'company' => 'RE / MAX',
             ],
             [
-                'author_name' => 'Elena Rostova',
-                'role' => 'Co-Founder',
-                'company' => 'DTC Health Brands',
-                'avatar' => null,
-                'avatar_shape' => 'circle',
-                'quote' => 'We scaled from 200 orders a day to 1,200 with two Remote Leverage customer success reps. Our CSAT score actually went up from 91% to 97%.',
-                'video_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-                'duration' => '1:45',
-                'rating' => 5,
+                'video_url' => 'https://vimeo.com/1067577620',
+                'image' => $imgBase . '/Realty-One-Group.jpg',
+                'duration' => '01:43',
+                'quote' => '“As I look back, I was on the fence about it, It\'s probably one of the best decisions I ever made if not the best to help grow my business.”',
+                'company' => 'Realty One Group',
+            ],
+            [
+                'video_url' => 'https://vimeo.com/1067577228',
+                'image' => $imgBase . '/OneUp-Sportz-01.jpg',
+                'duration' => '01:06',
+                'quote' => '“Very Very happy with the system, you guys system worked well and it was efficient.”',
+                'company' => 'OneUp Sportz',
+            ],
+            [
+                'video_url' => 'https://vimeo.com/1067577598',
+                'image' => $imgBase . '/OneUp-Sportz.jpg',
+                'duration' => '01:40',
+                'quote' => '“It was a seamless process, all the applicants that we had they all had Masters in Marketing, which is awesome.”',
+                'company' => 'OneUp Sportz',
+            ],
+            [
+                'video_url' => 'https://vimeo.com/1067577293',
+                'image' => $imgBase . '/Greener-Hill-Psychiatric.jpg',
+                'duration' => '05:59',
+                'quote' => '“Remote Leverage, presented six candidates and I did interview all of those very in depth, and I thought all of them were phenomenal.”',
+                'company' => 'Greener Hill Psychiatric',
+            ],
+            [
+                'video_url' => 'https://vimeo.com/1067577442',
+                'image' => $imgBase . '/Diamond-Detox.jpg',
+                'duration' => '00:43',
+                'quote' => '“I\'m very impressed with the english, the capability, qualification, timeliness, they were all very timely, patient.”',
+                'company' => 'Diamond Detox',
+            ],
+            [
+                'video_url' => 'https://vimeo.com/1067577645',
+                'image' => $imgBase . '/Ad-Center-360.jpg',
+                'duration' => '00:36',
+                'quote' => '“It was awesome the best experience I\'ve ever had as far as hiring.”',
+                'company' => 'Ad Center 360',
             ],
         ];
     }
