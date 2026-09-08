@@ -1,6 +1,119 @@
 import intlTelInput from 'intl-tel-input/intlTelInputWithUtils';
 window.intlTelInput = intlTelInput;
 
+export function phoneInputComponent(config = {}) {
+  return {
+    iti: null,
+    getWire() {
+      if (this.$wire) return this.$wire;
+      const wireEl = this.$el?.closest('[wire\\:id]');
+      if (wireEl && window.Livewire?.find) {
+        return window.Livewire.find(wireEl.getAttribute('wire:id'));
+      }
+      return null;
+    },
+    initIti() {
+      const input = this.$refs.phoneInput;
+      if (!input || !window.intlTelInput) return;
+
+      const initialCountry = (config && config.initialCountry) ? config.initialCountry : 'us';
+
+      this.iti = window.intlTelInput(input, {
+        initialCountry: initialCountry,
+        countryOrder: ['us', 'gb', 'ca', 'co', 'mx', 'au'],
+        separateDialCode: false,
+        strictMode: true,
+        autoPlaceholder: 'aggressive',
+        geoIpLookup: (callback) => {
+          fetch('https://ipapi.co/json')
+            .then((res) => res.json())
+            .then((data) => callback(data.country_code))
+            .catch(() => callback('us'));
+        },
+      });
+
+      const sync = () => {
+        const wire = this.getWire();
+        const country = this.iti.getSelectedCountryData();
+        if (country && country.iso2 && wire) {
+          wire.phoneCountry = country.iso2.toUpperCase();
+        }
+        if (wire) {
+          wire.phone = this.iti.getNumber() || input.value;
+        }
+      };
+
+      const adjustPhonePadding = () => {
+        const selectedCountry = this.$el.querySelector('.iti__selected-country');
+        if (selectedCountry && input) {
+          const width = selectedCountry.offsetWidth || 0;
+          if (width > 0) {
+            input.style.setProperty('padding-left', `${width + 12}px`, 'important');
+          }
+        }
+      };
+
+      adjustPhonePadding();
+      setTimeout(adjustPhonePadding, 50);
+      setTimeout(adjustPhonePadding, 250);
+
+      // Hide browser tooltip on country flag
+      const flag = this.$el.querySelector('.iti__selected-country');
+      if (flag) {
+        const observer = new MutationObserver(() => {
+          if (flag.getAttribute('title')) {
+            flag.removeAttribute('title');
+          }
+          adjustPhonePadding();
+        });
+        observer.observe(flag, { attributes: true });
+        flag.removeAttribute('title');
+      }
+
+      input.addEventListener('countrychange', () => {
+        sync();
+        setTimeout(adjustPhonePadding, 10);
+      });
+      input.addEventListener('input', sync);
+      input.addEventListener('change', sync);
+      input.addEventListener('blur', sync);
+
+      const wire = this.getWire();
+      if (wire && wire.phone && this.iti) {
+        this.iti.setNumber(wire.phone);
+        setTimeout(adjustPhonePadding, 10);
+      }
+    },
+    init() {
+      if (window.intlTelInput) {
+        this.initIti();
+      } else {
+        const check = setInterval(() => {
+          if (window.intlTelInput) {
+            clearInterval(check);
+            this.initIti();
+          }
+        }, 30);
+        setTimeout(() => clearInterval(check), 3000);
+      }
+    },
+  };
+}
+
+window.phoneInputComponent = phoneInputComponent;
+
+const registerAlpine = () => {
+  if (window.Alpine) {
+    window.Alpine.data('phoneInputComponent', phoneInputComponent);
+  }
+};
+
+if (window.Alpine) {
+  registerAlpine();
+} else {
+  document.addEventListener('alpine:init', registerAlpine);
+}
+
 // Expose global placeholders so early callers don't throw
 window.Sentry = window.Sentry || null;
 window.posthog = window.posthog || null;
