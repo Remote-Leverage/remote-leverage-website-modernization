@@ -306,7 +306,7 @@
         {{-- ═══════════════════════════════════════════════════════════ --}}
         {{-- SECTION 3 · BEYOND THE "VIRTUAL ASSISTANT"                --}}
         {{-- ═══════════════════════════════════════════════════════════ --}}
-        <section class="bg-bg-benefits py-24 lg:py-28">
+        <section class="bg-bg-light py-24 lg:py-28">
             <div class="max-w-[1380px] mx-auto px-6 lg:px-10">
                 <div class="text-center max-w-2xl mx-auto mb-14">
                     <h2
@@ -366,11 +366,11 @@
         {{-- SECTION 4 · 2,000+ BUSINESSES (MAP & TRUST)               --}}
         {{-- ═══════════════════════════════════════════════════════════ --}}
         <section id="trust-section" class="relative bg-[#E4ECFC] py-20 lg:py-28 overflow-hidden">
-            <div class="relative z-10 max-w-[1240px] mx-auto px-6 lg:px-10">
-                <div class="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-12 lg:gap-20">
+            <div class="relative z-10 max-w-[1380px] mx-auto px-6 lg:px-10">
+                <div class="flex flex-col lg:flex-row items-center lg:items-start justify-between gap-12 lg:gap-20">
 
                     {{-- Left: Stats Cards --}}
-                    <div class="w-full max-w-[370px] sm:max-w-[400px] flex flex-col gap-4 shrink-0">
+                    <div class="w-full max-w-[470px] flex flex-col gap-4 shrink-0">
                         {{-- Card 1: VAs Onboarded --}}
                         <div
                             class="w-full bg-white rounded-[24px] px-6 py-4.5 sm:px-7 sm:py-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)] flex items-center justify-between">
@@ -396,10 +396,10 @@
 
                         {{-- Card 2: Countries & Economic Impact --}}
                         <div
-                            class="w-full bg-white rounded-[24px] sm:rounded-[28px] p-6 sm:p-7 shadow-[0_15px_35px_rgba(0,0,0,0.04)] relative overflow-hidden flex flex-col justify-between min-h-[300px] sm:min-h-[330px]">
+                            class="w-full bg-white rounded-[24px] sm:rounded-[28px] p-6 sm:p-7 shadow-[0_15px_35px_rgba(0,0,0,0.04)] relative overflow-hidden flex flex-col justify-between min-h-[400px]">
                             {{-- Wireframe Globe Background Graphic --}}
                             <div
-                                class="absolute -right-12 -bottom-16 w-[300px] sm:w-[340px] pointer-events-none opacity-25 select-none">
+                                class="absolute -right-12 -bottom-16 w-[300px] sm:w-[340px] pointer-events-none select-none">
                                 <img src="{{ $imgBase }}/globe.webp" alt="Global Coverage" width="340"
                                     height="340" class="w-full h-auto object-contain" loading="lazy" decoding="async">
                             </div>
@@ -476,10 +476,9 @@
                     {{-- Right: Content --}}
                     <div class="w-full max-w-[480px] lg:pt-8">
                         {{-- 5 Purple Stars --}}
-                        <div class="flex items-center gap-2 mb-5 sm:mb-6" role="img"
-                            aria-label="5 out of 5 stars rating">
+                        <div class="flex items-center mb-5 sm:mb-6" role="img" aria-label="5 out of 5 stars rating">
                             @for ($i = 0; $i < 5; $i++)
-                                <svg class="w-4.5 h-4.5 text-[#9F53E7]" viewBox="0 0 24 24" fill="currentColor"
+                                <svg class="w-6 h-6 text-[#9F53E7]" viewBox="0 0 24 24" fill="currentColor"
                                     aria-hidden="true">
                                     <path
                                         d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
@@ -489,7 +488,7 @@
 
                         {{-- Headline --}}
                         <h2
-                            class="font-display text-3xl sm:text-[36px] lg:text-[38px] font-extrabold text-black leading-[1.18] tracking-tight mb-8">
+                            class="font-display text-3xl sm:text-[36px] lg:text-[38px] font-bold text-black leading-[1.18] tracking-tight mb-8">
                             We've helped more than<br class="hidden sm:inline"> 2,000 businesses hire<br
                                 class="hidden sm:inline"> exceptional talent from<br class="hidden sm:inline"> Latin
                             America, the<br class="hidden sm:inline"> Caribbean, and Europe.
