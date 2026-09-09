@@ -18,11 +18,11 @@
 
         <!-- wp:column {"width":"52%"} -->
         <div class="wp-block-column" style="flex-basis:52%">
-            <!-- wp:paragraph -->
-            <p style="color:#9F53E7;font-size:1.5rem;letter-spacing:0.1em;margin-bottom:1rem">
-                &#9733;&#9733;&#9733;&#9733;&#9733;
-            </p>
-            <!-- /wp:paragraph -->
+            <div style="display:flex;gap:4px;color:#9F53E7;margin-bottom:1rem;" aria-label="5 out of 5 stars">
+                <?php for ($i = 0; $i < 5; $i++): ?>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <?php endfor; ?>
+            </div>
 
             <!-- wp:heading {"level":2,"style":{"typography":{"lineHeight":"1.18","letterSpacing":"-0.02em"}},"fontSize":"huge"} -->
             <h2 class="wp-block-heading has-huge-font-size" style="letter-spacing:-0.02em;line-height:1.18">

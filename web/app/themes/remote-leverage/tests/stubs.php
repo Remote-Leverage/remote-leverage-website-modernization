@@ -273,3 +273,84 @@ if (! function_exists('config')) {
         return Arr::get($GLOBALS['_app_config'] ?? [], $key, $default);
     }
 }
+
+if (! function_exists('add_action')) {
+    function add_action($hook, $callback, $priority = 10, $accepted_args = 1)
+    {
+        return true;
+    }
+}
+
+if (! function_exists('esc_html')) {
+    function esc_html($text)
+    {
+        return htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (! function_exists('esc_attr')) {
+    function esc_attr($text)
+    {
+        return htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (! function_exists('esc_url')) {
+    function esc_url($url)
+    {
+        return filter_var($url, FILTER_SANITIZE_URL) ?: '';
+    }
+}
+
+if (! function_exists('admin_url')) {
+    function admin_url($path = '')
+    {
+        return 'https://remoteleverage.com/wp-admin/'.ltrim($path, '/');
+    }
+}
+
+if (! function_exists('wp_nonce_url')) {
+    function wp_nonce_url($actionurl, $action = -1, $name = '_wpnonce')
+    {
+        return $actionurl.'&'.$name.'=mock_nonce';
+    }
+}
+
+if (! function_exists('remove_meta_box')) {
+    function remove_meta_box($id, $page, $context)
+    {
+        $GLOBALS['rl_removed_meta_boxes'][] = $id;
+        return true;
+    }
+}
+
+if (! function_exists('wp_add_dashboard_widget')) {
+    function wp_add_dashboard_widget($widget_id, $widget_name, $callback, $control_callback = null, $callback_args = null, $context = 'normal', $priority = 'core')
+    {
+        $GLOBALS['rl_added_dashboard_widgets'][] = $widget_id;
+        return true;
+    }
+}
+
+if (! class_exists('WP_Admin_Bar')) {
+    class WP_Admin_Bar
+    {
+        public array $nodes = [];
+
+        public function add_node(array $args): void
+        {
+            $this->nodes[$args['id']] = $args;
+        }
+
+        public function remove_node(string $id): void
+        {
+            unset($this->nodes[$id]);
+        }
+
+        public function get_node(string $id): ?array
+        {
+            return $this->nodes[$id] ?? null;
+        }
+    }
+}
+

@@ -35,6 +35,8 @@ class DomainServiceProvider extends ServiceProvider
 
         $this->app->singleton(PartnerPostType::class, fn () => new PartnerPostType);
         $this->app->singleton(\App\Infrastructure\WordPress\Admin\LeadsAdminDashboard::class, fn () => new \App\Infrastructure\WordPress\Admin\LeadsAdminDashboard);
+        $this->app->singleton(\App\Infrastructure\WordPress\Admin\WordPressAdminTheme::class, fn () => new \App\Infrastructure\WordPress\Admin\WordPressAdminTheme);
+        $this->app->singleton(\App\Infrastructure\WordPress\Admin\MarketingDashboard::class, fn () => new \App\Infrastructure\WordPress\Admin\MarketingDashboard);
     }
 
     /**
@@ -45,5 +47,7 @@ class DomainServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
         $this->app->make(PartnerPostType::class)->register();
         $this->app->make(\App\Infrastructure\WordPress\Admin\LeadsAdminDashboard::class)->register();
+        $this->app->make(\App\Infrastructure\WordPress\Admin\WordPressAdminTheme::class)->register();
+        $this->app->make(\App\Infrastructure\WordPress\Admin\MarketingDashboard::class)->register();
     }
 }

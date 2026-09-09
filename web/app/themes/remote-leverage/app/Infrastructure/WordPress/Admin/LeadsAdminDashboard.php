@@ -234,8 +234,9 @@ class LeadsAdminDashboard
         wp_add_inline_style('wp-admin', '
             /* --- Base Typography & Reset --- */
             .rl-admin-wrap {
-                max-width: 1440px;
-                margin: 20px 20px 40px 0;
+                max-width: 1360px;
+                margin: 28px auto 64px auto !important;
+                padding: 0 20px !important;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
                 color: #09090b;
                 -webkit-font-smoothing: antialiased;
@@ -604,82 +605,48 @@ class LeadsAdminDashboard
             .rl-badge {
                 display: inline-flex;
                 align-items: center;
-                gap: 5px;
+                gap: 6px;
                 padding: 2px 8px;
                 border-radius: 9999px;
                 font-size: 11px;
-                font-weight: 600;
+                font-weight: 500;
                 line-height: 1.4;
                 white-space: nowrap;
+                background: #ffffff;
+                color: #09090b;
+                border: 1px solid #e4e4e7;
             }
             .rl-status-dot {
                 width: 6px;
                 height: 6px;
                 border-radius: 50%;
                 flex-shrink: 0;
+                background: #71717a;
             }
-            .rl-badge-booked {
-                background: #ecfdf5;
-                color: #065f46;
-                border: 1px solid #a7f3d0;
-            }
-            .rl-badge-booked .rl-status-dot { background: #10b981; }
-
-            .rl-badge-captured, .rl-badge-qualified {
-                background: #eff6ff;
-                color: #1e40af;
-                border: 1px solid #bfdbfe;
-            }
-            .rl-badge-captured .rl-status-dot, .rl-badge-qualified .rl-status-dot { background: #3b82f6; }
-
-            .rl-badge-partial {
-                background: #fffbeb;
-                color: #92400e;
-                border: 1px solid #fde68a;
-            }
-            .rl-badge-partial .rl-status-dot { background: #f59e0b; }
-
-            .rl-badge-abandoned, .rl-badge-canceled, .rl-badge-failed {
-                background: #fef2f2;
-                color: #991b1b;
-                border: 1px solid #fecaca;
-            }
-            .rl-badge-abandoned .rl-status-dot, .rl-badge-canceled .rl-status-dot, .rl-badge-failed .rl-status-dot { background: #ef4444; }
-
-            .rl-badge-succeeded {
-                background: #ecfdf5;
-                color: #065f46;
-                border: 1px solid #a7f3d0;
-            }
-            .rl-badge-dispatch {
-                background: #f4f4f5;
-                color: #18181b;
-                border: 1px solid #e4e4e7;
-            }
-            .rl-badge-consumption {
-                background: #eff6ff;
-                color: #1e40af;
-                border: 1px solid #bfdbfe;
-            }
+            .rl-badge-booked .rl-status-dot { background: #18181b; }
+            .rl-badge-captured .rl-status-dot, .rl-badge-qualified .rl-status-dot { background: #71717a; }
+            .rl-badge-partial .rl-status-dot { background: #a1a1aa; }
+            .rl-badge-abandoned .rl-status-dot, .rl-badge-canceled .rl-status-dot, .rl-badge-failed .rl-status-dot { background: #dc2626; }
+            .rl-badge-succeeded .rl-status-dot { background: #18181b; }
 
             /* --- Revenue Pills --- */
             .rl-pill-t10 {
                 display: inline-flex;
                 align-items: center;
                 gap: 5px;
-                padding: 3px 8px;
+                padding: 2px 8px;
                 border-radius: 6px;
                 font-size: 11px;
-                font-weight: 600;
-                background: #faf5ff;
-                color: #6b21a8;
-                border: 1px solid #e9d5ff;
+                font-weight: 500;
+                background: #18181b;
+                color: #fafafa;
+                border: 1px solid #18181b;
             }
             .rl-pill-t0 {
                 display: inline-flex;
                 align-items: center;
                 gap: 5px;
-                padding: 3px 8px;
+                padding: 2px 8px;
                 border-radius: 6px;
                 font-size: 11px;
                 font-weight: 500;
@@ -693,10 +660,10 @@ class LeadsAdminDashboard
                 display: inline-flex;
                 align-items: center;
                 gap: 6px;
-                padding: 5px 10px;
-                background: #ecfdf5;
-                color: #065f46;
-                border: 1px solid #a7f3d0;
+                padding: 4px 10px;
+                background: #ffffff;
+                color: #09090b;
+                border: 1px solid #e4e4e7;
                 border-radius: 6px;
                 font-size: 12px;
                 font-weight: 500;
@@ -704,9 +671,9 @@ class LeadsAdminDashboard
                 transition: all 0.15s ease;
             }
             .rl-meet-btn:hover {
-                background: #d1fae5;
-                color: #047857;
-                border-color: #6ee7b7;
+                background: #f4f4f5;
+                color: #09090b;
+                border-color: #d4d4d8;
             }
 
             /* --- Audit Count Pill --- */
@@ -822,7 +789,7 @@ class LeadsAdminDashboard
             .wp-admin.rl-leads-screen .notice {
                 background: #ffffff !important;
                 border: 1px solid #e4e4e7 !important;
-                border-left: 4px solid #f59e0b !important;
+                border-left: 3px solid #18181b !important;
                 border-radius: 8px !important;
                 padding: 12px 16px !important;
                 margin: 16px 0 !important;
@@ -832,60 +799,15 @@ class LeadsAdminDashboard
             }
             .rl-admin-wrap .notice-success,
             .wp-admin.rl-leads-screen .notice-success {
-                border-left-color: #10b981 !important;
+                border-left-color: #18181b !important;
             }
             .rl-admin-wrap .notice-error,
             .wp-admin.rl-leads-screen .notice-error {
-                border-left-color: #ef4444 !important;
+                border-left-color: #dc2626 !important;
             }
             .rl-admin-wrap .notice-info,
             .wp-admin.rl-leads-screen .notice-info {
-                border-left-color: #3b82f6 !important;
-            }
-
-            /* --- Modern WordPress Admin Chrome On Leads Screen --- */
-            .rl-leads-screen #adminmenu,
-            .rl-leads-screen #adminmenuback,
-            .rl-leads-screen #adminmenuwrap {
-                background-color: #09090b !important;
-            }
-            .rl-leads-screen #adminmenu a {
-                color: #a1a1aa !important;
-                font-weight: 500 !important;
-            }
-            .rl-leads-screen #adminmenu a:hover,
-            .rl-leads-screen #adminmenu li.menu-top:hover,
-            .rl-leads-screen #adminmenu li.opensub>a.menu-top {
-                background-color: #18181b !important;
-                color: #fafafa !important;
-            }
-            .rl-leads-screen #adminmenu li.current a.menu-top,
-            .rl-leads-screen #adminmenu li.wp-has-current-submenu a.wp-has-current-submenu {
-                background-color: #27272a !important;
-                color: #ffffff !important;
-                font-weight: 600 !important;
-            }
-            .rl-leads-screen #adminmenu .wp-has-current-submenu .wp-submenu {
-                background-color: #121215 !important;
-            }
-            .rl-leads-screen #adminmenu .wp-submenu a {
-                color: #a1a1aa !important;
-            }
-            .rl-leads-screen #adminmenu .wp-submenu a:hover {
-                color: #ffffff !important;
-            }
-            .rl-leads-screen #wpadminbar {
-                background: #09090b !important;
-                border-bottom: 1px solid #27272a !important;
-            }
-            .rl-leads-screen #wpadminbar .ab-item,
-            .rl-leads-screen #wpadminbar a.ab-item {
-                color: #a1a1aa !important;
-            }
-            .rl-leads-screen #wpadminbar .ab-item:hover,
-            .rl-leads-screen #wpadminbar a.ab-item:hover {
-                color: #ffffff !important;
-                background: #18181b !important;
+                border-left-color: #71717a !important;
             }
         ');
     }
@@ -1089,7 +1011,7 @@ class LeadsAdminDashboard
                         <span class="rl-card-title">Booked Consultations</span>
                         <?php echo $this->iconCalendar(); ?>
                     </div>
-                    <div class="rl-card-value" style="color: #065f46;"><?php echo esc_html((string) $bookedLeads); ?></div>
+                    <div class="rl-card-value"><?php echo esc_html((string) $bookedLeads); ?></div>
                     <div class="rl-card-subtext">Calendar scheduled calls</div>
                 </a>
                 <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads&mrr=t10')); ?>" class="rl-card <?php echo $mrrFilter === 't10' ? 'rl-card-active' : ''; ?>">
@@ -1097,7 +1019,7 @@ class LeadsAdminDashboard
                         <span class="rl-card-title">High-Tier MRR (&ge;$10k)</span>
                         <?php echo $this->iconTrending(); ?>
                     </div>
-                    <div class="rl-card-value" style="color: #6b21a8;"><?php echo esc_html((string) $t10Leads); ?></div>
+                    <div class="rl-card-value"><?php echo esc_html((string) $t10Leads); ?></div>
                     <div class="rl-card-subtext">&ge; $10k/mo revenue tier</div>
                 </a>
                 <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads&status=partial')); ?>" class="rl-card <?php echo $statusFilter === 'partial' ? 'rl-card-active' : ''; ?>">
@@ -1105,7 +1027,7 @@ class LeadsAdminDashboard
                         <span class="rl-card-title">Partial Form Drops</span>
                         <?php echo $this->iconAlert(); ?>
                     </div>
-                    <div class="rl-card-value" style="color: #92400e;"><?php echo esc_html((string) $partialLeads); ?></div>
+                    <div class="rl-card-value"><?php echo esc_html((string) $partialLeads); ?></div>
                     <div class="rl-card-subtext">Incomplete step 1 drop-offs</div>
                 </a>
                 <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads-activity')); ?>" class="rl-card">
@@ -1113,7 +1035,7 @@ class LeadsAdminDashboard
                         <span class="rl-card-title">Audit Log Events</span>
                         <?php echo $this->iconShield(); ?>
                     </div>
-                    <div class="rl-card-value" style="color: #1e40af;"><?php echo esc_html((string) $totalLogs); ?></div>
+                    <div class="rl-card-value"><?php echo esc_html((string) $totalLogs); ?></div>
                     <div class="rl-card-subtext">Dual-logged audit trail</div>
                 </a>
             </div>
@@ -1240,8 +1162,9 @@ class LeadsAdminDashboard
                                                 <?php echo $this->iconVideo(); ?> Google Meet
                                             </a>
                                         <?php elseif ($lead->status === 'booked') : ?>
-                                            <span style="color: #065f46; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
-                                                &check; Confirmed
+                                            <span class="rl-badge">
+                                                <span class="rl-status-dot"></span>
+                                                <?php echo $this->iconCheck(); ?> Confirmed
                                             </span>
                                         <?php else : ?>
                                             <span style="color: #a1a1aa; font-size: 11px;">Not Scheduled</span>
@@ -1254,7 +1177,7 @@ class LeadsAdminDashboard
                                                 <div style="font-size: 11px; color: #71717a;">cmp: <?php echo esc_html($lead->utm_campaign); ?></div>
                                             <?php endif; ?>
                                         <?php elseif ($lead->referral_code) : ?>
-                                            <span class="rl-badge" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;">via: <?php echo esc_html($lead->referral_code); ?></span>
+                                            <span class="rl-badge">via: <?php echo esc_html($lead->referral_code); ?></span>
                                         <?php else : ?>
                                             <span style="color: #a1a1aa; font-size: 11px;">Direct Organic</span>
                                         <?php endif; ?>
@@ -1829,6 +1752,11 @@ class LeadsAdminDashboard
     protected function iconCalendar(): string
     {
         return '<svg class="rl-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>';
+    }
+
+    protected function iconCheck(): string
+    {
+        return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
     }
 
     protected function iconTrending(): string
