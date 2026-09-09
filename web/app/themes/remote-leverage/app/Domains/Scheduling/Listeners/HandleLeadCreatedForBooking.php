@@ -8,15 +8,20 @@ use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Scheduling\Actions\BookMeetingAction;
+use App\Domains\Scheduling\Concerns\HandlesBookingRetryBackoff;
 use App\Domains\Scheduling\Data\BookingRequestData;
+use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 
 class HandleLeadCreatedForBooking
 {
+    use HandlesBookingRetryBackoff;
+
     public function __construct(
         protected BookMeetingAction $bookMeetingAction,
         protected LeadActivityLogger $activityLogger,
+        protected CalendlyEventTypeRoleResolver $eventTypeRoleResolver,
     ) {}
 
     /**
@@ -62,8 +67,8 @@ class HandleLeadCreatedForBooking
             if (! $calendlyEventUri && $lead->monthly_revenue) {
                 $isUnder10k = in_array($lead->monthly_revenue, ['$0 to $5k Per Month', '$5k to $10k Per Month', '<10k', 'under_10k'], true);
                 $calendlyEventUri = $isUnder10k
-                    ? config('services.calendly.t0_event_type')
-                    : config('services.calendly.t10_event_type');
+                    ? $this->eventTypeRoleResolver->get('t0')
+                    : $this->eventTypeRoleResolver->get('t10');
             }
 
             $result = $this->bookMeetingAction->execute($bookingData, $calendlyEventUri);
@@ -96,23 +101,23 @@ class HandleLeadCreatedForBooking
                     metadata: $result
                 ));
             } else {
-                $this->activityLogger->logConsumption(
-                    leadId: $lead->id,
-                    eventType: 'LeadCreated',
-                    actorDomain: 'Scheduling',
-                    outcome: 'failed',
-                    description: 'Failed to book slot with calendar provider'
+                $this->recordBookingFailureAndMaybeReschedule(
+                    $lead,
+                    $bookingData,
+                    $calendlyEventUri,
+                    $result['message'] ?? 'Failed to book slot with calendar provider',
+                    $this->activityLogger
                 );
             }
         } catch (\Throwable $e) {
             Log::error("HandleLeadCreatedForBooking: Error booking meeting for lead #{$lead->id}: ".$e->getMessage());
 
-            $this->activityLogger->logConsumption(
-                leadId: $lead->id,
-                eventType: 'LeadCreated',
-                actorDomain: 'Scheduling',
-                outcome: 'failed',
-                description: 'Scheduling exception: '.$e->getMessage()
+            $this->recordBookingFailureAndMaybeReschedule(
+                $lead,
+                $bookingData ?? BookingRequestData::fromArray(['name' => $lead->name, 'email' => $lead->email, 'start_time' => $preferredSlot, 'timezone' => $timezone]),
+                $calendlyEventUri ?? null,
+                'Scheduling exception: '.$e->getMessage(),
+                $this->activityLogger
             );
         }
     }

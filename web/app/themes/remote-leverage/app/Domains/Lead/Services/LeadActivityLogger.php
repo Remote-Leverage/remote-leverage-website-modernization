@@ -65,4 +65,20 @@ class LeadActivityLogger
             return null;
         }
     }
+
+    /**
+     * Duplicate-booking guard: has this email already had a successful booking
+     * logged within the window? Scoped by email (not lead_id) because a
+     * double-submit before any lead_id context exists produces two separate Lead
+     * rows for the same person — a lead_id-scoped check would never catch that.
+     */
+    public function hasRecentSuccessfulBooking(string $email, int $withinMinutes = 5): bool
+    {
+        return LeadActivityLog::query()
+            ->where('event_type', 'LeadCreated')
+            ->where('outcome', 'succeeded')
+            ->where('created_at', '>=', now()->subMinutes($withinMinutes))
+            ->whereHas('lead', fn ($query) => $query->where('email', $email))
+            ->exists();
+    }
 }

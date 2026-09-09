@@ -106,9 +106,10 @@ class InstantLiveCallButton extends Component
 
         try {
             // 1. Capture Lead in Lead Domain (ADR-0008)
+            $lead = null;
             try {
                 $captureAction = app(CaptureLeadAction::class);
-                $captureAction->execute(new LeadCaptureData(
+                $lead = $captureAction->execute(new LeadCaptureData(
                     name: $this->visitorName,
                     email: $this->visitorEmail,
                     phone: $this->visitorPhone ?: null,
@@ -124,7 +125,7 @@ class InstantLiveCallButton extends Component
                 'name' => $this->visitorName,
                 'email' => $this->visitorEmail,
                 'phone' => $this->visitorPhone,
-            ]);
+            ], $lead);
 
             if (! empty($result['routed']) && ! empty($result['redirect_url'])) {
                 $this->activeMeetUrl = $result['redirect_url'];

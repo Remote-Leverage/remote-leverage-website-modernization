@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Domains\Scheduling\Actions;
 
+use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Scheduling\Data\BookingRequestData;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
+use App\Domains\Scheduling\Gateways\CalendlyMetadataCache;
+use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
 use App\Domains\Scheduling\Gateways\GoogleCalendarClient;
+use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -15,6 +19,10 @@ class BookMeetingAction
     public function __construct(
         protected CalendlyClient $calendlyClient,
         protected GoogleCalendarClient $googleCalendarClient,
+        protected CalendlyTokenPool $tokenPool,
+        protected CalendlyEventTypeRoleResolver $eventTypeRoleResolver,
+        protected CalendlyMetadataCache $metadataCache,
+        protected LeadActivityLogger $activityLogger,
     ) {}
 
     /**
@@ -28,12 +36,53 @@ class BookMeetingAction
 
         Log::info('Executing BookMeetingAction', $data->toArray());
 
-        // Path A: Calendly Direct Invitee Booking
-        $eventUri = $calendlyEventUri ?: config('services.calendly.default_event_type');
+        // Duplicate-booking guard A: has this email already had a successful
+        // booking logged within the last 5 minutes? Short-circuits without
+        // touching Calendly/Google at all.
+        if ($this->activityLogger->hasRecentSuccessfulBooking($data->email)) {
+            return [
+                'success' => true,
+                'provider' => 'calendly',
+                'meeting_id' => 'deduplicated',
+                'meet_url' => null,
+                'start_time' => $startTime->toIso8601String(),
+                'end_time' => $endTime->toIso8601String(),
+                'client_name' => $data->name,
+                'client_email' => $data->email,
+                'idempotent_replay' => true,
+            ];
+        }
 
-        if ($eventUri && config('services.calendly.api_key')) {
+        // Path A: Calendly Direct Invitee Booking
+        $eventUri = $calendlyEventUri ?: $this->eventTypeRoleResolver->get('default');
+
+        if ($eventUri && ! empty($this->tokenPool->getEligibleTokens())) {
+            // Duplicate-booking guard B: Calendly-side preflight — does this exact
+            // slot already exist for this email on any pooled account?
+            $existing = $this->calendlyClient->findExistingInvitee($data->email, $eventUri, $startTime->toIso8601String());
+
+            if ($existing) {
+                $meetUrl = null;
+                if (! empty($existing['uri'])) {
+                    $eventDetails = $this->calendlyClient->getScheduledEvent($existing['uri']);
+                    $location = $eventDetails['location'] ?? [];
+                    $meetUrl = $location['join_url'] ?? $location['location'] ?? null;
+                }
+
+                return [
+                    'success' => true,
+                    'provider' => 'calendly',
+                    'meeting_id' => $existing['uri'] ?? uniqid('cal_dedup_', true),
+                    'meet_url' => $meetUrl,
+                    'start_time' => $startTime->toIso8601String(),
+                    'end_time' => $endTime->toIso8601String(),
+                    'client_name' => $data->name,
+                    'client_email' => $data->email,
+                    'idempotent_replay' => true,
+                ];
+            }
             $questionsAnswers = [];
-            $eventQuestions = $this->calendlyClient->getEventQuestions($eventUri);
+            $eventQuestions = $this->metadataCache->getEventQuestions($eventUri);
 
             if (! empty($eventQuestions)) {
                 foreach ($eventQuestions as $q) {

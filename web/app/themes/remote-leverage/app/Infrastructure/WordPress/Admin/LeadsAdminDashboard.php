@@ -11,7 +11,6 @@ use App\Domains\Lead\Services\LeadSettingsService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 
 class LeadsAdminDashboard
 {
@@ -149,6 +148,15 @@ class LeadsAdminDashboard
             } else {
                 wp_safe_redirect(admin_url('admin.php?page=rl-leads-settings&settings_error='.urlencode(implode(' ', $result['errors']))));
             }
+            exit;
+        }
+
+        if ($action === 'retry_calendly_booking') {
+            check_admin_referer('rl_retry_booking_nonce');
+            $leadId = absint($_REQUEST['lead_id'] ?? 0);
+            $result = app(\App\Domains\Scheduling\Actions\RetryFailedBookingAction::class)->execute($leadId);
+            Cache::forget('rl_lead_dashboard_kpi_metrics');
+            wp_safe_redirect(admin_url('admin.php?page=rl-leads-diagnostics&retry_result='.($result['success'] ? 'success' : 'failed').'&lead_id='.$leadId));
             exit;
         }
 
@@ -1636,24 +1644,28 @@ class LeadsAdminDashboard
 
     public function renderDiagnostics(): void
     {
-        $apiKey = config('services.calendly.api_key');
-        $t10 = config('services.calendly.t10_event_type');
-        $t0 = config('services.calendly.t0_event_type');
+        $tokenPool = app(\App\Domains\Scheduling\Gateways\CalendlyTokenPool::class);
+        $calendlyClient = app(\App\Domains\Scheduling\Gateways\CalendlyClient::class);
+        $roleResolver = app(\App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver::class);
+
+        $hasTokens = ! empty($tokenPool->getEligibleTokens());
+        $t10 = $roleResolver->get('t10');
+        $t0 = $roleResolver->get('t0');
 
         $t10Status = 'Unknown';
         $t10Name = '';
         $t0Status = 'Unknown';
         $t0Name = '';
 
-        if ($apiKey) {
+        if ($hasTokens) {
             try {
-                $r1 = Http::withToken($apiKey)->get($t10);
-                $t10Status = $r1->successful() ? 'Active (200 OK)' : 'Status: '.$r1->status();
-                $t10Name = $r1->json('resource.name', '');
+                $r1 = $t10 ? $calendlyClient->getEventType($t10) : null;
+                $t10Status = $r1 ? 'Active (200 OK)' : 'Unreachable across pool';
+                $t10Name = $r1['name'] ?? '';
 
-                $r2 = Http::withToken($apiKey)->get($t0);
-                $t0Status = $r2->successful() ? 'Active (200 OK)' : 'Status: '.$r2->status();
-                $t0Name = $r2->json('resource.name', '');
+                $r2 = $t0 ? $calendlyClient->getEventType($t0) : null;
+                $t0Status = $r2 ? 'Active (200 OK)' : 'Unreachable across pool';
+                $t0Name = $r2['name'] ?? '';
             } catch (\Throwable $e) {
                 $t10Status = 'Connection error: '.$e->getMessage();
             }
@@ -1661,6 +1673,13 @@ class LeadsAdminDashboard
 
         $cutoff = Carbon::now()->subDays(30);
         $staleLeadsCount = Lead::where('created_at', '<', $cutoff)->count();
+
+        $stuckLeads = Lead::where('status', 'booking_failed')
+            ->orWhere(function (Builder $query) {
+                $query->where('status', 'booking_pending')->where('booking_retry_count', '>', 0);
+            })
+            ->orderByDesc('booking_retry_count')
+            ->get();
 
         ?>
         <div class="wrap rl-admin-wrap">
@@ -1676,6 +1695,12 @@ class LeadsAdminDashboard
                 </a>
             </div>
 
+            <?php if (! empty($_GET['retry_result'])) { ?>
+                <div class="notice <?php echo $_GET['retry_result'] === 'success' ? 'notice-success' : 'notice-error'; ?>">
+                    <p>Booking retry <?php echo $_GET['retry_result'] === 'success' ? 'succeeded' : 'failed'; ?> for lead #<?php echo esc_html((string) absint($_GET['lead_id'] ?? 0)); ?>.</p>
+                </div>
+            <?php } ?>
+
             <!-- Segmented Navigation Tabs -->
             <?php $this->renderAdminNavigation('diagnostics'); ?>
 
@@ -1685,13 +1710,14 @@ class LeadsAdminDashboard
                     <h3 class="rl-detail-title">Calendly Direct API Connection</h3>
                     <table class="rl-key-value-table">
                         <tr>
-                            <td style="width: 170px;">API Key Configured:</td>
+                            <td style="width: 170px;">Token Pool:</td>
                             <td>
-                                <?php if ($apiKey) { ?>
-                                    <span class="rl-badge rl-badge-succeeded"><span class="rl-status-dot"></span>Configured (PAT)</span>
+                                <?php if ($hasTokens) { ?>
+                                    <span class="rl-badge rl-badge-succeeded"><span class="rl-status-dot"></span>Configured (<?php echo esc_html((string) count($tokenPool->getEligibleTokens())); ?> eligible)</span>
                                 <?php } else { ?>
-                                    <span class="rl-badge rl-badge-failed"><span class="rl-status-dot"></span>Missing Key</span>
+                                    <span class="rl-badge rl-badge-failed"><span class="rl-status-dot"></span>No eligible tokens</span>
                                 <?php } ?>
+                                <a href="<?php echo esc_url(admin_url('admin.php?page=rl-calendly')); ?>" class="rl-btn rl-btn-outline rl-btn-sm" style="margin-left:6px;">Manage Pool</a>
                             </td>
                         </tr>
                         <tr>
@@ -1736,6 +1762,55 @@ class LeadsAdminDashboard
                         </tr>
                     </table>
                 </div>
+            </div>
+
+            <!-- Booking Retry Queue -->
+            <div class="rl-detail-card">
+                <h3 class="rl-detail-title">Booking Retry Queue (<?php echo esc_html((string) $stuckLeads->count()); ?>)</h3>
+                <table class="widefat rl-key-value-table">
+                    <thead>
+                        <tr>
+                            <th>Lead</th>
+                            <th>Status</th>
+                            <th>Retries</th>
+                            <th>Next Retry</th>
+                            <th>Last Failure Reason</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($stuckLeads as $stuckLead) {
+                            $lastFailure = $stuckLead->activityLogs()
+                                ->where('event_type', 'LeadCreated')
+                                ->where('outcome', 'failed')
+                                ->orderByDesc('created_at')
+                                ->first();
+                        ?>
+                            <tr>
+                                <td><?php echo esc_html($stuckLead->name.' ('.$stuckLead->email.')'); ?></td>
+                                <td>
+                                    <span class="rl-badge <?php echo $stuckLead->status === 'booking_failed' ? 'rl-badge-failed' : 'rl-badge-partial'; ?>">
+                                        <span class="rl-status-dot"></span><?php echo esc_html($stuckLead->status); ?>
+                                    </span>
+                                </td>
+                                <td><?php echo esc_html((string) $stuckLead->booking_retry_count).'/5'; ?></td>
+                                <td><?php echo $stuckLead->booking_next_retry_at ? esc_html($stuckLead->booking_next_retry_at->format('Y-m-d H:i')) : '—'; ?></td>
+                                <td style="max-width: 320px;"><?php echo esc_html($lastFailure?->description ?? '—'); ?></td>
+                                <td>
+                                    <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=rl-leads-diagnostics')); ?>">
+                                        <?php wp_nonce_field('rl_retry_booking_nonce'); ?>
+                                        <input type="hidden" name="rl_action" value="retry_calendly_booking" />
+                                        <input type="hidden" name="lead_id" value="<?php echo esc_attr((string) $stuckLead->id); ?>" />
+                                        <button type="submit" class="rl-btn rl-btn-outline rl-btn-sm">Retry Booking Now</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php } ?>
+                        <?php if ($stuckLeads->isEmpty()) { ?>
+                            <tr><td colspan="6">No leads currently stuck in the booking retry queue.</td></tr>
+                        <?php } ?>
+                    </tbody>
+                </table>
             </div>
         </div>
         <?php

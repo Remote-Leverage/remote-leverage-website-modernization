@@ -8,6 +8,7 @@ use App\Domains\Lead\Actions\CaptureLeadAction;
 use App\Domains\Lead\Data\LeadCaptureData;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Scheduling\Actions\FetchAvailableSlotsAction;
+use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
 use App\Domains\Tracking\Data\AnalyticsEventData;
 use Carbon\Carbon;
@@ -280,11 +281,11 @@ class MultistepBookingWizard extends Component
 
     public function getActiveEventTypeUri(): string
     {
-        if ($this->isUnder10kMrr()) {
-            return config('services.calendly.t0_event_type', 'https://api.calendly.com/event_types/ff20712e-6387-4965-9026-dee4c7e5ef62');
-        }
+        $roleResolver = app(CalendlyEventTypeRoleResolver::class);
 
-        return config('services.calendly.t10_event_type', 'https://api.calendly.com/event_types/5c82a248-c65a-4fb1-bdc6-aefd6e89fbfb');
+        return $this->isUnder10kMrr()
+            ? (string) $roleResolver->get('t0')
+            : (string) $roleResolver->get('t10');
     }
 
     public function isUnder10kMrr(): bool
@@ -516,6 +517,19 @@ class MultistepBookingWizard extends Component
         }
         $this->name = trim($this->firstName.' '.$this->lastName);
 
+        // Server-side double-submit guard: a plain Livewire property only catches a
+        // second click after the first response already re-rendered the button
+        // disabled — it can't stop two genuinely concurrent requests that both
+        // hydrated from the same prior snapshot. Cache::lock() is shared across
+        // requests regardless of what snapshot they hydrated from.
+        $lock = Cache::lock('rl_booking_submit_'.md5($this->email.'|'.$this->selectedSlot), 15);
+
+        if (! $lock->get()) {
+            $this->errorMessage = 'Your booking is already being processed — please wait a moment.';
+
+            return;
+        }
+
         try {
             $captureAction = app(CaptureLeadAction::class);
 
@@ -584,6 +598,8 @@ class MultistepBookingWizard extends Component
         } catch (\Throwable $e) {
             Log::error('Error executing booking in wizard: '.$e->getMessage(), ['exception' => $e]);
             $this->errorMessage = 'An error occurred processing your consultation. Please check your information or try again.';
+        } finally {
+            $lock->release();
         }
     }
 

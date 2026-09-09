@@ -6,12 +6,14 @@ namespace App\Domains\Scheduling\Actions;
 
 use App\Domains\Scheduling\Data\TimeSlotData;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
+use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use Carbon\Carbon;
 
 class FetchAvailableSlotsAction
 {
     public function __construct(
-        protected CalendlyClient $calendlyClient
+        protected CalendlyClient $calendlyClient,
+        protected CalendlyEventTypeRoleResolver $eventTypeRoleResolver
     ) {}
 
     /**
@@ -33,7 +35,7 @@ class FetchAvailableSlotsAction
             $end = $start->copy()->addDays(7);
         }
 
-        $eventTypeId = $eventTypeId ?: config('services.calendly.default_event_type') ?: env('CALENDLY_DEFAULT_EVENT_TYPE') ?: env('CALENDLY_EVENT_TYPE_ID');
+        $eventTypeId = $eventTypeId ?: $this->eventTypeRoleResolver->get('default');
         if (! $eventTypeId) {
             // Fallback generation of realistic mock slots if API key/event type is not yet populated
             return $this->generateDefaultSlots($start, $end, $timezone);

@@ -30,6 +30,7 @@ return [
         'default_event_type' => env('CALENDLY_DEFAULT_EVENT_TYPE', 'https://api.calendly.com/event_types/5c82a248-c65a-4fb1-bdc6-aefd6e89fbfb'),
         't10_event_type' => env('CALENDLY_T10_EVENT_TYPE', 'https://api.calendly.com/event_types/5c82a248-c65a-4fb1-bdc6-aefd6e89fbfb'),
         't0_event_type' => env('CALENDLY_T0_EVENT_TYPE', 'https://api.calendly.com/event_types/ff20712e-6387-4965-9026-dee4c7e5ef62'),
+        'live_call_event_type' => env('CALENDLY_LIVE_CALL_EVENT_TYPE'),
         'webhook_signing_key' => env('CALENDLY_WEBHOOK_SIGNING_KEY'),
     ],
 

@@ -14,6 +14,7 @@ use App\Domains\Referral\Services\AttributionEngine;
 use App\Domains\Scheduling\Actions\BookMeetingAction;
 use App\Domains\Scheduling\Data\BookingRequestData;
 use App\Domains\Scheduling\Listeners\HandleLeadCreatedForBooking;
+use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use Illuminate\Support\Str;
 
 describe('Booking Wizard MRR Routing & Tracking Parity', function () {
@@ -153,7 +154,7 @@ describe('Booking Wizard MRR Routing & Tracking Parity', function () {
             }
         };
 
-        $listener = new HandleLeadCreatedForBooking($fakeBookMeetingAction, new LeadActivityLogger);
+        $listener = new HandleLeadCreatedForBooking($fakeBookMeetingAction, new LeadActivityLogger, new CalendlyEventTypeRoleResolver);
 
         $event = new LeadCreated(
             lead: $lead,
@@ -198,7 +199,7 @@ describe('Booking Wizard MRR Routing & Tracking Parity', function () {
             }
         };
 
-        $listener = new HandleLeadCreatedForBooking($fakeBookMeetingAction, new LeadActivityLogger);
+        $listener = new HandleLeadCreatedForBooking($fakeBookMeetingAction, new LeadActivityLogger, new CalendlyEventTypeRoleResolver);
 
         $event = new LeadCreated(
             lead: $lead,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Providers;
 
+use App\Infrastructure\WordPress\Admin\CalendlyAdminDashboard;
 use App\Infrastructure\WordPress\Admin\ContentAuditAdmin;
 use App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
 use App\Infrastructure\WordPress\Admin\MarketingDashboard;
@@ -46,6 +47,7 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(ContentAuditAdmin::class, fn () => new ContentAuditAdmin);
         $this->app->singleton(PartnerHubAdmin::class, fn () => new PartnerHubAdmin);
         $this->app->singleton(ReferralAdminDashboard::class, fn () => new ReferralAdminDashboard);
+        $this->app->singleton(CalendlyAdminDashboard::class, fn () => new CalendlyAdminDashboard);
     }
 
     /**
@@ -61,5 +63,6 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->make(ContentAuditAdmin::class)->register();
         $this->app->make(PartnerHubAdmin::class)->register();
         $this->app->make(ReferralAdminDashboard::class)->register();
+        $this->app->make(CalendlyAdminDashboard::class)->register();
     }
 }

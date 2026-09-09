@@ -43,7 +43,13 @@ class Lead extends Model
         'source_type',
         'source_id',
         'status',
+        'booking_retry_count',
+        'booking_next_retry_at',
         // something for dynamic properties
+    ];
+
+    protected $casts = [
+        'booking_next_retry_at' => 'datetime',
     ];
 
     /**
