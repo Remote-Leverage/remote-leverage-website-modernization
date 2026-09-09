@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Referral\Services;
 
-use App\Domains\Referral\Models\Partner;
 use App\Domains\Referral\Models\Payout;
+use App\Domains\Referral\Models\Referrer;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -22,9 +22,9 @@ class StripeConnectGateway
     }
 
     /**
-     * Create an onboarding link for an affiliate partner.
+     * Create an onboarding link for a referrer.
      */
-    public function createOnboardingLink(Partner $partner, string $returnUrl, string $refreshUrl): ?string
+    public function createOnboardingLink(Referrer $referrer, string $returnUrl, string $refreshUrl): ?string
     {
         if (! $this->secretKey) {
             Log::warning('StripeConnectGateway: Missing Stripe secret key.');
@@ -33,20 +33,20 @@ class StripeConnectGateway
         }
 
         try {
-            // If the partner doesn't have a Stripe account yet, create one
-            $accountId = $partner->stripe_account_id;
+            // If the referrer doesn't have a Stripe account yet, create one
+            $accountId = $referrer->stripe_account_id;
             if (! $accountId) {
                 $accountResponse = Http::withToken($this->secretKey)
                     ->asForm()
                     ->post('https://api.stripe.com/v1/accounts', [
                         'type' => 'express',
-                        'email' => $partner->email,
+                        'email' => $referrer->email,
                         'capabilities' => [
                             'transfers' => ['requested' => 'true'],
                         ],
                         'metadata' => [
-                            'partner_id' => (string) $partner->id,
-                            'referral_code' => $partner->referral_code,
+                            'referrer_id' => (string) $referrer->id,
+                            'referral_code' => $referrer->referral_code,
                         ],
                     ]);
 
@@ -57,7 +57,7 @@ class StripeConnectGateway
                 }
 
                 $accountId = $accountResponse->json('id');
-                $partner->update(['stripe_account_id' => $accountId]);
+                $referrer->update(['stripe_account_id' => $accountId]);
             }
 
             // Create account link for onboarding
@@ -85,7 +85,7 @@ class StripeConnectGateway
     }
 
     /**
-     * Transfer funds to a partner's connected Stripe account.
+     * Transfer funds to a referrer's connected Stripe account.
      */
     public function transferPayout(Payout $payout): ?string
     {
@@ -95,9 +95,9 @@ class StripeConnectGateway
             return null;
         }
 
-        $partner = $payout->partner;
-        if (! $partner || ! $partner->stripe_account_id) {
-            Log::error('StripeConnectGateway: Cannot transfer payout, partner has no connected Stripe account', [
+        $referrer = $payout->referrer;
+        if (! $referrer || ! $referrer->stripe_account_id) {
+            Log::error('StripeConnectGateway: Cannot transfer payout, referrer has no connected Stripe account', [
                 'payout_id' => $payout->id,
             ]);
 
@@ -112,11 +112,11 @@ class StripeConnectGateway
                 ->post('https://api.stripe.com/v1/transfers', [
                     'amount' => $amountInCents,
                     'currency' => strtolower($payout->currency),
-                    'destination' => $partner->stripe_account_id,
-                    'description' => 'Remote Leverage Partner Payout #'.$payout->id,
+                    'destination' => $referrer->stripe_account_id,
+                    'description' => 'Remote Leverage Referrer Payout #'.$payout->id,
                     'metadata' => [
                         'payout_id' => (string) $payout->id,
-                        'partner_id' => (string) $partner->id,
+                        'referrer_id' => (string) $referrer->id,
                     ],
                 ]);
 

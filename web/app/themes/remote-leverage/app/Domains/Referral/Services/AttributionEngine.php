@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Referral\Services;
 
+use App\Domains\Referral\Models\Referrer;
+
 class AttributionEngine
 {
     public const COOKIE_NAME = 'rl_referrer';
@@ -109,6 +111,15 @@ class AttributionEngine
                       (function_exists('user_can') && user_can($user, 'rl_access_referral_dashboard'));
 
         return $isReferrer ? $user : null;
+    }
+
+    /**
+     * Resolve a registered Referrer by their referral code.
+     * This is the primary attribution path for the referral program.
+     */
+    public function findReferrerByReferralCode(string $slug): ?Referrer
+    {
+        return Referrer::query()->where('referral_code', $slug)->first();
     }
 
     /**

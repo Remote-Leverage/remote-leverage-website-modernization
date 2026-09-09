@@ -9,6 +9,7 @@ use App\Domains\Lead\Actions\ProcessAbandonedLeadsAction;
 use App\Domains\Lead\Actions\PurgeOldLeadsAction;
 use App\Domains\Lead\Commands\ProcessAbandonedLeadsCommand;
 use App\Domains\Lead\Commands\PurgeLeadsCommand;
+use App\Domains\Lead\Events\LeadBookingCanceled;
 use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Listeners\HandleLeadEventsForEmailNotification;
@@ -18,7 +19,8 @@ use App\Domains\Lead\Services\HubSpotGateway;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Lead\Services\PhoneValidationService;
-use App\Domains\PartnerHub\Listeners\HandleLeadBookingCompletedForPartner;
+use App\Domains\Referral\Listeners\HandleLeadBookingCanceledForReferrer;
+use App\Domains\Referral\Listeners\HandleLeadBookingCompletedForReferrer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -82,10 +84,16 @@ class LeadServiceProvider extends ServiceProvider
         // 3b. Notify admin-configured recipient emails on LeadCreated (WR-102)
         Event::listen(LeadCreated::class, [HandleLeadEventsForEmailNotification::class, 'handleCreated']);
 
-        // 4. Attribute completed bookings to partners in PartnerHub
+        // 4. Attribute completed bookings to referrers
         Event::listen(
             LeadBookingCompleted::class,
-            [HandleLeadBookingCompletedForPartner::class, 'handle']
+            [HandleLeadBookingCompletedForReferrer::class, 'handle']
+        );
+
+        // 4b. Reverse referrer attribution (due reward + referral status) if the booking is later canceled
+        Event::listen(
+            LeadBookingCanceled::class,
+            [HandleLeadBookingCanceledForReferrer::class, 'handle']
         );
 
         // 5. Invalidate admin dashboard KPI cache on lead lifecycle events

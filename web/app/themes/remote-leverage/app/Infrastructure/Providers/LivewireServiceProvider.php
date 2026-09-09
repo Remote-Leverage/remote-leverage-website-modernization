@@ -7,8 +7,8 @@ namespace App\Infrastructure\Providers;
 use App\Application\Livewire\Blog\GuideIndexFilter;
 use App\Application\Livewire\Booking\MultistepBookingWizard;
 use App\Application\Livewire\Partner\PartnerDirectoryGrid;
-use App\Application\Livewire\Partner\PartnerPortalDashboard;
-use App\Application\Livewire\Partner\PartnerRegistrationForm;
+use App\Application\Livewire\Referrer\ReferrerPortalDashboard;
+use App\Application\Livewire\Referrer\ReferrerRegistrationForm;
 use App\Application\Livewire\Scheduling\InstantLiveCallButton;
 use App\Application\Livewire\Utilities\EmailSignatureGenerator;
 use Illuminate\Support\ServiceProvider;
@@ -39,11 +39,11 @@ class LivewireServiceProvider extends ServiceProvider
             Livewire::component('scheduling.instant-live-call-button', InstantLiveCallButton::class);
             Livewire::component('instant-live-call-button', InstantLiveCallButton::class);
 
-            Livewire::component('partner.partner-portal-dashboard', PartnerPortalDashboard::class);
-            Livewire::component('partner-portal-dashboard', PartnerPortalDashboard::class);
+            Livewire::component('referrer.referrer-portal-dashboard', ReferrerPortalDashboard::class);
+            Livewire::component('referrer-portal-dashboard', ReferrerPortalDashboard::class);
 
-            Livewire::component('partner.partner-registration-form', PartnerRegistrationForm::class);
-            Livewire::component('partner-registration-form', PartnerRegistrationForm::class);
+            Livewire::component('referrer.referrer-registration-form', ReferrerRegistrationForm::class);
+            Livewire::component('referrer-registration-form', ReferrerRegistrationForm::class);
 
             Livewire::component('partner.partner-directory-grid', PartnerDirectoryGrid::class);
             Livewire::component('partner-directory-grid', PartnerDirectoryGrid::class);

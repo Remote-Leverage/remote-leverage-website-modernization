@@ -6,8 +6,8 @@ namespace App\Domains\Referral\Actions;
 
 use App\Domains\Referral\Data\PayoutData;
 use App\Domains\Referral\Events\PayoutCompleted;
-use App\Domains\Referral\Models\Partner;
 use App\Domains\Referral\Models\Payout;
+use App\Domains\Referral\Models\Referrer;
 use App\Domains\Referral\Services\StripeConnectGateway;
 use Illuminate\Support\Facades\Event;
 
@@ -18,12 +18,12 @@ class ProcessPayoutAction
     ) {}
 
     /**
-     * Create and process a payout for an affiliate partner.
+     * Create and process a payout for a referrer.
      */
-    public function execute(Partner $partner, float $amount, array $referralIds = [], ?string $notes = null): ?Payout
+    public function execute(Referrer $referrer, float $amount, array $referralIds = [], ?string $notes = null): ?Payout
     {
         $payoutData = PayoutData::fromArray([
-            'partner_id' => $partner->id,
+            'referrer_id' => $referrer->id,
             'amount' => $amount,
             'currency' => 'USD',
             'status' => 'pending',

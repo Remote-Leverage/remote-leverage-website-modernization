@@ -117,13 +117,14 @@ $capsule->setAsGlobal();
 $capsule->bootEloquent();
 
 // Ensure test schema exists
-if (! Capsule::schema()->hasTable('rl_partners')) {
-    Capsule::schema()->create('rl_partners', function ($table) {
+if (! Capsule::schema()->hasTable('rl_referrers')) {
+    Capsule::schema()->create('rl_referrers', function ($table) {
         $table->increments('id');
         $table->string('name');
         $table->string('email');
         $table->string('referral_code');
         $table->string('company')->nullable();
+        $table->string('password')->nullable();
         $table->string('stripe_account_id')->nullable();
         $table->string('status')->default('pending');
         $table->text('metadata')->nullable();
@@ -134,13 +135,60 @@ if (! Capsule::schema()->hasTable('rl_partners')) {
 if (! Capsule::schema()->hasTable('rl_payouts')) {
     Capsule::schema()->create('rl_payouts', function ($table) {
         $table->increments('id');
-        $table->integer('partner_id');
+        $table->integer('referrer_id');
         $table->decimal('amount', 10, 2);
         $table->string('currency')->default('USD');
         $table->string('status')->default('pending');
         $table->string('stripe_transfer_id')->nullable();
+        $table->text('referral_ids')->nullable();
         $table->text('notes')->nullable();
         $table->timestamps();
+    });
+}
+
+if (! Capsule::schema()->hasTable('rl_referrals')) {
+    Capsule::schema()->create('rl_referrals', function ($table) {
+        $table->increments('id');
+        $table->integer('referrer_id')->nullable()->index();
+        $table->integer('referrer_user_id')->nullable()->index();
+        $table->string('lead_name');
+        $table->string('lead_email')->default('')->index();
+        $table->string('lead_phone')->default('');
+        $table->text('landing_page')->nullable();
+        $table->string('source')->default('manual_submission');
+        $table->string('status')->default('pending')->index();
+        $table->text('notes')->nullable();
+        $table->timestamps();
+    });
+}
+
+if (! Capsule::schema()->hasTable('rl_referral_clicks')) {
+    Capsule::schema()->create('rl_referral_clicks', function ($table) {
+        $table->increments('id');
+        $table->integer('referrer_id')->nullable()->index();
+        $table->integer('referrer_user_id')->nullable()->index();
+        $table->string('referrer_slug')->index();
+        $table->text('landing_page')->nullable();
+        $table->string('ip_address')->nullable()->index();
+        $table->text('user_agent')->nullable();
+        $table->text('referer_url')->nullable();
+        $table->timestamp('created_at')->nullable()->index();
+    });
+}
+
+if (! Capsule::schema()->hasTable('rl_referral_rewards')) {
+    Capsule::schema()->create('rl_referral_rewards', function ($table) {
+        $table->increments('id');
+        $table->integer('referrer_id')->nullable()->index();
+        $table->integer('referrer_user_id')->nullable()->default(0)->index();
+        $table->integer('referral_id')->default(0)->index();
+        $table->string('reward_type')->default('cash');
+        $table->decimal('amount', 10, 2)->default(0.00);
+        $table->string('currency')->default('USD');
+        $table->string('status')->default('due')->index();
+        $table->string('description')->default('');
+        $table->timestamp('issued_at')->nullable();
+        $table->timestamp('created_at')->nullable()->index();
     });
 }
 
@@ -249,6 +297,68 @@ if (! function_exists('now')) {
     function now()
     {
         return new DateTimeImmutable;
+    }
+}
+
+if (! isset($GLOBALS['_test_session'])) {
+    $GLOBALS['_test_session'] = [];
+}
+
+if (! function_exists('session')) {
+    function session($key = null, $default = null)
+    {
+        if ($key === null) {
+            return new class
+            {
+                public function forget($key)
+                {
+                    unset($GLOBALS['_test_session'][$key]);
+                }
+
+                public function get($key, $default = null)
+                {
+                    return $GLOBALS['_test_session'][$key] ?? $default;
+                }
+
+                public function put($key, $value = null)
+                {
+                    $GLOBALS['_test_session'][$key] = $value;
+                }
+            };
+        }
+
+        if (is_array($key)) {
+            foreach ($key as $k => $v) {
+                $GLOBALS['_test_session'][$k] = $v;
+            }
+
+            return null;
+        }
+
+        return $GLOBALS['_test_session'][$key] ?? $default;
+    }
+}
+
+if (! function_exists('request')) {
+    function request()
+    {
+        return new class
+        {
+            public function ip()
+            {
+                return $GLOBALS['_test_request_ip'] ?? '127.0.0.1';
+            }
+
+            public function query($key = null, $default = null)
+            {
+                return $GLOBALS['_test_request_query'][$key] ?? $default;
+            }
+
+            public function cookie($key = null, $default = null)
+            {
+                return $GLOBALS['_test_request_cookie'][$key] ?? $default;
+            }
+        };
     }
 }
 

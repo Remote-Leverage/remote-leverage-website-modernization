@@ -16,11 +16,11 @@ class DispatchReferralWebhook
 
         Log::info('Referral webhook dispatched', [
             'referral_id' => $referral->id,
-            'code' => $referral->referral_code,
+            'partner_id' => $referral->partner_id,
             'status' => $referral->status,
         ]);
 
-        $webhookUrl = env('REFERRAL_WEBHOOK_URL');
+        $webhookUrl = config('services.referral.webhook_url');
         if ($webhookUrl) {
             try {
                 Http::timeout(5)->post($webhookUrl, [

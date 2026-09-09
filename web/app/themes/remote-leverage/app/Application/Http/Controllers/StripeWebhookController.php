@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application\Http\Controllers;
 
-use App\Domains\Referral\Models\Partner;
 use App\Domains\Referral\Models\Payout;
+use App\Domains\Referral\Models\Referrer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -47,7 +47,7 @@ class StripeWebhookController
         }
 
         $payoutsEnabled = ! empty($account['payouts_enabled']);
-        Partner::query()->where('stripe_account_id', $accountId)->update([
+        Referrer::query()->where('stripe_account_id', $accountId)->update([
             'status' => $payoutsEnabled ? 'active' : 'pending',
         ]);
     }

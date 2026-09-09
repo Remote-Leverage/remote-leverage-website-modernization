@@ -20,6 +20,12 @@ return [
 
     'calendly' => [
         'api_key' => env('CALENDLY_API_KEY'),
+        'api_keys' => array_values(array_filter([
+            env('CALENDLY_API_KEY'),
+            env('CALENDLY_API_KEY_2'),
+            env('CALENDLY_API_KEY_3'),
+            env('CALENDLY_API_KEY_4'),
+        ])),
         'user_uri' => env('CALENDLY_USER_URI'),
         'default_event_type' => env('CALENDLY_DEFAULT_EVENT_TYPE', 'https://api.calendly.com/event_types/5c82a248-c65a-4fb1-bdc6-aefd6e89fbfb'),
         't10_event_type' => env('CALENDLY_T10_EVENT_TYPE', 'https://api.calendly.com/event_types/5c82a248-c65a-4fb1-bdc6-aefd6e89fbfb'),
@@ -56,5 +62,10 @@ return [
 
     'webhooks' => [
         'lead_webhook_url' => env('LEAD_WEBHOOK_URL'),
+    ],
+
+    'referral' => [
+        'default_reward_amount' => env('REFERRAL_DEFAULT_REWARD_AMOUNT', 14.00),
+        'webhook_url' => env('REFERRAL_WEBHOOK_URL'),
     ],
 ];

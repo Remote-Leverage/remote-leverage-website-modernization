@@ -7,10 +7,10 @@
           Strategic Network
         </span>
         <h3 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight mt-2">
-          Join the Remote Leverage Partner Network
+          Join the Remote Leverage Referral Network
         </h3>
         <p class="text-text-muted text-xs sm:text-sm mt-1 leading-relaxed">
-          Recommend vetted Latin American executive assistants and specialists to your clients and earn generous recurring commissions.
+          Refer clients who need remote executive talent to Remote Leverage and earn recurring commissions on every signup — no cost to you or your clients.
         </p>
       </div>
 
@@ -22,69 +22,53 @@
       @endif
 
       <form wire:submit.prevent="submitApplication" class="space-y-4">
-        {{-- Name and Email --}}
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-semibold text-text-slate mb-1">Your Full Name *</label>
-            <input
-              type="text"
-              wire:model="name"
-              placeholder="Jordan Hayes"
-              class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2.5 px-3.5 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
-              required
-            />
-            @error('name') <span class="text-red-500 text-2xs mt-1 block">{{ $message }}</span> @enderror
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-text-slate mb-1">Business Email *</label>
-            <input
-              type="email"
-              wire:model="email"
-              placeholder="jordan@venture.com"
-              class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2.5 px-3.5 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
-              required
-            />
-            @error('email') <span class="text-red-500 text-2xs mt-1 block">{{ $message }}</span> @enderror
-          </div>
-        </div>
-
-        {{-- Company and Website --}}
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-semibold text-text-slate mb-1">Agency / Company</label>
-            <input
-              type="text"
-              wire:model="company"
-              placeholder="Hayes Digital Media"
-              class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2.5 px-3.5 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
-            />
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-text-slate mb-1">Website URL</label>
-            <input
-              type="url"
-              wire:model="website"
-              placeholder="https://hayesdigital.com"
-              class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2.5 px-3.5 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
-            />
-          </div>
-        </div>
-
-        {{-- Audience / Niche --}}
         <div>
-          <label class="block text-xs font-semibold text-text-slate mb-1">Primary Audience / Network</label>
-          <select
-            wire:model="audience"
-            class="w-full text-xs sm:text-sm rounded-card border-slate-200 py-2.5 px-3.5 focus:border-brand-purple focus:ring-brand-purple text-text-body bg-white"
-          >
-            <option value="Agency / B2B Clients">Marketing / Design Agencies & Consultancies</option>
-            <option value="SaaS & Tech Startups">SaaS Founders & Tech Operators</option>
-            <option value="Real Estate Investors">Real Estate Investors & Brokerages</option>
-            <option value="E-commerce Brands">E-commerce Brands & DTC Operators</option>
-            <option value="Content Creators & Media">Media Brands & Influencers</option>
-          </select>
+          <label class="block text-xs sm:text-[13px] font-bold text-text-slate mb-2">Your Full Name *</label>
+          <input
+            type="text"
+            wire:model="name"
+            placeholder="Jordan Hayes"
+            class="w-full h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
+            required
+          />
+          @error('name') <span class="text-red-500 text-2xs mt-1 block">{{ $message }}</span> @enderror
+        </div>
+
+        <div>
+          <label class="block text-xs sm:text-[13px] font-bold text-text-slate mb-2">Email Address *</label>
+          <input
+            type="email"
+            wire:model="email"
+            placeholder="jordan@venture.com"
+            class="w-full h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
+            required
+          />
+          @error('email') <span class="text-red-500 text-2xs mt-1 block">{{ $message }}</span> @enderror
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs sm:text-[13px] font-bold text-text-slate mb-2">Password *</label>
+            <input
+              type="password"
+              wire:model="password"
+              placeholder="At least 8 characters"
+              class="w-full h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
+              required
+            />
+            @error('password') <span class="text-red-500 text-2xs mt-1 block">{{ $message }}</span> @enderror
+          </div>
+
+          <div>
+            <label class="block text-xs sm:text-[13px] font-bold text-text-slate mb-2">Confirm Password *</label>
+            <input
+              type="password"
+              wire:model="password_confirmation"
+              placeholder="Re-enter your password"
+              class="w-full h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
+              required
+            />
+          </div>
         </div>
 
         <div class="pt-3">
@@ -93,10 +77,10 @@
             wire:loading.attr="disabled"
             class="w-full py-3.5 rounded-cta bg-gradient-to-r from-brand-purple to-brand-magenta hover:opacity-95 text-white font-bold text-sm tracking-wide shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
           >
-            <span wire:loading.remove wire:target="submitApplication">Create Partner Account</span>
+            <span wire:loading.remove wire:target="submitApplication">Create Referrer Account</span>
             <span wire:loading wire:target="submitApplication" class="flex items-center gap-2">
               <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              Registering Partner...
+              Registering Referrer...
             </span>
           </button>
         </div>
@@ -116,10 +100,10 @@
 
       <div>
         <h3 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight">
-          Welcome to the Network, {{ $createdPartner->name }}!
+          Welcome to the Network, {{ $createdReferrer->name }}!
         </h3>
         <p class="text-text-muted text-xs sm:text-sm mt-1 max-w-md mx-auto">
-          Your partner account has been activated with instant lead tracking.
+          Your referrer account has been activated with instant lead tracking.
         </p>
       </div>
 
@@ -161,10 +145,10 @@
         @endif
 
         <a
-          href="{{ home_url('/partner-dashboard?partner=' . $referralCode) }}"
+          href="{{ home_url('/referrer-portal?referrer=' . $referralCode) }}"
           class="w-full sm:w-auto px-6 py-3 rounded-cta border border-slate-200 text-text-body hover:bg-slate-50 text-xs sm:text-sm font-semibold transition inline-flex items-center justify-center"
         >
-          Open Partner Dashboard
+          Open Referrer Dashboard
         </a>
       </div>
     </div>

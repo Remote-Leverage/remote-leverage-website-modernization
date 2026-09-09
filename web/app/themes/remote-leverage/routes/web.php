@@ -45,14 +45,26 @@ Route::get('live-call/connect', function (Request $request, RouteInstantCallActi
     ]);
 })->name('live-call.connect');
 
-// Partner Affiliate Portal & Dashboard (replaces rl-referral-program)
-Route::get('partner-portal', function () {
-    return view('pages.partner-portal');
-})->name('partner.portal');
+// Referrer Portal & Dashboard (replaces rl-referral-program)
+Route::get('referrer-portal', function () {
+    return view('pages.referrer-portal');
+})->name('referrer.portal');
 
-Route::get('partner-register', function () {
-    return view('pages.partner-register');
-})->name('partner.register');
+Route::get('referrer-register', function () {
+    return view('pages.referrer-register');
+})->name('referrer.register');
+
+// Legacy URL compatibility: rl-referral-program served login/signup as tabs of a single
+// "/referral-dashboard/" page (default tab: signup; "?tab=login" or "?logged_out"/"?action=login"
+// switched to login/dashboard). Preserved here so old bookmarks/emails/backlinks to that URL
+// keep working without a redirect rule.
+Route::get('referral-dashboard', function (Request $request) {
+    $isLoginTab = $request->query('tab') === 'login'
+        || $request->has('logged_out')
+        || $request->query('action') === 'login';
+
+    return $isLoginTab ? view('pages.referrer-portal') : view('pages.referrer-register');
+})->name('referrer.dashboard.legacy');
 
 Route::get('partner-dashboard', function () {
     return redirect()->route('partner.portal');

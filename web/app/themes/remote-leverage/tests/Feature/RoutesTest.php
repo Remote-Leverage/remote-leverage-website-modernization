@@ -24,8 +24,9 @@ describe('Application Routes', function () {
     test('web routes are registered for standalone funnels', function () {
         expect(Route::has('funnel.book-consultation'))->toBeTrue()
             ->and(Route::has('live-call.connect'))->toBeTrue()
-            ->and(Route::has('partner.portal'))->toBeTrue()
-            ->and(Route::has('partner.register'))->toBeTrue()
+            ->and(Route::has('referrer.portal'))->toBeTrue()
+            ->and(Route::has('referrer.register'))->toBeTrue()
+            ->and(Route::has('referrer.dashboard.legacy'))->toBeTrue()
             ->and(Route::has('tools.signature-generator'))->toBeTrue();
     });
 

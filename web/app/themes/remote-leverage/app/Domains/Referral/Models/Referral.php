@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Referral\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Referral extends Model
@@ -22,6 +23,7 @@ class Referral extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'referrer_id',
         'referrer_user_id',
         'lead_name',
         'lead_email',
@@ -31,6 +33,14 @@ class Referral extends Model
         'status',
         'notes',
     ];
+
+    /**
+     * Referrer this referral is attributed to.
+     */
+    public function referrer(): BelongsTo
+    {
+        return $this->belongsTo(Referrer::class, 'referrer_id');
+    }
 
     /**
      * Rewards associated with this referral.

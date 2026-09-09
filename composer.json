@@ -28,10 +28,15 @@
       "name": "wp-packages",
       "type": "composer",
       "url": "https://repo.wp-packages.org"
+    },
+    {
+      "type": "composer",
+      "url": "https://connect.advancedcustomfields.com"
     }
   ],
   "require": {
     "php": ">=8.3",
+    "wpengine/advanced-custom-fields-pro": "*",
     "composer/installers": "^2.0",
     "oscarotero/env": "^2.0",
     "roots/bedrock-autoloader": "^1.0",

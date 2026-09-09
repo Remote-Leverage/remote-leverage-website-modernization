@@ -7,7 +7,7 @@ namespace App\Domains\Referral\Data;
 readonly class PayoutData
 {
     public function __construct(
-        public int $partnerId,
+        public int $referrerId,
         public float $amount,
         public string $currency = 'USD',
         public ?string $stripeTransferId = null,
@@ -19,7 +19,7 @@ readonly class PayoutData
     public static function fromArray(array $data): self
     {
         return new self(
-            partnerId: (int) $data['partner_id'],
+            referrerId: (int) $data['referrer_id'],
             amount: (float) $data['amount'],
             currency: $data['currency'] ?? 'USD',
             stripeTransferId: $data['stripe_transfer_id'] ?? null,
@@ -32,7 +32,7 @@ readonly class PayoutData
     public function toArray(): array
     {
         return [
-            'partner_id' => $this->partnerId,
+            'referrer_id' => $this->referrerId,
             'amount' => $this->amount,
             'currency' => $this->currency,
             'stripe_transfer_id' => $this->stripeTransferId,
