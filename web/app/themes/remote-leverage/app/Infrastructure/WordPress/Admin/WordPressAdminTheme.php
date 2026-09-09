@@ -27,6 +27,9 @@ class WordPressAdminTheme
             add_action('login_head', [$this, 'injectAdminFavicon']);
             add_action('login_head', [$this, 'renderLoginHeaderStyles'], 99);
             add_action('login_enqueue_scripts', [$this, 'enqueueLoginStyles'], 99);
+            add_action('admin_menu', [$this, 'hideCommentsMenu'], 999);
+            add_action('init', [$this, 'disableCommentsSupport'], 100);
+            add_action('wp_dashboard_setup', [$this, 'removeCommentsDashboardWidget'], 999);
         }
 
         if (function_exists('add_filter')) {
@@ -35,6 +38,55 @@ class WordPressAdminTheme
             add_filter('login_headerurl', [$this, 'customizeLoginUrl']);
             add_filter('login_headertext', [$this, 'customizeLoginTitle']);
             add_filter('get_site_icon_url', [$this, 'filterSiteIconUrl'], 10, 3);
+            // Hide the entire ACF admin UI (field groups are all code-defined via
+            // Log1x\AcfComposer, so there's nothing an admin needs to manage there).
+            add_filter('acf/settings/show_admin', '__return_false');
+            // Disable comments/pingbacks site-wide regardless of individual posts'
+            // stored comment_status, rather than mass-updating every row.
+            add_filter('comments_open', '__return_false', 20, 2);
+            add_filter('pings_open', '__return_false', 20, 2);
+            add_filter('comments_array', '__return_empty_array', 20, 2);
+        }
+    }
+
+    /**
+     * Remove the Comments menu from wp-admin.
+     */
+    public function hideCommentsMenu(): void
+    {
+        if (function_exists('remove_menu_page')) {
+            remove_menu_page('edit-comments.php');
+        }
+    }
+
+    /**
+     * Remove 'comments' support from every registered post type, since comments
+     * are disabled site-wide.
+     */
+    public function disableCommentsSupport(): void
+    {
+        if (! function_exists('get_post_types') || ! function_exists('remove_post_type_support')) {
+            return;
+        }
+
+        foreach (get_post_types() as $postType) {
+            if (post_type_supports($postType, 'comments')) {
+                remove_post_type_support($postType, 'comments');
+            }
+
+            if (post_type_supports($postType, 'trackbacks')) {
+                remove_post_type_support($postType, 'trackbacks');
+            }
+        }
+    }
+
+    /**
+     * Remove the "Recent Comments" dashboard widget now that comments are disabled.
+     */
+    public function removeCommentsDashboardWidget(): void
+    {
+        if (function_exists('remove_meta_box')) {
+            remove_meta_box('dashboard_recent_comments', 'dashboard', 'normal');
         }
     }
 

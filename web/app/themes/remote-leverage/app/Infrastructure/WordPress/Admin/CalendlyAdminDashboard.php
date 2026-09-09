@@ -298,6 +298,22 @@ class CalendlyAdminDashboard
                     var options = box.querySelector('.rl-combobox-options');
                     var optionEls = Array.prototype.slice.call(box.querySelectorAll('.rl-combobox-option'));
 
+                    // Detach the options list from the table cell and append it
+                    // directly to <body>, positioned with `fixed` coordinates
+                    // computed from the input's own bounding rect. A table cell's
+                    // overflow (or border-collapse rendering) clips an absolutely
+                    // positioned descendant, so this is the only reliable way to
+                    // keep the dropdown visible regardless of ancestor styling.
+                    options.classList.add('rl-combobox-options-detached');
+                    document.body.appendChild(options);
+
+                    function reposition() {
+                        var rect = input.getBoundingClientRect();
+                        options.style.top = (rect.bottom + 4) + 'px';
+                        options.style.left = rect.left + 'px';
+                        options.style.width = rect.width + 'px';
+                    }
+
                     function filter() {
                         var term = input.value.trim().toLowerCase();
                         optionEls.forEach(function (opt) {
@@ -308,11 +324,16 @@ class CalendlyAdminDashboard
 
                     function open() {
                         filter();
+                        reposition();
                         options.style.display = 'block';
+                        window.addEventListener('scroll', reposition, true);
+                        window.addEventListener('resize', reposition);
                     }
 
                     function close() {
                         options.style.display = 'none';
+                        window.removeEventListener('scroll', reposition, true);
+                        window.removeEventListener('resize', reposition);
                     }
 
                     input.addEventListener('focus', open);
@@ -397,6 +418,7 @@ class CalendlyAdminDashboard
             .rl-combobox-input { width: 100%; padding: 6px 10px; border: 1px solid #e4e4e7; border-radius: 6px; font-size: 13px; }
             .rl-combobox-input:focus { outline: none; border-color: #18181b; }
             .rl-combobox-options { display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 20; max-height: 260px; overflow-y: auto; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 8px; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+            .rl-combobox-options-detached { position: fixed !important; z-index: 99999; margin-top: 0; }
             .rl-combobox-option { padding: 6px 10px; font-size: 12px; cursor: pointer; }
             .rl-combobox-option:hover { background: #f4f4f5; }
             .rl-admin-wrap .notice { background: #ffffff !important; border: 1px solid #e4e4e7 !important; border-left: 3px solid #18181b !important; border-radius: 8px !important; padding: 12px 16px !important; margin: 16px 0 !important; color: #09090b !important; font-size: 13px !important; }
