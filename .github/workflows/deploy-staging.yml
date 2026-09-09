@@ -15,6 +15,7 @@ permissions:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || 'arn:aws:iam::742621604050:role/wordpress-staging-github-actions' }}
   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'wordpress-staging' }}
   ECS_CLUSTER: ${{ vars.ECS_CLUSTER || 'wordpress-staging' }}
   ECS_SERVICE: ${{ vars.ECS_SERVICE || 'wordpress-staging' }}
@@ -32,12 +33,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR

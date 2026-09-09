@@ -20,7 +20,7 @@ jobs:
     name: Composer, Pint, Pest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -31,7 +31,7 @@ jobs:
           tools: composer
 
       - name: Cache Composer (Bedrock root)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.composer/cache
           key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock', 'web/app/themes/remote-leverage/composer.lock') }}
@@ -68,12 +68,12 @@ jobs:
       run:
         working-directory: web/app/themes/remote-leverage
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: web/app/themes/remote-leverage/package-lock.json
 

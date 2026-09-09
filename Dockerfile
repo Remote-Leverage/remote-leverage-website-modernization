@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-bookworm AS assets
+FROM node:22-bookworm AS assets
 
 WORKDIR /theme
 COPY web/app/themes/remote-leverage/package.json \
