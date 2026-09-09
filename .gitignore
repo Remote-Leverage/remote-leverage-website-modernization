@@ -27,7 +27,7 @@ web/.htaccess
 auth.json
 
 # PHPUnit/Pest
-phpunit.xml
+/phpunit.xml
 .phpunit.result.cache
 .phpunit.cache
 
