@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\WordPress\Admin;
 
+use App\Domains\Referral\Actions\FulfillReferralAction;
 use App\Domains\Referral\Actions\ProcessPayoutAction;
 use App\Domains\Referral\Models\Referral;
+use App\Domains\Referral\Models\ReferralClick;
 use App\Domains\Referral\Models\ReferralReward;
 use App\Domains\Referral\Models\Referrer;
 use App\Domains\Referral\Services\ReferralSettingsService;
+use Illuminate\Support\Facades\Cache;
 
 class ReferralAdminDashboard
 {
@@ -23,13 +26,22 @@ class ReferralAdminDashboard
     public function addMenuPages(): void
     {
         add_menu_page(
-            page_title: 'Referrers & Referrals',
+            page_title: 'Referral Program',
             menu_title: 'Referrers',
             capability: 'manage_options',
             menu_slug: 'rl-referrers',
-            callback: [$this, 'renderReferrers'],
+            callback: [$this, 'renderAnalytics'],
             icon_url: 'dashicons-groups',
             position: 31
+        );
+
+        add_submenu_page(
+            parent_slug: 'rl-referrers',
+            page_title: 'Analytics Overview',
+            menu_title: 'Analytics',
+            capability: 'manage_options',
+            menu_slug: 'rl-referrers',
+            callback: [$this, 'renderAnalytics']
         );
 
         add_submenu_page(
@@ -37,7 +49,7 @@ class ReferralAdminDashboard
             page_title: 'All Referrers',
             menu_title: 'All Referrers',
             capability: 'manage_options',
-            menu_slug: 'rl-referrers',
+            menu_slug: 'rl-referrers-list',
             callback: [$this, 'renderReferrers']
         );
 
@@ -91,6 +103,14 @@ class ReferralAdminDashboard
 
             if ($referral && in_array($newStatus, self::REFERRAL_STATUSES, true)) {
                 $referral->update(['status' => $newStatus]);
+
+                // The deal closing (fulfilled/rewarded) is what earns the reward — never
+                // the earlier booking step. Matches legacy's update_referral_status().
+                if (in_array($newStatus, ['fulfilled', 'rewarded'], true)) {
+                    app(FulfillReferralAction::class)->execute($referral);
+                }
+
+                Cache::forget('rl_referral_analytics_metrics');
                 wp_safe_redirect(admin_url('admin.php?page=rl-referrers-referrals&status_updated=1'));
                 exit;
             }
@@ -103,6 +123,7 @@ class ReferralAdminDashboard
 
             if ($reward && $reward->status === 'due') {
                 $reward->update(['status' => 'issued', 'issued_at' => now()]);
+                Cache::forget('rl_referral_analytics_metrics');
                 wp_safe_redirect(admin_url('admin.php?page=rl-referrers-rewards&reward_issued=1'));
                 exit;
             }
@@ -133,6 +154,7 @@ class ReferralAdminDashboard
                     }
                 }
 
+                Cache::forget('rl_referral_analytics_metrics');
                 wp_safe_redirect(admin_url('admin.php?page=rl-referrers-rewards&payout_sent=1'));
                 exit;
             }
@@ -158,6 +180,189 @@ class ReferralAdminDashboard
         }
     }
 
+    public function renderAnalytics(): void
+    {
+        $m = $this->getAnalyticsMetrics();
+
+        ?>
+        <div class="wrap">
+            <h1 class="wp-heading-inline">Referral Analytics</h1>
+            <?php $this->renderNav('rl-referrers'); ?>
+
+            <div style="display:flex; gap:16px; flex-wrap:wrap; margin: 16px 0;">
+                <?php
+                $this->renderStatCard('Total Referrers', (string) $m['totalReferrers']);
+        $this->renderStatCard('Total Reach', (string) $m['totalReach'], 'Clicks recorded');
+        $this->renderStatCard('Total Referrals', (string) $m['totalReferrals']);
+        $this->renderStatCard('Reach → Lead Rate', $m['reachToLeadRate'].'%', 'Clicks that became a referral');
+        $this->renderStatCard('Lead → Deal Rate', $m['leadToDealRate'].'%', 'Referrals that closed');
+        ?>
+            </div>
+
+            <h2>Referral Pipeline</h2>
+            <table class="wp-list-table widefat fixed striped" style="max-width:640px;">
+                <thead>
+                    <tr><th>Pending</th><th>Qualified</th><th>Fulfilled / Rewarded</th><th>Rejected</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><?php echo esc_html((string) $m['pendingReferrals']); ?></td>
+                        <td><?php echo esc_html((string) $m['qualifiedReferrals']); ?></td>
+                        <td><?php echo esc_html((string) $m['fulfilledDeals']); ?></td>
+                        <td><?php echo esc_html((string) $m['rejectedReferrals']); ?></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>Rewards</h2>
+            <table class="wp-list-table widefat fixed striped" style="max-width:640px;">
+                <thead>
+                    <tr><th>Due (count)</th><th>Due ($)</th><th>Issued (count)</th><th>Issued ($)</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><?php echo esc_html((string) $m['rewardsDueCount']); ?></td>
+                        <td>$<?php echo esc_html(number_format($m['rewardsDueSum'], 2)); ?></td>
+                        <td><?php echo esc_html((string) $m['rewardsIssuedCount']); ?></td>
+                        <td>$<?php echo esc_html(number_format($m['rewardsIssuedSum'], 2)); ?></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>Top 5 Referrers</h2>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Reach</th>
+                        <th>Total Leads</th>
+                        <th>Qualified</th>
+                        <th>Fulfilled Deals</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($m['topReferrers'])) { ?>
+                        <tr><td colspan="6">No referrals recorded yet.</td></tr>
+                    <?php } else { ?>
+                        <?php foreach ($m['topReferrers'] as $row) { ?>
+                            <tr>
+                                <td><strong><?php echo esc_html($row['name']); ?></strong></td>
+                                <td><?php echo esc_html($row['email']); ?></td>
+                                <td><?php echo esc_html((string) $row['reach']); ?></td>
+                                <td><?php echo esc_html((string) $row['total_leads']); ?></td>
+                                <td><?php echo esc_html((string) $row['qualified_leads']); ?></td>
+                                <td><?php echo esc_html((string) $row['fulfilled_deals']); ?></td>
+                            </tr>
+                        <?php } ?>
+                    <?php } ?>
+                </tbody>
+            </table>
+
+            <h2>Recent Referrals</h2>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>Referrer</th>
+                        <th>Lead</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if ($m['recentReferrals']->isEmpty()) { ?>
+                        <tr><td colspan="4">No referrals recorded yet.</td></tr>
+                    <?php } else { ?>
+                        <?php foreach ($m['recentReferrals'] as $referral) { ?>
+                            <tr>
+                                <td><?php echo esc_html($referral->referrer?->name ?? 'Unknown'); ?></td>
+                                <td><?php echo esc_html($referral->lead_name ?: '—'); ?></td>
+                                <td><?php echo esc_html(ucfirst($referral->status)); ?></td>
+                                <td><?php echo esc_html($referral->created_at?->format('M j, Y H:i') ?? ''); ?></td>
+                            </tr>
+                        <?php } ?>
+                    <?php } ?>
+                </tbody>
+            </table>
+        </div>
+        <?php
+    }
+
+    /**
+     * Aggregate referral analytics, cached briefly to avoid recomputing on every page load.
+     * Ported from legacy RL_Admin_Analytics::get_metrics().
+     *
+     * @return array<string, mixed>
+     */
+    protected function getAnalyticsMetrics(): array
+    {
+        return Cache::remember('rl_referral_analytics_metrics', 180, function () {
+            $totalReferrers = Referrer::count();
+            $totalReach = ReferralClick::count();
+            $totalReferrals = Referral::count();
+
+            $qualifiedReferrals = Referral::where('status', 'qualified')->count();
+            $fulfilledDeals = Referral::whereIn('status', ['fulfilled', 'rewarded'])->count();
+            $pendingReferrals = Referral::where('status', 'pending')->count();
+            $rejectedReferrals = Referral::where('status', 'rejected')->count();
+
+            $rewardsDueCount = ReferralReward::where('status', 'due')->count();
+            $rewardsDueSum = (float) ReferralReward::where('status', 'due')->sum('amount');
+            $rewardsIssuedCount = ReferralReward::where('status', 'issued')->count();
+            $rewardsIssuedSum = (float) ReferralReward::where('status', 'issued')->sum('amount');
+
+            $reachToLeadRate = $totalReach > 0 ? round(($totalReferrals / $totalReach) * 100, 1) : 0.0;
+            $leadToDealRate = $totalReferrals > 0 ? round(($fulfilledDeals / $totalReferrals) * 100, 1) : 0.0;
+
+            $topReferrers = Referral::query()
+                ->whereNotNull('referrer_id')
+                ->selectRaw('referrer_id')
+                ->selectRaw('COUNT(id) as total_leads')
+                ->selectRaw("SUM(CASE WHEN status IN ('fulfilled', 'rewarded') THEN 1 ELSE 0 END) as fulfilled_deals")
+                ->selectRaw("SUM(CASE WHEN status = 'qualified' THEN 1 ELSE 0 END) as qualified_leads")
+                ->groupBy('referrer_id')
+                ->orderByDesc('fulfilled_deals')
+                ->orderByDesc('total_leads')
+                ->limit(5)
+                ->get()
+                ->map(function ($row) {
+                    $referrer = Referrer::find($row->referrer_id);
+
+                    return [
+                        'name' => $referrer->name ?? 'Deleted Referrer',
+                        'email' => $referrer->email ?? '',
+                        'reach' => ReferralClick::where('referrer_id', $row->referrer_id)->count(),
+                        'total_leads' => (int) $row->total_leads,
+                        'qualified_leads' => (int) $row->qualified_leads,
+                        'fulfilled_deals' => (int) $row->fulfilled_deals,
+                    ];
+                })
+                ->all();
+
+            $recentReferrals = Referral::with('referrer')->latest()->take(8)->get();
+
+            return compact(
+                'totalReferrers', 'totalReach', 'totalReferrals',
+                'qualifiedReferrals', 'fulfilledDeals', 'pendingReferrals', 'rejectedReferrals',
+                'rewardsDueCount', 'rewardsDueSum', 'rewardsIssuedCount', 'rewardsIssuedSum',
+                'reachToLeadRate', 'leadToDealRate', 'topReferrers', 'recentReferrals'
+            );
+        });
+    }
+
+    protected function renderStatCard(string $label, string $value, ?string $meta = null): void
+    {
+        ?>
+        <div style="background:#fff; border:1px solid #dcdcde; border-radius:4px; padding:14px 18px; min-width:150px;">
+            <div style="font-size:11px; font-weight:600; text-transform:uppercase; color:#646970; letter-spacing:0.02em;"><?php echo esc_html($label); ?></div>
+            <div style="font-size:24px; font-weight:600; margin-top:4px;"><?php echo esc_html($value); ?></div>
+            <?php if ($meta) { ?>
+                <div style="font-size:11px; color:#646970; margin-top:2px;"><?php echo esc_html($meta); ?></div>
+            <?php } ?>
+        </div>
+        <?php
+    }
+
     public function renderReferrers(): void
     {
         $search = sanitize_text_field($_GET['s'] ?? '');
@@ -176,16 +381,16 @@ class ReferralAdminDashboard
         $total = (clone $query)->count();
         $referrers = $query->forPage($page, $perPage)->get();
 
-        $exportUrl = wp_nonce_url(admin_url('admin.php?page=rl-referrers&rl_action=export_referrers_csv'), 'rl_export_referrers_nonce');
+        $exportUrl = wp_nonce_url(admin_url('admin.php?page=rl-referrers-list&rl_action=export_referrers_csv'), 'rl_export_referrers_nonce');
 
         ?>
         <div class="wrap">
             <h1 class="wp-heading-inline">Referrers</h1>
             <a href="<?php echo esc_url($exportUrl); ?>" class="page-title-action">Export CSV</a>
-            <?php $this->renderNav('rl-referrers'); ?>
+            <?php $this->renderNav('rl-referrers-list'); ?>
 
             <form method="get">
-                <input type="hidden" name="page" value="rl-referrers" />
+                <input type="hidden" name="page" value="rl-referrers-list" />
                 <p class="search-box">
                     <input type="search" name="s" value="<?php echo esc_attr($search); ?>" placeholder="Search name, email, or referral code" />
                     <input type="submit" class="button" value="Search Referrers" />
@@ -225,7 +430,7 @@ class ReferralAdminDashboard
                 </tbody>
             </table>
 
-            <?php $this->renderPagination($total, $perPage, $page, 'rl-referrers'); ?>
+            <?php $this->renderPagination($total, $perPage, $page, 'rl-referrers-list'); ?>
         </div>
         <?php
     }
@@ -513,7 +718,8 @@ class ReferralAdminDashboard
     protected function renderNav(string $activeSlug): void
     {
         $tabs = [
-            'rl-referrers' => 'All Referrers',
+            'rl-referrers' => 'Analytics',
+            'rl-referrers-list' => 'All Referrers',
             'rl-referrers-referrals' => 'Referrals',
             'rl-referrers-rewards' => 'Rewards & Payouts',
             'rl-referrers-settings' => 'Settings',

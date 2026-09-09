@@ -6,24 +6,26 @@ namespace App\Domains\Referral\Listeners;
 
 use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Services\LeadActivityLogger;
-use App\Domains\Referral\Events\ReferralRecorded;
 use App\Domains\Referral\Models\Referral;
-use App\Domains\Referral\Models\ReferralReward;
 use App\Domains\Referral\Models\Referrer;
-use App\Domains\Referral\Services\ReferralSettingsService;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 
 class HandleLeadBookingCompletedForReferrer
 {
     public function __construct(
         protected LeadActivityLogger $activityLogger,
-        protected ReferralSettingsService $settings,
     ) {}
 
     /**
-     * Handle completed lead booking: attribute to referrer if applicable,
-     * recording a fulfilled Referral and auto-generating its due ReferralReward.
+     * Handle completed lead booking: attribute to referrer if applicable, recording
+     * a qualified Referral.
+     *
+     * Booking a call only qualifies the lead — it does not fulfill the referral and
+     * does not earn a reward. Per legacy RL_Referral_Service::update_referral_status(),
+     * a reward is only generated when the referral is later explicitly transitioned to
+     * "fulfilled"/"rewarded" (the actual deal closing, via admin action or an
+     * authenticated CRM webhook), which is a separate, human/ops-driven step. See
+     * FulfillReferralAction.
      */
     public function handle(LeadBookingCompleted $event): void
     {
@@ -43,7 +45,6 @@ class HandleLeadBookingCompletedForReferrer
             $referrerName = $referrer ? $referrer->name : $lead->source_id;
 
             $referral = null;
-            $rewardCreated = false;
 
             if ($referrer && strtolower($lead->email) !== strtolower($referrer->email)) {
                 $referral = Referral::query()->updateOrCreate(
@@ -56,28 +57,9 @@ class HandleLeadBookingCompletedForReferrer
                         'lead_phone' => $lead->phone ?? '',
                         'landing_page' => $lead->landing_url,
                         'source' => 'booking_completed',
-                        'status' => 'fulfilled',
+                        'status' => 'qualified',
                     ]
                 );
-
-                $rewardDefaults = $this->settings->get();
-
-                $reward = ReferralReward::query()->firstOrCreate(
-                    ['referral_id' => $referral->id],
-                    [
-                        'referrer_id' => $referrer->id,
-                        'reward_type' => $rewardDefaults['default_reward_type'],
-                        'amount' => $rewardDefaults['default_reward_amount'],
-                        'currency' => $rewardDefaults['default_reward_currency'],
-                        'status' => 'due',
-                        'description' => "Auto-generated reward for referred booking (referral #{$referral->id})",
-                        'created_at' => now(),
-                    ]
-                );
-
-                $rewardCreated = $reward->wasRecentlyCreated;
-
-                Event::dispatch(new ReferralRecorded($referral));
             }
 
             // Dual logging Stage 2: consumption write
@@ -86,11 +68,10 @@ class HandleLeadBookingCompletedForReferrer
                 eventType: 'LeadBookingCompleted',
                 actorDomain: 'Referral',
                 outcome: 'succeeded',
-                description: "Matched booking to referrer '{$referrerName}' [source: {$lead->source_type}:{$lead->source_id}]",
+                description: "Matched booking to referrer '{$referrerName}', referral qualified [source: {$lead->source_type}:{$lead->source_id}]",
                 payload: [
                     'referrer_id' => $referrer?->id,
                     'referral_id' => $referral?->id,
-                    'reward_created' => $rewardCreated,
                     'referral_code' => $lead->source_id,
                     'source_type' => $lead->source_type,
                 ]

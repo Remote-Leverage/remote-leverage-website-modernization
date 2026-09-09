@@ -20,10 +20,13 @@ class HandleLeadBookingCanceledForReferrer
     /**
      * Reverse referrer attribution when a completed booking is later canceled.
      *
-     * A still-due reward (not yet paid out) is removed and its Referral is marked
-     * rejected. A reward that was already issued is left untouched — clawing back a
-     * completed payout is an ops decision, not an automated one — but is flagged in
-     * the activity log for manual review.
+     * Normally there's nothing to un-reward here: booking a call only ever qualifies a
+     * referral (see HandleLeadBookingCompletedForReferrer), and rewards aren't created
+     * until the deal is separately marked fulfilled (FulfillReferralAction). This still
+     * defensively handles the edge case where fulfillment happened before the
+     * cancellation arrived: a still-due reward is removed, while an already-issued one
+     * is left untouched (clawing back a completed payout is an ops decision, not an
+     * automated one) and flagged in the activity log for manual review.
      */
     public function handle(LeadBookingCanceled $event): void
     {
