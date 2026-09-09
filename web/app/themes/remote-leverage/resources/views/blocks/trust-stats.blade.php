@@ -1,5 +1,5 @@
 @php
-    $imgBase = get_template_directory_uri() . '/public/images/home';
+    $img = fn (string $file) => \App\Support\BlockDefaults::homeImg($file);
 @endphp
 
 <div class="w-full max-w-[470px] flex flex-col gap-4 shrink-0">
@@ -9,16 +9,16 @@
         <span class="font-display font-bold text-[15px] sm:text-base text-black">VAs Onboarded</span>
         <div class="flex items-center">
             <div class="flex items-center -space-x-2">
-                <img src="{{ $imgBase }}/person_01.webp" alt="Remote Assistant" width="36"
+                <img src="{{ $img('person_01.webp') }}" alt="Remote Assistant" width="36"
                     height="36" class="w-9 h-9 rounded-full border-2 border-white object-cover"
                     loading="lazy" decoding="async">
-                <img src="{{ $imgBase }}/person_02.webp" alt="Remote Assistant" width="36"
+                <img src="{{ $img('person_02.webp') }}" alt="Remote Assistant" width="36"
                     height="36" class="w-9 h-9 rounded-full border-2 border-white object-cover"
                     loading="lazy" decoding="async">
-                <img src="{{ $imgBase }}/Person_03.webp" alt="Remote Assistant" width="36"
+                <img src="{{ $img('Person_03.webp') }}" alt="Remote Assistant" width="36"
                     height="36" class="w-9 h-9 rounded-full border-2 border-white object-cover"
                     loading="lazy" decoding="async">
-                <img src="{{ $imgBase }}/Person_04.webp" alt="Remote Assistant" width="36"
+                <img src="{{ $img('Person_04.webp') }}" alt="Remote Assistant" width="36"
                     height="36" class="w-9 h-9 rounded-full border-2 border-white object-cover"
                     loading="lazy" decoding="async">
             </div>
@@ -32,7 +32,7 @@
         {{-- Wireframe Globe Background Graphic --}}
         <div
             class="absolute -right-12 -bottom-16 w-[300px] sm:w-[340px] pointer-events-none select-none">
-            <img src="{{ $imgBase }}/globe.webp" alt="Global Coverage" width="340"
+            <img src="{{ $img('globe.webp') }}" alt="Global Coverage" width="340"
                 height="340" class="w-full h-auto object-contain" loading="lazy" decoding="async">
         </div>
 
@@ -41,35 +41,35 @@
             <span class="text-sm sm:text-[15px] font-bold text-black">Countries</span>
             <div class="flex items-center">
                 <div class="flex items-center -space-x-1.5">
-                    <img src="{{ $imgBase }}/costa-rica.webp" alt="Costa Rica" width="22"
+                    <img src="{{ $img('costa-rica.webp') }}" alt="Costa Rica" width="22"
                         height="22"
                         class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                         loading="lazy" decoding="async">
-                    <img src="{{ $imgBase }}/equador.webp" alt="Ecuador" width="22"
+                    <img src="{{ $img('equador.webp') }}" alt="Ecuador" width="22"
                         height="22"
                         class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                         loading="lazy" decoding="async">
-                    <img src="{{ $imgBase }}/chile.webp" alt="Chile" width="22"
+                    <img src="{{ $img('chile.webp') }}" alt="Chile" width="22"
                         height="22"
                         class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                         loading="lazy" decoding="async">
-                    <img src="{{ $imgBase }}/paraguai.webp" alt="Paraguay" width="22"
+                    <img src="{{ $img('paraguai.webp') }}" alt="Paraguay" width="22"
                         height="22"
                         class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                         loading="lazy" decoding="async">
-                    <img src="{{ $imgBase }}/brazil.webp" alt="Brazil" width="22"
+                    <img src="{{ $img('brazil.webp') }}" alt="Brazil" width="22"
                         height="22"
                         class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                         loading="lazy" decoding="async">
-                    <img src="{{ $imgBase }}/colombia.webp" alt="Colombia" width="22"
+                    <img src="{{ $img('colombia.webp') }}" alt="Colombia" width="22"
                         height="22"
                         class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                         loading="lazy" decoding="async">
-                    <img src="{{ $imgBase }}/argentina.webp" alt="Argentina" width="22"
+                    <img src="{{ $img('argentina.webp') }}" alt="Argentina" width="22"
                         height="22"
                         class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                         loading="lazy" decoding="async">
-                    <img src="{{ $imgBase }}/mexico.webp" alt="Mexico" width="22"
+                    <img src="{{ $img('mexico.webp') }}" alt="Mexico" width="22"
                         height="22"
                         class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                         loading="lazy" decoding="async">
