@@ -19,10 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libjpeg62-turbo-dev \
       libonig-dev \
       libpng-dev \
+      libwebp-dev \
       libxml2-dev \
       libzip-dev \
       unzip \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install -j"$(nproc)" \
       bcmath \
       exif \
