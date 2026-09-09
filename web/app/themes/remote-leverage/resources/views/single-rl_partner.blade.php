@@ -87,7 +87,7 @@
 @endphp
 
 <div class="min-h-screen bg-bg-light py-8 sm:py-12" x-data="{ mobileMenuOpen: false }">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <div class="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
 
     {{-- Top Co-Branded Hero Bar --}}
     <div
@@ -100,7 +100,7 @@
         <div class="space-y-2">
           {{-- Dual Logo Lockup --}}
           <div class="flex items-center gap-3">
-            <span class="font-extrabold font-display text-lg sm:text-xl text-white tracking-tight">Remote Leverage</span>
+            <span class="font-bold font-display text-lg sm:text-xl text-white tracking-tight">Remote Leverage</span>
             <span class="text-brand-magenta font-bold text-lg">&times;</span>
             @if ($partnerLogo)
               <img src="{{ $partnerLogo }}" alt="{{ $partnerName }}" class="h-7 max-w-[140px] object-contain brightness-0 invert" />
@@ -154,7 +154,7 @@
       {{-- Left Sidebar Navigation (Desktop) --}}
       <aside class="hidden lg:block lg:col-span-3 bg-surface-white rounded-card-lg border border-slate-200/80 shadow-card p-5 sticky top-8 space-y-6">
         <div>
-          <span class="text-2xs font-extrabold uppercase tracking-wider text-text-slate px-3">Getting Started</span>
+          <span class="text-2xs font-bold uppercase tracking-wider text-text-slate px-3">Getting Started</span>
           <nav class="mt-2 space-y-1">
             <a href="{{ getTabUrl($partnerPermalink, 'overview') }}" class="block px-3 py-2 rounded-card text-xs font-bold transition {{ $currentTab === 'overview' ? 'bg-brand-purple text-white shadow-sm' : 'text-text-body hover:bg-slate-50' }}">
               Overview & Actions
@@ -163,7 +163,7 @@
         </div>
 
         <div>
-          <span class="text-2xs font-extrabold uppercase tracking-wider text-text-slate px-3">Partnership Playbook</span>
+          <span class="text-2xs font-bold uppercase tracking-wider text-text-slate px-3">Partnership Playbook</span>
           <nav class="mt-2 space-y-1">
             <a href="{{ getTabUrl($partnerPermalink, 'icp') }}" class="block px-3 py-2 rounded-card text-xs font-semibold transition {{ $currentTab === 'icp' ? 'bg-brand-purple text-white shadow-sm font-bold' : 'text-text-body hover:bg-slate-50' }}">
               Ideal Client Profile
@@ -178,7 +178,7 @@
         </div>
 
         <div>
-          <span class="text-2xs font-extrabold uppercase tracking-wider text-text-slate px-3">Program & Collaboration</span>
+          <span class="text-2xs font-bold uppercase tracking-wider text-text-slate px-3">Program & Collaboration</span>
           <nav class="mt-2 space-y-1">
             <a href="{{ getTabUrl($partnerPermalink, 'referral-program') }}" class="block px-3 py-2 rounded-card text-xs font-semibold transition {{ $currentTab === 'referral-program' ? 'bg-brand-purple text-white shadow-sm font-bold' : 'text-text-body hover:bg-slate-50' }}">
               Referral Program & Fees
@@ -195,7 +195,7 @@
         </div>
 
         <div>
-          <span class="text-2xs font-extrabold uppercase tracking-wider text-text-slate px-3">Help & Support</span>
+          <span class="text-2xs font-bold uppercase tracking-wider text-text-slate px-3">Help & Support</span>
           <nav class="mt-2 space-y-1">
             <a href="{{ getTabUrl($partnerPermalink, 'faq') }}" class="block px-3 py-2 rounded-card text-xs font-semibold transition {{ $currentTab === 'faq' ? 'bg-brand-purple text-white shadow-sm font-bold' : 'text-text-body hover:bg-slate-50' }}">
               Partner FAQ
@@ -224,7 +224,7 @@
           <div class="space-y-8 animate-fadeIn">
             <div>
               <span class="px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">Partnership Brief</span>
-              <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-brand-hero tracking-tight mt-2">
+              <h1 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight mt-2">
                 Remote Leverage &times; {{ $partnerName }} Alliance
               </h1>
               <p class="text-text-muted text-sm sm:text-base mt-2 leading-relaxed">
@@ -338,7 +338,7 @@
           <div class="space-y-8 animate-fadeIn">
             <div>
               <span class="px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">Target Audience</span>
-              <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-brand-hero tracking-tight mt-2">Ideal Client Profile (ICP)</h1>
+              <h1 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight mt-2">Ideal Client Profile (ICP)</h1>
               <p class="text-text-muted text-sm mt-2">Qualification criteria and target market guidelines to identify strong referral opportunities.</p>
             </div>
 
@@ -385,7 +385,7 @@
           <div class="space-y-8 animate-fadeIn">
             <div>
               <span class="px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">Capabilities</span>
-              <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-brand-hero tracking-tight mt-2">Services Overview</h1>
+              <h1 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight mt-2">Services Overview</h1>
               <p class="text-text-muted text-sm mt-2">Remote Leverage provides specialized direct-hire recruitment across key business functions.</p>
             </div>
 
@@ -405,7 +405,7 @@
           <div class="space-y-8 animate-fadeIn">
             <div>
               <span class="px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">Competitive Edge</span>
-              <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-brand-hero tracking-tight mt-2">Why Remote Leverage</h1>
+              <h1 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight mt-2">Why Remote Leverage</h1>
               <p class="text-text-muted text-sm mt-2">Comparative analysis of Remote Leverage vs. traditional staffing agencies and in-house hiring.</p>
             </div>
 
@@ -447,7 +447,7 @@
           <div class="space-y-8 animate-fadeIn">
             <div>
               <span class="px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">Economics</span>
-              <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-brand-hero tracking-tight mt-2">Referral Program & Commission Terms</h1>
+              <h1 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight mt-2">Referral Program & Commission Terms</h1>
               <p class="text-text-muted text-sm mt-2">Transparent, bidirectional revenue-sharing terms for {{ $partnerName }}.</p>
             </div>
 
@@ -505,7 +505,7 @@
           <div class="space-y-8 animate-fadeIn">
             <div>
               <span class="px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">Collaborative Growth</span>
-              <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-brand-hero tracking-tight mt-2">Co-Marketing Opportunities & Guidelines</h1>
+              <h1 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight mt-2">Co-Marketing Opportunities & Guidelines</h1>
               <p class="text-text-muted text-sm mt-2">{{ $comarketingText }}</p>
             </div>
 
@@ -535,7 +535,7 @@
           <div class="space-y-8 animate-fadeIn">
             <div>
               <span class="px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">Track Record</span>
-              <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-brand-hero tracking-tight mt-2">Industry Case Studies</h1>
+              <h1 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight mt-2">Industry Case Studies</h1>
               <p class="text-text-muted text-sm mt-2">Real candidate placement results across key business sectors.</p>
             </div>
 
@@ -583,7 +583,7 @@
           <div class="space-y-8 animate-fadeIn">
             <div>
               <span class="px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">FAQ</span>
-              <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-brand-hero tracking-tight mt-2">Partner Frequently Asked Questions</h1>
+              <h1 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight mt-2">Partner Frequently Asked Questions</h1>
             </div>
 
             <div class="space-y-3">
@@ -601,7 +601,7 @@
           <div class="space-y-8 animate-fadeIn">
             <div>
               <span class="px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">Partner Support</span>
-              <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-brand-hero tracking-tight mt-2">Dedicated Partnerships Contact</h1>
+              <h1 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight mt-2">Dedicated Partnerships Contact</h1>
               <p class="text-text-muted text-sm mt-2">Direct access to our team for custom client inquiries, co-marketing requests, or billing questions.</p>
             </div>
 
@@ -643,7 +643,7 @@
       {{-- Right Sidebar: Dedicated Resources --}}
       <aside class="hidden lg:block lg:col-span-3 space-y-4 sticky top-8">
         <div class="bg-surface-white rounded-card-lg border border-slate-200/80 shadow-card p-5 space-y-3">
-          <span class="text-2xs font-extrabold uppercase tracking-wider text-text-slate">Partnership Resources</span>
+          <span class="text-2xs font-bold uppercase tracking-wider text-text-slate">Partnership Resources</span>
 
           @if ($rlResourceUrl)
             <a href="{{ esc_url($rlResourceUrl) }}" target="_blank" class="flex items-center gap-2 p-3 rounded-card border border-slate-200/80 hover:border-brand-purple/40 transition">
@@ -687,7 +687,7 @@
         </div>
 
         <div class="bg-surface-white rounded-card-lg border border-slate-200/80 shadow-card p-5 space-y-2">
-          <span class="text-2xs font-extrabold uppercase tracking-wider text-text-slate">Quick Actions</span>
+          <span class="text-2xs font-bold uppercase tracking-wider text-text-slate">Quick Actions</span>
           @if ($referralFormUrl)
             <a href="{{ esc_url($referralFormUrl) }}" target="_blank" class="block w-full text-center py-2 rounded-cta bg-brand-purple hover:bg-brand-purple-deep text-white text-xs font-bold transition">
               Refer to Remote Leverage

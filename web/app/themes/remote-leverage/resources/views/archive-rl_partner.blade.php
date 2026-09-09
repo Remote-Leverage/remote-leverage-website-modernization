@@ -7,7 +7,7 @@
     <div class="pointer-events-none absolute -top-40 right-1/4 h-96 w-96 rounded-full bg-brand-purple/20 blur-3xl"></div>
     <div class="pointer-events-none absolute -bottom-20 left-10 h-80 w-80 rounded-full bg-brand-magenta/15 blur-3xl"></div>
 
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+    <div class="relative max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
       {{-- Badge --}}
       <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-pill bg-white/10 border border-white/15 text-white text-xs font-semibold backdrop-blur-sm">
         <svg class="w-3.5 h-3.5 text-brand-magenta" fill="currentColor" viewBox="0 0 20 20">
@@ -17,7 +17,7 @@
       </div>
 
       {{-- Heading --}}
-      <h1 class="text-3xl sm:text-5xl lg:text-6xl font-black font-display tracking-tight text-white max-w-4xl mx-auto leading-tight">
+      <h1 class="text-3xl sm:text-5xl lg:text-6xl font-bold font-display tracking-tight text-white max-w-4xl mx-auto leading-tight">
         Enterprise <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-pink-400 to-brand-magenta">Partner Network</span>
       </h1>
 
@@ -28,19 +28,19 @@
       {{-- Network Metrics Bar --}}
       <div class="pt-8 grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 max-w-4xl mx-auto">
         <div class="p-4 rounded-card bg-white/5 border border-white/10 backdrop-blur-sm text-center">
-          <div class="text-2xl sm:text-3xl font-black font-display text-white">50+</div>
+          <div class="text-2xl sm:text-3xl font-bold font-display text-white">50+</div>
           <div class="text-xs text-slate-300 mt-0.5">Certified Partners</div>
         </div>
         <div class="p-4 rounded-card bg-white/5 border border-white/10 backdrop-blur-sm text-center">
-          <div class="text-2xl sm:text-3xl font-black font-display text-brand-magenta">$14M+</div>
+          <div class="text-2xl sm:text-3xl font-bold font-display text-brand-magenta">$14M+</div>
           <div class="text-xs text-slate-300 mt-0.5">Client Revenue Influenced</div>
         </div>
         <div class="p-4 rounded-card bg-white/5 border border-white/10 backdrop-blur-sm text-center">
-          <div class="text-2xl sm:text-3xl font-black font-display text-white">99.4%</div>
+          <div class="text-2xl sm:text-3xl font-bold font-display text-white">99.4%</div>
           <div class="text-xs text-slate-300 mt-0.5">Placement Retention</div>
         </div>
         <div class="p-4 rounded-card bg-white/5 border border-white/10 backdrop-blur-sm text-center">
-          <div class="text-2xl sm:text-3xl font-black font-display text-brand-purple">Tier-1</div>
+          <div class="text-2xl sm:text-3xl font-bold font-display text-brand-purple">Tier-1</div>
           <div class="text-xs text-slate-300 mt-0.5">Direct Collaboration</div>
         </div>
       </div>
@@ -54,7 +54,7 @@
 
   {{-- Join Network CTA Banner --}}
   <section class="py-16 bg-surface-white border-t border-slate-200/70">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
       <div class="relative overflow-hidden rounded-card-lg bg-gradient-to-r from-brand-midnight via-brand-hero to-brand-midnight text-white p-8 sm:p-12 lg:p-16 border border-brand-purple/30 shadow-2xl">
         <div class="pointer-events-none absolute -right-20 -bottom-20 w-80 h-80 rounded-full bg-brand-purple/25 blur-3xl"></div>
         <div class="pointer-events-none absolute left-10 -top-20 w-60 h-60 rounded-full bg-brand-magenta/20 blur-3xl"></div>
@@ -64,7 +64,7 @@
             Partner Opportunities
           </div>
 
-          <h2 class="text-2xl sm:text-4xl font-black font-display text-white tracking-tight">
+          <h2 class="text-2xl sm:text-4xl font-bold font-display text-white tracking-tight">
             Deliver World-Class Talent to Your Clients & Earn Recurring Commissions
           </h2>
 
