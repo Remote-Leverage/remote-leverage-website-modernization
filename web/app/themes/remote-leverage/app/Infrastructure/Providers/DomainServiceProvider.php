@@ -7,6 +7,7 @@ namespace App\Infrastructure\Providers;
 use App\Infrastructure\WordPress\Admin\ContentAuditAdmin;
 use App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
 use App\Infrastructure\WordPress\Admin\MarketingDashboard;
+use App\Infrastructure\WordPress\Admin\PartnerHubAdmin;
 use App\Infrastructure\WordPress\Admin\WordPressAdminTheme;
 use App\Infrastructure\WordPress\PostTypes\PartnerPostType;
 use Illuminate\Support\ServiceProvider;
@@ -42,6 +43,7 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(WordPressAdminTheme::class, fn () => new WordPressAdminTheme);
         $this->app->singleton(MarketingDashboard::class, fn () => new MarketingDashboard);
         $this->app->singleton(ContentAuditAdmin::class, fn () => new ContentAuditAdmin);
+        $this->app->singleton(PartnerHubAdmin::class, fn () => new PartnerHubAdmin);
     }
 
     /**
@@ -55,5 +57,6 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->make(WordPressAdminTheme::class)->register();
         $this->app->make(MarketingDashboard::class)->register();
         $this->app->make(ContentAuditAdmin::class)->register();
+        $this->app->make(PartnerHubAdmin::class)->register();
     }
 }

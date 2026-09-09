@@ -303,6 +303,67 @@ if (! function_exists('esc_url')) {
     }
 }
 
+if (! function_exists('esc_url_raw')) {
+    function esc_url_raw($url)
+    {
+        return filter_var($url, FILTER_SANITIZE_URL) ?: '';
+    }
+}
+
+if (! function_exists('esc_textarea')) {
+    function esc_textarea($text)
+    {
+        return htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (! function_exists('sanitize_email')) {
+    function sanitize_email($email)
+    {
+        return filter_var(trim((string) $email), FILTER_SANITIZE_EMAIL);
+    }
+}
+
+if (! function_exists('sanitize_textarea_field')) {
+    function sanitize_textarea_field($str)
+    {
+        return is_scalar($str) ? trim(strip_tags((string) $str)) : '';
+    }
+}
+
+if (! function_exists('sanitize_key')) {
+    function sanitize_key($key)
+    {
+        return strtolower(preg_replace('/[^a-z0-9_\-]/', '', (string) $key));
+    }
+}
+
+if (! function_exists('wp_verify_nonce')) {
+    function wp_verify_nonce($nonce, $action = -1)
+    {
+        return true;
+    }
+}
+
+if (! function_exists('current_user_can')) {
+    function current_user_can($capability, ...$args)
+    {
+        return true;
+    }
+}
+
+if (! function_exists('checked')) {
+    function checked($checked, $current = true, $echo = true)
+    {
+        $result = ((string) $checked === (string) $current) ? ' checked="checked"' : '';
+        if ($echo) {
+            echo $result;
+        }
+
+        return $result;
+    }
+}
+
 if (! function_exists('admin_url')) {
     function admin_url($path = '')
     {
