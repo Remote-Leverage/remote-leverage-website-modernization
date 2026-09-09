@@ -140,7 +140,6 @@ remoteleverage-platform/                <-- Clean-Slate Bedrock Root
     │           │   │
     │           │   ├── Application/    <-- Presentation & Delivery Layer (Sage 11)
     │           │   │   ├── Blocks/     # Native Gutenberg Blocks (ACF Composer)
-    │           │   │   │   ├── HeroBlock.php
     │           │   │   │   ├── BookingBlock.php
     │           │   │   │   ├── LiveCallBlock.php
     │           │   │   │   ├── TestimonialsBlock.php
@@ -221,7 +220,6 @@ remoteleverage-platform/                <-- Clean-Slate Bedrock Root
     │           │       │   ├── header.blade.php
     │           │       │   └── footer.blade.php
     │           │       ├── blocks/     # Native Gutenberg Block Blade Templates
-    │           │       │   ├── hero.blade.php
     │           │       │   ├── booking.blade.php
     │           │       │   ├── live-call.blade.php
     │           │       │   ├── testimonials.blade.php
@@ -306,7 +304,7 @@ We consolidate 36 bespoke Elementor widgets into ~16 lightweight, composable nat
 
 | Legacy Elementor Widget(s) | Proposed Gutenberg Block | UX & Performance Improvements |
 | :--- | :--- | :--- |
-| `HeroWidget`, `HeroSectionWidget`, `HeroCarouselWidget` | `HeroBlock` (`hero.blade.php`) | Native video background with lazy loading; zero layout shifts; instant LCP render. |
+| `HeroWidget`, `HeroSectionWidget`, `HeroCarouselWidget` | Native Hero Pattern (`patterns/hire-va-4-hero.php`) | Pre-hydrated native Gutenberg hero pattern (`remote-leverage/hire-va-4-hero`) with candidate backdrop grid, checklist, logo marquee, and embedded 3-step booking wizard. |
 | `HeadlessCalendlyMultistepWidget`, `GoogleCalendarMultistepWidget`, `IsolatedFieldsHeadlessCalendlyMultistepWidget` | `BookingBlock` (`booking.blade.php`) | Wraps the `MultistepBookingWizard` Livewire 4 component. Eliminates iframe bloat and jQuery dependencies. |
 | `JoinLiveCallWidget` | `LiveCallBlock` (`live-call.blade.php`) | Wraps the `InstantLiveCallButton` Livewire 4 component with dynamic availability polling. |
 | `TestimonialCardWidget`, `TestimonialListWidget`, `TrustSectionWidget` | `TestimonialsBlock` (`testimonials.blade.php`) | Lightweight CSS scroll-snap carousel with Alpine.js controls; video modal lightbox. |

@@ -347,10 +347,11 @@ Scenario: Server restart or process crash
 * **Sprint**: WORDPRES Sprint 6
 * **Assignee**: Adrián Salvatori
 
-### Subtasks Added for Remaining Gutenberg Scope:
+### Subtasks for Remaining Gutenberg Scope:
+*(Note: Hero block subtask WR-108 removed per design decision; the primary Hero section is fully completed via native Gutenberg pattern `remote-leverage/hire-va-4-hero`).*
+
 | Key | Summary | Type | Priority | Assignee | Direct Link |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **WR-108** | **[Gutenberg Blocks] Generalize HeroBlock with Video/Image Background & ACF Controls** | Subtarea | High | Adrián Salvatori | [View WR-108](https://remoteleveragetech.atlassian.net/browse/WR-108) |
 | **WR-109** | **[Block Editor WYSIWYG] Gutenberg Canvas Styling Parity & editor.css Tailwind Alignment** | Subtarea | High | Adrián Salvatori | [View WR-109](https://remoteleveragetech.atlassian.net/browse/WR-109) |
 | **WR-110** | **[Block Inserter Previews] Add Rich Example Data to ACF Composer Blocks** | Subtarea | Medium | Adrián Salvatori | [View WR-110](https://remoteleveragetech.atlassian.net/browse/WR-110) |
 | **WR-111** | **[Pattern Library] Register Curated Gutenberg Pattern Categories & VA Guide Layouts** | Subtarea | High | Adrián Salvatori | [View WR-111](https://remoteleveragetech.atlassian.net/browse/WR-111) |

@@ -215,7 +215,6 @@ All blocks are declared via `Log1x\AcfComposer` (`app/Blocks/`), use dedicated B
 
 | Block Name | Block Slug | View File | Key Features & Replacements |
 | :--- | :--- | :--- | :--- |
-| **Hire VA Hero** | `acf/hire-va-hero` | `hire-va-hero.blade.php` | Full-height hero (`min-h-dvh`), headline, 6-item checklist, candidate backdrop grid, client logo marquee, embedded 3-step booking wizard. |
 | **Booking Block** | `acf/booking` | `booking.blade.php` | Embeds `MultistepBookingWizard` with customizable skin and revenue routing. |
 | **Booking Footer** | `acf/booking-footer` | `booking-footer.blade.php` | Dedicated dark glassmorphic footer booking section (`skin="glass"`). |
 | **Talent Marquee** | `acf/talent-marquee` | `talent-marquee.blade.php` | Smooth infinite scrolling candidate cards with avatar, role, country, and rates. |
@@ -239,10 +238,10 @@ All blocks are declared via `Log1x\AcfComposer` (`app/Blocks/`), use dedicated B
 
 ## 🧩 Pre-Hydrated Block Patterns (`patterns/`)
 
-The theme includes 21+ ready-to-use Gutenberg Block Patterns registered under the `Remote Leverage` block pattern category. Every pattern contains fully hydrated ACF block attributes so that default demo content renders immediately without empty placeholders:
+The theme includes 21+ ready-to-use Gutenberg Block Patterns registered under the `Remote Leverage` block pattern category. Every pattern contains fully hydrated block attributes and demo content so that layouts render immediately without empty placeholders:
 
+- **`hire-va-4-hero.php`**: **Primary Hero Pattern (Active & Completed)** — Modern full-height hero section (`min-h-dvh`) with candidate grid backdrop, 6-item checklist, client logo marquee, and embedded 3-step booking wizard. (Replaces any standalone hero block; hero sections are cleanly composed via native block patterns).
 - `hire-va-4-full.php`: Complete end-to-end landing page pattern matching `hire-va-4`.
-- `hire-va-4-hero.php`: Modern full-height hero section with candidate grid backdrop and booking wizard.
 - `hire-va-4-comparison.php`: 3-way agency vs. direct hire comparison matrix.
 - `hire-va-4-process-steps.php`: 3-step candidate vetting and hiring process.
 - `hire-va-4-testimonials.php`: Client review cards and video proof.

@@ -20,11 +20,11 @@ Consolidate the 36 Elementor widgets into ~10–16 native Gutenberg blocks
 recorded here as written, not reconciled) built with `log1x/acf-composer`
 and rendered via Laravel Blade templates (`README.md` §5, migration matrix):
 
-- `HeroBlock`, `BookingBlock`, `LiveCallBlock`, `TestimonialsBlock`,
+- `BookingBlock`, `LiveCallBlock`, `TestimonialsBlock`,
   `DepartmentCardsBlock`, `ProcessStepsBlock`, `BenefitsGuaranteeBlock`,
   `AccordionFaqBlock`, `DataTableBlock`, `CtaBannerBlock` — each replacing a
   named set of legacy Elementor widgets, listed per-block in §5's migration
-  matrix.
+  matrix. (Note: Hero sections are implemented directly as native Gutenberg block patterns such as `remote-leverage/hire-va-4-hero`, eliminating the need for a monolithic hero block).
 - Two additional legacy widget groups (`ArticleHeaderWidget` /
   `ArticleTableOfContentWidget` / `ArticleAuthorBioWidget` /
   `ArticleAlsoReadWidget` and `BlogIndexHeaderWidget` /
@@ -89,7 +89,7 @@ ADR-0006, before any post is switched onto `single.blade.php` /
    AI-driven pass walks the Elementor widget tree and generates the
    equivalent native Gutenberg block markup, using the Elementor→Gutenberg
    mapping already defined in `README.md` §5 / this ADR's Decision section
-   (e.g. `HeroWidget` → `HeroBlock`). Widgets without a defined mapping are
+   (e.g. `HeroWidget` → native hero block pattern `remote-leverage/hire-va-4-hero`). Widgets without a defined mapping are
    converted to the closest available native block and explicitly flagged
    as unmapped.
 3. **Mandatory human editorial review**: every AI-converted post — mapped
