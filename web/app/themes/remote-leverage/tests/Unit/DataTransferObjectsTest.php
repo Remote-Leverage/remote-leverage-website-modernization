@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Domains\Referral\Data\PartnerData;
 use App\Domains\Referral\Data\PayoutData;
 use App\Domains\Referral\Data\ReferralData;
+use App\Domains\Referral\Data\ReferrerData;
 use App\Domains\Scheduling\Data\BookingRequestData;
 use App\Domains\Scheduling\Data\TimeSlotData;
 use App\Domains\Tracking\Data\AnalyticsEventData;
@@ -13,36 +13,36 @@ use App\Domains\Tracking\Data\UserProfileData;
 describe('Data Transfer Objects', function () {
     test('ReferralData instantiates correctly and serializes to array', function () {
         $dto = ReferralData::fromArray([
-            'partner_id' => 42,
+            'referrer_id' => 42,
             'referral_code' => 'apex-capital',
             'ip_address' => '192.168.1.1',
             'landing_url' => 'https://remoteleverage.com/executive-assistant',
             'utm_source' => 'linkedin',
-            'utm_medium' => 'partner_post',
+            'utm_medium' => 'referrer_post',
             'utm_campaign' => 'q3_launch',
         ]);
 
-        expect($dto->partnerId)->toBe(42)
+        expect($dto->referrerId)->toBe(42)
             ->and($dto->referralCode)->toBe('apex-capital')
             ->and($dto->utmSource)->toBe('linkedin')
             ->and($dto->status)->toBe('clicked');
 
         $arr = $dto->toArray();
-        expect($arr['partner_id'])->toBe(42)
+        expect($arr['referrer_id'])->toBe(42)
             ->and($arr['referral_code'])->toBe('apex-capital')
-            ->and($arr['utm_medium'])->toBe('partner_post');
+            ->and($arr['utm_medium'])->toBe('referrer_post');
     });
 
     test('PayoutData handles amounts and statuses', function () {
         $dto = PayoutData::fromArray([
-            'partner_id' => 10,
+            'referrer_id' => 10,
             'amount' => 1250.50,
             'currency' => 'USD',
             'status' => 'pending',
             'stripe_transfer_id' => 'tr_12345',
         ]);
 
-        expect($dto->partnerId)->toBe(10)
+        expect($dto->referrerId)->toBe(10)
             ->and($dto->amount)->toBe(1250.50)
             ->and($dto->currency)->toBe('USD')
             ->and($dto->status)->toBe('pending');
@@ -50,8 +50,8 @@ describe('Data Transfer Objects', function () {
         expect($dto->toArray()['stripe_transfer_id'])->toBe('tr_12345');
     });
 
-    test('PartnerData validates company and referral codes', function () {
-        $dto = PartnerData::fromArray([
+    test('ReferrerData validates company and referral codes', function () {
+        $dto = ReferrerData::fromArray([
             'name' => 'Adrian Miller',
             'email' => 'adrian@scaleops.com',
             'company' => 'ScaleOps Agency',

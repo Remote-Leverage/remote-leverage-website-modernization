@@ -7,7 +7,7 @@ namespace App\Infrastructure\WordPress\Admin;
 use App\Domains\ContentAudit\Services\ElementorAuditService;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
-use App\Domains\Referral\Models\Partner;
+use App\Domains\Referral\Models\Referrer;
 use App\Domains\Referral\Models\Payout;
 use App\Domains\Referral\Models\Referral;
 use Illuminate\Support\Facades\Cache;
@@ -71,7 +71,7 @@ class MarketingDashboard
             'default'
         );
 
-        // 3. Right Column (side): Domain Architecture, Partner Hub, Site Health, Shortcuts
+        // 3. Right Column (side): Domain Architecture, Referrer Network, Site Health, Shortcuts
         wp_add_dashboard_widget(
             'rl_dashboard_domains',
             'Domain Architecture & Multi-Service Status',
@@ -83,9 +83,9 @@ class MarketingDashboard
         );
 
         wp_add_dashboard_widget(
-            'rl_dashboard_partner_hub',
-            'Partner Hub & Referral Revenue',
-            [$this, 'renderPartnerHubWidget'],
+            'rl_dashboard_referrer_network',
+            'Referrer Network & Revenue',
+            [$this, 'renderReferrerNetworkWidget'],
             null,
             null,
             'side',
@@ -374,12 +374,12 @@ class MarketingDashboard
                     </div>
                 </div>
 
-                <!-- 3. PartnerHub & Referral Domain -->
+                <!-- 3. Referrer Network & Referral Domain -->
                 <div class="rl-dash-domain-card">
                     <div class="rl-dash-domain-top">
                         <div class="rl-dash-domain-title-wrap">
                             <span class="rl-dash-indicator-green"></span>
-                            <span class="rl-dash-domain-title">PartnerHub & Referral</span>
+                            <span class="rl-dash-domain-title">Referrer Network & Referral</span>
                         </div>
                         <span class="rl-badge-zinc">Stripe Connect</span>
                     </div>
@@ -387,9 +387,9 @@ class MarketingDashboard
                         Attribution engine with 30-day cookie stamps, referral slug matching, and Stripe Connect automated payout transfers.
                     </p>
                     <div class="rl-dash-domain-badges">
-                        <span class="rl-dash-chip">Partners: <?php echo esc_html((string) $domainInfo['partners']['count']); ?></span>
-                        <span class="rl-dash-chip">Referrals: <?php echo esc_html((string) $domainInfo['partners']['referrals']); ?></span>
-                        <span class="rl-dash-chip">Payouts: $<?php echo esc_html(number_format((float) $domainInfo['partners']['payouts_sum'], 2)); ?></span>
+                        <span class="rl-dash-chip">Referrers: <?php echo esc_html((string) $domainInfo['referrers']['count']); ?></span>
+                        <span class="rl-dash-chip">Referrals: <?php echo esc_html((string) $domainInfo['referrers']['referrals']); ?></span>
+                        <span class="rl-dash-chip">Payouts: $<?php echo esc_html(number_format((float) $domainInfo['referrers']['payouts_sum'], 2)); ?></span>
                     </div>
                 </div>
 
@@ -434,29 +434,29 @@ class MarketingDashboard
     }
 
     /**
-     * Render Partner Hub & Referral Revenue widget.
+     * Render Referrer Network & Revenue widget.
      */
-    public function renderPartnerHubWidget(): void
+    public function renderReferrerNetworkWidget(): void
     {
         $domainInfo = $this->getDomainOverview();
-        $partners = $domainInfo['partners'];
+        $referrers = $domainInfo['referrers'];
 
         ?>
-        <div class="rl-dash-partner-wrap">
+        <div class="rl-dash-referrer-wrap">
             <div class="rl-dash-kpi-grid" style="grid-template-columns: repeat(3, 1fr);">
                 <div class="rl-dash-kpi-card">
                     <div class="rl-dash-kpi-header">
-                        <span class="rl-dash-kpi-label">PARTNERS</span>
+                        <span class="rl-dash-kpi-label">REFERRERS</span>
                     </div>
-                    <div class="rl-dash-kpi-number"><?php echo esc_html((string) $partners['count']); ?></div>
-                    <div class="rl-dash-kpi-meta">Active affiliates</div>
+                    <div class="rl-dash-kpi-number"><?php echo esc_html((string) $referrers['count']); ?></div>
+                    <div class="rl-dash-kpi-meta">Active referrers</div>
                 </div>
 
                 <div class="rl-dash-kpi-card">
                     <div class="rl-dash-kpi-header">
                         <span class="rl-dash-kpi-label">REFERRALS</span>
                     </div>
-                    <div class="rl-dash-kpi-number"><?php echo esc_html((string) $partners['referrals']); ?></div>
+                    <div class="rl-dash-kpi-number"><?php echo esc_html((string) $referrers['referrals']); ?></div>
                     <div class="rl-dash-kpi-meta">Tracked conversions</div>
                 </div>
 
@@ -464,7 +464,7 @@ class MarketingDashboard
                     <div class="rl-dash-kpi-header">
                         <span class="rl-dash-kpi-label">PAID OUT</span>
                     </div>
-                    <div class="rl-dash-kpi-number">$<?php echo esc_html(number_format((float) $partners['payouts_sum'], 0)); ?></div>
+                    <div class="rl-dash-kpi-number">$<?php echo esc_html(number_format((float) $referrers['payouts_sum'], 0)); ?></div>
                     <div class="rl-dash-kpi-meta">Stripe transfers</div>
                 </div>
             </div>
@@ -474,15 +474,15 @@ class MarketingDashboard
                     <span class="rl-dash-indicator-green"></span>
                     <div>
                         <div class="rl-dash-health-name">Stripe Connect Payout Gateway</div>
-                        <div class="rl-dash-health-desc">Automated partner transfer listener active</div>
+                        <div class="rl-dash-health-desc">Automated referrer transfer listener active</div>
                     </div>
                 </div>
                 <span class="rl-badge-emerald">Enabled</span>
             </div>
 
             <div class="rl-dash-card-footer">
-                <a href="<?php echo esc_url(admin_url('edit.php?post_type=partner')); ?>" class="rl-dash-link">
-                    Manage Partner Network &rarr;
+                <a href="<?php echo esc_url(admin_url('admin.php?page=rl-referrers')); ?>" class="rl-dash-link">
+                    Manage Referrer Network &rarr;
                 </a>
             </div>
         </div>
@@ -640,7 +640,7 @@ class MarketingDashboard
                     <span class="rl-dash-indicator-green"></span>
                     <div>
                         <div class="rl-dash-health-name">Stripe Webhooks</div>
-                        <div class="rl-dash-health-desc">Partner payout & account events listener</div>
+                        <div class="rl-dash-health-desc">Referrer payout & account events listener</div>
                     </div>
                 </div>
                 <span class="rl-badge-zinc">/api/webhooks/stripe</span>
@@ -813,7 +813,7 @@ class MarketingDashboard
     }
 
     /**
-     * Aggregate domain metrics across Lead, Scheduling, PartnerHub, and Tracking domains.
+     * Aggregate domain metrics across Lead, Scheduling, Referral, and Tracking domains.
      *
      * @return array<string, mixed>
      */
@@ -829,12 +829,12 @@ class MarketingDashboard
                 $leadLogs = LeadActivityLog::count();
                 $booked = Lead::where('status', 'booked')->count();
 
-                $partnerCount = 0;
+                $referrerCount = 0;
                 $referralCount = 0;
                 $payoutsSum = 0.0;
 
                 try {
-                    $partnerCount = Partner::count();
+                    $referrerCount = Referrer::count();
                 } catch (\Throwable) {}
 
                 try {
@@ -854,8 +854,8 @@ class MarketingDashboard
                     'scheduling' => [
                         'booked' => $booked,
                     ],
-                    'partners' => [
-                        'count' => $partnerCount,
+                    'referrers' => [
+                        'count' => $referrerCount,
                         'referrals' => $referralCount,
                         'payouts_sum' => $payoutsSum,
                     ],
@@ -865,7 +865,7 @@ class MarketingDashboard
             return [
                 'leads' => ['total' => 0, 't10' => 0, 'logs' => 0],
                 'scheduling' => ['booked' => 0],
-                'partners' => ['count' => 0, 'referrals' => 0, 'payouts_sum' => 0.0],
+                'referrers' => ['count' => 0, 'referrals' => 0, 'payouts_sum' => 0.0],
             ];
         }
     }

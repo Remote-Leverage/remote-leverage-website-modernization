@@ -8,6 +8,7 @@ use App\Infrastructure\WordPress\Admin\ContentAuditAdmin;
 use App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
 use App\Infrastructure\WordPress\Admin\MarketingDashboard;
 use App\Infrastructure\WordPress\Admin\PartnerHubAdmin;
+use App\Infrastructure\WordPress\Admin\ReferralAdminDashboard;
 use App\Infrastructure\WordPress\Admin\WordPressAdminTheme;
 use App\Infrastructure\WordPress\PostTypes\PartnerPostType;
 use Illuminate\Support\ServiceProvider;
@@ -44,6 +45,7 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(MarketingDashboard::class, fn () => new MarketingDashboard);
         $this->app->singleton(ContentAuditAdmin::class, fn () => new ContentAuditAdmin);
         $this->app->singleton(PartnerHubAdmin::class, fn () => new PartnerHubAdmin);
+        $this->app->singleton(ReferralAdminDashboard::class, fn () => new ReferralAdminDashboard);
     }
 
     /**
@@ -58,5 +60,6 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->make(MarketingDashboard::class)->register();
         $this->app->make(ContentAuditAdmin::class)->register();
         $this->app->make(PartnerHubAdmin::class)->register();
+        $this->app->make(ReferralAdminDashboard::class)->register();
     }
 }

@@ -41,9 +41,10 @@ class ReferralAttributionMiddleware
         // If a new query parameter was present and matches a valid referrer
         $hasQuery = ! empty($viaParam) || ! empty($refParam) || ! empty($rParam);
         if ($resolvedSlug && $hasQuery) {
-            $user = $this->attributionEngine->findReferrerUser($resolvedSlug);
+            $isValidReferrer = $this->attributionEngine->findReferrerByReferralCode($resolvedSlug)
+                || $this->attributionEngine->findReferrerUser($resolvedSlug);
 
-            if ($user) {
+            if ($isValidReferrer) {
                 // Record click in database
                 $this->trackClickAction->execute($resolvedSlug, [
                     'ip_address' => $request->ip(),

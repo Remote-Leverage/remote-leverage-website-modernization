@@ -1,16 +1,14 @@
 <div class="w-full">
   
-  {{-- Partner Authentication Login Screen --}}
+  {{-- Referrer Authentication Login Screen --}}
   @if (! $isAuthenticated)
     <div class="max-w-md mx-auto my-12 bg-surface-white rounded-card-lg border border-slate-200/80 p-8 shadow-card text-center">
       <div class="w-12 h-12 rounded-full bg-brand-purple/10 text-brand-purple mx-auto flex items-center justify-center mb-4">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-        </svg>
+        {!! app(\App\Infrastructure\WordPress\Admin\WordPressAdminTheme::class)->getIsoSvg('currentColor', 26) !!}
       </div>
 
-      <h2 class="text-2xl font-bold font-display text-brand-hero tracking-tight">Partner Portal Login</h2>
-      <p class="text-xs text-text-muted mt-2 mb-6">Enter your registered referral code or partner email address to access your live attribution dashboard.</p>
+      <h2 class="text-2xl font-bold font-display text-brand-hero tracking-tight">Referrer Portal Login</h2>
+      <p class="text-xs text-text-muted mt-2 mb-6">Enter your registered referral code or referrer email address to access your live attribution dashboard.</p>
 
       @if ($loginError)
         <div class="mb-4 p-3 rounded-card bg-red-50 border border-red-200 text-status-alert text-xs text-left">
@@ -18,17 +16,26 @@
         </div>
       @endif
 
-      <form wire:submit.prevent="authenticatePartner" class="space-y-4">
+      <form wire:submit.prevent="authenticateReferrer" class="space-y-4">
         <div>
-          <input 
-            type="text" 
+          <input
+            type="text"
             wire:model="lookupCode"
-            placeholder="e.g. RL-PARTNER-123 or partner@agency.com"
-            class="w-full px-4 py-3 rounded-card border border-slate-200 text-sm text-text-body focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple bg-white"
+            placeholder="e.g. RL-REFERRER-123 or referrer@agency.com"
+            class="w-full h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
           />
         </div>
 
-        <button 
+        <div>
+          <input
+            type="password"
+            wire:model="password"
+            placeholder="Password"
+            class="w-full h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
+          />
+        </div>
+
+        <button
           type="submit"
           class="w-full btn-primary cursor-pointer text-xs"
         >
@@ -37,8 +44,8 @@
       </form>
 
       <div class="mt-6 pt-6 border-t border-slate-100 text-xs text-text-muted">
-        Don't have a partner account yet? 
-        <a href="{{ route('partner.register') }}" class="font-bold text-brand-purple hover:underline">Apply here</a>.
+        Don't have a referrer account yet?
+        <a href="{{ route('referrer.register') }}" class="font-bold text-brand-purple hover:underline">Apply here</a>.
       </div>
     </div>
 
@@ -64,7 +71,7 @@
           <!-- Greeting -->
           <div>
             <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-brand-hero tracking-tight">
-              Hi {{ $partner->name }}
+              Hi {{ $referrer->name }}
             </h1>
             <p class="text-xs sm:text-sm text-text-muted mt-1">
               Use your unique referral link to refer clients and earn automated commissions on placed talent.
@@ -176,7 +183,7 @@
 
           <!-- Footer Links -->
           <div class="flex items-center justify-between text-xs text-text-muted">
-            <span>Attribution Code: <strong class="text-text-body font-mono">{{ $partnerCode }}</strong></span>
+            <span>Attribution Code: <strong class="text-text-body font-mono">{{ $referrerCode }}</strong></span>
             <button type="button" wire:click="logout" class="text-status-alert hover:underline inline-flex items-center gap-1 cursor-pointer">
               <span>Log Out</span>
             </button>
@@ -233,7 +240,7 @@
             <div class="p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 class="text-sm font-bold text-brand-hero font-display">Referred Prospects & Lead Activity</h3>
-                <p class="text-2xs text-text-muted">Live feed of clients attributed to your partnership code.</p>
+                <p class="text-2xs text-text-muted">Live feed of clients attributed to your referral code.</p>
               </div>
               <span class="px-2.5 py-1 rounded-pill bg-slate-100 text-slate-600 text-2xs font-bold uppercase tracking-wider">
                 {{ count($recentActivity) }} Records

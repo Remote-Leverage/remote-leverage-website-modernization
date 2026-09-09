@@ -24,6 +24,7 @@ class ReferralReward extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'referrer_id',
         'referrer_user_id',
         'referral_id',
         'reward_type',

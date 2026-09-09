@@ -22,7 +22,7 @@ class Payout extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'partner_id',
+        'referrer_id',
         'amount',
         'currency',
         'stripe_transfer_id',
@@ -42,10 +42,10 @@ class Payout extends Model
     ];
 
     /**
-     * Partner associated with this payout.
+     * Referrer associated with this payout.
      */
-    public function partner(): BelongsTo
+    public function referrer(): BelongsTo
     {
-        return $this->belongsTo(Partner::class, 'partner_id');
+        return $this->belongsTo(Referrer::class, 'referrer_id');
     }
 }

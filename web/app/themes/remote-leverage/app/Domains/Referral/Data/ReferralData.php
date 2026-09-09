@@ -7,7 +7,7 @@ namespace App\Domains\Referral\Data;
 readonly class ReferralData
 {
     public function __construct(
-        public int $partnerId,
+        public int $referrerId,
         public string $referralCode,
         public ?string $ipAddress = null,
         public ?string $userAgent = null,
@@ -22,7 +22,7 @@ readonly class ReferralData
     public static function fromArray(array $data): self
     {
         return new self(
-            partnerId: (int) $data['partner_id'],
+            referrerId: (int) $data['referrer_id'],
             referralCode: $data['referral_code'],
             ipAddress: $data['ip_address'] ?? null,
             userAgent: $data['user_agent'] ?? null,
@@ -38,7 +38,7 @@ readonly class ReferralData
     public function toArray(): array
     {
         return [
-            'partner_id' => $this->partnerId,
+            'referrer_id' => $this->referrerId,
             'referral_code' => $this->referralCode,
             'ip_address' => $this->ipAddress,
             'user_agent' => $this->userAgent,

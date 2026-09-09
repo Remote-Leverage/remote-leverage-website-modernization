@@ -23,6 +23,7 @@ class ReferralClick extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'referrer_id',
         'referrer_user_id',
         'referrer_slug',
         'landing_page',

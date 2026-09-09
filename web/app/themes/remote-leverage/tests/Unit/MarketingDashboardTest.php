@@ -34,7 +34,7 @@ describe('MarketingDashboard Executive Modernization', function () {
             ->toContain('rl_dashboard_channels')
             ->toContain('rl_dashboard_recent_leads')
             ->toContain('rl_dashboard_domains')
-            ->toContain('rl_dashboard_partner_hub')
+            ->toContain('rl_dashboard_referrer_network')
             ->toContain('rl_dashboard_site_health')
             ->toContain('rl_dashboard_marketing_shortcuts');
     });
@@ -121,7 +121,7 @@ describe('MarketingDashboard Executive Modernization', function () {
         // Must cover all core architectural domains
         expect($output)->toContain('Lead Domain')
             ->toContain('Scheduling Domain')
-            ->toContain('PartnerHub & Referral')
+            ->toContain('Referrer Network & Referral')
             ->toContain('Tracking Domain')
             ->toContain('Content Modernization')
             ->toContain('rl-dash-domain-card');
@@ -130,18 +130,18 @@ describe('MarketingDashboard Executive Modernization', function () {
         expect(preg_match($emojiPattern, $output))->toBe(0);
     });
 
-    it('renders Partner Hub & Referral Revenue widget with affiliate KPIs', function () {
+    it('renders Referrer Network & Revenue widget with affiliate KPIs', function () {
         $dashboard = new MarketingDashboard();
 
         ob_start();
-        $dashboard->renderPartnerHubWidget();
+        $dashboard->renderReferrerNetworkWidget();
         $output = ob_get_clean();
 
-        expect($output)->toContain('PARTNERS')
+        expect($output)->toContain('REFERRERS')
             ->toContain('REFERRALS')
             ->toContain('PAID OUT')
             ->toContain('Stripe Connect Payout Gateway')
-            ->toContain('Manage Partner Network')
+            ->toContain('Manage Referrer Network')
             ->toContain('rl-dash-kpi-grid');
 
         $emojiPattern = '/[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F700}-\x{1F77F}\x{1F780}-\x{1F7FF}\x{1F800}-\x{1F8FF}\x{1F900}-\x{1F9FF}\x{1FA00}-\x{1FA6F}\x{1FA70}-\x{1FAFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u';

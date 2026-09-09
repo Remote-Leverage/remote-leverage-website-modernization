@@ -158,8 +158,8 @@
         <a href="{{ home_url('/privacy-policy') }}" class="hover:text-slate-300 transition-colors">
           {{ __('Privacy Policy', 'remote-leverage') }}
         </a>
-        <a href="{{ home_url('/partner-portal') }}" class="hover:text-slate-300 transition-colors">
-          {{ __('Partner Portal', 'remote-leverage') }}
+        <a href="{{ home_url('/referrer-portal') }}" class="hover:text-slate-300 transition-colors">
+          {{ __('Referrer Portal', 'remote-leverage') }}
         </a>
       </div>
     </div>

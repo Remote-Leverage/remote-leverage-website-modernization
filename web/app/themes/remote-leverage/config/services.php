@@ -57,4 +57,9 @@ return [
     'webhooks' => [
         'lead_webhook_url' => env('LEAD_WEBHOOK_URL'),
     ],
+
+    'referral' => [
+        'default_reward_amount' => env('REFERRAL_DEFAULT_REWARD_AMOUNT', 14.00),
+        'webhook_url' => env('REFERRAL_WEBHOOK_URL'),
+    ],
 ];
