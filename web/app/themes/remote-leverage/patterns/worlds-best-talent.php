@@ -1,4 +1,7 @@
 <?php
+
+use App\Support\BlockDefaults;
+
 /**
  * Title: World's Best Talent - 6 Benefit Cards
  * Slug: remote-leverage/worlds-best-talent
@@ -32,6 +35,6 @@
     </div>
     <!-- /wp:columns -->
 
-    <?php echo \App\Support\BlockDefaults::renderFeatureCards('3'); ?>
+    <?php echo BlockDefaults::renderFeatureCards('3'); ?>
 </div>
 <!-- /wp:group -->

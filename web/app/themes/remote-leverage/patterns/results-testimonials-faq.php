@@ -1,4 +1,7 @@
 <?php
+
+use App\Support\BlockDefaults;
+
 /**
  * Title: Results, Not Promises - Testimonials & FAQ
  * Slug: remote-leverage/results-testimonials-faq
@@ -32,8 +35,8 @@
     </div>
     <!-- /wp:columns -->
 
-    <?php echo \App\Support\BlockDefaults::renderTestimonials(); ?>
+    <?php echo BlockDefaults::renderTestimonials(); ?>
 
-    <?php echo \App\Support\BlockDefaults::renderAccordionFaq(); ?>
+    <?php echo BlockDefaults::renderAccordionFaq(); ?>
 </div>
 <!-- /wp:group -->

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Blocks;
 
+use App\Support\BlockDefaults;
 use Log1x\AcfComposer\Block;
 use Log1x\AcfComposer\Builder;
 
@@ -36,9 +37,9 @@ class RolesGridBlock extends Block
     public function with(): array
     {
         return [
-            'eyebrow' => \App\Support\BlockDefaults::cleanText((function_exists('get_field') ? get_field('eyebrow') : null) ?: '2.5K+ pre-vetted candidates'),
-            'headline' => \App\Support\BlockDefaults::cleanText((function_exists('get_field') ? get_field('headline') : null) ?: 'The Roles That Buy Back Your Time'),
-            'ctaText' => \App\Support\BlockDefaults::cleanText((function_exists('get_field') ? get_field('cta_text') : null) ?: 'BOOK A FREE CONSULTATION'),
+            'eyebrow' => BlockDefaults::cleanText((function_exists('get_field') ? get_field('eyebrow') : null) ?: '2.5K+ pre-vetted candidates'),
+            'headline' => BlockDefaults::cleanText((function_exists('get_field') ? get_field('headline') : null) ?: 'The Roles That Buy Back Your Time'),
+            'ctaText' => BlockDefaults::cleanText((function_exists('get_field') ? get_field('cta_text') : null) ?: 'BOOK A FREE CONSULTATION'),
             'ctaUrl' => (function_exists('get_field') ? get_field('cta_url') : null) ?: '#booking-footer',
             'cards' => $this->cards(),
         ];
@@ -70,9 +71,9 @@ class RolesGridBlock extends Block
                 'layout' => 'block',
                 'button_label' => 'Add Role Card',
             ])
-                ->addText('title', ['label' => 'Role Title'])
-                ->addTextarea('desc', ['label' => 'Role Description', 'rows' => 2])
-                ->addImage('img', ['label' => 'Role Visual / Photo', 'return_format' => 'url'])
+            ->addText('title', ['label' => 'Role Title'])
+            ->addTextarea('desc', ['label' => 'Role Description', 'rows' => 2])
+            ->addImage('img', ['label' => 'Role Visual / Photo', 'return_format' => 'url'])
             ->endRepeater();
 
         return $fields->build();
@@ -83,12 +84,13 @@ class RolesGridBlock extends Block
         $custom = function_exists('get_field') ? get_field('cards') : null;
         $cards = (! empty($custom) && is_array($custom))
             ? $custom
-            : \App\Support\BlockDefaults::rolesGridCards();
+            : BlockDefaults::rolesGridCards();
 
         return array_map(function ($card) {
-            $card['title'] = \App\Support\BlockDefaults::cleanText($card['title'] ?? '');
-            $card['desc'] = \App\Support\BlockDefaults::cleanText($card['desc'] ?? '');
-            $card['img'] = \App\Support\BlockDefaults::resolveImageUrl($card['img'] ?? '');
+            $card['title'] = BlockDefaults::cleanText($card['title'] ?? '');
+            $card['desc'] = BlockDefaults::cleanText($card['desc'] ?? '');
+            $card['img'] = BlockDefaults::resolveImageUrl($card['img'] ?? '');
+
             return $card;
         }, $cards);
     }

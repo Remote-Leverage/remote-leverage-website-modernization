@@ -87,9 +87,9 @@ class HireVaHeroBlock extends Block
     {
         $rawIsolatedSteps = get_field('isolated_steps');
         $isolatedSteps = [];
-        if (!empty($rawIsolatedSteps) && is_array($rawIsolatedSteps)) {
+        if (! empty($rawIsolatedSteps) && is_array($rawIsolatedSteps)) {
             foreach ($rawIsolatedSteps as $step) {
-                if (!empty($step['step_fields'])) {
+                if (! empty($step['step_fields'])) {
                     $isolatedSteps[] = [
                         'step_label' => $step['step_label'] ?? 'Step',
                         'step_fields' => is_array($step['step_fields']) ? array_values($step['step_fields']) : [$step['step_fields']],
@@ -112,7 +112,7 @@ class HireVaHeroBlock extends Block
         }
 
         $enableIsolated = get_field('enable_isolated_fields');
-        $enableIsolatedFields = !empty($rawIsolatedSteps) || ($enableIsolated === null || $enableIsolated === '' ? true : (bool) $enableIsolated);
+        $enableIsolatedFields = ! empty($rawIsolatedSteps) || ($enableIsolated === null || $enableIsolated === '' ? true : (bool) $enableIsolated);
 
         $hideHeader = get_field('hide_profile_header');
         $hideProfileHeader = $hideHeader === null ? true : (bool) $hideHeader;
@@ -122,7 +122,7 @@ class HireVaHeroBlock extends Block
 
         return [
             'badgeText' => get_field('badge_text') ?: "2,000+ businesses we've helped hire",
-            'headline' => get_field('headline') ?: "Latin American<br>Virtual Assistants<br>$6-$10 Per Hour",
+            'headline' => get_field('headline') ?: 'Latin American<br>Virtual Assistants<br>$6-$10 Per Hour',
             'bookingTitle' => get_field('booking_title') ?: 'Book a Free 15-Minute Consultation',
             'bookingSubtitle' => get_field('booking_subtitle') ?? '',
             'enableIsolatedFields' => $enableIsolatedFields,
@@ -152,7 +152,7 @@ class HireVaHeroBlock extends Block
             ])
             ->addTextarea('headline', [
                 'label' => 'Headline (HTML allowed)',
-                'default_value' => "Latin American<br>Virtual Assistants<br>$6-$10 Per Hour",
+                'default_value' => 'Latin American<br>Virtual Assistants<br>$6-$10 Per Hour',
                 'rows' => 3,
             ])
             ->addText('booking_title', [
@@ -194,23 +194,23 @@ class HireVaHeroBlock extends Block
                 'layout' => 'block',
                 'button_label' => 'Add Sub-Step',
             ])
-                ->addText('step_label', [
-                    'label' => 'Sub-Step Label',
-                    'default_value' => 'Step',
-                ])
-                ->addSelect('step_fields', [
-                    'label' => 'Fields in this Sub-Step',
-                    'choices' => [
-                        'email' => 'Work / Business Email',
-                        'monthly_revenue' => 'Monthly Revenue',
-                        'name' => 'Name (First & Last)',
-                        'phone' => 'Phone Number',
-                        'consent' => 'Terms & SMS Consent Checkbox',
-                    ],
-                    'multiple' => 1,
-                    'ui' => 1,
-                    'return_format' => 'value',
-                ])
+            ->addText('step_label', [
+                'label' => 'Sub-Step Label',
+                'default_value' => 'Step',
+            ])
+            ->addSelect('step_fields', [
+                'label' => 'Fields in this Sub-Step',
+                'choices' => [
+                    'email' => 'Work / Business Email',
+                    'monthly_revenue' => 'Monthly Revenue',
+                    'name' => 'Name (First & Last)',
+                    'phone' => 'Phone Number',
+                    'consent' => 'Terms & SMS Consent Checkbox',
+                ],
+                'multiple' => 1,
+                'ui' => 1,
+                'return_format' => 'value',
+            ])
             ->endRepeater();
 
         return $hero->build();

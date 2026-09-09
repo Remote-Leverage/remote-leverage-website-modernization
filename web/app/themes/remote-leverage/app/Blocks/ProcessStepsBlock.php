@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Blocks;
 
+use App\Support\BlockDefaults;
 use Log1x\AcfComposer\Block;
 use Log1x\AcfComposer\Builder;
 
@@ -74,11 +75,12 @@ class ProcessStepsBlock extends Block
         $items = function_exists('get_field') ? get_field('steps') : null;
         $steps = (! empty($items) && is_array($items))
             ? $items
-            : \App\Support\BlockDefaults::steps();
+            : BlockDefaults::steps();
 
         return array_map(function ($step) {
-            $step['title'] = \App\Support\BlockDefaults::cleanText($step['title'] ?? '');
-            $step['desc'] = \App\Support\BlockDefaults::cleanText($step['desc'] ?? '');
+            $step['title'] = BlockDefaults::cleanText($step['title'] ?? '');
+            $step['desc'] = BlockDefaults::cleanText($step['desc'] ?? '');
+
             return $step;
         }, $steps);
     }

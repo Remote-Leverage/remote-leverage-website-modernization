@@ -8,7 +8,7 @@ use App\Infrastructure\WordPress\Admin\WordPressAdminTheme;
 
 describe('WordPressAdminTheme Branding & Modernization', function () {
     it('generates Remote Leverage ISO SVG and Data URI with correct geometry', function () {
-        $theme = new WordPressAdminTheme();
+        $theme = new WordPressAdminTheme;
 
         $svg = $theme->getIsoSvg('#09090B', 24);
         expect($svg)->toContain('<svg width="24" height="24"')
@@ -22,7 +22,7 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
     });
 
     it('generates comprehensive shadcn/ui zinc global admin CSS without triangle arrows', function () {
-        $theme = new WordPressAdminTheme();
+        $theme = new WordPressAdminTheme;
         $css = $theme->getGlobalAdminCss();
 
         expect($css)->toContain('body.wp-admin')
@@ -39,7 +39,7 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
     });
 
     it('generates sleek shadcn/ui login CSS with Remote Leverage ISO and zero browser outlines', function () {
-        $theme = new WordPressAdminTheme();
+        $theme = new WordPressAdminTheme;
         $css = $theme->getLoginCss();
 
         expect($css)->toContain('body.login')
@@ -52,7 +52,7 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
     });
 
     it('customizes footer attribution and login headers cleanly', function () {
-        $theme = new WordPressAdminTheme();
+        $theme = new WordPressAdminTheme;
 
         expect($theme->customizeFooterText())->toContain('Remote Leverage Admin Console')
             ->and($theme->customizeFooterVersion())->toContain('v2.0')
@@ -60,8 +60,8 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
     });
 
     it('adds notifications center node to admin bar top-secondary', function () {
-        $theme = new WordPressAdminTheme();
-        $adminBar = new \WP_Admin_Bar();
+        $theme = new WordPressAdminTheme;
+        $adminBar = new \WP_Admin_Bar;
 
         $theme->customizeAdminBarLogo($adminBar);
 
@@ -75,7 +75,7 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
     });
 
     it('renders notifications drawer markup with bell, actions, and empty state', function () {
-        $theme = new WordPressAdminTheme();
+        $theme = new WordPressAdminTheme;
 
         ob_start();
         $theme->renderNotificationsCenterMarkup();
@@ -93,7 +93,7 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
     });
 
     it('generates notifications center CSS in global admin styles', function () {
-        $theme = new WordPressAdminTheme();
+        $theme = new WordPressAdminTheme;
         $css = $theme->getGlobalAdminCss();
 
         expect($css)->toContain('#wpadminbar #wp-admin-bar-rl-notifications')
@@ -106,7 +106,7 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
     });
 
     it('generates unified admin bar CSS containing brand ISO, dropdown styles, and sticky header fixes', function () {
-        $theme = new WordPressAdminTheme();
+        $theme = new WordPressAdminTheme;
         $css = $theme->getAdminBarCss();
 
         expect($css)->toContain('#wpadminbar')
@@ -122,8 +122,8 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
     });
 
     it('removes customize and search clutter and configures admin console navigation', function () {
-        $theme = new WordPressAdminTheme();
-        $adminBar = new \WP_Admin_Bar();
+        $theme = new WordPressAdminTheme;
+        $adminBar = new \WP_Admin_Bar;
 
         // Seed nodes that exist by default on front-end
         $adminBar->add_node(['id' => 'customize', 'title' => 'Customize']);
@@ -158,13 +158,13 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
     });
 
     it('strictly contains zero unicode emojis', function () {
-        $theme = new WordPressAdminTheme();
+        $theme = new WordPressAdminTheme;
 
         ob_start();
         $theme->renderNotificationsCenterMarkup();
         $markup = ob_get_clean();
 
-        $allContent = $theme->getGlobalAdminCss() . $theme->getAdminBarCss() . $theme->getLoginCss() . $theme->customizeFooterText() . $markup;
+        $allContent = $theme->getGlobalAdminCss().$theme->getAdminBarCss().$theme->getLoginCss().$theme->customizeFooterText().$markup;
 
         // Regex detecting any Unicode emojis
         $emojiPattern = '/[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F700}-\x{1F77F}\x{1F780}-\x{1F7FF}\x{1F800}-\x{1F8FF}\x{1F900}-\x{1F9FF}\x{1FA00}-\x{1FA6F}\x{1FA70}-\x{1FAFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u';
@@ -172,4 +172,3 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
         expect(preg_match($emojiPattern, $allContent))->toBe(0);
     });
 });
-

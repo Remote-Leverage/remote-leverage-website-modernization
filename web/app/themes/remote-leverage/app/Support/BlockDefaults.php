@@ -89,9 +89,9 @@ class BlockDefaults
             return self::homeImg(substr($path, 5));
         }
 
-        $themePath = get_theme_file_path('public/images/' . $path);
+        $themePath = get_theme_file_path('public/images/'.$path);
         if (is_file($themePath)) {
-            return esc_url(set_url_scheme(get_template_directory_uri() . '/public/images/' . $path, 'https'));
+            return esc_url(set_url_scheme(get_template_directory_uri().'/public/images/'.$path, 'https'));
         }
 
         return self::homeImg(basename($path));
@@ -114,27 +114,27 @@ class BlockDefaults
         $file = ltrim($file, '/');
         $name = pathinfo($file, PATHINFO_FILENAME);
         $dirs = [
-            WP_CONTENT_DIR . '/uploads/home' => content_url('/uploads/home'),
-            WP_CONTENT_DIR . '/uploads/hire-va-4' => content_url('/uploads/hire-va-4'),
-            WP_CONTENT_DIR . '/uploads/2026/09' => content_url('/uploads/2026/09'),
-            WP_CONTENT_DIR . '/uploads/2026/07' => content_url('/uploads/2026/07'),
-            WP_CONTENT_DIR . '/uploads/2026/06' => content_url('/uploads/2026/06'),
-            WP_CONTENT_DIR . '/uploads/2026/05' => content_url('/uploads/2026/05'),
-            WP_CONTENT_DIR . '/uploads/2026/04' => content_url('/uploads/2026/04'),
-            get_theme_file_path('public/images/home') => get_template_directory_uri() . '/public/images/home',
-            get_theme_file_path('public/images/hire-va-4') => get_template_directory_uri() . '/public/images/hire-va-4',
+            WP_CONTENT_DIR.'/uploads/home' => content_url('/uploads/home'),
+            WP_CONTENT_DIR.'/uploads/hire-va-4' => content_url('/uploads/hire-va-4'),
+            WP_CONTENT_DIR.'/uploads/2026/09' => content_url('/uploads/2026/09'),
+            WP_CONTENT_DIR.'/uploads/2026/07' => content_url('/uploads/2026/07'),
+            WP_CONTENT_DIR.'/uploads/2026/06' => content_url('/uploads/2026/06'),
+            WP_CONTENT_DIR.'/uploads/2026/05' => content_url('/uploads/2026/05'),
+            WP_CONTENT_DIR.'/uploads/2026/04' => content_url('/uploads/2026/04'),
+            get_theme_file_path('public/images/home') => get_template_directory_uri().'/public/images/home',
+            get_theme_file_path('public/images/hire-va-4') => get_template_directory_uri().'/public/images/hire-va-4',
         ];
 
         foreach ($dirs as $dir => $url) {
             foreach (['webp', 'png', 'jpg', 'jpeg', 'svg'] as $ext) {
-                $path = $dir . '/' . $name . '.' . $ext;
+                $path = $dir.'/'.$name.'.'.$ext;
                 if (is_file($path)) {
-                    return esc_url(set_url_scheme(rtrim($url, '/') . '/' . $name . '.' . $ext, 'https'));
+                    return esc_url(set_url_scheme(rtrim($url, '/').'/'.$name.'.'.$ext, 'https'));
                 }
             }
         }
 
-        return esc_url(set_url_scheme(self::imgBase() . '/' . $file, 'https'));
+        return esc_url(set_url_scheme(self::imgBase().'/'.$file, 'https'));
     }
 
     /**
@@ -231,13 +231,14 @@ class BlockDefaults
             }
             $formatted[] = $formattedRow;
         }
+
         return $formatted;
     }
 
     public static function encodeRepeater(string $fieldName, string $fieldKey, array $rows, array &$data = []): array
     {
         $data[$fieldName] = count($rows);
-        $data['_' . $fieldName] = $fieldKey;
+        $data['_'.$fieldName] = $fieldKey;
         foreach ($rows as $i => $row) {
             foreach ($row as $subfield => $val) {
                 $encodedVal = self::getAttachmentId($val);
@@ -245,6 +246,7 @@ class BlockDefaults
                 $data["_{$fieldName}_{$i}_{$subfield}"] = "{$fieldKey}_{$subfield}";
             }
         }
+
         return $data;
     }
 
@@ -257,7 +259,7 @@ class BlockDefaults
             'mode' => 'preview',
         ], $attrs);
 
-        return '<!-- wp:acf/' . $slug . ' ' . json_encode($blockAttrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ' /-->';
+        return '<!-- wp:acf/'.$slug.' '.json_encode($blockAttrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE).' /-->';
     }
 
     // --- PROCESS STEPS ---
@@ -286,6 +288,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('steps', 'field_process_steps_block_steps', self::steps(), $data);
+
         return self::patternBlock('process-steps', array_merge($data, $overrides));
     }
 
@@ -293,6 +296,7 @@ class BlockDefaults
     public static function departmentCards(): array
     {
         $img = self::imgBase();
+
         return [
             [
                 'img' => self::homeImg('magnific_half-body-shot-of-a-young_SOmwQLyUb8-1.webp'),
@@ -321,6 +325,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('cards', 'field_department_cards_block_cards', self::departmentCards(), $data);
+
         return self::patternBlock('department-cards', array_merge($data, $overrides));
     }
 
@@ -395,6 +400,7 @@ class BlockDefaults
             '_columns' => 'field_feature_cards_block_columns',
         ];
         self::encodeRepeater('cards', 'field_feature_cards_block_cards', self::featureCards($columns), $data);
+
         return self::patternBlock('feature-cards', array_merge($data, $overrides));
     }
 
@@ -421,6 +427,7 @@ class BlockDefaults
             '_col_2_header' => 'field_data_table_block_col_2_header',
         ];
         self::encodeRepeater('rows', 'field_data_table_block_rows', self::dataTableRows(), $data);
+
         return self::patternBlock('data-table', array_merge($data, $overrides));
     }
 
@@ -437,6 +444,7 @@ class BlockDefaults
             'timeframe' => "Last 12\nMonths",
             '_timeframe' => 'field_trust_stats_block_timeframe',
         ];
+
         return self::patternBlock('trust-stats', array_merge($data, $overrides));
     }
 
@@ -444,6 +452,7 @@ class BlockDefaults
     public static function testimonials(): array
     {
         $img = self::imgBase();
+
         return [
             [
                 'video_url' => 'https://vimeo.com/1067577208',
@@ -557,6 +566,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('testimonials', 'field_testimonials_block_testimonials', self::testimonials(), $data);
+
         return self::patternBlock('testimonials', array_merge($data, $overrides));
     }
 
@@ -624,6 +634,7 @@ class BlockDefaults
             '_headline' => 'field_accordion_faq_block_headline',
         ];
         self::encodeRepeater('faqs', 'field_accordion_faq_block_faqs', self::faqsForAcf(), $data);
+
         return self::patternBlock('accordion-faq', array_merge($data, $overrides));
     }
 
@@ -631,6 +642,7 @@ class BlockDefaults
     public static function logos(): array
     {
         $img = self::imgBase();
+
         return [
             ['src' => self::homeImg('brrrr-1.webp'), 'alt' => 'BRRRR'],
             ['src' => self::homeImg('carbon-1.webp'), 'alt' => 'Carbon Solutions'],
@@ -658,6 +670,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('logos', 'field_client_logos_marquee_block_logos', self::logos(), $data);
+
         return self::patternBlock('client-logos-marquee', array_merge($data, $overrides), ['align' => 'full']);
     }
 
@@ -665,6 +678,7 @@ class BlockDefaults
     public static function talentCards(): array
     {
         $img = self::imgBase();
+
         return [
             [
                 'name' => 'Daniela Costa',
@@ -750,6 +764,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('talent_cards', 'field_talent_marquee_block_talent_cards', self::talentCards(), $data);
+
         return self::patternBlock('talent-marquee', array_merge($data, $overrides), ['align' => 'full']);
     }
 
@@ -762,6 +777,7 @@ class BlockDefaults
     public static function rolesGridCards(): array
     {
         $img = self::imgBaseHireVa4();
+
         return [
             [
                 'title' => 'Administrative',
@@ -810,6 +826,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('cards', 'field_roles_grid_block_cards', self::rolesGridCards(), $data);
+
         return self::patternBlock('roles-grid', array_merge($data, $overrides));
     }
 
@@ -839,6 +856,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('steps', 'field_process_steps_block_steps', self::hireVa4ProcessSteps(), $data);
+
         return self::patternBlock('process-steps', array_merge($data, $overrides));
     }
 
@@ -846,6 +864,7 @@ class BlockDefaults
     public static function hireVa4Testimonials(): array
     {
         $img = self::imgBaseHireVa4();
+
         return [
             [
                 'company' => 'PRES Property Management',
@@ -952,6 +971,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('testimonials', 'field_testimonials_block_testimonials', self::hireVa4Testimonials(), $data);
+
         return self::patternBlock('testimonials', array_merge($data, $overrides));
     }
 
@@ -1014,6 +1034,7 @@ class BlockDefaults
             $data["faqs_{$i}_answer"] = $item['a'];
             $data["_faqs_{$i}_answer"] = 'field_accordion_faq_block_faqs_answer';
         }
+
         return self::patternBlock('accordion-faq', array_merge($data, $overrides));
     }
 }

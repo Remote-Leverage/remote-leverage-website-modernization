@@ -1,12 +1,14 @@
 <?php
+
+use App\Support\BlockDefaults;
+
 /**
  * Title: Hero - Great Talent Changes Everything
  * Slug: remote-leverage/hero
  * Categories: remote-leverage
  * Description: Homepage hero section with headline, FIND MY NEXT HIRE CTA, and talent cards marquee.
  */
-
-$imgBase = get_template_directory_uri() . '/public/images/home';
+$imgBase = get_template_directory_uri().'/public/images/home';
 ?>
 <!-- wp:group {"align":"full","className":"relative overflow-hidden rl-hero-group","style":{"spacing":{"padding":{"top":"3.5rem","bottom":"1rem"}}},"backgroundColor":"bg-light","layout":{"type":"default"}} -->
 <div class="wp-block-group alignfull relative overflow-hidden rl-hero-group has-bg-light-background-color has-background" style="padding-top:3.5rem;padding-bottom:1rem">
@@ -34,6 +36,6 @@ $imgBase = get_template_directory_uri() . '/public/images/home';
     </div>
     <!-- /wp:group -->
 
-    <?= \App\Support\BlockDefaults::renderTalentMarquee() ?>
+    <?= BlockDefaults::renderTalentMarquee() ?>
 </div>
 <!-- /wp:group -->

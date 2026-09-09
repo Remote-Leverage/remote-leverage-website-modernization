@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Blocks;
 
+use App\Support\BlockDefaults;
 use Log1x\AcfComposer\Block;
 use Log1x\AcfComposer\Builder;
 
@@ -81,10 +82,11 @@ class TestimonialsBlock extends Block
         $items = function_exists('get_field') ? get_field('testimonials') : null;
         $testimonials = (! empty($items) && is_array($items))
             ? $items
-            : \App\Support\BlockDefaults::testimonials();
+            : BlockDefaults::testimonials();
 
         return array_map(function ($item) {
-            $item['image'] = \App\Support\BlockDefaults::resolveImageUrl($item['image'] ?? '');
+            $item['image'] = BlockDefaults::resolveImageUrl($item['image'] ?? '');
+
             return $item;
         }, $testimonials);
     }

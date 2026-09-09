@@ -6,6 +6,8 @@
 
 namespace App;
 
+use App\Support\BlockDefaults;
+
 /**
  * Add "… Continued" to the excerpt.
  *
@@ -16,4 +18,4 @@ add_filter('excerpt_more', function () {
 });
 
 // Initialize default demo content hooks for ACF blocks and patterns
-\App\Support\BlockDefaults::init();
+BlockDefaults::init();

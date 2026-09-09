@@ -5,8 +5,7 @@
  * Categories: remote-leverage
  * Description: High-converting final call-to-action with embedded reactive booking wizard.
  */
-
-$imgBase = get_template_directory_uri() . '/public/images/home';
+$imgBase = get_template_directory_uri().'/public/images/home';
 ?>
 <!-- wp:group {"align":"full","className":"relative overflow-hidden rl-booking-footer-group","style":{"spacing":{"padding":{"top":"6rem","bottom":"6rem"}}},"backgroundColor":"brand-dark-violet","textColor":"white","layout":{"type":"constrained","contentSize":"1380px"}} -->
 <div class="wp-block-group alignfull relative overflow-hidden rl-booking-footer-group has-white-color has-brand-dark-violet-background-color has-text-color has-background" id="booking-footer" style="padding-top:6rem;padding-bottom:6rem">

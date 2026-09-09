@@ -7,9 +7,10 @@ namespace App\Infrastructure\WordPress\Admin;
 use App\Domains\ContentAudit\Services\ElementorAuditService;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
-use App\Domains\Referral\Models\Referrer;
 use App\Domains\Referral\Models\Payout;
 use App\Domains\Referral\Models\Referral;
+use App\Domains\Referral\Models\Referrer;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -216,38 +217,38 @@ class MarketingDashboard
                 <div class="rl-dash-chart-body">
                     <?php
                     $maxDaily = 1;
-                    foreach ($dailyVolume as $day) {
-                        if ($day['count'] > $maxDaily) {
-                            $maxDaily = $day['count'];
-                        }
-                    }
-                    ?>
+        foreach ($dailyVolume as $day) {
+            if ($day['count'] > $maxDaily) {
+                $maxDaily = $day['count'];
+            }
+        }
+        ?>
                     <div class="rl-dash-barchart-grid">
-                        <?php foreach ($dailyVolume as $day) :
+                        <?php foreach ($dailyVolume as $day) {
                             $count = $day['count'];
                             $pct = $count > 0 ? max(14, (int) round(($count / $maxDaily) * 100)) : 0;
                             $isPeak = $count === $maxDaily && $count > 0;
                             ?>
                             <div class="rl-dash-bar-col">
                                 <div class="rl-dash-bar-val-wrap">
-                                    <?php if ($count > 0) : ?>
+                                    <?php if ($count > 0) { ?>
                                         <span class="rl-dash-bar-val <?php echo $isPeak ? 'rl-val-peak' : ''; ?>"><?php echo esc_html((string) $count); ?></span>
-                                    <?php else : ?>
+                                    <?php } else { ?>
                                         <span class="rl-dash-bar-val-empty">&ndash;</span>
-                                    <?php endif; ?>
+                                    <?php } ?>
                                 </div>
                                 <div class="rl-dash-bar-slot">
-                                    <?php if ($count > 0) : ?>
+                                    <?php if ($count > 0) { ?>
                                         <div class="rl-dash-bar-fill-v <?php echo $isPeak ? 'rl-bar-peak' : ''; ?>" style="height: <?php echo esc_attr((string) $pct); ?>%;" title="<?php echo esc_attr($day['label'].': '.$count.' leads'); ?>"></div>
-                                    <?php else : ?>
+                                    <?php } else { ?>
                                         <div class="rl-dash-bar-fill-zero" title="<?php echo esc_attr($day['label'].': 0 leads'); ?>"></div>
-                                    <?php endif; ?>
+                                    <?php } ?>
                                 </div>
                                 <div class="rl-dash-bar-label-wrap">
                                     <span class="rl-dash-bar-day <?php echo $isPeak ? 'rl-day-peak' : ''; ?>"><?php echo esc_html($day['label']); ?></span>
                                 </div>
                             </div>
-                        <?php endforeach; ?>
+                        <?php } ?>
                     </div>
                 </div>
             </div>
@@ -282,29 +283,29 @@ class MarketingDashboard
                 <span class="rl-dash-badge-subtle"><?php echo esc_html((string) count($sources)); ?> Detected Sources</span>
             </div>
 
-            <?php if (! empty($sources)) : ?>
+            <?php if (! empty($sources)) { ?>
                 <!-- Stacked horizontal bar chart -->
                 <div class="rl-dash-stacked-bar">
                     <?php
                     $colorIdx = 0;
-                    foreach ($sources as $source => $count) :
-                        $pct = round(($count / $total) * 100, 1);
-                        $color = $palette[$colorIdx % count($palette)];
-                        $colorIdx++;
-                        ?>
+                foreach ($sources as $source => $count) {
+                    $pct = round(($count / $total) * 100, 1);
+                    $color = $palette[$colorIdx % count($palette)];
+                    $colorIdx++;
+                    ?>
                         <div class="rl-dash-stacked-seg" style="width: <?php echo esc_attr((string) max(3, $pct)); ?>%; background-color: <?php echo esc_attr($color); ?>;" title="<?php echo esc_attr($source.': '.$count.' ('.$pct.'%)'); ?>"></div>
-                    <?php endforeach; ?>
+                    <?php } ?>
                 </div>
 
                 <div class="rl-dash-channels-grid">
                     <?php
                     $colorIdx = 0;
-                    foreach ($sources as $source => $count) :
-                        $pct = round(($count / $total) * 100, 1);
-                        $color = $palette[$colorIdx % count($palette)];
-                        $colorIdx++;
-                        $filterUrl = admin_url('admin.php?page=rl-leads&s='.urlencode($source));
-                        ?>
+                foreach ($sources as $source => $count) {
+                    $pct = round(($count / $total) * 100, 1);
+                    $color = $palette[$colorIdx % count($palette)];
+                    $colorIdx++;
+                    $filterUrl = admin_url('admin.php?page=rl-leads&s='.urlencode($source));
+                    ?>
                         <div class="rl-dash-channel-item">
                             <div class="rl-dash-channel-left">
                                 <span class="rl-dash-color-dot" style="background-color: <?php echo esc_attr($color); ?>;"></span>
@@ -316,13 +317,13 @@ class MarketingDashboard
                                 <a href="<?php echo esc_url($filterUrl); ?>" class="rl-dash-channel-link" title="Filter leads by <?php echo esc_attr($source); ?>">&rarr;</a>
                             </div>
                         </div>
-                    <?php endforeach; ?>
+                    <?php } ?>
                 </div>
-            <?php else : ?>
+            <?php } else { ?>
                 <div class="rl-dash-empty">
                     <p>No attribution sources recorded yet. UTM tags on inbound campaign links will populate here automatically.</p>
                 </div>
-            <?php endif; ?>
+            <?php } ?>
         </div>
         <?php
     }
@@ -520,7 +521,7 @@ class MarketingDashboard
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($recentLeads as $lead) : ?>
+                    <?php foreach ($recentLeads as $lead) { ?>
                         <?php
                         $name = trim($lead->name ?: ($lead->first_name.' '.$lead->last_name));
                         if (empty($name)) {
@@ -551,15 +552,15 @@ class MarketingDashboard
                                 </div>
                             </td>
                             <td>
-                                <?php if ($isT10) : ?>
+                                <?php if ($isT10) { ?>
                                     <span class="rl-badge-dark" title="<?php echo esc_attr($lead->monthly_revenue ?: ''); ?>">
                                         &ge; $10k MRR
                                     </span>
-                                <?php else : ?>
+                                <?php } else { ?>
                                     <span class="rl-badge-subtle" title="<?php echo esc_attr($lead->monthly_revenue ?: ''); ?>">
                                         &lt; $10k MRR
                                     </span>
-                                <?php endif; ?>
+                                <?php } ?>
                             </td>
                             <td>
                                 <span class="<?php echo esc_attr($statusClass); ?>">
@@ -575,7 +576,7 @@ class MarketingDashboard
                                 </a>
                             </td>
                         </tr>
-                    <?php endforeach; ?>
+                    <?php } ?>
                 </tbody>
             </table>
 
@@ -835,15 +836,18 @@ class MarketingDashboard
 
                 try {
                     $referrerCount = Referrer::count();
-                } catch (\Throwable) {}
+                } catch (\Throwable) {
+                }
 
                 try {
                     $referralCount = Referral::count();
-                } catch (\Throwable) {}
+                } catch (\Throwable) {
+                }
 
                 try {
                     $payoutsSum = (float) Payout::where('status', 'completed')->sum('amount');
-                } catch (\Throwable) {}
+                } catch (\Throwable) {
+                }
 
                 return [
                     'leads' => [
@@ -873,7 +877,7 @@ class MarketingDashboard
     /**
      * Retrieve latest leads for the dashboard stream.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, Lead>
+     * @return Collection<int, Lead>
      */
     protected function getRecentLeads(int $limit = 6)
     {

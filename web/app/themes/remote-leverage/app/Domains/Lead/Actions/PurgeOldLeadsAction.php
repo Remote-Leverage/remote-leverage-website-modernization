@@ -6,6 +6,7 @@ namespace App\Domains\Lead\Actions;
 
 use App\Domains\Lead\Models\Lead;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class PurgeOldLeadsAction
@@ -46,7 +47,7 @@ class PurgeOldLeadsAction
             ]);
         }
 
-        \Illuminate\Support\Facades\Cache::forget('rl_lead_dashboard_kpi_metrics');
+        Cache::forget('rl_lead_dashboard_kpi_metrics');
 
         return $count;
     }

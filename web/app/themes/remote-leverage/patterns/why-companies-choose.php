@@ -1,4 +1,7 @@
 <?php
+
+use App\Support\BlockDefaults;
+
 /**
  * Title: Why Companies Choose Remote Leverage
  * Slug: remote-leverage/why-companies-choose
@@ -14,8 +17,8 @@
     </h2>
     <!-- /wp:heading -->
 
-    <?php echo \App\Support\BlockDefaults::renderFeatureCards('4'); ?>
+    <?php echo BlockDefaults::renderFeatureCards('4'); ?>
 
-    <?php echo \App\Support\BlockDefaults::renderDataTable(); ?>
+    <?php echo BlockDefaults::renderDataTable(); ?>
 </div>
 <!-- /wp:group -->

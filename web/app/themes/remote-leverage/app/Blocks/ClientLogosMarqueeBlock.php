@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Blocks;
 
+use App\Support\BlockDefaults;
 use Log1x\AcfComposer\Block;
 use Log1x\AcfComposer\Builder;
 
@@ -62,10 +63,11 @@ class ClientLogosMarqueeBlock extends Block
         $custom = function_exists('get_field') ? get_field('logos') : null;
         $logos = (! empty($custom) && is_array($custom))
             ? $custom
-            : \App\Support\BlockDefaults::logos();
+            : BlockDefaults::logos();
 
         return array_map(function ($logo) {
-            $logo['src'] = \App\Support\BlockDefaults::resolveImageUrl($logo['src'] ?? '');
+            $logo['src'] = BlockDefaults::resolveImageUrl($logo['src'] ?? '');
+
             return $logo;
         }, $logos);
     }

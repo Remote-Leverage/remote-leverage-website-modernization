@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use App\Domains\Lead\Models\Lead;
 use App\Infrastructure\WordPress\Admin\MarketingDashboard;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 
 describe('MarketingDashboard Executive Modernization', function () {
     it('instantiates cleanly and registers wp_dashboard_setup hook', function () {
-        $dashboard = new MarketingDashboard();
+        $dashboard = new MarketingDashboard;
 
         // In test environment, add_action might be mocked or no-op
         $dashboard->register();
@@ -19,7 +17,7 @@ describe('MarketingDashboard Executive Modernization', function () {
     });
 
     it('removes legacy blog widgets and adds modern remote leverage widgets during dashboard setup', function () {
-        $dashboard = new MarketingDashboard();
+        $dashboard = new MarketingDashboard;
 
         $GLOBALS['rl_removed_meta_boxes'] = [];
         $GLOBALS['rl_added_dashboard_widgets'] = [];
@@ -40,7 +38,7 @@ describe('MarketingDashboard Executive Modernization', function () {
     });
 
     it('renders Marketing KPIs widget without emojis and with executive metrics', function () {
-        $dashboard = new MarketingDashboard();
+        $dashboard = new MarketingDashboard;
 
         ob_start();
         $dashboard->renderKpisWidget();
@@ -59,7 +57,7 @@ describe('MarketingDashboard Executive Modernization', function () {
     });
 
     it('renders Recent Leads widget with empty state or lead stream table', function () {
-        $dashboard = new MarketingDashboard();
+        $dashboard = new MarketingDashboard;
 
         ob_start();
         $dashboard->renderRecentLeadsWidget();
@@ -78,7 +76,7 @@ describe('MarketingDashboard Executive Modernization', function () {
     });
 
     it('renders Platform & Site Health widget with Bedrock and integration statuses', function () {
-        $dashboard = new MarketingDashboard();
+        $dashboard = new MarketingDashboard;
 
         ob_start();
         $dashboard->renderSiteHealthWidget();
@@ -97,7 +95,7 @@ describe('MarketingDashboard Executive Modernization', function () {
     });
 
     it('renders Traffic Acquisition & Attribution Channels widget with visual channel distribution', function () {
-        $dashboard = new MarketingDashboard();
+        $dashboard = new MarketingDashboard;
 
         ob_start();
         $dashboard->renderChannelsWidget();
@@ -112,7 +110,7 @@ describe('MarketingDashboard Executive Modernization', function () {
     });
 
     it('renders Domain Architecture & Multi-Service Status widget covering all domains', function () {
-        $dashboard = new MarketingDashboard();
+        $dashboard = new MarketingDashboard;
 
         ob_start();
         $dashboard->renderDomainsWidget();
@@ -131,7 +129,7 @@ describe('MarketingDashboard Executive Modernization', function () {
     });
 
     it('renders Referrer Network & Revenue widget with affiliate KPIs', function () {
-        $dashboard = new MarketingDashboard();
+        $dashboard = new MarketingDashboard;
 
         ob_start();
         $dashboard->renderReferrerNetworkWidget();
@@ -149,7 +147,7 @@ describe('MarketingDashboard Executive Modernization', function () {
     });
 
     it('renders KPI widget containing conversion funnel steps and 7-day volume bar chart', function () {
-        $dashboard = new MarketingDashboard();
+        $dashboard = new MarketingDashboard;
 
         ob_start();
         $dashboard->renderKpisWidget();
@@ -162,7 +160,7 @@ describe('MarketingDashboard Executive Modernization', function () {
     });
 
     it('renders Marketing Shortcuts widget with direct actions', function () {
-        $dashboard = new MarketingDashboard();
+        $dashboard = new MarketingDashboard;
 
         ob_start();
         $dashboard->renderMarketingShortcutsWidget();
@@ -175,4 +173,3 @@ describe('MarketingDashboard Executive Modernization', function () {
             ->toContain('rl-dash-shortcuts-grid');
     });
 });
-
