@@ -44,18 +44,19 @@ ENV COMPOSER_ALLOW_SUPERUSER=1
 
 COPY composer.json composer.lock ./
 RUN mkdir -p web/app/plugins web/app/mu-plugins web/app/themes \
-    && composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts
+    && composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-progress --no-scripts
 
 COPY web/app/themes/remote-leverage/composer.json \
      web/app/themes/remote-leverage/composer.lock \
      web/app/themes/remote-leverage/
-RUN composer install --no-dev --prefer-dist --no-interaction --no-progress \
+RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-progress \
       --working-dir=web/app/themes/remote-leverage --no-scripts
 
 COPY . .
 COPY --from=assets /theme/public web/app/themes/remote-leverage/public
-RUN composer dump-autoload --optimize --no-dev \
-    && composer dump-autoload --optimize --no-dev --working-dir=web/app/themes/remote-leverage
+RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-progress --no-scripts \
+    && composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-progress \
+         --working-dir=web/app/themes/remote-leverage --no-scripts
 
 FROM php-base AS runtime
 

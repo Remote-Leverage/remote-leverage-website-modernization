@@ -16,3 +16,6 @@ web/app/themes/remote-leverage/public
 doc
 plan.md
 .github
+*.sql
+docker-compose.yml
+auth.json

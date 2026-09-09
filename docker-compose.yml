@@ -1,0 +1,48 @@
+# Local preview stack (MySQL + the same Bedrock image as staging).
+# Usage: docker compose --env-file env up --build
+# Site:  http://127.0.0.1:8080
+# Compare with https://staging.remoteleverage.com
+
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: remoteleveragev2
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - rl-local-mysql:/var/lib/mysql
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    env_file:
+      - env
+    environment:
+      WP_ENV: development
+      WP_HOME: http://127.0.0.1:8080
+      WP_SITEURL: http://127.0.0.1:8080/wp
+      DB_HOST: db
+      DB_NAME: remoteleveragev2
+      DB_USER: root
+      DB_PASSWORD: root
+      SKIP_CHOWN: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./web/app/uploads:/var/www/html/web/app/uploads
+      - ./web/app/themes/remote-leverage/app:/var/www/html/web/app/themes/remote-leverage/app
+      - ./web/app/themes/remote-leverage/resources:/var/www/html/web/app/themes/remote-leverage/resources
+
+volumes:
+  rl-local-mysql:
