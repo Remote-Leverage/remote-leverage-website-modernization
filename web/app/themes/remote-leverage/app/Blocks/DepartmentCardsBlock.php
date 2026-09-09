@@ -23,6 +23,16 @@ class DepartmentCardsBlock extends Block
 
     public $view = 'blocks.department-cards';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'headline' => 'Specialized Roles for High-Output Teams',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         return [

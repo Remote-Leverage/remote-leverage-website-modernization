@@ -23,6 +23,16 @@ class BookingBlock extends Block
 
     public $view = 'blocks.booking';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'skin' => 'glass',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         return [

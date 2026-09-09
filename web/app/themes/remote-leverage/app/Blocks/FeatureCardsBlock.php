@@ -23,6 +23,16 @@ class FeatureCardsBlock extends Block
 
     public $view = 'blocks.feature-cards';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'columns' => '3',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         $columns = (string) ((function_exists('get_field') ? get_field('columns') : null) ?: '3');

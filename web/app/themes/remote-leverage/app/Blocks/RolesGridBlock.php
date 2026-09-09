@@ -23,6 +23,16 @@ class RolesGridBlock extends Block
 
     public $view = 'blocks.roles-grid';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'headline' => 'Pre-Vetted Roles Ready to Deploy',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         return [

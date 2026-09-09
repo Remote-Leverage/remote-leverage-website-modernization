@@ -23,6 +23,16 @@ class ClientLogosMarqueeBlock extends Block
 
     public $view = 'blocks.client-logos-marquee';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'title' => 'TRUSTED BY 2,000+ FAST-GROWING COMPANIES',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         return [

@@ -35,6 +35,16 @@ class ComparisonMatrixBlock extends Block
      */
     public $category = 'remote-leverage';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'headline' => 'Remote Leverage vs. The Alternatives',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     /**
      * The block icon.
      *

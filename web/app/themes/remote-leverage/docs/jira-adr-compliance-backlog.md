@@ -350,12 +350,13 @@ Scenario: Server restart or process crash
 ### Subtasks for Remaining Gutenberg Scope:
 *(Note: Hero block subtask WR-108 removed per design decision; the primary Hero section is fully completed via native Gutenberg pattern `remote-leverage/hire-va-4-hero`).*
 
-| Key | Summary | Type | Priority | Assignee | Direct Link |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **WR-109** | **[Block Editor WYSIWYG] Gutenberg Canvas Styling Parity & editor.css Tailwind Alignment** | Subtarea | High | Adrián Salvatori | [View WR-109](https://remoteleveragetech.atlassian.net/browse/WR-109) |
-| **WR-110** | **[Block Inserter Previews] Add Rich Example Data to ACF Composer Blocks** | Subtarea | Medium | Adrián Salvatori | [View WR-110](https://remoteleveragetech.atlassian.net/browse/WR-110) |
-| **WR-111** | **[Pattern Library] Register Curated Gutenberg Pattern Categories & VA Guide Layouts** | Subtarea | High | Adrián Salvatori | [View WR-111](https://remoteleveragetech.atlassian.net/browse/WR-111) |
-| **WR-112** | **[Landing Page Patterns] Modernize Secondary Landing Page Templates into Reusable Block Patterns** | Subtarea | Medium | Adrián Salvatori | [View WR-112](https://remoteleveragetech.atlassian.net/browse/WR-112) |
-| **WR-113** | **[Block QA] Cross-Browser & Mobile Viewport Audit of Native Blocks** | Subtarea | High | Adrián Salvatori | [View WR-113](https://remoteleveragetech.atlassian.net/browse/WR-113) |
+| Key | Summary | Type | Priority | Est | Status | Assignee | Direct Link |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **WR-109** | **[Block Editor WYSIWYG] Gutenberg Canvas Styling Parity & editor.css Tailwind Alignment** | Subtarea | High | 2 pts | **Done** | Adrián Salvatori | [View WR-109](https://remoteleveragetech.atlassian.net/browse/WR-109) |
+| **WR-110** | **[Block Inserter Previews] Add Rich Example Data to ACF Composer Blocks** | Subtarea | Medium | 2 pts | **Done** | Adrián Salvatori | [View WR-110](https://remoteleveragetech.atlassian.net/browse/WR-110) |
+| **WR-111** | **[Pattern Library] Register Curated Gutenberg Pattern Categories & VA Guide Layouts** | Subtarea | High | 3 pts | **Done** | Adrián Salvatori | [View WR-111](https://remoteleveragetech.atlassian.net/browse/WR-111) |
+| **WR-112** | **[Landing Page Patterns] Modernize Secondary Landing Page Templates into Reusable Block Patterns** | Subtarea | Medium | 2 pts | **Done** | Adrián Salvatori | [View WR-112](https://remoteleveragetech.atlassian.net/browse/WR-112) |
+| **WR-113** | **[Block QA] Cross-Browser & Mobile Viewport Audit of Native Blocks** | Subtarea | High | 2 pts | **Done** | Adrián Salvatori | [View WR-113](https://remoteleveragetech.atlassian.net/browse/WR-113) |
+| **Total** | | | | **11 pts** | **100% Done** | | |
 
 

@@ -136,6 +136,12 @@ add_action('after_setup_theme', function () {
      * @link https://developer.wordpress.org/reference/functions/add_theme_support/#customize-selective-refresh-widgets
      */
     add_theme_support('customize-selective-refresh-widgets');
+
+    /**
+     * Enable block editor styles.
+     */
+    add_theme_support('editor-styles');
+    add_editor_style('public/build/assets/editor.css');
 }, 20);
 
 /**
@@ -208,10 +214,20 @@ add_action('template_redirect', function () {
  * Register custom Gutenberg block styles and pattern categories.
  */
 add_action('init', function () {
-    // Register Remote Leverage Pattern Category
-    register_block_pattern_category('remote-leverage', [
-        'label' => __('Remote Leverage', 'remote-leverage'),
-    ]);
+    // Register Remote Leverage Curated Pattern Categories
+    $categories = [
+        'remote-leverage' => __('Remote Leverage', 'remote-leverage'),
+        'remote-leverage-heroes' => __('Remote Leverage - Heroes', 'remote-leverage'),
+        'remote-leverage-sections' => __('Remote Leverage - Sections & Trust', 'remote-leverage'),
+        'remote-leverage-funnels' => __('Remote Leverage - Booking & Funnels', 'remote-leverage'),
+        'remote-leverage-guides' => __('Remote Leverage - Editorial VA Guides', 'remote-leverage'),
+    ];
+
+    foreach ($categories as $slug => $label) {
+        register_block_pattern_category($slug, [
+            'label' => $label,
+        ]);
+    }
 
     // Register theme block patterns from patterns/ directory
     $patternFiles = glob(get_theme_file_path('patterns/*.php'));

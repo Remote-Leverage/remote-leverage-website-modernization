@@ -23,6 +23,16 @@ class TalentMarqueeBlock extends Block
 
     public $view = 'blocks.talent-marquee';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'speed' => 'normal',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public $supports = [
         'align' => ['full', 'wide'],
     ];

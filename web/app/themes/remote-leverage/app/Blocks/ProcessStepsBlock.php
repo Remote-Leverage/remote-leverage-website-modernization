@@ -23,6 +23,17 @@ class ProcessStepsBlock extends Block
 
     public $view = 'blocks.process-steps';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'badge' => 'HOW IT WORKS',
+                'headline' => 'Hiring Top Talent in 3 Simple Steps',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         return [

@@ -23,6 +23,16 @@ class DataTableBlock extends Block
 
     public $view = 'blocks.data-table';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'title' => 'Average Hourly Rates by Role & Experience',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         $hasGetField = function_exists('get_field');

@@ -23,6 +23,17 @@ class BenefitsGuaranteeBlock extends Block
 
     public $view = 'blocks.benefits-guarantee';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'badge' => 'GUARANTEED PERFORMANCE',
+                'headline' => 'Top 1% Talent with Zero Overhead',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         return [

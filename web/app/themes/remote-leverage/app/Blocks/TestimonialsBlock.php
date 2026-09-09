@@ -23,6 +23,16 @@ class TestimonialsBlock extends Block
 
     public $view = 'blocks.testimonials';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'headline' => 'Client Stories & Verified Results',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         return [

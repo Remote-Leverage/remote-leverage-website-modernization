@@ -35,6 +35,16 @@ class GuaranteeCardBlock extends Block
      */
     public $category = 'remote-leverage';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'headline' => '100% Risk-Free Replacement Guarantee',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     /**
      * The block icon.
      *

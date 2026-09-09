@@ -35,6 +35,16 @@ class WhyHireBlock extends Block
      */
     public $category = 'remote-leverage';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'headline' => 'Why Fast-Growing Companies Choose Us',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     /**
      * The block icon.
      *

@@ -174,3 +174,50 @@
   height: auto !important;
 }
 
+/* ═══════════════════════════════════════════════════════════ */
+/* EDITORIAL VA GUIDE PATTERNS & SECONDARY LANDING BLOCKS      */
+/* ═══════════════════════════════════════════════════════════ */
+.editor-styles-wrapper .rl-editorial-toc {
+  background-color: var(--color-surface-white) !important;
+  border: 1px solid var(--color-border-card) !important;
+  border-radius: 1rem !important;
+  padding: 1.5rem !important;
+  box-shadow: 0 4px 20px -2px rgba(138, 43, 226, 0.05) !important;
+}
+
+.editor-styles-wrapper .rl-key-takeaways {
+  background: linear-gradient(135deg, rgba(138, 43, 226, 0.04) 0%, rgba(248, 36, 138, 0.04) 100%) !important;
+  border-left: 4px solid var(--color-brand-purple) !important;
+  border-radius: 0.75rem !important;
+  padding: 1.5rem !important;
+}
+
+.editor-styles-wrapper .rl-author-bio {
+  background-color: var(--color-surface-white) !important;
+  border: 1px solid var(--color-border-card) !important;
+  border-radius: 1rem !important;
+  padding: 2rem !important;
+}
+
+.editor-styles-wrapper .rl-split-consultation {
+  background: linear-gradient(180deg, #13132F 0%, #18112C 100%) !important;
+  border-radius: 1.5rem !important;
+  color: var(--color-surface-white) !important;
+}
+
+.editor-styles-wrapper .rl-split-consultation h2,
+.editor-styles-wrapper .rl-split-consultation h3 {
+  color: var(--color-surface-white) !important;
+}
+
+.editor-styles-wrapper .rl-partner-header {
+  background: linear-gradient(135deg, #13132F 0%, #342567 100%) !important;
+  border-radius: 1.5rem !important;
+  color: var(--color-surface-white) !important;
+}
+
+.editor-styles-wrapper .rl-partner-header h1,
+.editor-styles-wrapper .rl-partner-header p {
+  color: var(--color-surface-white) !important;
+}
+

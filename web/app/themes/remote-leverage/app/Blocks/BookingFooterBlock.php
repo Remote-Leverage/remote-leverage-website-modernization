@@ -35,6 +35,16 @@ class BookingFooterBlock extends Block
      */
     public $category = 'remote-leverage';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'title' => 'Ready to Find Your Next Assistant?',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     /**
      * The block icon.
      *

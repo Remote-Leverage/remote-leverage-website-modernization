@@ -23,6 +23,16 @@ class LiveCallBlock extends Block
 
     public $view = 'blocks.live-call';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'button_text' => 'Connect With a Specialist Live',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         return [

@@ -23,6 +23,16 @@ class AccordionFaqBlock extends Block
 
     public $view = 'blocks.accordion-faq';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'headline' => 'Frequently Asked Questions',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         $faqs = $this->faqs();

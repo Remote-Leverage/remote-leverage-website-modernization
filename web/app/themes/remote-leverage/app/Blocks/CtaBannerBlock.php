@@ -23,6 +23,17 @@ class CtaBannerBlock extends Block
 
     public $view = 'blocks.cta-banner';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'headline' => 'Ready to Save 70% on Top Talent?',
+                'button_text' => 'Schedule Free Consultation',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         return [

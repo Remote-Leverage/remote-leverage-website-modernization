@@ -35,6 +35,17 @@ class HireVaHeroBlock extends Block
      */
     public $category = 'remote-leverage';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'headline' => 'Latin American Virtual Assistants',
+                'badge_text' => '2,000+ Businesses Helped',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     /**
      * The block icon.
      *

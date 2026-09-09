@@ -23,6 +23,16 @@ class TrustStatsBlock extends Block
 
     public $view = 'blocks.trust-stats';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => [
+                'title' => 'Proven Scale & Reliability',
+                'is_preview' => true,
+            ],
+        ],
+    ];
+
     public function with(): array
     {
         $hasGetField = function_exists('get_field');
