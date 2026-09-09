@@ -4,19 +4,55 @@ declare(strict_types=1);
 
 namespace App\Domains\Scheduling\Gateways;
 
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class CalendlyClient
 {
-    protected ?string $apiKey;
+    protected CalendlyTokenPool $tokenPool;
 
     protected ?string $userUri;
 
-    public function __construct()
+    public function __construct(?CalendlyTokenPool $tokenPool = null)
     {
-        $this->apiKey = config('services.calendly.api_key');
+        $this->tokenPool = $tokenPool ?: new CalendlyTokenPool(config('services.calendly.api_keys', []));
         $this->userUri = config('services.calendly.user_uri');
+    }
+
+    /**
+     * Send a Calendly request, failing over to the next pooled token if the current
+     * one comes back rate-limited (HTTP 429). Tokens are tried in order (sequentially),
+     * never proactively rotated, so the primary token is always preferred.
+     */
+    protected function sendWithFailover(callable $makeRequest): ?Response
+    {
+        $attempts = count($this->tokenPool->all());
+        if ($attempts === 0) {
+            return null;
+        }
+
+        $response = null;
+
+        for ($i = 0; $i < $attempts; $i++) {
+            $token = $this->tokenPool->getToken();
+            if (! $token) {
+                break;
+            }
+
+            $response = $makeRequest($token);
+
+            if ($response->status() === 429) {
+                Log::warning('CalendlyClient: token rate-limited, failing over to next token in pool');
+                $this->tokenPool->markRateLimited($token);
+
+                continue;
+            }
+
+            return $response;
+        }
+
+        return $response;
     }
 
     /**
@@ -25,26 +61,28 @@ class CalendlyClient
      */
     public function getAvailableSlots(string $eventTypeId, string $startTime, string $endTime, ?string $timezone = null): array
     {
-        if (! $this->apiKey) {
-            Log::warning('CalendlyClient: Missing CALENDLY_API_KEY');
+        $params = [
+            'event_type' => $eventTypeId,
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+        ];
 
-            return [];
+        if ($timezone) {
+            $params['timezone'] = $timezone;
         }
 
         try {
-            $params = [
-                'event_type' => $eventTypeId,
-                'start_time' => $startTime,
-                'end_time' => $endTime,
-            ];
+            $response = $this->sendWithFailover(
+                fn (string $token) => Http::withToken($token)
+                    ->timeout(15)
+                    ->get('https://api.calendly.com/event_type_available_times', $params)
+            );
 
-            if ($timezone) {
-                $params['timezone'] = $timezone;
+            if (! $response) {
+                Log::warning('CalendlyClient: Missing CALENDLY_API_KEY');
+
+                return [];
             }
-
-            $response = Http::withToken($this->apiKey)
-                ->timeout(15)
-                ->get('https://api.calendly.com/event_type_available_times', $params);
 
             if ($response->failed()) {
                 Log::error('CalendlyClient: Error fetching slots', $response->json() ?? ['body' => $response->body()]);
@@ -65,18 +103,14 @@ class CalendlyClient
      */
     public function getEventType(string $eventUriOrUuid): ?array
     {
-        if (! $this->apiKey) {
-            return null;
-        }
-
         $url = str_starts_with($eventUriOrUuid, 'http')
             ? $eventUriOrUuid
             : 'https://api.calendly.com/event_types/'.rawurlencode($eventUriOrUuid);
 
         try {
-            $response = Http::withToken($this->apiKey)->get($url);
+            $response = $this->sendWithFailover(fn (string $token) => Http::withToken($token)->get($url));
 
-            return $response->successful() ? $response->json('resource') : null;
+            return $response && $response->successful() ? $response->json('resource') : null;
         } catch (\Throwable $e) {
             Log::error('CalendlyClient Event Type Error: '.$e->getMessage());
 
@@ -109,12 +143,6 @@ class CalendlyClient
         array $questionsAnswers = [],
         array $tracking = []
     ): ?array {
-        if (! $this->apiKey) {
-            Log::warning('CalendlyClient: Missing CALENDLY_API_KEY');
-
-            return null;
-        }
-
         try {
             $payload = [
                 'event_type' => $eventUri,
@@ -153,9 +181,17 @@ class CalendlyClient
                 ];
             }
 
-            $response = Http::withToken($this->apiKey)
-                ->timeout(20)
-                ->post('https://api.calendly.com/invitees', $payload);
+            $response = $this->sendWithFailover(
+                fn (string $token) => Http::withToken($token)
+                    ->timeout(20)
+                    ->post('https://api.calendly.com/invitees', $payload)
+            );
+
+            if (! $response) {
+                Log::warning('CalendlyClient: Missing CALENDLY_API_KEY');
+
+                return null;
+            }
 
             if ($response->failed()) {
                 Log::error('CalendlyClient Invitee Creation Failed', [
@@ -179,18 +215,14 @@ class CalendlyClient
      */
     public function getScheduledEvent(string $eventUriOrUuid): ?array
     {
-        if (! $this->apiKey) {
-            return null;
-        }
-
         $url = str_starts_with($eventUriOrUuid, 'http')
             ? $eventUriOrUuid
             : 'https://api.calendly.com/scheduled_events/'.rawurlencode($eventUriOrUuid);
 
         try {
-            $response = Http::withToken($this->apiKey)->get($url);
+            $response = $this->sendWithFailover(fn (string $token) => Http::withToken($token)->get($url));
 
-            return $response->successful() ? $response->json('resource') : null;
+            return $response && $response->successful() ? $response->json('resource') : null;
         } catch (\Throwable $e) {
             Log::error('CalendlyClient Event Detail Error: '.$e->getMessage());
 
