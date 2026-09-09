@@ -26,7 +26,7 @@ class CalendlyAdminDashboard
             menu_slug: 'rl-calendly',
             callback: [$this, 'renderTokenPool'],
             icon_url: 'dashicons-calendar-alt',
-            position: 31
+            position: 31,
         );
 
         add_submenu_page(
@@ -35,7 +35,7 @@ class CalendlyAdminDashboard
             menu_title: 'Token Pool',
             capability: 'manage_options',
             menu_slug: 'rl-calendly',
-            callback: [$this, 'renderTokenPool']
+            callback: [$this, 'renderTokenPool'],
         );
 
         add_submenu_page(
@@ -44,7 +44,7 @@ class CalendlyAdminDashboard
             menu_title: 'Event Types',
             capability: 'manage_options',
             menu_slug: 'rl-calendly-event-types',
-            callback: [$this, 'renderEventTypes']
+            callback: [$this, 'renderEventTypes'],
         );
     }
 
@@ -164,7 +164,7 @@ class CalendlyAdminDashboard
                             $failures = $pool->failureCount($row['token'], 'metadata');
                             $open = $pool->isCircuitOpen($row['token'], 'metadata');
                             $limited = $pool->isRateLimited($row['token']);
-                        ?>
+                            ?>
                             <tr>
                                 <td><?php echo esc_html($row['label']); ?></td>
                                 <td><code><?php echo esc_html(CalendlyTokenPool::maskToken($row['token'])); ?></code></td>
@@ -270,7 +270,7 @@ class CalendlyAdminDashboard
                         <?php foreach (CalendlyEventTypeRoleResolver::ROLES as $role) {
                             $currentUri = $roles[$role] ?? '';
                             $currentLabel = $discovered[$currentUri]['label'] ?? '';
-                        ?>
+                            ?>
                             <tr>
                                 <td><?php echo esc_html(ucwords(str_replace('_', ' ', $role))); ?></td>
                                 <td>

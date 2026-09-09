@@ -33,7 +33,7 @@ class BlockDefaults
             return $filteredImage;
         }
 
-        return str_replace($m[0], ' src=' . $m[1] . esc_attr($newSrc) . $m[1], $filteredImage);
+        return str_replace($m[0], ' src='.$m[1].esc_attr($newSrc).$m[1], $filteredImage);
     }
 
     /**
@@ -50,7 +50,7 @@ class BlockDefaults
 
         foreach ($bases as $baseUrl => $baseDir) {
             if ($baseUrl !== '' && str_starts_with($url, $baseUrl)) {
-                return $baseDir . substr($url, strlen($baseUrl));
+                return $baseDir.substr($url, strlen($baseUrl));
             }
         }
 
@@ -78,8 +78,8 @@ class BlockDefaults
             return $url;
         }
 
-        $webpPath = preg_replace('/\.' . preg_quote($ext, '/') . '$/i', '.webp', $path);
-        $webpUrl = preg_replace('/\.' . preg_quote($ext, '/') . '$/i', '.webp', $url);
+        $webpPath = preg_replace('/\.'.preg_quote($ext, '/').'$/i', '.webp', $path);
+        $webpUrl = preg_replace('/\.'.preg_quote($ext, '/').'$/i', '.webp', $url);
 
         if (is_file($webpPath)) {
             return $webpUrl;
@@ -182,9 +182,9 @@ class BlockDefaults
             return self::homeImg(substr($path, 5));
         }
 
-        $themePath = get_theme_file_path('public/images/' . $path);
+        $themePath = get_theme_file_path('public/images/'.$path);
         if (is_file($themePath)) {
-            return esc_url(set_url_scheme(get_template_directory_uri() . '/public/images/' . $path, 'https'));
+            return esc_url(set_url_scheme(get_template_directory_uri().'/public/images/'.$path, 'https'));
         }
 
         return self::homeImg(basename($path));
@@ -207,27 +207,27 @@ class BlockDefaults
         $file = ltrim($file, '/');
         $name = pathinfo($file, PATHINFO_FILENAME);
         $dirs = [
-            WP_CONTENT_DIR . '/uploads/home' => content_url('/uploads/home'),
-            WP_CONTENT_DIR . '/uploads/hire-va-4' => content_url('/uploads/hire-va-4'),
-            WP_CONTENT_DIR . '/uploads/2026/09' => content_url('/uploads/2026/09'),
-            WP_CONTENT_DIR . '/uploads/2026/07' => content_url('/uploads/2026/07'),
-            WP_CONTENT_DIR . '/uploads/2026/06' => content_url('/uploads/2026/06'),
-            WP_CONTENT_DIR . '/uploads/2026/05' => content_url('/uploads/2026/05'),
-            WP_CONTENT_DIR . '/uploads/2026/04' => content_url('/uploads/2026/04'),
-            get_theme_file_path('public/images/home') => get_template_directory_uri() . '/public/images/home',
-            get_theme_file_path('public/images/hire-va-4') => get_template_directory_uri() . '/public/images/hire-va-4',
+            WP_CONTENT_DIR.'/uploads/home' => content_url('/uploads/home'),
+            WP_CONTENT_DIR.'/uploads/hire-va-4' => content_url('/uploads/hire-va-4'),
+            WP_CONTENT_DIR.'/uploads/2026/09' => content_url('/uploads/2026/09'),
+            WP_CONTENT_DIR.'/uploads/2026/07' => content_url('/uploads/2026/07'),
+            WP_CONTENT_DIR.'/uploads/2026/06' => content_url('/uploads/2026/06'),
+            WP_CONTENT_DIR.'/uploads/2026/05' => content_url('/uploads/2026/05'),
+            WP_CONTENT_DIR.'/uploads/2026/04' => content_url('/uploads/2026/04'),
+            get_theme_file_path('public/images/home') => get_template_directory_uri().'/public/images/home',
+            get_theme_file_path('public/images/hire-va-4') => get_template_directory_uri().'/public/images/hire-va-4',
         ];
 
         foreach ($dirs as $dir => $url) {
             foreach (['webp', 'png', 'jpg', 'jpeg', 'svg'] as $ext) {
-                $path = $dir . '/' . $name . '.' . $ext;
+                $path = $dir.'/'.$name.'.'.$ext;
                 if (is_file($path)) {
-                    return esc_url(set_url_scheme(rtrim($url, '/') . '/' . $name . '.' . $ext, 'https'));
+                    return esc_url(set_url_scheme(rtrim($url, '/').'/'.$name.'.'.$ext, 'https'));
                 }
             }
         }
 
-        return esc_url(set_url_scheme(self::imgBase() . '/' . $file, 'https'));
+        return esc_url(set_url_scheme(self::imgBase().'/'.$file, 'https'));
     }
 
     /**
@@ -331,7 +331,7 @@ class BlockDefaults
     public static function encodeRepeater(string $fieldName, string $fieldKey, array $rows, array &$data = []): array
     {
         $data[$fieldName] = count($rows);
-        $data['_' . $fieldName] = $fieldKey;
+        $data['_'.$fieldName] = $fieldKey;
         foreach ($rows as $i => $row) {
             foreach ($row as $subfield => $val) {
                 $encodedVal = self::getAttachmentId($val);
@@ -352,7 +352,7 @@ class BlockDefaults
             'mode' => 'preview',
         ], $attrs);
 
-        return '<!-- wp:acf/' . $slug . ' ' . json_encode($blockAttrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ' /-->';
+        return '<!-- wp:acf/'.$slug.' '.json_encode($blockAttrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE).' /-->';
     }
 
     // --- PROCESS STEPS ---

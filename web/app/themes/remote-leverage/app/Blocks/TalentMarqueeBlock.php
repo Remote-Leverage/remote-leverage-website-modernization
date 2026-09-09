@@ -83,7 +83,7 @@ class TalentMarqueeBlock extends Block
                 if ($srcset) {
                     $card['bg_srcset'] = preg_replace_callback(
                         '/(\S+)(?=\s+\d+w)/',
-                        fn($m) => BlockDefaults::preferWebp($m[1]),
+                        fn ($m) => BlockDefaults::preferWebp($m[1]),
                         $srcset,
                     );
                     $card['bg_sizes'] = '250px';

@@ -8,6 +8,10 @@ use App\Domains\Lead\Actions\PurgeOldLeadsAction;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Services\LeadSettingsService;
+use App\Domains\Scheduling\Actions\RetryFailedBookingAction;
+use App\Domains\Scheduling\Gateways\CalendlyClient;
+use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
+use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
@@ -41,7 +45,7 @@ class LeadsAdminDashboard
             menu_slug: 'rl-leads',
             callback: [$this, 'renderDashboard'],
             icon_url: 'dashicons-groups',
-            position: 30
+            position: 30,
         );
 
         add_submenu_page(
@@ -50,7 +54,7 @@ class LeadsAdminDashboard
             menu_title: 'All Leads',
             capability: 'manage_options',
             menu_slug: 'rl-leads',
-            callback: [$this, 'renderDashboard']
+            callback: [$this, 'renderDashboard'],
         );
 
         add_submenu_page(
@@ -59,7 +63,7 @@ class LeadsAdminDashboard
             menu_title: 'Activity Logs',
             capability: 'manage_options',
             menu_slug: 'rl-leads-activity',
-            callback: [$this, 'renderActivityLogs']
+            callback: [$this, 'renderActivityLogs'],
         );
 
         add_submenu_page(
@@ -68,7 +72,7 @@ class LeadsAdminDashboard
             menu_title: 'Diagnostics',
             capability: 'manage_options',
             menu_slug: 'rl-leads-diagnostics',
-            callback: [$this, 'renderDiagnostics']
+            callback: [$this, 'renderDiagnostics'],
         );
 
         add_submenu_page(
@@ -77,7 +81,7 @@ class LeadsAdminDashboard
             menu_title: 'Settings',
             capability: 'manage_options',
             menu_slug: 'rl-leads-settings',
-            callback: [$this, 'renderSettings']
+            callback: [$this, 'renderSettings'],
         );
     }
 
@@ -154,7 +158,7 @@ class LeadsAdminDashboard
         if ($action === 'retry_calendly_booking') {
             check_admin_referer('rl_retry_booking_nonce');
             $leadId = absint($_REQUEST['lead_id'] ?? 0);
-            $result = app(\App\Domains\Scheduling\Actions\RetryFailedBookingAction::class)->execute($leadId);
+            $result = app(RetryFailedBookingAction::class)->execute($leadId);
             Cache::forget('rl_lead_dashboard_kpi_metrics');
             wp_safe_redirect(admin_url('admin.php?page=rl-leads-diagnostics&retry_result='.($result['success'] ? 'success' : 'failed').'&lead_id='.$leadId));
             exit;
@@ -905,7 +909,7 @@ class LeadsAdminDashboard
                 $query->where(function ($q) use ($booleanExpr, $search) {
                     $q->whereRaw(
                         'MATCH(name, email, company, phone) AGAINST(? IN BOOLEAN MODE)',
-                        [$booleanExpr]
+                        [$booleanExpr],
                     )
                         ->orWhere('utm_campaign', 'LIKE', $search.'%')
                         ->orWhere('referral_code', 'LIKE', $search.'%');
@@ -1014,11 +1018,11 @@ class LeadsAdminDashboard
                     <?php
                     $exportUrl = wp_nonce_url(
                         admin_url('admin.php?page=rl-leads&rl_action=export_csv&status='.urlencode($statusFilter).'&s='.urlencode($search)),
-                        'rl_export_leads_nonce'
+                        'rl_export_leads_nonce',
                     );
         $purgeUrl = wp_nonce_url(
             admin_url('admin.php?page=rl-leads&rl_action=purge_leads'),
-            'rl_purge_leads_nonce'
+            'rl_purge_leads_nonce',
         );
         ?>
                     <a href="<?php echo esc_url($exportUrl); ?>" class="rl-btn rl-btn-outline">
@@ -1269,7 +1273,7 @@ class LeadsAdminDashboard
         $meeting = $this->extractMeetingDetails($lead);
         $deleteUrl = wp_nonce_url(
             admin_url('admin.php?page=rl-leads&rl_action=delete_lead&lead_id='.$lead->id),
-            'rl_delete_lead_nonce'
+            'rl_delete_lead_nonce',
         );
 
         ?>
@@ -1644,9 +1648,9 @@ class LeadsAdminDashboard
 
     public function renderDiagnostics(): void
     {
-        $tokenPool = app(\App\Domains\Scheduling\Gateways\CalendlyTokenPool::class);
-        $calendlyClient = app(\App\Domains\Scheduling\Gateways\CalendlyClient::class);
-        $roleResolver = app(\App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver::class);
+        $tokenPool = app(CalendlyTokenPool::class);
+        $calendlyClient = app(CalendlyClient::class);
+        $roleResolver = app(CalendlyEventTypeRoleResolver::class);
 
         $hasTokens = ! empty($tokenPool->getEligibleTokens());
         $t10 = $roleResolver->get('t10');
@@ -1785,7 +1789,7 @@ class LeadsAdminDashboard
                                 ->where('outcome', 'failed')
                                 ->orderByDesc('created_at')
                                 ->first();
-                        ?>
+                            ?>
                             <tr>
                                 <td><?php echo esc_html($stuckLead->name.' ('.$stuckLead->email.')'); ?></td>
                                 <td>
