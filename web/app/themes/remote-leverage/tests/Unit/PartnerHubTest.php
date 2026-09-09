@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Domains\PartnerHub\Services\PartnerHubGlobalData;
 use App\Domains\PartnerHub\Services\PartnerHubTabResolver;
+use App\Fields\PartnerHubFields;
 use App\Infrastructure\WordPress\Admin\PartnerHubAdmin;
+use Log1x\AcfComposer\Field;
 
 describe('PartnerHubTabResolver (WR-119)', function () {
     test('comarketing is enabled by default and only disabled by an explicit "0"', function () {
@@ -30,78 +32,57 @@ describe('PartnerHubTabResolver (WR-119)', function () {
     });
 });
 
-describe('PartnerHubAdmin metaboxes (WR-116/117/118/119)', function () {
+describe('PartnerHubAdmin list columns', function () {
     beforeEach(function () {
         $GLOBALS['_wp_mock_post_meta'] = [];
-        $_POST = [];
     });
 
-    test('saveMetaBoxes persists branding, terms, and bidirectional referral fields', function () {
+    test('addAdminColumns inserts Referral Code and Submission Form after the title column', function () {
         $admin = new PartnerHubAdmin;
-        $postId = 601;
 
-        $_POST = [
-            'rl_partner_meta_nonce' => 'valid',
-            '_rl_partner_name' => 'Oyster',
-            '_rl_partner_code' => 'RL-OYSTER',
-            '_rl_partner_logo_url' => 'https://example.com/logo.png',
-            '_rl_partnership_type' => 'Mutual Referral Partner',
-            '_rl_territory' => 'Worldwide',
-            '_rl_referral_form_url' => 'https://docs.google.com/forms/d/abc/viewform',
-            '_rl_intro_email' => 'partnerships@remoteleverage.com',
-            '_rl_partner_to_rl_fee' => '10% of net placement fee.',
-            '_rl_partner_referral_label' => 'Refer a Client to Oyster',
-            '_rl_partner_referral_email' => 'pending to define',
-            '_rl_rl_to_partner_fee' => '10% of eligible subscription fees.',
-        ];
+        $columns = $admin->addAdminColumns(['cb' => '', 'title' => 'Title', 'date' => 'Date']);
 
-        $admin->saveMetaBoxes($postId);
-
-        expect(get_post_meta($postId, '_rl_partner_name', true))->toBe('Oyster')
-            ->and(get_post_meta($postId, '_rl_partner_code', true))->toBe('RL-OYSTER')
-            ->and(get_post_meta($postId, '_rl_partnership_type', true))->toBe('Mutual Referral Partner')
-            ->and(get_post_meta($postId, '_rl_referral_form_url', true))->toBe('https://docs.google.com/forms/d/abc/viewform')
-            ->and(get_post_meta($postId, '_rl_partner_referral_label', true))->toBe('Refer a Client to Oyster')
-            ->and(get_post_meta($postId, '_rl_partner_referral_email', true))->toBe('pending to define')
-            ->and(get_post_meta($postId, '_rl_rl_to_partner_fee', true))->toBe('10% of eligible subscription fees.');
+        expect(array_keys($columns))->toBe(['cb', 'title', 'partner_code', 'referral_form', 'date']);
     });
 
-    test('saveMetaBoxes defaults co-marketing to disabled when the checkbox is unchecked', function () {
+    test('renderAdminColumns prints the referral code and a link when the form URL is set', function () {
         $admin = new PartnerHubAdmin;
-        $postId = 602;
+        $postId = 701;
+        update_post_meta($postId, '_rl_partner_code', 'RL-OYSTER');
+        update_post_meta($postId, '_rl_referral_form_url', 'https://docs.google.com/forms/d/abc/viewform');
 
-        $_POST = ['rl_partner_meta_nonce' => 'valid'];
-        $admin->saveMetaBoxes($postId);
+        ob_start();
+        $admin->renderAdminColumns('partner_code', $postId);
+        $partnerCodeOutput = ob_get_clean();
 
-        expect(get_post_meta($postId, '_rl_enable_comarketing', true))->toBe('0');
+        ob_start();
+        $admin->renderAdminColumns('referral_form', $postId);
+        $referralFormOutput = ob_get_clean();
 
-        $_POST = ['rl_partner_meta_nonce' => 'valid', '_rl_enable_comarketing' => '1'];
-        $admin->saveMetaBoxes($postId);
-
-        expect(get_post_meta($postId, '_rl_enable_comarketing', true))->toBe('1');
+        expect($partnerCodeOutput)->toContain('RL-OYSTER')
+            ->and($referralFormOutput)->toContain('https://docs.google.com/forms/d/abc/viewform');
     });
 
-    test('saveMetaBoxes sanitizes and persists per-section PDF attachments, dropping empty URLs', function () {
+    test('renderAdminColumns shows a placeholder when no submission form is set', function () {
         $admin = new PartnerHubAdmin;
-        $postId = 603;
+        $postId = 702;
 
-        $_POST = [
-            'rl_partner_meta_nonce' => 'valid',
-            '_rl_section_attachments' => [
-                'referral-program' => [
-                    ['title' => 'Fee Sheet', 'url' => 'https://example.com/fee-sheet.pdf', 'size' => '1.2 MB'],
-                    ['title' => 'Empty Row', 'url' => '', 'size' => ''],
-                ],
-            ],
-        ];
+        ob_start();
+        $admin->renderAdminColumns('referral_form', $postId);
+        $output = ob_get_clean();
 
-        $admin->saveMetaBoxes($postId);
+        expect($output)->toContain('None set');
+    });
+});
 
-        $attachments = get_post_meta($postId, '_rl_section_attachments', true);
+describe('PartnerHubFields ACF field group (WR-121)', function () {
+    test('PartnerHubFields extends the ACF Composer Field base and defines a fields() method', function () {
+        expect(class_exists(PartnerHubFields::class))->toBeTrue();
 
-        expect($attachments['referral-program'])->toHaveCount(1)
-            ->and($attachments['referral-program'][0]['title'])->toBe('Fee Sheet')
-            ->and($attachments['referral-program'][0]['url'])->toBe('https://example.com/fee-sheet.pdf');
+        $reflection = new ReflectionClass(PartnerHubFields::class);
+
+        expect($reflection->isSubclassOf(Field::class))->toBeTrue()
+            ->and($reflection->hasMethod('fields'))->toBeTrue();
     });
 });
 
