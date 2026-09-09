@@ -54,6 +54,14 @@ Route::get('partner-register', function () {
     return view('pages.partner-register');
 })->name('partner.register');
 
+Route::get('partner-dashboard', function () {
+    return redirect()->route('partner.portal');
+});
+
+Route::get('partners', function () {
+    return view('archive-rl_partner');
+});
+
 // Email Signature Generator (replaces rl-social-kit)
 Route::get('tools/signature-generator', function () {
     return view('pages.signature-generator');

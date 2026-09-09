@@ -115,11 +115,14 @@ class BlockDefaults
         $name = pathinfo($file, PATHINFO_FILENAME);
         $dirs = [
             WP_CONTENT_DIR . '/uploads/home' => content_url('/uploads/home'),
+            WP_CONTENT_DIR . '/uploads/hire-va-4' => content_url('/uploads/hire-va-4'),
             WP_CONTENT_DIR . '/uploads/2026/09' => content_url('/uploads/2026/09'),
+            WP_CONTENT_DIR . '/uploads/2026/07' => content_url('/uploads/2026/07'),
             WP_CONTENT_DIR . '/uploads/2026/06' => content_url('/uploads/2026/06'),
             WP_CONTENT_DIR . '/uploads/2026/05' => content_url('/uploads/2026/05'),
             WP_CONTENT_DIR . '/uploads/2026/04' => content_url('/uploads/2026/04'),
             get_theme_file_path('public/images/home') => get_template_directory_uri() . '/public/images/home',
+            get_theme_file_path('public/images/hire-va-4') => get_template_directory_uri() . '/public/images/hire-va-4',
         ];
 
         foreach ($dirs as $dir => $url) {
@@ -139,7 +142,7 @@ class BlockDefaults
      */
     public static function hireVaImg(string $file): string
     {
-        return self::themeImg('hire-va-4/' . ltrim($file, '/'));
+        return self::homeImg(ltrim($file, '/'));
     }
 
     /**
@@ -752,7 +755,7 @@ class BlockDefaults
 
     public static function imgBaseHireVa4(): string
     {
-        return get_template_directory_uri() . '/public/images/hire-va-4';
+        return rtrim(content_url('/uploads/home'), '/');
     }
 
     // --- HIRE-VA-4: ROLES GRID ---

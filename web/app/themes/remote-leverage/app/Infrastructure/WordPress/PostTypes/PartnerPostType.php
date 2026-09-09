@@ -63,7 +63,7 @@ class PartnerPostType
             'labels' => $labels,
             'supports' => ['title', 'editor', 'thumbnail', 'revisions', 'custom-fields'],
             'public' => true,
-            'has_archive' => false,
+            'has_archive' => 'partners',
             'rewrite' => ['slug' => 'partners', 'with_front' => false],
             'show_in_rest' => true,
             'menu_position' => 25,

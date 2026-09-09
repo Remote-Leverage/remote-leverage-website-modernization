@@ -18,4 +18,5 @@ return [
     'hire-virtual-assistant' => 'hire-va-4',
     'book-a-call' => 'book-consultation',
     'join-live-call' => 'live-call/connect',
+    'partner-dashboard' => 'partner-portal',
 ];

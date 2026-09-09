@@ -215,8 +215,13 @@ add_action('wp_enqueue_scripts', function () {
 
 /**
  * Enforce HTTPS redirect for Best Practices audit and security.
+ * Skip when WP_HOME is http (local Docker / Herd) so the stack can be previewed without TLS.
  */
 add_action('template_redirect', function () {
+    if (str_starts_with((string) home_url('/'), 'http://')) {
+        return;
+    }
+
     $isHttps = is_ssl()
         || (isset($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) === 'on')
         || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
@@ -227,6 +232,14 @@ add_action('template_redirect', function () {
         exit;
     }
 }, 1);
+
+/**
+ * WordPress redirect_canonical 301-loops on local URLs that include a port
+ * (http://127.0.0.1:8080 and http://localhost:8080).
+ */
+if (defined('WP_ENV') && WP_ENV === 'development') {
+    remove_action('template_redirect', 'redirect_canonical');
+}
 
 /**
  * Legacy URL 301 redirects for retired pages (ADR-0006 § SEO & Risk Mitigation).
@@ -382,10 +395,23 @@ add_action('init', function () {
                 }
             }
             if (! empty($attributes['data']) && is_array($attributes['data'])) {
-                $data = array_merge($data, $attributes['data']);
+                foreach ($attributes['data'] as $key => $value) {
+                    if (is_array($data[$key] ?? null) && ! is_array($value)) {
+                        continue;
+                    }
+                    $data[$key] = $value;
+                }
             }
 
-            return view($config['view'], $data)->render();
+            try {
+                return view($config['view'], $data)->render();
+            } catch (\Throwable $e) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log(sprintf('Block %s render failed: %s', $config['view'], $e->getMessage()));
+                }
+
+                return $content ?: '';
+            }
         };
 
         if (! \WP_Block_Type_Registry::get_instance()->is_registered("remote-leverage/{$slug}")) {

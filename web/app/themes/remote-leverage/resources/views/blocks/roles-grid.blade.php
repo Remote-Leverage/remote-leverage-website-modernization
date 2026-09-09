@@ -23,7 +23,7 @@
       </div>
 
       <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold font-display text-brand-hero tracking-tight leading-[1.08]">
-        The Roles That Buy<br class="hidden sm:inline"> Back Your Time
+        {!! nl2br(e($headline ?? 'The Roles That Buy Back Your Time')) !!}
       </h2>
     </div>
 
