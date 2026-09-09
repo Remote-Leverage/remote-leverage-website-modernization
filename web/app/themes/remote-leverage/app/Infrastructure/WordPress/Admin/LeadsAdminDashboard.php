@@ -7,9 +7,10 @@ namespace App\Infrastructure\WordPress\Admin;
 use App\Domains\Lead\Actions\PurgeOldLeadsAction;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
+use App\Domains\Lead\Services\LeadSettingsService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 class LeadsAdminDashboard
@@ -70,6 +71,15 @@ class LeadsAdminDashboard
             menu_slug: 'rl-leads-diagnostics',
             callback: [$this, 'renderDiagnostics']
         );
+
+        add_submenu_page(
+            parent_slug: 'rl-leads',
+            page_title: 'Lead Form & Routing Settings',
+            menu_title: 'Settings',
+            capability: 'manage_options',
+            menu_slug: 'rl-leads-settings',
+            callback: [$this, 'renderSettings']
+        );
     }
 
     public function handleAdminActions(): void
@@ -119,6 +129,27 @@ class LeadsAdminDashboard
                 wp_safe_redirect(admin_url('admin.php?page=rl-leads&view_lead='.$lead->id.'&status_updated=1'));
                 exit;
             }
+        }
+
+        if ($action === 'save_lead_settings') {
+            check_admin_referer('rl_save_lead_settings_nonce');
+
+            $result = app(LeadSettingsService::class)->save([
+                'retention_days' => $_POST['retention_days'] ?? '',
+                'notification_emails' => $_POST['notification_emails'] ?? '',
+                'optional_fields' => $_POST['optional_fields'] ?? [],
+                'hubspot_access_token' => $_POST['hubspot_access_token'] ?? '',
+                'hubspot_portal_id' => $_POST['hubspot_portal_id'] ?? '',
+                'slack_webhook_url' => $_POST['slack_webhook_url'] ?? '',
+                'lead_webhook_url' => $_POST['lead_webhook_url'] ?? '',
+            ]);
+
+            if ($result['success']) {
+                wp_safe_redirect(admin_url('admin.php?page=rl-leads-settings&settings_saved=1'));
+            } else {
+                wp_safe_redirect(admin_url('admin.php?page=rl-leads-settings&settings_error='.urlencode(implode(' ', $result['errors']))));
+            }
+            exit;
         }
 
         if ($action === 'delete_lead') {
@@ -818,7 +849,7 @@ class LeadsAdminDashboard
      * for general text search across (name, email, company, phone), and falls back
      * cleanly to indexed LIKE queries.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  Builder  $query
      */
     protected function applyOptimizedSearch($query, string $search): void
     {
@@ -868,8 +899,8 @@ class LeadsAdminDashboard
                         'MATCH(name, email, company, phone) AGAINST(? IN BOOLEAN MODE)',
                         [$booleanExpr]
                     )
-                    ->orWhere('utm_campaign', 'LIKE', $search.'%')
-                    ->orWhere('referral_code', 'LIKE', $search.'%');
+                        ->orWhere('utm_campaign', 'LIKE', $search.'%')
+                        ->orWhere('referral_code', 'LIKE', $search.'%');
                 });
 
                 return;
@@ -952,17 +983,17 @@ class LeadsAdminDashboard
 
         ?>
         <div class="wrap rl-admin-wrap">
-            <?php if (isset($_GET['purged_count'])) : ?>
+            <?php if (isset($_GET['purged_count'])) { ?>
                 <div class="notice notice-success is-dismissible">
                     <p><strong>Retention Purge Complete:</strong> <?php echo esc_html($_GET['purged_count']); ?> leads older than 30 days were successfully purged.</p>
                 </div>
-            <?php endif; ?>
+            <?php } ?>
 
-            <?php if (isset($_GET['lead_deleted'])) : ?>
+            <?php if (isset($_GET['lead_deleted'])) { ?>
                 <div class="notice notice-info is-dismissible">
                     <p>Lead and its associated audit activity logs were permanently deleted.</p>
                 </div>
-            <?php endif; ?>
+            <?php } ?>
 
             <div class="rl-admin-header">
                 <div>
@@ -977,11 +1008,11 @@ class LeadsAdminDashboard
                         admin_url('admin.php?page=rl-leads&rl_action=export_csv&status='.urlencode($statusFilter).'&s='.urlencode($search)),
                         'rl_export_leads_nonce'
                     );
-                    $purgeUrl = wp_nonce_url(
-                        admin_url('admin.php?page=rl-leads&rl_action=purge_leads'),
-                        'rl_purge_leads_nonce'
-                    );
-                    ?>
+        $purgeUrl = wp_nonce_url(
+            admin_url('admin.php?page=rl-leads&rl_action=purge_leads'),
+            'rl_purge_leads_nonce'
+        );
+        ?>
                     <a href="<?php echo esc_url($exportUrl); ?>" class="rl-btn rl-btn-outline">
                         <?php echo $this->iconDownload(); ?> Export Leads (CSV)
                     </a>
@@ -1073,9 +1104,9 @@ class LeadsAdminDashboard
                     </select>
 
                     <button type="submit" class="rl-btn rl-btn-primary">Filter</button>
-                    <?php if ($search || $statusFilter || $mrrFilter || $dateFilter) : ?>
+                    <?php if ($search || $statusFilter || $mrrFilter || $dateFilter) { ?>
                         <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads')); ?>" class="rl-btn rl-btn-outline">Reset</a>
-                    <?php endif; ?>
+                    <?php } ?>
                 </form>
 
                 <div class="rl-count-badge">
@@ -1099,14 +1130,14 @@ class LeadsAdminDashboard
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if ($leads->isEmpty()) : ?>
+                        <?php if ($leads->isEmpty()) { ?>
                             <tr>
                                 <td colspan="8" style="text-align: center; padding: 48px; color: #a1a1aa;">
                                     No submissions found matching your filters.
                                 </td>
                             </tr>
-                        <?php else : ?>
-                            <?php foreach ($leads as $lead) :
+                        <?php } else { ?>
+                            <?php foreach ($leads as $lead) {
                                 $meeting = $this->extractMeetingDetails($lead);
                                 $isT10 = ! in_array($lead->monthly_revenue, ['$0 to $5k Per Month', '$5k to $10k Per Month', '<10k', 'under_10k'], true) && ! empty($lead->monthly_revenue);
                                 ?>
@@ -1124,31 +1155,31 @@ class LeadsAdminDashboard
                                                 <span class="rl-contact-name"><?php echo esc_html($lead->name ?: 'Partial Contact'); ?></span>
                                                 <a href="mailto:<?php echo esc_attr($lead->email); ?>" class="rl-contact-email"><?php echo esc_html($lead->email); ?></a>
                                                 <div class="rl-contact-sub">
-                                                    <?php if ($lead->phone) : ?>
+                                                    <?php if ($lead->phone) { ?>
                                                         <a href="tel:<?php echo esc_attr($lead->phone); ?>" style="color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 3px;">
                                                             <?php echo $this->iconPhone(); ?> <?php echo esc_html($lead->phone); ?>
                                                         </a>
-                                                    <?php endif; ?>
-                                                    <?php if ($lead->company) : ?>
+                                                    <?php } ?>
+                                                    <?php if ($lead->company) { ?>
                                                         <span class="rl-contact-company">
                                                             <?php echo $this->iconBuilding(); ?> <?php echo esc_html($lead->company); ?>
                                                         </span>
-                                                    <?php endif; ?>
+                                                    <?php } ?>
                                                 </div>
                                             </div>
                                         </div>
                                     </td>
                                     <td>
-                                        <?php if ($lead->monthly_revenue) : ?>
+                                        <?php if ($lead->monthly_revenue) { ?>
                                             <span class="<?php echo $isT10 ? 'rl-pill-t10' : 'rl-pill-t0'; ?>">
                                                 <?php echo esc_html($lead->monthly_revenue); ?> &bull; <?php echo $isT10 ? 'T10' : 'T0'; ?>
                                             </span>
-                                        <?php else : ?>
+                                        <?php } else { ?>
                                             <span style="color: #a1a1aa; font-size: 11px;">Not specified</span>
-                                        <?php endif; ?>
-                                        <?php if ($lead->role_needed) : ?>
+                                        <?php } ?>
+                                        <?php if ($lead->role_needed) { ?>
                                             <div style="font-size: 11px; color: #71717a; margin-top: 3px;">Role: <?php echo esc_html($lead->role_needed); ?></div>
-                                        <?php endif; ?>
+                                        <?php } ?>
                                     </td>
                                     <td>
                                         <span class="rl-badge rl-badge-<?php echo esc_attr($lead->status); ?>">
@@ -1157,30 +1188,30 @@ class LeadsAdminDashboard
                                         </span>
                                     </td>
                                     <td>
-                                        <?php if (! empty($meeting['meet_url'])) : ?>
+                                        <?php if (! empty($meeting['meet_url'])) { ?>
                                             <a href="<?php echo esc_url($meeting['meet_url']); ?>" target="_blank" class="rl-meet-btn">
                                                 <?php echo $this->iconVideo(); ?> Google Meet
                                             </a>
-                                        <?php elseif ($lead->status === 'booked') : ?>
+                                        <?php } elseif ($lead->status === 'booked') { ?>
                                             <span class="rl-badge">
                                                 <span class="rl-status-dot"></span>
                                                 <?php echo $this->iconCheck(); ?> Confirmed
                                             </span>
-                                        <?php else : ?>
+                                        <?php } else { ?>
                                             <span style="color: #a1a1aa; font-size: 11px;">Not Scheduled</span>
-                                        <?php endif; ?>
+                                        <?php } ?>
                                     </td>
                                     <td>
-                                        <?php if ($lead->utm_source || $lead->utm_campaign) : ?>
+                                        <?php if ($lead->utm_source || $lead->utm_campaign) { ?>
                                             <div style="font-weight: 600; color: #09090b; font-size: 12px;"><?php echo esc_html($lead->utm_source ?: 'direct'); ?></div>
-                                            <?php if ($lead->utm_campaign) : ?>
+                                            <?php if ($lead->utm_campaign) { ?>
                                                 <div style="font-size: 11px; color: #71717a;">cmp: <?php echo esc_html($lead->utm_campaign); ?></div>
-                                            <?php endif; ?>
-                                        <?php elseif ($lead->referral_code) : ?>
+                                            <?php } ?>
+                                        <?php } elseif ($lead->referral_code) { ?>
                                             <span class="rl-badge">via: <?php echo esc_html($lead->referral_code); ?></span>
-                                        <?php else : ?>
+                                        <?php } else { ?>
                                             <span style="color: #a1a1aa; font-size: 11px;">Direct Organic</span>
-                                        <?php endif; ?>
+                                        <?php } ?>
                                     </td>
                                     <td>
                                         <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads&view_lead='.$lead->id)); ?>" class="rl-audit-pill">
@@ -1193,8 +1224,8 @@ class LeadsAdminDashboard
                                         </a>
                                     </td>
                                 </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                            <?php } ?>
+                        <?php } ?>
                     </tbody>
                 </table>
             </div>
@@ -1205,12 +1236,12 @@ class LeadsAdminDashboard
                     Page <strong><?php echo esc_html((string) $leads->currentPage()); ?></strong> of <strong><?php echo esc_html((string) $leads->lastPage()); ?></strong>
                 </div>
                 <div style="display: flex; gap: 6px;">
-                    <?php if ($leads->previousPageUrl()) : ?>
+                    <?php if ($leads->previousPageUrl()) { ?>
                         <a href="<?php echo esc_url($leads->previousPageUrl()); ?>" class="rl-btn rl-btn-outline rl-btn-sm"><?php echo $this->iconArrowLeft(); ?> Previous</a>
-                    <?php endif; ?>
-                    <?php if ($leads->nextPageUrl()) : ?>
+                    <?php } ?>
+                    <?php if ($leads->nextPageUrl()) { ?>
                         <a href="<?php echo esc_url($leads->nextPageUrl()); ?>" class="rl-btn rl-btn-outline rl-btn-sm">Next <?php echo $this->iconArrowRight(); ?></a>
-                    <?php endif; ?>
+                    <?php } ?>
                 </div>
             </div>
         </div>
@@ -1244,11 +1275,11 @@ class LeadsAdminDashboard
             <!-- Segmented Navigation Tabs -->
             <?php $this->renderAdminNavigation('leads'); ?>
 
-            <?php if (isset($_GET['status_updated'])) : ?>
+            <?php if (isset($_GET['status_updated'])) { ?>
                 <div class="notice notice-success is-dismissible">
                     <p>Lead status successfully updated.</p>
                 </div>
-            <?php endif; ?>
+            <?php } ?>
 
             <!-- Lead Header -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
@@ -1307,30 +1338,30 @@ class LeadsAdminDashboard
                             <tr><td>Role Needed:</td><td><?php echo esc_html($lead->role_needed ?: '—'); ?></td></tr>
                             <tr><td>Weekly Hours:</td><td><?php echo esc_html($lead->weekly_hours ?: '—'); ?></td></tr>
                             <tr><td>Start Timeline:</td><td><?php echo esc_html($lead->start_date ?: '—'); ?></td></tr>
-                            <?php if ($lead->notes) : ?>
+                            <?php if ($lead->notes) { ?>
                                 <tr><td>Notes:</td><td><?php echo nl2br(esc_html($lead->notes)); ?></td></tr>
-                            <?php endif; ?>
+                            <?php } ?>
                         </table>
                     </div>
 
                     <!-- Consultation / Video Meeting Card -->
                     <div class="rl-detail-card">
                         <h3 class="rl-detail-title">Consultation & Video Meeting</h3>
-                        <?php if (! empty($meeting['meet_url'])) : ?>
+                        <?php if (! empty($meeting['meet_url'])) { ?>
                             <div style="margin-bottom: 14px;">
                                 <a href="<?php echo esc_url($meeting['meet_url']); ?>" target="_blank" class="rl-meet-btn" style="padding: 7px 14px; font-size: 13px;">
                                     <?php echo $this->iconVideo(); ?> Join Google Meet Room
                                 </a>
                             </div>
-                        <?php endif; ?>
+                        <?php } ?>
                         <table class="rl-key-value-table">
                             <tr><td>Meeting Status:</td><td><span class="rl-badge rl-badge-<?php echo esc_attr($lead->status); ?>"><span class="rl-status-dot"></span><?php echo esc_html(ucfirst($lead->status)); ?></span></td></tr>
-                            <?php if (! empty($meeting['meeting_id'])) : ?>
+                            <?php if (! empty($meeting['meeting_id'])) { ?>
                                 <tr><td>Meeting ID:</td><td><code><?php echo esc_html($meeting['meeting_id']); ?></code></td></tr>
-                            <?php endif; ?>
-                            <?php if (! empty($meeting['provider'])) : ?>
+                            <?php } ?>
+                            <?php if (! empty($meeting['provider'])) { ?>
                                 <tr><td>Provider:</td><td><?php echo esc_html(strtoupper($meeting['provider'])); ?></td></tr>
-                            <?php endif; ?>
+                            <?php } ?>
                         </table>
                     </div>
 
@@ -1343,18 +1374,18 @@ class LeadsAdminDashboard
                             <tr><td>Campaign:</td><td><?php echo esc_html($lead->utm_campaign ?: '—'); ?></td></tr>
                             <tr><td>Term / Content:</td><td><?php echo esc_html(trim(($lead->utm_term ?: '').' '.($lead->utm_content ?: '')) ?: '—'); ?></td></tr>
                             <tr><td>Source Type:</td><td><span class="rl-badge" style="background:#f4f4f5; color:#52525b;"><?php echo esc_html($lead->source_type ?: 'organic'); ?></span></td></tr>
-                            <?php if ($lead->referral_code) : ?>
+                            <?php if ($lead->referral_code) { ?>
                                 <tr><td>Referral Code:</td><td><code><?php echo esc_html($lead->referral_code); ?></code></td></tr>
-                            <?php endif; ?>
-                            <?php if ($lead->gclid) : ?>
+                            <?php } ?>
+                            <?php if ($lead->gclid) { ?>
                                 <tr><td>Google Click ID:</td><td><code><?php echo esc_html($lead->gclid); ?></code></td></tr>
-                            <?php endif; ?>
-                            <?php if ($lead->fbclid) : ?>
+                            <?php } ?>
+                            <?php if ($lead->fbclid) { ?>
                                 <tr><td>Facebook Click ID:</td><td><code><?php echo esc_html($lead->fbclid); ?></code></td></tr>
-                            <?php endif; ?>
-                            <?php if ($lead->landing_url) : ?>
+                            <?php } ?>
+                            <?php if ($lead->landing_url) { ?>
                                 <tr><td>Landing URL:</td><td style="word-break: break-all; font-size: 11px;"><?php echo esc_html($lead->landing_url); ?></td></tr>
-                            <?php endif; ?>
+                            <?php } ?>
                         </table>
                     </div>
                 </div>
@@ -1376,11 +1407,11 @@ class LeadsAdminDashboard
                             </span>
                         </div>
 
-                        <?php if ($lead->activityLogs->isEmpty()) : ?>
+                        <?php if ($lead->activityLogs->isEmpty()) { ?>
                             <p style="color: #a1a1aa; font-size: 13px;">No activity logged yet for this lead.</p>
-                        <?php else : ?>
+                        <?php } else { ?>
                             <div class="rl-timeline">
-                                <?php foreach ($lead->activityLogs as $log) : ?>
+                                <?php foreach ($lead->activityLogs as $log) { ?>
                                     <div class="rl-timeline-item">
                                         <div class="rl-timeline-dot dot-<?php echo esc_attr($log->outcome); ?>"></div>
                                         <div class="rl-timeline-content">
@@ -1395,17 +1426,17 @@ class LeadsAdminDashboard
                                             <div style="font-size: 13px; font-weight: 500; color: #09090b; margin-bottom: 4px;">
                                                 <?php echo esc_html($log->description); ?>
                                             </div>
-                                            <?php if (! empty($log->payload)) : ?>
+                                            <?php if (! empty($log->payload)) { ?>
                                                 <details style="margin-top: 6px;">
                                                     <summary style="font-size: 11px; color: #71717a; cursor: pointer; font-weight: 500;">View Event Payload JSON</summary>
                                                     <div class="rl-json-box"><?php echo esc_html(json_encode($log->payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></div>
                                                 </details>
-                                            <?php endif; ?>
+                                            <?php } ?>
                                         </div>
                                     </div>
-                                <?php endforeach; ?>
+                                <?php } ?>
                             </div>
-                        <?php endif; ?>
+                        <?php } ?>
                     </div>
                 </div>
             </div>
@@ -1495,9 +1526,9 @@ class LeadsAdminDashboard
                     </select>
 
                     <button type="submit" class="rl-btn rl-btn-primary">Filter Logs</button>
-                    <?php if ($search || $stageFilter || $domainFilter || $outcomeFilter) : ?>
+                    <?php if ($search || $stageFilter || $domainFilter || $outcomeFilter) { ?>
                         <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads-activity')); ?>" class="rl-btn rl-btn-outline">Reset</a>
-                    <?php endif; ?>
+                    <?php } ?>
                 </form>
 
                 <div class="rl-count-badge">
@@ -1520,14 +1551,14 @@ class LeadsAdminDashboard
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if ($logs->isEmpty()) : ?>
+                        <?php if ($logs->isEmpty()) { ?>
                             <tr>
                                 <td colspan="7" style="text-align: center; padding: 48px; color: #a1a1aa;">
                                     No audit logs found matching criteria.
                                 </td>
                             </tr>
-                        <?php else : ?>
-                            <?php foreach ($logs as $log) : ?>
+                        <?php } else { ?>
+                            <?php foreach ($logs as $log) { ?>
                                 <tr>
                                     <td style="white-space: nowrap;">
                                         <div style="font-weight: 600; color: #09090b;"><?php echo esc_html($log->created_at?->format('M j, Y')); ?></div>
@@ -1536,7 +1567,7 @@ class LeadsAdminDashboard
                                         </div>
                                     </td>
                                     <td>
-                                        <?php if ($log->lead) : ?>
+                                        <?php if ($log->lead) { ?>
                                             <div class="rl-contact-cell">
                                                 <div class="rl-avatar-initials"><?php echo esc_html($this->getInitials($log->lead->name, $log->lead->email)); ?></div>
                                                 <div class="rl-contact-info">
@@ -1546,9 +1577,9 @@ class LeadsAdminDashboard
                                                     <span style="font-size: 11px; color: #71717a;"><?php echo esc_html($log->lead->email); ?></span>
                                                 </div>
                                             </div>
-                                        <?php else : ?>
+                                        <?php } else { ?>
                                             <span style="color: #a1a1aa; font-size: 12px;">Lead #<?php echo esc_html((string) $log->lead_id); ?> (deleted)</span>
-                                        <?php endif; ?>
+                                        <?php } ?>
                                     </td>
                                     <td>
                                         <span class="rl-badge rl-badge-<?php echo esc_attr($log->stage); ?>">
@@ -1569,18 +1600,18 @@ class LeadsAdminDashboard
                                         <div style="font-size: 11px; color: #71717a; margin-top: 2px;">Event: <code><?php echo esc_html($log->event_type); ?></code></div>
                                     </td>
                                     <td>
-                                        <?php if (! empty($log->payload)) : ?>
+                                        <?php if (! empty($log->payload)) { ?>
                                             <details>
                                                 <summary style="font-size: 11px; color: #71717a; cursor: pointer; font-weight: 500;">JSON</summary>
                                                 <div class="rl-json-box"><?php echo esc_html(json_encode($log->payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></div>
                                             </details>
-                                        <?php else : ?>
+                                        <?php } else { ?>
                                             <span style="color: #a1a1aa; font-size: 11px;">—</span>
-                                        <?php endif; ?>
+                                        <?php } ?>
                                     </td>
                                 </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                            <?php } ?>
+                        <?php } ?>
                     </tbody>
                 </table>
             </div>
@@ -1591,12 +1622,12 @@ class LeadsAdminDashboard
                     Page <strong><?php echo esc_html((string) $logs->currentPage()); ?></strong> of <strong><?php echo esc_html((string) $logs->lastPage()); ?></strong>
                 </div>
                 <div style="display: flex; gap: 6px;">
-                    <?php if ($logs->previousPageUrl()) : ?>
+                    <?php if ($logs->previousPageUrl()) { ?>
                         <a href="<?php echo esc_url($logs->previousPageUrl()); ?>" class="rl-btn rl-btn-outline rl-btn-sm"><?php echo $this->iconArrowLeft(); ?> Previous</a>
-                    <?php endif; ?>
-                    <?php if ($logs->nextPageUrl()) : ?>
+                    <?php } ?>
+                    <?php if ($logs->nextPageUrl()) { ?>
                         <a href="<?php echo esc_url($logs->nextPageUrl()); ?>" class="rl-btn rl-btn-outline rl-btn-sm">Next <?php echo $this->iconArrowRight(); ?></a>
-                    <?php endif; ?>
+                    <?php } ?>
                 </div>
             </div>
         </div>
@@ -1656,11 +1687,11 @@ class LeadsAdminDashboard
                         <tr>
                             <td style="width: 170px;">API Key Configured:</td>
                             <td>
-                                <?php if ($apiKey) : ?>
+                                <?php if ($apiKey) { ?>
                                     <span class="rl-badge rl-badge-succeeded"><span class="rl-status-dot"></span>Configured (PAT)</span>
-                                <?php else : ?>
+                                <?php } else { ?>
                                     <span class="rl-badge rl-badge-failed"><span class="rl-status-dot"></span>Missing Key</span>
-                                <?php endif; ?>
+                                <?php } ?>
                             </td>
                         </tr>
                         <tr>
@@ -1710,20 +1741,136 @@ class LeadsAdminDashboard
         <?php
     }
 
+    public function renderSettings(): void
+    {
+        $settings = app(LeadSettingsService::class)->get();
+        ?>
+        <div class="wrap rl-admin-wrap">
+            <div class="rl-admin-header">
+                <div>
+                    <h1 class="rl-admin-title">Lead Form & Routing Settings</h1>
+                    <p class="rl-admin-subtitle">
+                        Admin-configurable form fields, notification routing, and retention policy (ADR-0008).
+                    </p>
+                </div>
+                <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads')); ?>" class="rl-btn rl-btn-outline">
+                    <?php echo $this->iconArrowLeft(); ?> Back to All Leads
+                </a>
+            </div>
+
+            <?php $this->renderAdminNavigation('settings'); ?>
+
+            <?php if (isset($_GET['settings_saved'])) { ?>
+                <div class="notice notice-success is-dismissible">
+                    <p><strong>Settings saved.</strong></p>
+                </div>
+            <?php } elseif (! empty($_GET['settings_error'])) { ?>
+                <div class="notice notice-error is-dismissible">
+                    <p><?php echo esc_html(wp_unslash($_GET['settings_error'])); ?></p>
+                </div>
+            <?php } ?>
+
+            <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=rl-leads-settings')); ?>">
+                <?php wp_nonce_field('rl_save_lead_settings_nonce'); ?>
+                <input type="hidden" name="rl_action" value="save_lead_settings" />
+
+                <div class="rl-detail-card" style="margin-bottom: 20px;">
+                    <h3 class="rl-detail-title">Notifications</h3>
+                    <table class="form-table" role="presentation">
+                        <tr>
+                            <th scope="row"><label for="notification_emails">Recipient emails</label></th>
+                            <td>
+                                <input type="text" id="notification_emails" name="notification_emails" class="regular-text"
+                                    value="<?php echo esc_attr(implode(', ', $settings['notification_emails'])); ?>"
+                                    placeholder="sales@remoteleverage.com, ops@remoteleverage.com" />
+                                <p class="description">Comma-separated. Notified by email on every new lead capture.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="rl-detail-card" style="margin-bottom: 20px;">
+                    <h3 class="rl-detail-title">Optional Form Fields</h3>
+                    <table class="form-table" role="presentation">
+                        <tr>
+                            <th scope="row">Visible fields</th>
+                            <td>
+                                <?php foreach (LeadSettingsService::OPTIONAL_FIELDS as $field) { ?>
+                                    <label style="display: block; margin-bottom: 6px;">
+                                        <input type="checkbox" name="optional_fields[<?php echo esc_attr($field); ?>]" value="1"
+                                            <?php checked(! empty($settings['optional_fields'][$field])); ?> />
+                                        <?php echo esc_html(ucwords(str_replace('_', ' ', $field))); ?>
+                                    </label>
+                                <?php } ?>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="rl-detail-card" style="margin-bottom: 20px;">
+                    <h3 class="rl-detail-title">Retention Policy</h3>
+                    <table class="form-table" role="presentation">
+                        <tr>
+                            <th scope="row"><label for="retention_days">Retention days</label></th>
+                            <td>
+                                <input type="number" id="retention_days" name="retention_days" min="<?php echo esc_attr((string) LeadSettingsService::MINIMUM_RETENTION_DAYS); ?>"
+                                    value="<?php echo esc_attr((string) $settings['retention_days']); ?>" class="small-text" />
+                                <p class="description">Minimum <?php echo esc_html((string) LeadSettingsService::MINIMUM_RETENTION_DAYS); ?> days (ADR-0008 floor). Leads older than this are eligible for purge.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="rl-detail-card" style="margin-bottom: 20px;">
+                    <h3 class="rl-detail-title">Integration Overrides</h3>
+                    <table class="form-table" role="presentation">
+                        <tr>
+                            <th scope="row"><label for="hubspot_access_token">HubSpot access token</label></th>
+                            <td><input type="password" id="hubspot_access_token" name="hubspot_access_token" class="regular-text"
+                                    value="<?php echo esc_attr($settings['hubspot_access_token']); ?>" autocomplete="off" />
+                                <p class="description">Overrides <code>HUBSPOT_ACCESS_TOKEN</code> from <code>.env</code> when set.</p></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="hubspot_portal_id">HubSpot portal ID</label></th>
+                            <td><input type="text" id="hubspot_portal_id" name="hubspot_portal_id" class="regular-text"
+                                    value="<?php echo esc_attr($settings['hubspot_portal_id']); ?>" /></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="slack_webhook_url">Slack webhook URL</label></th>
+                            <td><input type="url" id="slack_webhook_url" name="slack_webhook_url" class="regular-text"
+                                    value="<?php echo esc_attr($settings['slack_webhook_url']); ?>" placeholder="https://hooks.slack.com/services/..." /></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="lead_webhook_url">Outgoing lead webhook URL</label></th>
+                            <td><input type="url" id="lead_webhook_url" name="lead_webhook_url" class="regular-text"
+                                    value="<?php echo esc_attr($settings['lead_webhook_url']); ?>" placeholder="https://api.example.com/webhooks/leads" /></td>
+                        </tr>
+                    </table>
+                </div>
+
+                <p>
+                    <button type="submit" class="rl-btn rl-btn-primary">Save Settings</button>
+                </p>
+            </form>
+        </div>
+        <?php
+    }
+
     protected function renderAdminNavigation(string $activeTab): void
     {
         $tabs = [
             'leads' => ['label' => 'All Leads & Submissions', 'url' => admin_url('admin.php?page=rl-leads')],
             'activity' => ['label' => 'Live Activity & Audit Logs', 'url' => admin_url('admin.php?page=rl-leads-activity')],
             'diagnostics' => ['label' => 'Diagnostics & Health', 'url' => admin_url('admin.php?page=rl-leads-diagnostics')],
+            'settings' => ['label' => 'Form & Routing Settings', 'url' => admin_url('admin.php?page=rl-leads-settings')],
         ];
         ?>
         <div class="rl-tabs">
-            <?php foreach ($tabs as $key => $tab) : ?>
+            <?php foreach ($tabs as $key => $tab) { ?>
                 <a href="<?php echo esc_url($tab['url']); ?>" class="rl-tab <?php echo $activeTab === $key ? 'rl-tab-active' : ''; ?>">
                     <?php echo esc_html($tab['label']); ?>
                 </a>
-            <?php endforeach; ?>
+            <?php } ?>
         </div>
         <?php
     }
@@ -1734,13 +1881,15 @@ class LeadsAdminDashboard
         if ($name !== '') {
             $parts = preg_split('/\s+/', $name);
             if (count($parts) >= 2) {
-                return strtoupper(mb_substr($parts[0], 0, 1) . mb_substr(end($parts), 0, 1));
+                return strtoupper(mb_substr($parts[0], 0, 1).mb_substr(end($parts), 0, 1));
             }
+
             return strtoupper(mb_substr($name, 0, 2));
         }
         if ($email) {
             return strtoupper(mb_substr($email, 0, 2));
         }
+
         return 'RL';
     }
 

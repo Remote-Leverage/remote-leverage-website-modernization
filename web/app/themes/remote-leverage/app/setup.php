@@ -6,6 +6,23 @@
 
 namespace App;
 
+use App\Application\Http\Middleware\LegacyRedirectMiddleware;
+use App\Blocks\AccordionFaqBlock;
+use App\Blocks\BookingBlock;
+use App\Blocks\BookingFooterBlock;
+use App\Blocks\ClientLogosMarqueeBlock;
+use App\Blocks\ComparisonMatrixBlock;
+use App\Blocks\DataTableBlock;
+use App\Blocks\DepartmentCardsBlock;
+use App\Blocks\FeatureCardsBlock;
+use App\Blocks\GuaranteeCardBlock;
+use App\Blocks\HireVaHeroBlock;
+use App\Blocks\ProcessStepsBlock;
+use App\Blocks\RolesGridBlock;
+use App\Blocks\TalentMarqueeBlock;
+use App\Blocks\TestimonialsBlock;
+use App\Blocks\TrustStatsBlock;
+use App\Blocks\WhyHireBlock;
 use Illuminate\Support\Facades\Vite;
 
 /**
@@ -182,6 +199,7 @@ add_filter('wp_robots', function (array $robots) {
     $robots['max-image-preview'] = 'large';
     $robots['max-snippet'] = '-1';
     $robots['max-video-preview'] = '-1';
+
     return $robots;
 }, PHP_INT_MAX);
 
@@ -200,15 +218,22 @@ add_action('wp_enqueue_scripts', function () {
  */
 add_action('template_redirect', function () {
     $isHttps = is_ssl()
-        || (isset($_SERVER['HTTPS']) && 'on' === strtolower($_SERVER['HTTPS']))
-        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && 'https' === strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']))
-        || (isset($_SERVER['SERVER_PORT']) && '443' == $_SERVER['SERVER_PORT']);
+        || (isset($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) === 'on')
+        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+        || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == '443');
 
     if (! $isHttps && isset($_SERVER['HTTP_HOST'], $_SERVER['REQUEST_URI'])) {
-        wp_safe_redirect('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'], 301);
+        wp_safe_redirect('https://'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'], 301);
         exit;
     }
 }, 1);
+
+/**
+ * Legacy URL 301 redirects for retired pages (ADR-0006 § SEO & Risk Mitigation).
+ */
+add_action('template_redirect', function () {
+    (new LegacyRedirectMiddleware)->handle();
+}, 2);
 
 /**
  * Register custom Gutenberg block styles and pattern categories.
@@ -231,7 +256,7 @@ add_action('init', function () {
 
     // Register theme block patterns from patterns/ directory
     $patternFiles = glob(get_theme_file_path('patterns/*.php'));
-    if (!empty($patternFiles)) {
+    if (! empty($patternFiles)) {
         foreach ($patternFiles as $patternFile) {
             $headers = get_file_data($patternFile, [
                 'title' => 'Title',
@@ -239,7 +264,7 @@ add_action('init', function () {
                 'categories' => 'Categories',
                 'description' => 'Description',
             ]);
-            if (!empty($headers['slug']) && !empty($headers['title'])) {
+            if (! empty($headers['slug']) && ! empty($headers['title'])) {
                 ob_start();
                 include $patternFile;
                 $patternContent = ob_get_clean();
@@ -247,7 +272,7 @@ add_action('init', function () {
                 register_block_pattern($headers['slug'], [
                     'title' => $headers['title'],
                     'content' => $patternContent,
-                    'categories' => !empty($headers['categories']) ? array_map('trim', explode(',', $headers['categories'])) : ['remote-leverage'],
+                    'categories' => ! empty($headers['categories']) ? array_map('trim', explode(',', $headers['categories'])) : ['remote-leverage'],
                     'description' => $headers['description'] ?? '',
                 ]);
             }
@@ -274,67 +299,67 @@ add_action('init', function () {
     // Register Remote Leverage Smart Blocks with server render callbacks
     $smartBlocks = [
         'talent-marquee' => [
-            'class' => \App\Blocks\TalentMarqueeBlock::class,
+            'class' => TalentMarqueeBlock::class,
             'view' => 'blocks.talent-marquee',
         ],
         'client-logos-marquee' => [
-            'class' => \App\Blocks\ClientLogosMarqueeBlock::class,
+            'class' => ClientLogosMarqueeBlock::class,
             'view' => 'blocks.client-logos-marquee',
         ],
         'trust-stats' => [
-            'class' => \App\Blocks\TrustStatsBlock::class,
+            'class' => TrustStatsBlock::class,
             'view' => 'blocks.trust-stats',
         ],
         'department-cards' => [
-            'class' => \App\Blocks\DepartmentCardsBlock::class,
+            'class' => DepartmentCardsBlock::class,
             'view' => 'blocks.department-cards',
         ],
         'data-table' => [
-            'class' => \App\Blocks\DataTableBlock::class,
+            'class' => DataTableBlock::class,
             'view' => 'blocks.data-table',
         ],
         'process-steps' => [
-            'class' => \App\Blocks\ProcessStepsBlock::class,
+            'class' => ProcessStepsBlock::class,
             'view' => 'blocks.process-steps',
         ],
         'testimonials' => [
-            'class' => \App\Blocks\TestimonialsBlock::class,
+            'class' => TestimonialsBlock::class,
             'view' => 'blocks.testimonials',
         ],
         'accordion-faq' => [
-            'class' => \App\Blocks\AccordionFaqBlock::class,
+            'class' => AccordionFaqBlock::class,
             'view' => 'blocks.accordion-faq',
         ],
         'booking' => [
-            'class' => \App\Blocks\BookingBlock::class,
+            'class' => BookingBlock::class,
             'view' => 'blocks.booking',
         ],
         'feature-cards' => [
-            'class' => \App\Blocks\FeatureCardsBlock::class,
+            'class' => FeatureCardsBlock::class,
             'view' => 'blocks.feature-cards',
         ],
         'roles-grid' => [
-            'class' => \App\Blocks\RolesGridBlock::class,
+            'class' => RolesGridBlock::class,
             'view' => 'blocks.roles-grid',
         ],
         'hire-va-hero' => [
-            'class' => \App\Blocks\HireVaHeroBlock::class,
+            'class' => HireVaHeroBlock::class,
             'view' => 'blocks.hire-va-hero',
         ],
         'why-hire' => [
-            'class' => \App\Blocks\WhyHireBlock::class,
+            'class' => WhyHireBlock::class,
             'view' => 'blocks.why-hire',
         ],
         'guarantee-card' => [
-            'class' => \App\Blocks\GuaranteeCardBlock::class,
+            'class' => GuaranteeCardBlock::class,
             'view' => 'blocks.guarantee-card',
         ],
         'comparison-matrix' => [
-            'class' => \App\Blocks\ComparisonMatrixBlock::class,
+            'class' => ComparisonMatrixBlock::class,
             'view' => 'blocks.comparison-matrix',
         ],
         'booking-footer' => [
-            'class' => \App\Blocks\BookingFooterBlock::class,
+            'class' => BookingFooterBlock::class,
             'view' => 'blocks.booking-footer',
         ],
     ];
@@ -377,6 +402,3 @@ add_action('init', function () {
         }
     }
 });
-
-
-

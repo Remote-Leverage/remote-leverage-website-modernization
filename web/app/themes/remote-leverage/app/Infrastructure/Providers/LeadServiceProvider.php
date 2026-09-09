@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace App\Infrastructure\Providers;
 
 use App\Domains\Lead\Actions\CaptureLeadAction;
+use App\Domains\Lead\Actions\ProcessAbandonedLeadsAction;
 use App\Domains\Lead\Actions\PurgeOldLeadsAction;
+use App\Domains\Lead\Commands\ProcessAbandonedLeadsCommand;
 use App\Domains\Lead\Commands\PurgeLeadsCommand;
 use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
+use App\Domains\Lead\Listeners\HandleLeadEventsForEmailNotification;
 use App\Domains\Lead\Listeners\HandleLeadEventsForSlack;
 use App\Domains\Lead\Listeners\HandleLeadEventsForWebhook;
 use App\Domains\Lead\Services\HubSpotGateway;
 use App\Domains\Lead\Services\LeadActivityLogger;
+use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\PartnerHub\Listeners\HandleLeadBookingCompletedForPartner;
 use Illuminate\Support\Facades\Cache;
@@ -27,16 +31,20 @@ class LeadServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(PhoneValidationService::class, fn () => new PhoneValidationService);
-        $this->app->singleton(HubSpotGateway::class, fn () => new HubSpotGateway);
+        $this->app->singleton(LeadSettingsService::class, fn () => new LeadSettingsService);
+        $this->app->singleton(HubSpotGateway::class);
         $this->app->singleton(LeadActivityLogger::class, fn () => new LeadActivityLogger);
         $this->app->singleton(HandleLeadEventsForSlack::class);
         $this->app->singleton(HandleLeadEventsForWebhook::class);
+        $this->app->singleton(HandleLeadEventsForEmailNotification::class);
         $this->app->singleton(CaptureLeadAction::class);
         $this->app->singleton(PurgeOldLeadsAction::class);
+        $this->app->singleton(ProcessAbandonedLeadsAction::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
                 PurgeLeadsCommand::class,
+                ProcessAbandonedLeadsCommand::class,
             ]);
         }
     }
@@ -71,6 +79,9 @@ class LeadServiceProvider extends ServiceProvider
         Event::listen(LeadCreated::class, [HandleLeadEventsForWebhook::class, 'handleCreated']);
         Event::listen(LeadBookingCompleted::class, [HandleLeadEventsForWebhook::class, 'handleBookingCompleted']);
 
+        // 3b. Notify admin-configured recipient emails on LeadCreated (WR-102)
+        Event::listen(LeadCreated::class, [HandleLeadEventsForEmailNotification::class, 'handleCreated']);
+
         // 4. Attribute completed bookings to partners in PartnerHub
         Event::listen(
             LeadBookingCompleted::class,
@@ -81,5 +92,18 @@ class LeadServiceProvider extends ServiceProvider
         Event::listen([LeadCreated::class, LeadBookingCompleted::class], function () {
             Cache::forget('rl_lead_dashboard_kpi_metrics');
         });
+
+        // 6. Hourly WP-Cron: process leads abandoned before completing booking (ADR-0008)
+        if (function_exists('add_action')) {
+            add_action('init', function () {
+                if (! wp_next_scheduled('rl_process_abandoned_leads')) {
+                    wp_schedule_event(time(), 'hourly', 'rl_process_abandoned_leads');
+                }
+            });
+
+            add_action('rl_process_abandoned_leads', function () {
+                $this->app->make(ProcessAbandonedLeadsAction::class)->execute();
+            });
+        }
     }
 }

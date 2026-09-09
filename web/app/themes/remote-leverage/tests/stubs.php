@@ -72,7 +72,8 @@ $app->singleton('validator', function ($app) {
 });
 
 $app->singleton('cache', function () {
-    return new class {
+    return new class
+    {
         protected array $storage = [];
 
         public function get($key, $default = null)
@@ -316,10 +317,55 @@ if (! function_exists('wp_nonce_url')) {
     }
 }
 
+if (! function_exists('get_post_meta')) {
+    function get_post_meta($postId, $key = '', $single = false)
+    {
+        return $GLOBALS['_wp_mock_post_meta'][$postId][$key] ?? ($single ? '' : []);
+    }
+}
+
+if (! function_exists('update_post_meta')) {
+    function update_post_meta($postId, $key, $value)
+    {
+        $GLOBALS['_wp_mock_post_meta'][$postId][$key] = $value;
+
+        return true;
+    }
+}
+
+if (! function_exists('delete_post_meta')) {
+    function delete_post_meta($postId, $key)
+    {
+        unset($GLOBALS['_wp_mock_post_meta'][$postId][$key]);
+
+        return true;
+    }
+}
+
+if (! function_exists('wp_update_post')) {
+    function wp_update_post($postArr)
+    {
+        $postId = $postArr['ID'] ?? 0;
+        $GLOBALS['_wp_mock_posts'][$postId] = array_merge($GLOBALS['_wp_mock_posts'][$postId] ?? [], $postArr);
+
+        return $postId;
+    }
+}
+
+if (! function_exists('wp_mail')) {
+    function wp_mail($to, $subject, $message, $headers = '', $attachments = [])
+    {
+        $GLOBALS['_wp_mock_mail_sent'][] = compact('to', 'subject', 'message');
+
+        return true;
+    }
+}
+
 if (! function_exists('remove_meta_box')) {
     function remove_meta_box($id, $page, $context)
     {
         $GLOBALS['rl_removed_meta_boxes'][] = $id;
+
         return true;
     }
 }
@@ -328,6 +374,7 @@ if (! function_exists('wp_add_dashboard_widget')) {
     function wp_add_dashboard_widget($widget_id, $widget_name, $callback, $control_callback = null, $callback_args = null, $context = 'normal', $priority = 'core')
     {
         $GLOBALS['rl_added_dashboard_widgets'][] = $widget_id;
+
         return true;
     }
 }
@@ -353,4 +400,3 @@ if (! class_exists('WP_Admin_Bar')) {
         }
     }
 }
-

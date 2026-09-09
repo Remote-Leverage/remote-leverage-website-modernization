@@ -1,8 +1,29 @@
 # ADR-0008: Introduce a `Lead` Bounded Context and Retire Gravity Forms
 
-- Status: Proposed
-- Date: 2026-09-06
-- Deciders: Hyller Bandeira (proposer) — pending review by Adrián Salvatori
+- Status: Accepted (2026-09-09)
+- Date: 2026-09-06 (proposed) / 2026-09-09 (accepted)
+- Deciders: Hyller Bandeira (proposer), Adrián Salvatori (accepted)
+
+## Acceptance Note (2026-09-09)
+
+Accepted as written. The `Lead` bounded context described below is already
+implemented in `app/Domains/Lead` — `Lead`/`LeadActivityLog` models, all four
+lifecycle events, `CaptureLeadAction`, `PurgeOldLeadsAction` +
+`ProcessAbandonedLeadsAction` (the scheduled `LeadAbandoned` processor,
+closing the one gap this ADR's "mechanism ... left for implementation"
+called out), `HubSpotGateway`, `PhoneValidationService`, and the
+Slack/webhook/email listeners — wired through `LeadServiceProvider`.
+
+This also resolves the one decision this ADR explicitly left open — the
+event transport (§ "Cross-context communication is Event-Driven Design"):
+**synchronous subscriber** is the transport in use throughout (plain
+`Event::listen()`; no listener implements `ShouldQueue`). This matches the
+"no new infrastructure" tradeoff already described below, and is consistent
+with WR-106 (persistent queue worker provisioning) being deferred/on hold —
+there is no worker process to route deferred jobs to. If a future subscriber
+needs retry/backoff (e.g. a flaky external call), the per-subscriber queued
+transport described below remains available without revisiting this
+decision for the whole domain.
 
 ## Context
 

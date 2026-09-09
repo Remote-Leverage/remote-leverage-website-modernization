@@ -14,10 +14,13 @@ class HubSpotGateway
 
     protected string $portalId;
 
-    public function __construct()
+    public function __construct(?LeadSettingsService $settings = null)
     {
-        $this->accessToken = env('HUBSPOT_ACCESS_TOKEN');
-        $this->portalId = (string) env('HUBSPOT_PORTAL_ID', '');
+        $settings ??= new LeadSettingsService;
+        $configured = $settings->get();
+
+        $this->accessToken = $configured['hubspot_access_token'] ?: env('HUBSPOT_ACCESS_TOKEN');
+        $this->portalId = (string) ($configured['hubspot_portal_id'] ?: env('HUBSPOT_PORTAL_ID', ''));
     }
 
     /**

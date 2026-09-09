@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Providers;
 
+use App\Infrastructure\WordPress\Admin\ContentAuditAdmin;
+use App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
+use App\Infrastructure\WordPress\Admin\MarketingDashboard;
+use App\Infrastructure\WordPress\Admin\WordPressAdminTheme;
 use App\Infrastructure\WordPress\PostTypes\PartnerPostType;
 use Illuminate\Support\ServiceProvider;
 
@@ -34,9 +38,10 @@ class DomainServiceProvider extends ServiceProvider
         }
 
         $this->app->singleton(PartnerPostType::class, fn () => new PartnerPostType);
-        $this->app->singleton(\App\Infrastructure\WordPress\Admin\LeadsAdminDashboard::class, fn () => new \App\Infrastructure\WordPress\Admin\LeadsAdminDashboard);
-        $this->app->singleton(\App\Infrastructure\WordPress\Admin\WordPressAdminTheme::class, fn () => new \App\Infrastructure\WordPress\Admin\WordPressAdminTheme);
-        $this->app->singleton(\App\Infrastructure\WordPress\Admin\MarketingDashboard::class, fn () => new \App\Infrastructure\WordPress\Admin\MarketingDashboard);
+        $this->app->singleton(LeadsAdminDashboard::class, fn () => new LeadsAdminDashboard);
+        $this->app->singleton(WordPressAdminTheme::class, fn () => new WordPressAdminTheme);
+        $this->app->singleton(MarketingDashboard::class, fn () => new MarketingDashboard);
+        $this->app->singleton(ContentAuditAdmin::class, fn () => new ContentAuditAdmin);
     }
 
     /**
@@ -46,8 +51,9 @@ class DomainServiceProvider extends ServiceProvider
     {
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
         $this->app->make(PartnerPostType::class)->register();
-        $this->app->make(\App\Infrastructure\WordPress\Admin\LeadsAdminDashboard::class)->register();
-        $this->app->make(\App\Infrastructure\WordPress\Admin\WordPressAdminTheme::class)->register();
-        $this->app->make(\App\Infrastructure\WordPress\Admin\MarketingDashboard::class)->register();
+        $this->app->make(LeadsAdminDashboard::class)->register();
+        $this->app->make(WordPressAdminTheme::class)->register();
+        $this->app->make(MarketingDashboard::class)->register();
+        $this->app->make(ContentAuditAdmin::class)->register();
     }
 }

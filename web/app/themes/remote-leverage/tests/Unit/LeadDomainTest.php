@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Domains\Lead\Actions\CaptureLeadAction;
+use App\Domains\Lead\Actions\ProcessAbandonedLeadsAction;
 use App\Domains\Lead\Actions\PurgeOldLeadsAction;
 use App\Domains\Lead\Data\LeadCaptureData;
+use App\Domains\Lead\Events\LeadAbandoned;
 use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Events\LeadFormSubmitted;
@@ -15,6 +17,7 @@ use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Referral\Services\AttributionEngine;
+use App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
@@ -158,6 +161,73 @@ describe('Lead Domain', function () {
         expect($purgedCount)->toBe(1);
         expect(Lead::query()->find($oldLead->id))->toBeNull();
         expect(Lead::query()->find($recentLead->id))->not->toBeNull();
+    });
+
+    test('ProcessAbandonedLeadsAction marks stale unbooked leads abandoned, dispatches LeadAbandoned, and logs dispatch', function () {
+        $abandonedEvents = [];
+        Event::listen(LeadAbandoned::class, function ($e) use (&$abandonedEvents) {
+            $abandonedEvents[] = $e;
+        });
+
+        // Stale lead: captured 3 hours ago, never booked
+        $staleLead = new Lead([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Stale Lead',
+            'email' => 'stale@lead.com',
+            'source_type' => 'organic',
+            'status' => 'captured',
+        ]);
+        $staleLead->timestamps = false;
+        $staleLead->created_at = Carbon::now()->subHours(3);
+        $staleLead->updated_at = Carbon::now()->subHours(3);
+        $staleLead->save();
+
+        // Fresh lead: captured 30 minutes ago, still within the timeout window
+        $freshLead = new Lead([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Fresh Lead',
+            'email' => 'fresh@lead.com',
+            'source_type' => 'organic',
+            'status' => 'captured',
+        ]);
+        $freshLead->timestamps = false;
+        $freshLead->created_at = Carbon::now()->subMinutes(30);
+        $freshLead->updated_at = Carbon::now()->subMinutes(30);
+        $freshLead->save();
+
+        // Stale but already booked: must be excluded regardless of age
+        $bookedLead = new Lead([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Booked Lead',
+            'email' => 'booked@lead.com',
+            'source_type' => 'organic',
+            'status' => 'booked',
+        ]);
+        $bookedLead->timestamps = false;
+        $bookedLead->created_at = Carbon::now()->subHours(5);
+        $bookedLead->updated_at = Carbon::now()->subHours(5);
+        $bookedLead->save();
+
+        $action = new ProcessAbandonedLeadsAction(new LeadActivityLogger);
+        $abandonedCount = $action->execute(2);
+
+        expect($abandonedCount)->toBe(1);
+        expect($staleLead->fresh()->status)->toBe('abandoned');
+        expect($freshLead->fresh()->status)->toBe('captured');
+        expect($bookedLead->fresh()->status)->toBe('booked');
+
+        expect(count($abandonedEvents))->toBe(1);
+        expect($abandonedEvents[0]->lead->id)->toBe($staleLead->id);
+
+        $dispatchLog = LeadActivityLog::query()
+            ->where('lead_id', $staleLead->id)
+            ->where('stage', 'dispatch')
+            ->where('event_type', 'LeadAbandoned')
+            ->first();
+
+        expect($dispatchLog)->not->toBeNull()
+            ->and($dispatchLog->actor_domain)->toBe('Lead')
+            ->and($dispatchLog->outcome)->toBe('succeeded');
     });
 
     test('CaptureLeadAction updates existing lead on final submission without duplicating rows', function () {
@@ -329,7 +399,7 @@ describe('Lead Domain', function () {
             'status' => 'partial',
         ]);
 
-        $dashboard = new \App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
+        $dashboard = new LeadsAdminDashboard;
 
         // Use reflection to access protected applyOptimizedSearch
         $reflection = new ReflectionClass($dashboard);
