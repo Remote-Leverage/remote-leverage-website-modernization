@@ -5,7 +5,10 @@
             <div class="rl-talent-card-wrapper rl-talent-card">
                 <img class="rl-department-card__bg w-full h-full object-cover object-top"
                     src="{{ $card['bg'] }}" alt="{{ $card['name'] }}" loading="lazy" decoding="async"
-                    width="250" height="400">
+                    width="250" height="400"
+                    @if (! empty($card['bg_srcset']))
+                        srcset="{{ $card['bg_srcset'] }}" sizes="{{ $card['bg_sizes'] }}"
+                    @endif>
                 <div class="rl-department-card__overlay"></div>
                 <div class="rl-department-card__blur"></div>
                 <div class="rl-department-card__content">

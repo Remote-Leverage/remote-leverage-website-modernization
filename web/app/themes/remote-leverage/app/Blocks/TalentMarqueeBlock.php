@@ -73,8 +73,22 @@ class TalentMarqueeBlock extends Block
             : BlockDefaults::talentCards();
 
         return array_map(function ($card) {
-            $card['bg'] = BlockDefaults::resolveImageUrl($card['bg'] ?? '');
-            $card['logo'] = BlockDefaults::resolveImageUrl($card['logo'] ?? '');
+            $bgUrl = BlockDefaults::resolveImageUrl($card['bg'] ?? '');
+            $card['bg'] = BlockDefaults::preferWebp($bgUrl);
+            $card['logo'] = BlockDefaults::preferWebp(BlockDefaults::resolveImageUrl($card['logo'] ?? ''));
+
+            $bgId = BlockDefaults::getAttachmentId($bgUrl);
+            if (is_int($bgId) && function_exists('wp_get_attachment_image_srcset')) {
+                $srcset = wp_get_attachment_image_srcset($bgId, 'medium_large');
+                if ($srcset) {
+                    $card['bg_srcset'] = preg_replace_callback(
+                        '/(\S+)(?=\s+\d+w)/',
+                        fn($m) => BlockDefaults::preferWebp($m[1]),
+                        $srcset,
+                    );
+                    $card['bg_sizes'] = '250px';
+                }
+            }
 
             return $card;
         }, $cards);

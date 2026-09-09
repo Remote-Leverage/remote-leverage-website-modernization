@@ -1,5 +1,17 @@
-import intlTelInput from 'intl-tel-input/intlTelInputWithUtils';
-window.intlTelInput = intlTelInput;
+window.intlTelInput = window.intlTelInput || null;
+
+let itiLoadPromise = null;
+function loadIntlTelInput() {
+  if (window.intlTelInput) return Promise.resolve(window.intlTelInput);
+  if (itiLoadPromise) return itiLoadPromise;
+
+  itiLoadPromise = import('intl-tel-input/intlTelInputWithUtils').then((mod) => {
+    window.intlTelInput = mod.default;
+    return window.intlTelInput;
+  });
+
+  return itiLoadPromise;
+}
 
 export function phoneInputComponent(config = {}) {
   return {
@@ -85,6 +97,8 @@ export function phoneInputComponent(config = {}) {
       }
     },
     init() {
+      loadIntlTelInput();
+
       if (window.intlTelInput) {
         this.initIti();
       } else {
