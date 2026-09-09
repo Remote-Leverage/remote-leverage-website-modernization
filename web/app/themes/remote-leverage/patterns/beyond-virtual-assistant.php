@@ -1,4 +1,7 @@
 <?php
+
+use App\Support\BlockDefaults;
+
 /**
  * Title: Beyond Virtual Assistant - 4 Specialty Roles
  * Slug: remote-leverage/beyond-virtual-assistant
@@ -32,6 +35,6 @@
     </div>
     <!-- /wp:columns -->
 
-    <?php echo \App\Support\BlockDefaults::renderDepartmentCards(); ?>
+    <?php echo BlockDefaults::renderDepartmentCards(); ?>
 </div>
 <!-- /wp:group -->

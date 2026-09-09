@@ -24,7 +24,7 @@ class Lead extends Model
         'phone_country',
         'company',
         'role_needed',
-        //dynamic new fields 
+        // dynamic new fields
         'weekly_hours',
         'monthly_revenue',
         'start_date',
@@ -43,7 +43,7 @@ class Lead extends Model
         'source_type',
         'source_id',
         'status',
-        //something for dynamic properties
+        // something for dynamic properties
     ];
 
     /**

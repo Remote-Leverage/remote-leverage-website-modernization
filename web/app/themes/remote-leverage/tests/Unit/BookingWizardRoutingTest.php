@@ -326,10 +326,8 @@ describe('Booking Wizard MRR Routing & Tracking Parity', function () {
         expect($wizard->currentStep)->toBe(3);
 
         // Selecting a slot sets selectedSlot and stays on step 3 for confirmation
-        $wizard->selectSlot($date . 'T14:00:00Z');
-        expect($wizard->selectedSlot)->toBe($date . 'T14:00:00Z')
+        $wizard->selectSlot($date.'T14:00:00Z');
+        expect($wizard->selectedSlot)->toBe($date.'T14:00:00Z')
             ->and($wizard->currentStep)->toBe(3);
     });
 });
-
-

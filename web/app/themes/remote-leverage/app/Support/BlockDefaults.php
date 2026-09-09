@@ -79,10 +79,62 @@ class BlockDefaults
 
     /**
      * Resolve any image in public/images/ to its canonical HTTPS URL.
+     * Homepage art lives on EFS under uploads/home (and dated upload folders),
+     * not in the gitignored theme public/ directory.
      */
     public static function themeImg(string $path): string
     {
-        return esc_url(set_url_scheme(get_template_directory_uri() . '/public/images/' . ltrim($path, '/'), 'https'));
+        $path = ltrim($path, '/');
+        if (str_starts_with($path, 'home/')) {
+            return self::homeImg(substr($path, 5));
+        }
+
+        $themePath = get_theme_file_path('public/images/'.$path);
+        if (is_file($themePath)) {
+            return esc_url(set_url_scheme(get_template_directory_uri().'/public/images/'.$path, 'https'));
+        }
+
+        return self::homeImg(basename($path));
+    }
+
+    /**
+     * Directory URL for homepage media stored on EFS.
+     */
+    public static function imgBase(): string
+    {
+        return rtrim(content_url('/uploads/home'), '/');
+    }
+
+    /**
+     * Resolve a homepage image, preferring EFS uploads then the theme public dir.
+     * Accepts a .webp name and falls back to png/jpg if that is what was uploaded.
+     */
+    public static function homeImg(string $file): string
+    {
+        $file = ltrim($file, '/');
+        $name = pathinfo($file, PATHINFO_FILENAME);
+        $dirs = [
+            WP_CONTENT_DIR.'/uploads/home' => content_url('/uploads/home'),
+            WP_CONTENT_DIR.'/uploads/hire-va-4' => content_url('/uploads/hire-va-4'),
+            WP_CONTENT_DIR.'/uploads/2026/09' => content_url('/uploads/2026/09'),
+            WP_CONTENT_DIR.'/uploads/2026/07' => content_url('/uploads/2026/07'),
+            WP_CONTENT_DIR.'/uploads/2026/06' => content_url('/uploads/2026/06'),
+            WP_CONTENT_DIR.'/uploads/2026/05' => content_url('/uploads/2026/05'),
+            WP_CONTENT_DIR.'/uploads/2026/04' => content_url('/uploads/2026/04'),
+            get_theme_file_path('public/images/home') => get_template_directory_uri().'/public/images/home',
+            get_theme_file_path('public/images/hire-va-4') => get_template_directory_uri().'/public/images/hire-va-4',
+        ];
+
+        foreach ($dirs as $dir => $url) {
+            foreach (['webp', 'png', 'jpg', 'jpeg', 'svg'] as $ext) {
+                $path = $dir.'/'.$name.'.'.$ext;
+                if (is_file($path)) {
+                    return esc_url(set_url_scheme(rtrim($url, '/').'/'.$name.'.'.$ext, 'https'));
+                }
+            }
+        }
+
+        return esc_url(set_url_scheme(self::imgBase().'/'.$file, 'https'));
     }
 
     /**
@@ -90,7 +142,7 @@ class BlockDefaults
      */
     public static function hireVaImg(string $file): string
     {
-        return self::themeImg('hire-va-4/' . ltrim($file, '/'));
+        return self::homeImg(ltrim($file, '/'));
     }
 
     /**
@@ -179,13 +231,14 @@ class BlockDefaults
             }
             $formatted[] = $formattedRow;
         }
+
         return $formatted;
     }
 
     public static function encodeRepeater(string $fieldName, string $fieldKey, array $rows, array &$data = []): array
     {
         $data[$fieldName] = count($rows);
-        $data['_' . $fieldName] = $fieldKey;
+        $data['_'.$fieldName] = $fieldKey;
         foreach ($rows as $i => $row) {
             foreach ($row as $subfield => $val) {
                 $encodedVal = self::getAttachmentId($val);
@@ -193,6 +246,7 @@ class BlockDefaults
                 $data["_{$fieldName}_{$i}_{$subfield}"] = "{$fieldKey}_{$subfield}";
             }
         }
+
         return $data;
     }
 
@@ -205,12 +259,7 @@ class BlockDefaults
             'mode' => 'preview',
         ], $attrs);
 
-        return '<!-- wp:acf/' . $slug . ' ' . json_encode($blockAttrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ' /-->';
-    }
-
-    public static function imgBase(): string
-    {
-        return get_template_directory_uri() . '/public/images/home';
+        return '<!-- wp:acf/'.$slug.' '.json_encode($blockAttrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE).' /-->';
     }
 
     // --- PROCESS STEPS ---
@@ -239,6 +288,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('steps', 'field_process_steps_block_steps', self::steps(), $data);
+
         return self::patternBlock('process-steps', array_merge($data, $overrides));
     }
 
@@ -246,24 +296,25 @@ class BlockDefaults
     public static function departmentCards(): array
     {
         $img = self::imgBase();
+
         return [
             [
-                'img' => $img . '/magnific_half-body-shot-of-a-young_SOmwQLyUb8-1.webp',
+                'img' => self::homeImg('magnific_half-body-shot-of-a-young_SOmwQLyUb8-1.webp'),
                 'title' => 'Administrative &<br>Executive Assistants',
                 'desc' => 'Executive support for busy founders and teams.',
             ],
             [
-                'img' => $img . '/magnific_wPmw8Jk7EI-1.webp',
+                'img' => self::homeImg('magnific_wPmw8Jk7EI-1.webp'),
                 'title' => 'Healthcare &<br>Medical Assistants',
                 'desc' => 'Healthcare professionals supporting clinics and practices.',
             ],
             [
-                'img' => $img . '/magnific_ubzu0aUQLD-1.webp',
+                'img' => self::homeImg('magnific_ubzu0aUQLD-1.webp'),
                 'title' => 'Sales & Growth<br>Marketing Talents',
                 'desc' => 'Professionals focused on growth, leads, and revenue.',
             ],
             [
-                'img' => $img . '/magnific_YVjYLdkWeC-1.webp',
+                'img' => self::homeImg('magnific_YVjYLdkWeC-1.webp'),
                 'title' => 'Operations &<br>Finance Professionals',
                 'desc' => 'Experts in finance, operations, and business support.',
             ],
@@ -274,6 +325,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('cards', 'field_department_cards_block_cards', self::departmentCards(), $data);
+
         return self::patternBlock('department-cards', array_merge($data, $overrides));
     }
 
@@ -285,22 +337,22 @@ class BlockDefaults
         if ($columns === '4') {
             return [
                 [
-                    'img' => $img . '/hour.webp',
+                    'img' => self::homeImg('hour.webp'),
                     'title' => '$6-10 /hr',
                     'desc' => 'Access experienced professionals at highly competitive rates. Most administrative, support, sales, and marketing roles can be filled within this range.',
                 ],
                 [
-                    'img' => $img . '/lower-cost.webp',
+                    'img' => self::homeImg('lower-cost.webp'),
                     'title' => '70% Lower Costs',
                     'desc' => 'Reduce hiring costs without sacrificing quality. Reinvest the savings into growth, marketing, product development, or additional hires.',
                 ],
                 [
-                    'img' => $img . '/day-average.webp',
+                    'img' => self::homeImg('day-average.webp'),
                     'title' => '4-Day Average',
                     'desc' => 'From opening a role to reviewing qualified candidates in days, not weeks. Our recruiting process is designed for speed without compromising quality.',
                 ],
                 [
-                    'img' => $img . '/quality.webp',
+                    'img' => self::homeImg('quality.webp'),
                     'title' => 'Vetted for Quality',
                     'desc' => 'Every candidate is screened for English proficiency, experience, communication skills, and role-specific expertise before reaching your inbox.',
                 ],
@@ -309,32 +361,32 @@ class BlockDefaults
 
         return [
             [
-                'img' => $img . '/Latin-american.webp',
+                'img' => self::homeImg('Latin-american.webp'),
                 'title' => 'Top-tier talents from Latin America and EU',
                 'desc' => 'Access exceptional global talent. We identify skilled professionals with the communication, expertise, and reliability needed to make an immediate impact.',
             ],
             [
-                'img' => $img . '/no-contracts.webp',
+                'img' => self::homeImg('no-contracts.webp'),
                 'title' => 'No contracts<br>No obligations',
                 'desc' => 'Evaluate talent, interview candidates, and see our process firsthand before making any commitment. The decision is always yours.',
             ],
             [
-                'img' => $img . '/ongoing-middleman.webp',
+                'img' => self::homeImg('ongoing-middleman.webp'),
                 'title' => 'No ongoing<br>middleman fees',
                 'desc' => 'You hire talent directly into your business. No payroll markups, monthly management fees, or recurring commissions.',
             ],
             [
-                'img' => $img . '/payment.webp',
+                'img' => self::homeImg('payment.webp'),
                 'title' => "No payment if we don't find the right talent",
                 'desc' => 'Our incentives are aligned with yours. We only succeed when you make a successful hire, so we focus relentlessly on finding the right fit.',
             ],
             [
-                'img' => $img . '/payment-compliance.webp',
+                'img' => self::homeImg('payment-compliance.webp'),
                 'title' => 'Payments, compliance,<br>onboarding support',
                 'desc' => 'Our Contractor Management solution simplifies onboarding, contracts, payroll, and compliance for international talent.',
             ],
             [
-                'img' => $img . '/one-dashboard.webp',
+                'img' => self::homeImg('one-dashboard.webp'),
                 'title' => 'One dashboard<br>for your entire team',
                 'desc' => 'Manage payroll, contracts, compliance, and workforce reporting from a single platform. Stay organized as your global team grows.',
             ],
@@ -348,6 +400,7 @@ class BlockDefaults
             '_columns' => 'field_feature_cards_block_columns',
         ];
         self::encodeRepeater('cards', 'field_feature_cards_block_cards', self::featureCards($columns), $data);
+
         return self::patternBlock('feature-cards', array_merge($data, $overrides));
     }
 
@@ -374,6 +427,7 @@ class BlockDefaults
             '_col_2_header' => 'field_data_table_block_col_2_header',
         ];
         self::encodeRepeater('rows', 'field_data_table_block_rows', self::dataTableRows(), $data);
+
         return self::patternBlock('data-table', array_merge($data, $overrides));
     }
 
@@ -390,6 +444,7 @@ class BlockDefaults
             'timeframe' => "Last 12\nMonths",
             '_timeframe' => 'field_trust_stats_block_timeframe',
         ];
+
         return self::patternBlock('trust-stats', array_merge($data, $overrides));
     }
 
@@ -397,108 +452,109 @@ class BlockDefaults
     public static function testimonials(): array
     {
         $img = self::imgBase();
+
         return [
             [
                 'video_url' => 'https://vimeo.com/1067577208',
-                'image' => $img . '/PRES-Property-Management.jpg',
+                'image' => self::homeImg('PRES-Property-Management.jpg'),
                 'duration' => '00:38',
                 'quote' => '“I can\'t say enought about how every step of the way it just wowed me.”',
                 'company' => 'PRES Property Management',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577369',
-                'image' => $img . '/Coldwell-Banker.jpg',
+                'image' => self::homeImg('Coldwell-Banker.jpg'),
                 'duration' => '00:19',
                 'quote' => '“I’m very impressed with the quality of my VA, she’s very intelligent and she aims to please.”',
                 'company' => 'Coldwell Banker',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577665',
-                'image' => $img . '/Carbon-Solutions-Group.jpg',
+                'image' => self::homeImg('Carbon-Solutions-Group.jpg'),
                 'duration' => '00:55',
                 'quote' => '“I really recommend Remote Leverage; it was a fast process, and the results are good.”',
                 'company' => 'Carbon Solutions Group',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577549',
-                'image' => $img . '/The-Zen-Zone-Wellness.jpg',
+                'image' => self::homeImg('The-Zen-Zone-Wellness.jpg'),
                 'duration' => '04:06',
                 'quote' => '“I got to talk to five amazing virtual assistants, and they all were good; it was kind of hard to make a choice at first.”',
                 'company' => 'The Zen Zone Wellness',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577688',
-                'image' => $img . '/Color-Job.jpg',
+                'image' => self::homeImg('Color-Job.jpg'),
                 'duration' => '01:56',
                 'quote' => '“The transition of working with you guys was absolutely smooth and amazing.”',
                 'company' => 'Color Job',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577383',
-                'image' => $img . '/Connect-Church-Colorado.jpg',
+                'image' => self::homeImg('Connect-Church-Colorado.jpg'),
                 'duration' => '02:45',
                 'quote' => '“She was just perfect, everything that we were looking for we found it in her.”',
                 'company' => 'Connect Church Colorado',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577489',
-                'image' => $img . '/Cash-is-King.jpg',
+                'image' => self::homeImg('Cash-is-King.jpg'),
                 'duration' => '02:39',
                 'quote' => '“Honestly, the reason why we keep hiring is because it is so incredibly easy.”',
                 'company' => 'Cash is King',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577248',
-                'image' => $img . '/Liberty-Hill.jpg',
+                'image' => self::homeImg('Liberty-Hill.jpg'),
                 'duration' => '02:31',
                 'quote' => '“If somebody were asking me why they should work with Remote Leverage, I would say it\'s because of the quality of the candidates.”',
                 'company' => 'Liberty Hill',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577464',
-                'image' => $img . '/RE-MAX.jpg',
+                'image' => self::homeImg('RE-MAX.jpg'),
                 'duration' => '01:02',
                 'quote' => '“Its been about a year and a half since I\'ve been with them so far, I would definitely say go for it, it\'s been a game changer for me.”',
                 'company' => 'RE / MAX',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577620',
-                'image' => $img . '/Realty-One-Group.jpg',
+                'image' => self::homeImg('Realty-One-Group.jpg'),
                 'duration' => '01:43',
                 'quote' => '“As I look back, I was on the fence about it, It\'s probably one of the best decisions I ever made if not the best to help grow my business.”',
                 'company' => 'Realty One Group',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577228',
-                'image' => $img . '/OneUp-Sportz-01.jpg',
+                'image' => self::homeImg('OneUp-Sportz-01.jpg'),
                 'duration' => '01:06',
                 'quote' => '“Very Very happy with the system, you guys system worked well and it was efficient.”',
                 'company' => 'OneUp Sportz',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577598',
-                'image' => $img . '/OneUp-Sportz.jpg',
+                'image' => self::homeImg('OneUp-Sportz.jpg'),
                 'duration' => '01:40',
                 'quote' => '“It was a seamless process, all the applicants that we had they all had Masters in Marketing, which is awesome.”',
                 'company' => 'OneUp Sportz',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577293',
-                'image' => $img . '/Greener-Hill-Psychiatric.jpg',
+                'image' => self::homeImg('Greener-Hill-Psychiatric.jpg'),
                 'duration' => '05:59',
                 'quote' => '“Remote Leverage, presented six candidates and I did interview all of those very in depth, and I thought all of them were phenomenal.”',
                 'company' => 'Greener Hill Psychiatric',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577442',
-                'image' => $img . '/Diamond-Detox.jpg',
+                'image' => self::homeImg('Diamond-Detox.jpg'),
                 'duration' => '00:43',
                 'quote' => '“I\'m very impressed with the english, the capability, qualification, timeliness, they were all very timely, patient.”',
                 'company' => 'Diamond Detox',
             ],
             [
                 'video_url' => 'https://vimeo.com/1067577645',
-                'image' => $img . '/Ad-Center-360.jpg',
+                'image' => self::homeImg('Ad-Center-360.jpg'),
                 'duration' => '00:36',
                 'quote' => '“It was awesome the best experience I\'ve ever had as far as hiring.”',
                 'company' => 'Ad Center 360',
@@ -510,6 +566,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('testimonials', 'field_testimonials_block_testimonials', self::testimonials(), $data);
+
         return self::patternBlock('testimonials', array_merge($data, $overrides));
     }
 
@@ -577,6 +634,7 @@ class BlockDefaults
             '_headline' => 'field_accordion_faq_block_headline',
         ];
         self::encodeRepeater('faqs', 'field_accordion_faq_block_faqs', self::faqsForAcf(), $data);
+
         return self::patternBlock('accordion-faq', array_merge($data, $overrides));
     }
 
@@ -584,26 +642,27 @@ class BlockDefaults
     public static function logos(): array
     {
         $img = self::imgBase();
+
         return [
-            ['src' => $img . '/brrrr-1.webp', 'alt' => 'BRRRR'],
-            ['src' => $img . '/carbon-1.webp', 'alt' => 'Carbon Solutions'],
-            ['src' => $img . '/Q-BitNewLogo-Photoroom-1.webp', 'alt' => 'Q-Bit'],
-            ['src' => $img . '/boe-1.webp', 'alt' => 'BOE'],
-            ['src' => $img . '/greener-hill-1.webp', 'alt' => 'Greener Hill'],
-            ['src' => $img . '/Prestige-Landscaping-1.webp', 'alt' => 'Prestige Landscaping'],
-            ['src' => $img . '/garuz-1-1.webp', 'alt' => 'Garuz'],
-            ['src' => $img . '/vercasa-1.webp', 'alt' => 'Vercasa'],
-            ['src' => $img . '/adcenter-2.webp', 'alt' => 'Ad Center 360'],
-            ['src' => $img . '/liberty-hill-1.webp', 'alt' => 'Liberty Hill'],
-            ['src' => $img . '/chick-fil-a-logo-1.webp', 'alt' => 'Chick-fil-A'],
-            ['src' => $img . '/rl-adp.webp', 'alt' => 'ADP'],
-            ['src' => $img . '/rl-mainstreet.webp', 'alt' => 'Mainstreet'],
-            ['src' => $img . '/rl-farmers.webp', 'alt' => 'Farmers Insurance'],
-            ['src' => $img . '/rl-college-hunks.webp', 'alt' => 'College Hunks'],
-            ['src' => $img . '/remax-1.webp', 'alt' => 'RE/MAX'],
-            ['src' => $img . '/coldwell-1.webp', 'alt' => 'Coldwell Banker'],
-            ['src' => $img . '/sivia-law-white-306w-1.webp', 'alt' => 'Sivia Law'],
-            ['src' => $img . '/zone-4-1.webp', 'alt' => 'Zone 4'],
+            ['src' => self::homeImg('brrrr-1.webp'), 'alt' => 'BRRRR'],
+            ['src' => self::homeImg('carbon-1.webp'), 'alt' => 'Carbon Solutions'],
+            ['src' => self::homeImg('Q-BitNewLogo-Photoroom-1.webp'), 'alt' => 'Q-Bit'],
+            ['src' => self::homeImg('boe-1.webp'), 'alt' => 'BOE'],
+            ['src' => self::homeImg('greener-hill-1.webp'), 'alt' => 'Greener Hill'],
+            ['src' => self::homeImg('Prestige-Landscaping-1.webp'), 'alt' => 'Prestige Landscaping'],
+            ['src' => self::homeImg('garuz-1-1.webp'), 'alt' => 'Garuz'],
+            ['src' => self::homeImg('vercasa-1.webp'), 'alt' => 'Vercasa'],
+            ['src' => self::homeImg('adcenter-2.webp'), 'alt' => 'Ad Center 360'],
+            ['src' => self::homeImg('liberty-hill-1.webp'), 'alt' => 'Liberty Hill'],
+            ['src' => self::homeImg('chick-fil-a-logo-1.webp'), 'alt' => 'Chick-fil-A'],
+            ['src' => self::homeImg('rl-adp.webp'), 'alt' => 'ADP'],
+            ['src' => self::homeImg('rl-mainstreet.webp'), 'alt' => 'Mainstreet'],
+            ['src' => self::homeImg('rl-farmers.webp'), 'alt' => 'Farmers Insurance'],
+            ['src' => self::homeImg('rl-college-hunks.webp'), 'alt' => 'College Hunks'],
+            ['src' => self::homeImg('remax-1.webp'), 'alt' => 'RE/MAX'],
+            ['src' => self::homeImg('coldwell-1.webp'), 'alt' => 'Coldwell Banker'],
+            ['src' => self::homeImg('sivia-law-white-306w-1.webp'), 'alt' => 'Sivia Law'],
+            ['src' => self::homeImg('zone-4-1.webp'), 'alt' => 'Zone 4'],
         ];
     }
 
@@ -611,6 +670,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('logos', 'field_client_logos_marquee_block_logos', self::logos(), $data);
+
         return self::patternBlock('client-logos-marquee', array_merge($data, $overrides), ['align' => 'full']);
     }
 
@@ -618,83 +678,84 @@ class BlockDefaults
     public static function talentCards(): array
     {
         $img = self::imgBase();
+
         return [
             [
                 'name' => 'Daniela Costa',
                 'title' => 'Executive Assistant',
                 'desc' => 'Experienced Executive Assistant specializing in executive support, meeting coordination, travel planning, and operational workflows. Known for exceptional organization.',
-                'logo' => $img . '/rappi_logo-Small.webp',
-                'bg' => $img . '/Frame-132-1.webp',
+                'logo' => self::homeImg('rappi_logo-Small.webp'),
+                'bg' => self::homeImg('Frame-132-1.webp'),
             ],
             [
                 'name' => 'Lucas Mendes',
                 'title' => 'Marketing Manager',
                 'desc' => 'Marketing Manager with 8+ years of experience across demand generation, paid acquisition, lifecycle marketing, and funnel optimization with proven track record scaling pipeline.',
-                'logo' => $img . '/clickup.webp',
-                'bg' => $img . '/Frame-133-1.webp',
+                'logo' => self::homeImg('clickup.webp'),
+                'bg' => self::homeImg('Frame-133-1.webp'),
             ],
             [
                 'name' => 'Noah Martinez',
                 'title' => 'Sales Representative',
                 'desc' => 'Sales Development Representative who consistently exceeded quota by building high-quality outbound pipelines for B2B software companies.',
-                'logo' => $img . '/image-2.webp',
-                'bg' => $img . '/Frame-135-1.webp',
+                'logo' => self::homeImg('image-2.webp'),
+                'bg' => self::homeImg('Frame-135-1.webp'),
             ],
             [
                 'name' => 'Diego Navarro',
                 'title' => 'Sales Representative',
                 'desc' => 'Revenue-focused sales representative experienced in outbound prospecting, product demonstrations, and account management to convert qualified leads.',
-                'logo' => $img . '/image-11.webp',
-                'bg' => $img . '/Frame-135-2.webp',
+                'logo' => self::homeImg('image-11.webp'),
+                'bg' => self::homeImg('Frame-135-2.webp'),
             ],
             [
                 'name' => 'André Vilalobos',
                 'title' => 'Graphic Designer',
                 'desc' => '6+ years of experience helping brands of all sizes, from small and mid-sized businesses to big companies, look professional, polished, and unmistakably them.',
-                'logo' => $img . '/State-Farm-01.webp',
-                'bg' => $img . '/con-07.webp',
+                'logo' => self::homeImg('State-Farm-01.webp'),
+                'bg' => self::homeImg('con-07.webp'),
             ],
             [
                 'name' => 'Juliana Silva',
                 'title' => 'Lead Generation (SDR)',
                 'desc' => '6+ years of experience as an SDR, skilled in prospecting, active listening, clear communication, time management, and handling rejection to consistently generate and qualify sales leads.',
-                'logo' => $img . '/mercado.webp',
-                'bg' => $img . '/cont-02.webp',
+                'logo' => self::homeImg('mercado.webp'),
+                'bg' => self::homeImg('cont-02.webp'),
             ],
             [
                 'name' => 'Valeria Andrea',
                 'title' => 'Medical Assistant',
                 'desc' => '4+ years of experience in fast-paced clinic and hospital settings. Skilled in EMR systems (Epic, Cerner), patient intake, vital signs, and assisting physicians with exams and procedures.',
-                'logo' => $img . '/Allstate-01.webp',
-                'bg' => $img . '/con-05.webp',
+                'logo' => self::homeImg('Allstate-01.webp'),
+                'bg' => self::homeImg('con-05.webp'),
             ],
             [
                 'name' => 'Laura Valentina',
                 'title' => 'Customer Support',
                 'desc' => '+4 years in B2B SaaS customer support, I\'ve supported customers in North America, Europe, and Latin America, adapting to different cultural expectations and communication styles.',
-                'logo' => $img . '/image-12-1.webp',
-                'bg' => $img . '/con-08.webp',
+                'logo' => self::homeImg('image-12-1.webp'),
+                'bg' => self::homeImg('con-08.webp'),
             ],
             [
                 'name' => 'Sofía Pérez',
                 'title' => 'Marketing Assistant',
                 'desc' => '4+ years of experience as a results-driven marketing professional, skilled in content creation, social media strategy, campaign management, and data analysis to drive brand awareness.',
-                'logo' => $img . '/Frame-74-1.webp',
-                'bg' => $img . '/cont-03.webp',
+                'logo' => self::homeImg('Frame-74-1.webp'),
+                'bg' => self::homeImg('cont-03.webp'),
             ],
             [
                 'name' => 'Luana Dias',
                 'title' => 'Executive Assistant',
                 'desc' => '3+ years of experience supporting C-level executives in fast-paced environments. High organization, anticipate needs, and protect executive\'s time like it\'s my own.',
-                'logo' => $img . '/NU-bank-01.webp',
-                'bg' => $img . '/con-06.webp',
+                'logo' => self::homeImg('NU-bank-01.webp'),
+                'bg' => self::homeImg('con-06.webp'),
             ],
             [
                 'name' => 'Sarah Martinez',
                 'title' => 'Sr Executive Assistant',
                 'desc' => 'Executive Assistant with 8+ years supporting founders and executives. Expert in calendar management, inbox organization, project coordination, and keeping fast-growing teams operating smoothly.',
-                'logo' => $img . '/1655873088shopify-logo-transparent.webp',
-                'bg' => $img . '/Frame-131-1.webp',
+                'logo' => self::homeImg('1655873088shopify-logo-transparent.webp'),
+                'bg' => self::homeImg('Frame-131-1.webp'),
             ],
         ];
     }
@@ -703,58 +764,60 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('talent_cards', 'field_talent_marquee_block_talent_cards', self::talentCards(), $data);
+
         return self::patternBlock('talent-marquee', array_merge($data, $overrides), ['align' => 'full']);
     }
 
     public static function imgBaseHireVa4(): string
     {
-        return get_template_directory_uri() . '/public/images/hire-va-4';
+        return rtrim(content_url('/uploads/home'), '/');
     }
 
     // --- HIRE-VA-4: ROLES GRID ---
     public static function rolesGridCards(): array
     {
         $img = self::imgBaseHireVa4();
+
         return [
             [
                 'title' => 'Administrative',
                 'desc' => 'Inbox, calendar, invoices, data entry. The daily upkeep taken off your plate.',
-                'img' => $img . '/Woman_looking_camera_smiling_2K_202607171433-1.png',
+                'img' => self::homeImg('Woman_looking_camera_smiling_2K_202607171433-1.png'),
             ],
             [
                 'title' => 'Lead Generation',
                 'desc' => 'Outreach calls, emails, texting, and follow-up that keeps your pipeline full.',
-                'img' => $img . '/Frame-1092.png',
+                'img' => self::homeImg('Frame-1092.png'),
             ],
             [
                 'title' => 'Sales (SDR)',
                 'desc' => 'Qualifies leads, runs demos, and follows through until it\'s a closed deal.',
-                'img' => $img . '/Screenshot-2026-07-17-at-2.03.18-p.m.-1.png',
+                'img' => self::homeImg('Screenshot-2026-07-17-at-2.03.18-p.m.-1.png'),
             ],
             [
                 'title' => 'Social Media',
                 'desc' => 'Posts, replies, and community management that keeps your brand active.',
-                'img' => $img . '/Screenshot-2026-07-17-at-2.02.42-p.m.-1.png',
+                'img' => self::homeImg('Screenshot-2026-07-17-at-2.02.42-p.m.-1.png'),
             ],
             [
                 'title' => 'Marketing',
                 'desc' => 'Runs and optimizes your paid campaigns across Meta, Google, and LinkedIn.',
-                'img' => $img . '/Frame-1092-1.png',
+                'img' => self::homeImg('Frame-1092-1.png'),
             ],
             [
                 'title' => 'Graphic Design',
                 'desc' => 'Social creative, decks, and brand assets that look like an in-house hire made them.',
-                'img' => $img . '/Screenshot-2026-07-17-at-2.01.07-p.m.-1.png',
+                'img' => self::homeImg('Screenshot-2026-07-17-at-2.01.07-p.m.-1.png'),
             ],
             [
                 'title' => 'Customer Support',
                 'desc' => 'Tickets, questions, and vendor calls handled so your customers stay happy.',
-                'img' => $img . '/man-dressed-casual-wearing-glasses-studio-shot-copy-space-2.png',
+                'img' => self::homeImg('man-dressed-casual-wearing-glasses-studio-shot-copy-space-2.png'),
             ],
             [
                 'title' => 'Custom Role',
                 'desc' => 'Something specific in mind? Tell us the role — we\'ve likely filled it before.',
-                'img' => $img . '/Frame-216.png',
+                'img' => self::homeImg('Frame-216.png'),
             ],
         ];
     }
@@ -763,6 +826,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('cards', 'field_roles_grid_block_cards', self::rolesGridCards(), $data);
+
         return self::patternBlock('roles-grid', array_merge($data, $overrides));
     }
 
@@ -792,6 +856,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('steps', 'field_process_steps_block_steps', self::hireVa4ProcessSteps(), $data);
+
         return self::patternBlock('process-steps', array_merge($data, $overrides));
     }
 
@@ -799,103 +864,104 @@ class BlockDefaults
     public static function hireVa4Testimonials(): array
     {
         $img = self::imgBaseHireVa4();
+
         return [
             [
                 'company' => 'PRES Property Management',
                 'quote' => '“I can\'t say enough about how every step of the way it just wowed me.”',
                 'video_url' => 'https://vimeo.com/1067577208',
-                'image' => $img . '/PRES-Property-Management.jpg',
+                'image' => self::homeImg('PRES-Property-Management.jpg'),
                 'duration' => '00:38',
             ],
             [
                 'company' => 'Coldwell Banker',
                 'quote' => '“I’m very impressed with the quality of my VA, she’s very intelligent and she aims to please.”',
                 'video_url' => 'https://vimeo.com/1067577369',
-                'image' => $img . '/Coldwell-Banker.jpg',
+                'image' => self::homeImg('Coldwell-Banker.jpg'),
                 'duration' => '00:19',
             ],
             [
                 'company' => 'Carbon Solutions Group',
                 'quote' => '“I really recommend Remote Leverage; it was a fast process, and the results are good.”',
                 'video_url' => 'https://vimeo.com/1067577665',
-                'image' => $img . '/Carbon-Solutions-Group.jpg',
+                'image' => self::homeImg('Carbon-Solutions-Group.jpg'),
                 'duration' => '00:55',
             ],
             [
                 'company' => 'The Zen Zone Wellness',
                 'quote' => '“I got to talk to five amazing virtual assistants, and they all were good; it was kind of hard to make a choice at first.”',
                 'video_url' => 'https://vimeo.com/1067577549',
-                'image' => $img . '/The-Zen-Zone-Wellness.jpg',
+                'image' => self::homeImg('The-Zen-Zone-Wellness.jpg'),
                 'duration' => '04:06',
             ],
             [
                 'company' => 'Color Job',
                 'quote' => '“The transition of working with you guys was absolutely smooth and amazing.”',
                 'video_url' => 'https://vimeo.com/1067577688',
-                'image' => $img . '/Color-Job.jpg',
+                'image' => self::homeImg('Color-Job.jpg'),
                 'duration' => '01:56',
             ],
             [
                 'company' => 'Connect Church Colorado',
                 'quote' => '“She was just perfect, everything that we were looking for we found it in her.”',
                 'video_url' => 'https://vimeo.com/1067577383',
-                'image' => $img . '/Connect-Church-Colorado.jpg',
+                'image' => self::homeImg('Connect-Church-Colorado.jpg'),
                 'duration' => '02:45',
             ],
             [
                 'company' => 'Cash is King',
                 'quote' => '“Honestly, the reason why we keep hiring is because it is so incredibly easy.”',
                 'video_url' => 'https://vimeo.com/1067577489',
-                'image' => $img . '/Cash-is-King.jpg',
+                'image' => self::homeImg('Cash-is-King.jpg'),
                 'duration' => '02:39',
             ],
             [
                 'company' => 'Liberty Hill',
                 'quote' => '“If somebody were asking me why they should work with Remote Leverage, I would say it\'s because of the quality of the candidates”',
                 'video_url' => 'https://vimeo.com/1067577248',
-                'image' => $img . '/Liberty-Hill.jpg',
+                'image' => self::homeImg('Liberty-Hill.jpg'),
                 'duration' => '02:31',
             ],
             [
                 'company' => 'RE / MAX',
                 'quote' => '“Its been about a year and a half since I\'ve been with them so far, I would definitely say go for it, it’s been a game changer for me.”',
                 'video_url' => 'https://vimeo.com/1067577464',
-                'image' => $img . '/RE-MAX.jpg',
+                'image' => self::homeImg('RE-MAX.jpg'),
                 'duration' => '01:02',
             ],
             [
                 'company' => 'Realty One Group',
                 'quote' => '“As I look back, I was on the fence about it, It\'s probably one of the best decisions I ever made if not the best to help grow my business.”',
                 'video_url' => 'https://vimeo.com/1067577620',
-                'image' => $img . '/Realty-One-Group.jpg',
+                'image' => self::homeImg('Realty-One-Group.jpg'),
                 'duration' => '01:43',
             ],
             [
                 'company' => 'OneUp Sportz',
                 'quote' => '“Very Very happy with the system, you guys system worked well and it was efficient.”',
                 'video_url' => 'https://vimeo.com/1067577228',
-                'image' => $img . '/OneUp-Sportz-01.jpg',
+                'image' => self::homeImg('OneUp-Sportz-01.jpg'),
                 'duration' => '01:06',
             ],
             [
                 'company' => 'Greener Hill Psychiatric',
                 'quote' => '“Remote Leverage, presented six candidates and I did interview all of those very in depth, and I thought all of them were phenomenal.”',
                 'video_url' => 'https://vimeo.com/1067577293',
-                'image' => $img . '/Greener-Hill-Psychiatric.jpg',
+                'image' => self::homeImg('Greener-Hill-Psychiatric.jpg'),
                 'duration' => '05:59',
             ],
             [
                 'company' => 'Diamond Detox',
                 'quote' => '“I\'m very impressed with the english, the capability, qualification, timeliness, they were all very timely, patient.”',
                 'video_url' => 'https://vimeo.com/1067577442',
-                'image' => $img . '/Diamond-Detox.jpg',
+                'image' => self::homeImg('Diamond-Detox.jpg'),
                 'duration' => '00:43',
             ],
             [
                 'company' => 'Ad Center 360',
                 'quote' => '“It was awesome the best experience I\'ve ever had as far as hiring.”',
                 'video_url' => 'https://vimeo.com/1067577645',
-                'image' => $img . '/Ad-Center-360.jpg',
+                'image' => self::homeImg('Ad-Center-360.jpg'),
                 'duration' => '00:36',
             ],
         ];
@@ -905,6 +971,7 @@ class BlockDefaults
     {
         $data = [];
         self::encodeRepeater('testimonials', 'field_testimonials_block_testimonials', self::hireVa4Testimonials(), $data);
+
         return self::patternBlock('testimonials', array_merge($data, $overrides));
     }
 
@@ -967,6 +1034,7 @@ class BlockDefaults
             $data["faqs_{$i}_answer"] = $item['a'];
             $data["_faqs_{$i}_answer"] = 'field_accordion_faq_block_faqs_answer';
         }
+
         return self::patternBlock('accordion-faq', array_merge($data, $overrides));
     }
 }

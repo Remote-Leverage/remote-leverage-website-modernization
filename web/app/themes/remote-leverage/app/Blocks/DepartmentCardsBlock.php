@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Blocks;
 
+use App\Support\BlockDefaults;
 use Log1x\AcfComposer\Block;
 use Log1x\AcfComposer\Builder;
 
@@ -63,12 +64,13 @@ class DepartmentCardsBlock extends Block
         $items = function_exists('get_field') ? get_field('cards') : null;
         $cards = (! empty($items) && is_array($items))
             ? $items
-            : \App\Support\BlockDefaults::departmentCards();
+            : BlockDefaults::departmentCards();
 
         return array_map(function ($card) {
-            $card['title'] = \App\Support\BlockDefaults::cleanText($card['title'] ?? '');
-            $card['desc'] = \App\Support\BlockDefaults::cleanText($card['desc'] ?? '');
-            $card['img'] = \App\Support\BlockDefaults::resolveImageUrl($card['img'] ?? '');
+            $card['title'] = BlockDefaults::cleanText($card['title'] ?? '');
+            $card['desc'] = BlockDefaults::cleanText($card['desc'] ?? '');
+            $card['img'] = BlockDefaults::resolveImageUrl($card['img'] ?? '');
+
             return $card;
         }, $cards);
     }

@@ -1,4 +1,7 @@
 <?php
+
+use App\Support\BlockDefaults;
+
 /**
  * Title: Reviews - Client Reviews
  * Slug: remote-leverage/hire-va-4-testimonials
@@ -16,6 +19,6 @@
     <p class="has-text-muted-color has-text-color" style="font-size:0.95rem;margin-bottom:3rem">Don't just take our word for it, hear from business owners who've hired through Remote Leverage. See why quality makes all the difference!</p>
     <!-- /wp:paragraph -->
 
-    <?= \App\Support\BlockDefaults::renderHireVa4Testimonials() ?>
+    <?= BlockDefaults::renderHireVa4Testimonials() ?>
 </div>
 <!-- /wp:group -->

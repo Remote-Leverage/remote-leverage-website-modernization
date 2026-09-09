@@ -2,7 +2,7 @@
 
 @section('content')
     @php
-        $imgBase = set_url_scheme(get_template_directory_uri() . '/public/images/home', 'https');
+        $img = fn (string $file) => \App\Support\BlockDefaults::homeImg($file);
     @endphp
 
     @while (have_posts())
@@ -34,7 +34,7 @@
                 <section class="relative bg-bg-light pt-14 pb-4 overflow-hidden">
                     {{-- World Map Background behind Hero --}}
                     <div class="absolute top-2 left-1/2 -translate-x-1/2 w-[1400px] max-w-[96vw] h-[540px] pointer-events-none z-0 opacity-45 bg-no-repeat bg-contain bg-center"
-                        style="background-image: url('{{ $imgBase }}/Map.webp');"></div>
+                        style="background-image: url('{{ $img('Map.webp') }}');"></div>
 
                     <div class="relative z-10 max-w-[1380px] mx-auto px-6 lg:px-10 text-center">
 
@@ -76,88 +76,88 @@
                                 'title' => 'Executive Assistant',
                                 'desc' =>
                                     'Experienced Executive Assistant specializing in executive support, meeting coordination, travel planning, and operational workflows. Known for exceptional organization.',
-                                'logo' => $imgBase . '/rappi_logo-Small.webp',
-                                'bg' => $imgBase . '/Frame-132-1.webp',
+                                'logo' => $img('rappi_logo-Small.webp'),
+                                'bg' => $img('Frame-132-1.webp'),
                             ],
                             [
                                 'name' => 'Lucas Mendes',
                                 'title' => 'Marketing Manager',
                                 'desc' =>
                                     'Marketing Manager with 8+ years of experience across demand generation, paid acquisition, lifecycle marketing, and funnel optimization with proven track record scaling pipeline.',
-                                'logo' => $imgBase . '/clickup.webp',
-                                'bg' => $imgBase . '/Frame-133-1.webp',
+                                'logo' => $img('clickup.webp'),
+                                'bg' => $img('Frame-133-1.webp'),
                             ],
                             [
                                 'name' => 'Noah Martinez',
                                 'title' => 'Sales Representative',
                                 'desc' =>
                                     'Sales Development Representative who consistently exceeded quota by building high-quality outbound pipelines for B2B software companies.',
-                                'logo' => $imgBase . '/image-2.webp',
-                                'bg' => $imgBase . '/Frame-135-1.webp',
+                                'logo' => $img('image-2.webp'),
+                                'bg' => $img('Frame-135-1.webp'),
                             ],
                             [
                                 'name' => 'Diego Navarro',
                                 'title' => 'Sales Representative',
                                 'desc' =>
                                     'Revenue-focused sales representative experienced in outbound prospecting, product demonstrations, and account management to convert qualified leads.',
-                                'logo' => $imgBase . '/image-11.webp',
-                                'bg' => $imgBase . '/Frame-135-2.webp',
+                                'logo' => $img('image-11.webp'),
+                                'bg' => $img('Frame-135-2.webp'),
                             ],
                             [
                                 'name' => 'André Vilalobos',
                                 'title' => 'Graphic Designer',
                                 'desc' =>
                                     '6+ years of experience helping brands of all sizes, from small and mid-sized businesses to big companies, look professional, polished, and unmistakably them.',
-                                'logo' => $imgBase . '/State-Farm-01.webp',
-                                'bg' => $imgBase . '/con-07.webp',
+                                'logo' => $img('State-Farm-01.webp'),
+                                'bg' => $img('con-07.webp'),
                             ],
                             [
                                 'name' => 'Juliana Silva',
                                 'title' => 'Lead Generation (SDR)',
                                 'desc' =>
                                     '6+ years of experience as an SDR, skilled in prospecting, active listening, clear communication, time management, and handling rejection to consistently generate and qualify sales leads.',
-                                'logo' => $imgBase . '/mercado.webp',
-                                'bg' => $imgBase . '/cont-02.webp',
+                                'logo' => $img('mercado.webp'),
+                                'bg' => $img('cont-02.webp'),
                             ],
                             [
                                 'name' => 'Valeria Andrea',
                                 'title' => 'Medical Assistant',
                                 'desc' =>
                                     '4+ years of experience in fast-paced clinic and hospital settings. Skilled in EMR systems (Epic, Cerner), patient intake, vital signs, and assisting physicians with exams and procedures.',
-                                'logo' => $imgBase . '/Allstate-01.webp',
-                                'bg' => $imgBase . '/con-05.webp',
+                                'logo' => $img('Allstate-01.webp'),
+                                'bg' => $img('con-05.webp'),
                             ],
                             [
                                 'name' => 'Laura Valentina',
                                 'title' => 'Customer Support',
                                 'desc' =>
                                     '+4 years in B2B SaaS customer support, I\'ve supported customers in North America, Europe, and Latin America, adapting to different cultural expectations and communication styles.',
-                                'logo' => $imgBase . '/image-12-1.webp',
-                                'bg' => $imgBase . '/con-08.webp',
+                                'logo' => $img('image-12-1.webp'),
+                                'bg' => $img('con-08.webp'),
                             ],
                             [
                                 'name' => 'Sofía Pérez',
                                 'title' => 'Marketing Assistant',
                                 'desc' =>
                                     '4+ years of experience as a results-driven marketing professional, skilled in content creation, social media strategy, campaign management, and data analysis to drive brand awareness.',
-                                'logo' => $imgBase . '/Frame-74-1.webp',
-                                'bg' => $imgBase . '/cont-03.webp',
+                                'logo' => $img('Frame-74-1.webp'),
+                                'bg' => $img('cont-03.webp'),
                             ],
                             [
                                 'name' => 'Luana Dias',
                                 'title' => 'Executive Assistant',
                                 'desc' =>
                                     '3+ years of experience supporting C-level executives in fast-paced environments. High organization, anticipate needs, and protect executive\'s time like it\'s my own.',
-                                'logo' => $imgBase . '/NU-bank-01.webp',
-                                'bg' => $imgBase . '/con-06.webp',
+                                'logo' => $img('NU-bank-01.webp'),
+                                'bg' => $img('con-06.webp'),
                             ],
                             [
                                 'name' => 'Sarah Martinez',
                                 'title' => 'Sr Executive Assistant',
                                 'desc' =>
                                     'Executive Assistant with 8+ years supporting founders and executives. Expert in calendar management, inbox organization, project coordination, and keeping fast-growing teams operating smoothly.',
-                                'logo' => $imgBase . '/1655873088shopify-logo-transparent.webp',
-                                'bg' => $imgBase . '/Frame-131-1.webp',
+                                'logo' => $img('1655873088shopify-logo-transparent.webp'),
+                                'bg' => $img('Frame-131-1.webp'),
                             ],
                         ];
                     @endphp
@@ -201,25 +201,25 @@
                 <section class="bg-bg-light py-8 sm:py-10 overflow-hidden">
                     @php
                         $logos = [
-                            ['src' => $imgBase . '/brrrr-1.webp', 'alt' => 'BRRRR'],
-                            ['src' => $imgBase . '/carbon-1.webp', 'alt' => 'Carbon Solutions'],
-                            ['src' => $imgBase . '/Q-BitNewLogo-Photoroom-1.webp', 'alt' => 'Q-Bit'],
-                            ['src' => $imgBase . '/boe-1.webp', 'alt' => 'BOE'],
-                            ['src' => $imgBase . '/greener-hill-1.webp', 'alt' => 'Greener Hill'],
-                            ['src' => $imgBase . '/Prestige-Landscaping-1.webp', 'alt' => 'Prestige Landscaping'],
-                            ['src' => $imgBase . '/garuz-1-1.webp', 'alt' => 'Garuz'],
-                            ['src' => $imgBase . '/vercasa-1.webp', 'alt' => 'Vercasa'],
-                            ['src' => $imgBase . '/adcenter-2.webp', 'alt' => 'Ad Center 360'],
-                            ['src' => $imgBase . '/liberty-hill-1.webp', 'alt' => 'Liberty Hill'],
-                            ['src' => $imgBase . '/chick-fil-a-logo-1.webp', 'alt' => 'Chick-fil-A'],
-                            ['src' => $imgBase . '/rl-adp.webp', 'alt' => 'ADP'],
-                            ['src' => $imgBase . '/rl-mainstreet.webp', 'alt' => 'Mainstreet'],
-                            ['src' => $imgBase . '/rl-farmers.webp', 'alt' => 'Farmers Insurance'],
-                            ['src' => $imgBase . '/rl-college-hunks.webp', 'alt' => 'College Hunks'],
-                            ['src' => $imgBase . '/remax-1.webp', 'alt' => 'RE/MAX'],
-                            ['src' => $imgBase . '/coldwell-1.webp', 'alt' => 'Coldwell Banker'],
-                            ['src' => $imgBase . '/sivia-law-white-306w-1.webp', 'alt' => 'Sivia Law'],
-                            ['src' => $imgBase . '/zone-4-1.webp', 'alt' => 'Zone 4'],
+                            ['src' => $img('brrrr-1.webp'), 'alt' => 'BRRRR'],
+                            ['src' => $img('carbon-1.webp'), 'alt' => 'Carbon Solutions'],
+                            ['src' => $img('Q-BitNewLogo-Photoroom-1.webp'), 'alt' => 'Q-Bit'],
+                            ['src' => $img('boe-1.webp'), 'alt' => 'BOE'],
+                            ['src' => $img('greener-hill-1.webp'), 'alt' => 'Greener Hill'],
+                            ['src' => $img('Prestige-Landscaping-1.webp'), 'alt' => 'Prestige Landscaping'],
+                            ['src' => $img('garuz-1-1.webp'), 'alt' => 'Garuz'],
+                            ['src' => $img('vercasa-1.webp'), 'alt' => 'Vercasa'],
+                            ['src' => $img('adcenter-2.webp'), 'alt' => 'Ad Center 360'],
+                            ['src' => $img('liberty-hill-1.webp'), 'alt' => 'Liberty Hill'],
+                            ['src' => $img('chick-fil-a-logo-1.webp'), 'alt' => 'Chick-fil-A'],
+                            ['src' => $img('rl-adp.webp'), 'alt' => 'ADP'],
+                            ['src' => $img('rl-mainstreet.webp'), 'alt' => 'Mainstreet'],
+                            ['src' => $img('rl-farmers.webp'), 'alt' => 'Farmers Insurance'],
+                            ['src' => $img('rl-college-hunks.webp'), 'alt' => 'College Hunks'],
+                            ['src' => $img('remax-1.webp'), 'alt' => 'RE/MAX'],
+                            ['src' => $img('coldwell-1.webp'), 'alt' => 'Coldwell Banker'],
+                            ['src' => $img('sivia-law-white-306w-1.webp'), 'alt' => 'Sivia Law'],
+                            ['src' => $img('zone-4-1.webp'), 'alt' => 'Zone 4'],
                         ];
                     @endphp
                     <div class="rl-logo-marquee-wrapper px-4">
@@ -258,37 +258,37 @@
                             @php
                                 $benefits = [
                                     [
-                                        'img' => $imgBase . '/Latin-american.webp',
+                                        'img' => $img('Latin-american.webp'),
                                         'title' => 'Top-tier talents from Latin America and EU',
                                         'desc' =>
                                             'Access exceptional global talent. We identify skilled professionals with the communication, expertise, and reliability needed to make an immediate impact.',
                                     ],
                                     [
-                                        'img' => $imgBase . '/no-contracts.webp',
+                                        'img' => $img('no-contracts.webp'),
                                         'title' => 'No contracts<br>No obligations',
                                         'desc' =>
                                             'Evaluate talent, interview candidates, and see our process firsthand before making any commitment. The decision is always yours.',
                                     ],
                                     [
-                                        'img' => $imgBase . '/ongoing-middleman.webp',
+                                        'img' => $img('ongoing-middleman.webp'),
                                         'title' => 'No ongoing<br>middleman fees',
                                         'desc' =>
                                             'You hire talent directly into your business. No payroll markups, monthly management fees, or recurring commissions.',
                                     ],
                                     [
-                                        'img' => $imgBase . '/payment.webp',
+                                        'img' => $img('payment.webp'),
                                         'title' => "No payment if we don't find the right talent",
                                         'desc' =>
                                             'Our incentives are aligned with yours. We only succeed when you make a successful hire, so we focus relentlessly on finding the right fit.',
                                     ],
                                     [
-                                        'img' => $imgBase . '/payment-compliance.webp',
+                                        'img' => $img('payment-compliance.webp'),
                                         'title' => 'Payments, compliance,<br>onboarding support',
                                         'desc' =>
                                             'Our Contractor Management solution simplifies onboarding, contracts, payroll, and compliance for international talent.',
                                     ],
                                     [
-                                        'img' => $imgBase . '/one-dashboard.webp',
+                                        'img' => $img('one-dashboard.webp'),
                                         'title' => 'One dashboard<br>for your entire team',
                                         'desc' =>
                                             'Manage payroll, contracts, compliance, and workforce reporting from a single platform. Stay organized as your global team grows.',
@@ -339,22 +339,22 @@
                             @php
                                 $specialties = [
                                     [
-                                        'img' => $imgBase . '/magnific_half-body-shot-of-a-young_SOmwQLyUb8-1.webp',
+                                        'img' => $img('magnific_half-body-shot-of-a-young_SOmwQLyUb8-1.webp'),
                                         'title' => 'Administrative &amp;<br>Executive Assistants',
                                         'desc' => 'Executive support for busy founders and teams.',
                                     ],
                                     [
-                                        'img' => $imgBase . '/magnific_wPmw8Jk7EI-1.webp',
+                                        'img' => $img('magnific_wPmw8Jk7EI-1.webp'),
                                         'title' => 'Healthcare &amp;<br>Medical Assistants',
                                         'desc' => 'Healthcare professionals supporting clinics and practices.',
                                     ],
                                     [
-                                        'img' => $imgBase . '/magnific_ubzu0aUQLD-1.webp',
+                                        'img' => $img('magnific_ubzu0aUQLD-1.webp'),
                                         'title' => 'Sales &amp; Growth<br>Marketing Talents',
                                         'desc' => 'Professionals focused on growth, leads, and revenue.',
                                     ],
                                     [
-                                        'img' => $imgBase . '/magnific_YVjYLdkWeC-1.webp',
+                                        'img' => $img('magnific_YVjYLdkWeC-1.webp'),
                                         'title' => 'Operations &amp;<br>Finance Professionals',
                                         'desc' => 'Experts in finance, operations, and business support.',
                                     ],
@@ -398,19 +398,19 @@
                                         Onboarded</span>
                                     <div class="flex items-center">
                                         <div class="flex items-center -space-x-2">
-                                            <img src="{{ $imgBase }}/person_01.webp" alt="Remote Assistant"
+                                            <img src="{{ $img('person_01.webp') }}" alt="Remote Assistant"
                                                 width="36" height="36"
                                                 class="w-9 h-9 rounded-full border-2 border-white object-cover"
                                                 loading="lazy" decoding="async">
-                                            <img src="{{ $imgBase }}/person_02.webp" alt="Remote Assistant"
+                                            <img src="{{ $img('person_02.webp') }}" alt="Remote Assistant"
                                                 width="36" height="36"
                                                 class="w-9 h-9 rounded-full border-2 border-white object-cover"
                                                 loading="lazy" decoding="async">
-                                            <img src="{{ $imgBase }}/Person_03.webp" alt="Remote Assistant"
+                                            <img src="{{ $img('Person_03.webp') }}" alt="Remote Assistant"
                                                 width="36" height="36"
                                                 class="w-9 h-9 rounded-full border-2 border-white object-cover"
                                                 loading="lazy" decoding="async">
-                                            <img src="{{ $imgBase }}/Person_04.webp" alt="Remote Assistant"
+                                            <img src="{{ $img('Person_04.webp') }}" alt="Remote Assistant"
                                                 width="36" height="36"
                                                 class="w-9 h-9 rounded-full border-2 border-white object-cover"
                                                 loading="lazy" decoding="async">
@@ -425,7 +425,7 @@
                                     {{-- Wireframe Globe Background Graphic --}}
                                     <div
                                         class="absolute -right-12 -bottom-16 w-[300px] sm:w-[340px] pointer-events-none select-none">
-                                        <img src="{{ $imgBase }}/globe.webp" alt="Global Coverage" width="340"
+                                        <img src="{{ $img('globe.webp') }}" alt="Global Coverage" width="340"
                                             height="340" class="w-full h-auto object-contain" loading="lazy"
                                             decoding="async">
                                     </div>
@@ -435,35 +435,35 @@
                                         <span class="text-sm sm:text-[15px] font-bold text-black">Countries</span>
                                         <div class="flex items-center">
                                             <div class="flex items-center -space-x-1.5">
-                                                <img src="{{ $imgBase }}/costa-rica.webp" alt="Costa Rica"
+                                                <img src="{{ $img('costa-rica.webp') }}" alt="Costa Rica"
                                                     width="22" height="22"
                                                     class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                                                     loading="lazy" decoding="async">
-                                                <img src="{{ $imgBase }}/equador.webp" alt="Ecuador"
+                                                <img src="{{ $img('equador.webp') }}" alt="Ecuador"
                                                     width="22" height="22"
                                                     class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                                                     loading="lazy" decoding="async">
-                                                <img src="{{ $imgBase }}/chile.webp" alt="Chile" width="22"
+                                                <img src="{{ $img('chile.webp') }}" alt="Chile" width="22"
                                                     height="22"
                                                     class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                                                     loading="lazy" decoding="async">
-                                                <img src="{{ $imgBase }}/paraguai.webp" alt="Paraguay"
+                                                <img src="{{ $img('paraguai.webp') }}" alt="Paraguay"
                                                     width="22" height="22"
                                                     class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                                                     loading="lazy" decoding="async">
-                                                <img src="{{ $imgBase }}/brazil.webp" alt="Brazil" width="22"
+                                                <img src="{{ $img('brazil.webp') }}" alt="Brazil" width="22"
                                                     height="22"
                                                     class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                                                     loading="lazy" decoding="async">
-                                                <img src="{{ $imgBase }}/colombia.webp" alt="Colombia"
+                                                <img src="{{ $img('colombia.webp') }}" alt="Colombia"
                                                     width="22" height="22"
                                                     class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                                                     loading="lazy" decoding="async">
-                                                <img src="{{ $imgBase }}/argentina.webp" alt="Argentina"
+                                                <img src="{{ $img('argentina.webp') }}" alt="Argentina"
                                                     width="22" height="22"
                                                     class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                                                     loading="lazy" decoding="async">
-                                                <img src="{{ $imgBase }}/mexico.webp" alt="Mexico" width="22"
+                                                <img src="{{ $img('mexico.webp') }}" alt="Mexico" width="22"
                                                     height="22"
                                                     class="w-5.5 h-5.5 rounded-full border-2 border-white object-cover shadow-xs"
                                                     loading="lazy" decoding="async">
@@ -560,25 +560,25 @@
                             @php
                                 $metrics = [
                                     [
-                                        'img' => $imgBase . '/hour.webp',
+                                        'img' => $img('hour.webp'),
                                         'title' => '$6-10 /hr',
                                         'desc' =>
                                             'Access experienced professionals at highly competitive rates. Most administrative, support, sales, and marketing roles can be filled within this range.',
                                     ],
                                     [
-                                        'img' => $imgBase . '/lower-cost.webp',
+                                        'img' => $img('lower-cost.webp'),
                                         'title' => '70% Lower Costs',
                                         'desc' =>
                                             'Reduce hiring costs without sacrificing quality. Reinvest the savings into growth, marketing, product development, or additional hires.',
                                     ],
                                     [
-                                        'img' => $imgBase . '/day-average.webp',
+                                        'img' => $img('day-average.webp'),
                                         'title' => '4-Day Average',
                                         'desc' =>
                                             'From opening a role to reviewing qualified candidates in days, not weeks. Our recruiting process is designed for speed without compromising quality.',
                                     ],
                                     [
-                                        'img' => $imgBase . '/quality.webp',
+                                        'img' => $img('quality.webp'),
                                         'title' => 'Vetted for Quality',
                                         'desc' =>
                                             'Every candidate is screened for English proficiency, experience, communication skills, and role-specific expertise before reaching your inbox.',
@@ -777,7 +777,7 @@
                             </div>
 
                             <div class="flex justify-center lg:justify-end self-start w-full pb-12 lg:pb-0">
-                                <img src="{{ $imgBase }}/Group-59-1-e1780958571501.webp"
+                                <img src="{{ $img('Group-59-1-e1780958571501.webp') }}"
                                     alt="12-Month Replacement Guarantee" width="578" height="545" loading="lazy"
                                     decoding="async"
                                     class="w-full max-w-[460px] sm:max-w-[500px] lg:max-w-[560px] h-auto object-contain">
@@ -808,7 +808,7 @@
                             $testimonials = [
                                 [
                                     'video_url' => 'https://vimeo.com/1067577208',
-                                    'image' => $imgBase . '/PRES-Property-Management.jpg',
+                                    'image' => $img('PRES-Property-Management.jpg'),
                                     'duration' => '00:38',
                                     'quote' =>
                                         '“I can\'t say enought about how every step of the way it just wowed me.”',
@@ -816,7 +816,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577369',
-                                    'image' => $imgBase . '/Coldwell-Banker.jpg',
+                                    'image' => $img('Coldwell-Banker.jpg'),
                                     'duration' => '00:19',
                                     'quote' =>
                                         '“I’m very impressed with the quality of my VA, she’s very intelligent and she aims to please.”',
@@ -824,7 +824,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577665',
-                                    'image' => $imgBase . '/Carbon-Solutions-Group.jpg',
+                                    'image' => $img('Carbon-Solutions-Group.jpg'),
                                     'duration' => '00:55',
                                     'quote' =>
                                         '“I really recommend Remote Leverage; it was a fast process, and the results are good.”',
@@ -832,7 +832,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577549',
-                                    'image' => $imgBase . '/The-Zen-Zone-Wellness.jpg',
+                                    'image' => $img('The-Zen-Zone-Wellness.jpg'),
                                     'duration' => '04:06',
                                     'quote' =>
                                         '“I got to talk to five amazing virtual assistants, and they all were good; it was kind of hard to make a choice at first.”',
@@ -840,7 +840,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577688',
-                                    'image' => $imgBase . '/Color-Job.jpg',
+                                    'image' => $img('Color-Job.jpg'),
                                     'duration' => '01:56',
                                     'quote' =>
                                         '“The transition of working with you guys was absolutely smooth and amazing.”',
@@ -848,7 +848,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577383',
-                                    'image' => $imgBase . '/Connect-Church-Colorado.jpg',
+                                    'image' => $img('Connect-Church-Colorado.jpg'),
                                     'duration' => '02:45',
                                     'quote' =>
                                         '“She was just perfect, everything that we were looking for we found it in her.”',
@@ -856,7 +856,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577489',
-                                    'image' => $imgBase . '/Cash-is-King.jpg',
+                                    'image' => $img('Cash-is-King.jpg'),
                                     'duration' => '02:39',
                                     'quote' =>
                                         '“Honestly, the reason why we keep hiring is because it is so incredibly easy.”',
@@ -864,7 +864,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577248',
-                                    'image' => $imgBase . '/Liberty-Hill.jpg',
+                                    'image' => $img('Liberty-Hill.jpg'),
                                     'duration' => '02:31',
                                     'quote' =>
                                         '“If somebody were asking me why they should work with Remote Leverage, I would say it\'s because of the quality of the candidates.”',
@@ -872,7 +872,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577464',
-                                    'image' => $imgBase . '/RE-MAX.jpg',
+                                    'image' => $img('RE-MAX.jpg'),
                                     'duration' => '01:02',
                                     'quote' =>
                                         '“Its been about a year and a half since I\'ve been with them so far, I would definitely say go for it, it\'s been a game changer for me.”',
@@ -880,7 +880,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577620',
-                                    'image' => $imgBase . '/Realty-One-Group.jpg',
+                                    'image' => $img('Realty-One-Group.jpg'),
                                     'duration' => '01:43',
                                     'quote' =>
                                         '“As I look back, I was on the fence about it, It\'s probably one of the best decisions I ever made if not the best to help grow my business.”',
@@ -888,7 +888,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577228',
-                                    'image' => $imgBase . '/OneUp-Sportz-01.jpg',
+                                    'image' => $img('OneUp-Sportz-01.jpg'),
                                     'duration' => '01:06',
                                     'quote' =>
                                         '“Very Very happy with the system, you guys system worked well and it was efficient.”',
@@ -896,7 +896,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577598',
-                                    'image' => $imgBase . '/OneUp-Sportz.jpg',
+                                    'image' => $img('OneUp-Sportz.jpg'),
                                     'duration' => '01:40',
                                     'quote' =>
                                         '“It was a seamless process, all the applicants that we had they all had Masters in Marketing, which is awesome.”',
@@ -904,7 +904,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577293',
-                                    'image' => $imgBase . '/Greener-Hill-Psychiatric.jpg',
+                                    'image' => $img('Greener-Hill-Psychiatric.jpg'),
                                     'duration' => '05:59',
                                     'quote' =>
                                         '“Remote Leverage, presented six candidates and I did interview all of those very in depth, and I thought all of them were phenomenal.”',
@@ -912,7 +912,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577442',
-                                    'image' => $imgBase . '/Diamond-Detox.jpg',
+                                    'image' => $img('Diamond-Detox.jpg'),
                                     'duration' => '00:43',
                                     'quote' =>
                                         '“I\'m very impressed with the english, the capability, qualification, timeliness, they were all very timely, patient.”',
@@ -920,7 +920,7 @@
                                 ],
                                 [
                                     'video_url' => 'https://vimeo.com/1067577645',
-                                    'image' => $imgBase . '/Ad-Center-360.jpg',
+                                    'image' => $img('Ad-Center-360.jpg'),
                                     'duration' => '00:36',
                                     'quote' => '“It was awesome the best experience I\'ve ever had as far as hiring.”',
                                     'company' => 'Ad Center 360',
@@ -1113,7 +1113,7 @@
                     class="relative bg-brand-dark-violet py-20 lg:py-28 text-white overflow-hidden">
                     {{-- Map in the bottom --}}
                     <div class="absolute inset-x-0 bottom-0 h-full max-h-[640px] bg-no-repeat bg-bottom bg-contain opacity-25 pointer-events-none"
-                        style="background-image: url('{{ $imgBase }}/Map.webp');"></div>
+                        style="background-image: url('{{ $img('Map.webp') }}');"></div>
 
                     <div class="relative z-10 max-w-[1380px] mx-auto px-6 lg:px-10">
                         <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">

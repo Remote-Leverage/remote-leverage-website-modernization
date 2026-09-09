@@ -20,13 +20,14 @@ web/.htaccess
 .env
 .env.*
 !.env.example
+/env
 
 # Composer
 /vendor
 auth.json
 
 # PHPUnit/Pest
-phpunit.xml
+/phpunit.xml
 .phpunit.result.cache
 .phpunit.cache
 

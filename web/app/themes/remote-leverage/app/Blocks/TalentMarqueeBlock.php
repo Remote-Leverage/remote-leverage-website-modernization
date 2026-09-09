@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Blocks;
 
+use App\Support\BlockDefaults;
 use Log1x\AcfComposer\Block;
 use Log1x\AcfComposer\Builder;
 
@@ -69,11 +70,12 @@ class TalentMarqueeBlock extends Block
         $custom = function_exists('get_field') ? get_field('talent_cards') : null;
         $cards = (! empty($custom) && is_array($custom))
             ? $custom
-            : \App\Support\BlockDefaults::talentCards();
+            : BlockDefaults::talentCards();
 
         return array_map(function ($card) {
-            $card['bg'] = \App\Support\BlockDefaults::resolveImageUrl($card['bg'] ?? '');
-            $card['logo'] = \App\Support\BlockDefaults::resolveImageUrl($card['logo'] ?? '');
+            $card['bg'] = BlockDefaults::resolveImageUrl($card['bg'] ?? '');
+            $card['logo'] = BlockDefaults::resolveImageUrl($card['logo'] ?? '');
+
             return $card;
         }, $cards);
     }

@@ -1,4 +1,7 @@
 <?php
+
+use App\Support\BlockDefaults;
+
 /**
  * Title: Process Steps - The Bridge
  * Slug: remote-leverage/hire-va-4-process-steps
@@ -20,6 +23,6 @@
     </div>
     <!-- /wp:group -->
 
-    <?= \App\Support\BlockDefaults::renderHireVa4ProcessSteps() ?>
+    <?= BlockDefaults::renderHireVa4ProcessSteps() ?>
 </div>
 <!-- /wp:group -->

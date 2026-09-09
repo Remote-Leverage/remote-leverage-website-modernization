@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Blocks;
 
+use App\Support\BlockDefaults;
 use Log1x\AcfComposer\Block;
 use Log1x\AcfComposer\Builder;
 
@@ -75,13 +76,13 @@ class AccordionFaqBlock extends Block
         if (! empty($items) && is_array($items)) {
             return array_map(function ($item) {
                 return [
-                    'q' => \App\Support\BlockDefaults::cleanText($item['question'] ?? ($item['q'] ?? '')),
-                    'a' => \App\Support\BlockDefaults::cleanText($item['answer'] ?? ($item['a'] ?? '')),
+                    'q' => BlockDefaults::cleanText($item['question'] ?? ($item['q'] ?? '')),
+                    'a' => BlockDefaults::cleanText($item['answer'] ?? ($item['a'] ?? '')),
                 ];
             }, $items);
         }
 
-        return \App\Support\BlockDefaults::faqs();
+        return BlockDefaults::faqs();
     }
 
     private function generateSchemaJson(array $faqs): string

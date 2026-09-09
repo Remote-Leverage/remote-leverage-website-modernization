@@ -12,6 +12,7 @@ use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
 use App\Domains\Tracking\Data\AnalyticsEventData;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -212,7 +213,7 @@ class MultistepBookingWizard extends Component
             $buttonText = (string) $rest['buttonText'];
         }
 
-        if (!empty($isolatedSteps)) {
+        if (! empty($isolatedSteps)) {
             $enableIsolatedFields = true;
         }
 
@@ -241,7 +242,7 @@ class MultistepBookingWizard extends Component
                 }
                 $allStandardFields = ['monthly_revenue', 'name', 'phone', 'consent'];
                 $missing = array_diff($allStandardFields, $configuredFields);
-                if (!empty($missing)) {
+                if (! empty($missing)) {
                     if (count($this->isolatedSteps) === 1) {
                         $this->isolatedSteps[] = [
                             'step_label' => 'Remaining Details',
@@ -599,8 +600,8 @@ class MultistepBookingWizard extends Component
             $start = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1, $this->timezone)->startOfMonth();
             $end = $start->copy()->endOfMonth();
 
-            $cacheKey = 'rl_avail_dates_' . md5($this->getActiveEventTypeUri() . $start->format('Y-m') . $this->timezone);
-            $this->availableDates = \Illuminate\Support\Facades\Cache::remember($cacheKey, 600, function () use ($slotsAction, $start, $end) {
+            $cacheKey = 'rl_avail_dates_'.md5($this->getActiveEventTypeUri().$start->format('Y-m').$this->timezone);
+            $this->availableDates = Cache::remember($cacheKey, 600, function () use ($slotsAction, $start, $end) {
                 $slots = $slotsAction->execute(
                     $start->toIso8601String(),
                     $end->toIso8601String(),
@@ -629,8 +630,8 @@ class MultistepBookingWizard extends Component
             $start = Carbon::parse($date, $this->timezone)->startOfDay();
             $end = $start->copy()->endOfDay();
 
-            $cacheKey = 'rl_avail_slots_' . md5($this->getActiveEventTypeUri() . $date . $this->timezone);
-            $this->availableSlots = \Illuminate\Support\Facades\Cache::remember($cacheKey, 600, function () use ($slotsAction, $start, $end) {
+            $cacheKey = 'rl_avail_slots_'.md5($this->getActiveEventTypeUri().$date.$this->timezone);
+            $this->availableSlots = Cache::remember($cacheKey, 600, function () use ($slotsAction, $start, $end) {
                 $slots = $slotsAction->execute(
                     $start->toIso8601String(),
                     $end->toIso8601String(),

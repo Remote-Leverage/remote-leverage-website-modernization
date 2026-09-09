@@ -139,6 +139,10 @@ Config::define('LOGGED_IN_SALT', env('LOGGED_IN_SALT'));
 Config::define('NONCE_SALT', env('NONCE_SALT'));
 Config::define('APP_KEY', env('APP_KEY'));
 
+if (env('ACF_PRO_KEY')) {
+    Config::define('ACF_PRO_LICENSE', env('ACF_PRO_KEY'));
+}
+
 /**
  * Custom Settings
  */

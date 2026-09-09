@@ -1,5 +1,9 @@
+@php
+  $cards = is_array($cards ?? null) ? $cards : [];
+@endphp
 <div class="grid grid-cols-1 sm:grid-cols-2 {{ $columns === '4' ? 'lg:grid-cols-4 mb-[12px]' : 'lg:grid-cols-3' }} gap-card w-full">
     @foreach ($cards as $card)
+        @continue(! is_array($card))
         <div class="bg-white rounded-card p-card flex flex-col justify-between border border-black/4 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300">
             <div>
                 <div class="w-full overflow-hidden rounded-xl mb-5 bg-[#f7f8fc]">

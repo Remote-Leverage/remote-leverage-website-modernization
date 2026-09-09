@@ -1,4 +1,7 @@
 <?php
+
+use App\Support\BlockDefaults;
+
 /**
  * Title: The 3-Step Remote Leverage Process
  * Slug: remote-leverage/process-steps
@@ -32,6 +35,6 @@
     </div>
     <!-- /wp:columns -->
 
-    <?php echo \App\Support\BlockDefaults::renderProcessSteps(); ?>
+    <?php echo BlockDefaults::renderProcessSteps(); ?>
 </div>
 <!-- /wp:group -->

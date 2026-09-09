@@ -1,4 +1,7 @@
 <?php
+
+use App\Support\BlockDefaults;
+
 /**
  * Title: Trust & Impact - 2,000+ Businesses
  * Slug: remote-leverage/trust-and-impact
@@ -12,7 +15,7 @@
     <div class="wp-block-columns are-vertically-aligned-center">
         <!-- wp:column {"width":"48%"} -->
         <div class="wp-block-column" style="flex-basis:48%">
-            <?php echo \App\Support\BlockDefaults::renderTrustStats(); ?>
+            <?php echo BlockDefaults::renderTrustStats(); ?>
         </div>
         <!-- /wp:column -->
 
@@ -20,9 +23,9 @@
         <div class="wp-block-column" style="flex-basis:52%">
             <!-- wp:html -->
             <div style="display:flex;gap:4px;color:#9F53E7;margin-bottom:1rem;" aria-label="5 out of 5 stars">
-                <?php for ($i = 0; $i < 5; $i++): ?>
+                <?php for ($i = 0; $i < 5; $i++) { ?>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                <?php endfor; ?>
+                <?php } ?>
             </div>
             <!-- /wp:html -->
 

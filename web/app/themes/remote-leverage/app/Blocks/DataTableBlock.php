@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Blocks;
 
+use App\Support\BlockDefaults;
 use Log1x\AcfComposer\Block;
 use Log1x\AcfComposer\Builder;
 
@@ -75,12 +76,13 @@ class DataTableBlock extends Block
         $items = function_exists('get_field') ? get_field('rows') : null;
         $rows = (! empty($items) && is_array($items))
             ? $items
-            : \App\Support\BlockDefaults::dataTableRows();
+            : BlockDefaults::dataTableRows();
 
         return array_map(function ($row) {
-            $row['feature'] = \App\Support\BlockDefaults::cleanText($row['feature'] ?? '');
-            $row['diy'] = \App\Support\BlockDefaults::cleanText($row['diy'] ?? '');
-            $row['rl'] = \App\Support\BlockDefaults::cleanText($row['rl'] ?? '');
+            $row['feature'] = BlockDefaults::cleanText($row['feature'] ?? '');
+            $row['diy'] = BlockDefaults::cleanText($row['diy'] ?? '');
+            $row['rl'] = BlockDefaults::cleanText($row['rl'] ?? '');
+
             return $row;
         }, $rows);
     }

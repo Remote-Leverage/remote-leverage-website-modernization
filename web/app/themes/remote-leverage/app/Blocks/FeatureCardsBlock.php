@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Blocks;
 
+use App\Support\BlockDefaults;
 use Log1x\AcfComposer\Block;
 use Log1x\AcfComposer\Builder;
 
@@ -74,12 +75,13 @@ class FeatureCardsBlock extends Block
         $custom = function_exists('get_field') ? get_field('cards') : null;
         $cards = (! empty($custom) && is_array($custom))
             ? $custom
-            : \App\Support\BlockDefaults::featureCards($columns);
+            : BlockDefaults::featureCards($columns);
 
         return array_map(function ($card) {
-            $card['title'] = \App\Support\BlockDefaults::cleanText($card['title'] ?? '');
-            $card['desc'] = \App\Support\BlockDefaults::cleanText($card['desc'] ?? '');
-            $card['img'] = \App\Support\BlockDefaults::resolveImageUrl($card['img'] ?? '');
+            $card['title'] = BlockDefaults::cleanText($card['title'] ?? '');
+            $card['desc'] = BlockDefaults::cleanText($card['desc'] ?? '');
+            $card['img'] = BlockDefaults::resolveImageUrl($card['img'] ?? '');
+
             return $card;
         }, $cards);
     }

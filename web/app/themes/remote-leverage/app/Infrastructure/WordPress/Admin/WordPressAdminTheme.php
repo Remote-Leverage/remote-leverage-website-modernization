@@ -66,7 +66,7 @@ class WordPressAdminTheme
             htmlspecialchars($fillHex, ENT_QUOTES, 'UTF-8')
         );
 
-        return 'data:image/svg+xml;base64,' . base64_encode($svg);
+        return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
 
     /**
@@ -90,45 +90,45 @@ class WordPressAdminTheme
         $siteUrl = function_exists('home_url') ? home_url('/') : '/';
 
         $wp_admin_bar->add_node([
-            'id'    => 'site-name',
+            'id' => 'site-name',
             'title' => '<span class="rl-brand-iso" aria-hidden="true"></span><span class="rl-brand-text">Remote Leverage</span>',
-            'href'  => $leadsUrl,
-            'meta'  => [
+            'href' => $leadsUrl,
+            'meta' => [
                 'title' => 'Remote Leverage Admin',
             ],
         ]);
 
         $wp_admin_bar->add_node([
-            'id'     => 'rl-sub-dashboard',
+            'id' => 'rl-sub-dashboard',
             'parent' => 'site-name',
-            'title'  => 'Admin Console',
-            'href'   => $adminUrl,
+            'title' => 'Admin Console',
+            'href' => $adminUrl,
         ]);
 
         $wp_admin_bar->add_node([
-            'id'     => 'rl-sub-leads',
+            'id' => 'rl-sub-leads',
             'parent' => 'site-name',
-            'title'  => 'Leads & Submissions',
-            'href'   => $leadsUrl,
+            'title' => 'Leads & Submissions',
+            'href' => $leadsUrl,
         ]);
 
         $wp_admin_bar->add_node([
-            'id'     => 'rl-sub-site',
+            'id' => 'rl-sub-site',
             'parent' => 'site-name',
-            'title'  => 'View Live Website',
-            'href'   => $siteUrl,
+            'title' => 'View Live Website',
+            'href' => $siteUrl,
         ]);
 
         // Notifications Center Trigger in top-secondary (right side of admin bar)
         $wp_admin_bar->add_node([
-            'id'     => 'rl-notifications',
+            'id' => 'rl-notifications',
             'parent' => 'top-secondary',
-            'title'  => '<span class="rl-notif-bar-trigger" id="rl-notif-trigger" role="button" tabindex="0" title="Notifications Center">'
+            'title' => '<span class="rl-notif-bar-trigger" id="rl-notif-trigger" role="button" tabindex="0" title="Notifications Center">'
                 .'<svg class="rl-notif-bell-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>'
                 .'<span class="rl-notif-badge" id="rl-notif-badge" style="display:none;">0</span>'
                 .'</span>',
-            'href'   => '#',
-            'meta'   => [
+            'href' => '#',
+            'meta' => [
                 'title' => 'Notifications Center',
                 'class' => 'rl-notif-admin-bar-item',
             ],
@@ -489,7 +489,7 @@ class WordPressAdminTheme
         }
 
         if (! function_exists('wp_style_is') || ! \wp_style_is('admin-bar', 'done')) {
-            echo '<style id="rl-admin-bar-site-css">' . $this->getAdminBarCss() . '</style>' . "\n";
+            echo '<style id="rl-admin-bar-site-css">'.$this->getAdminBarCss().'</style>'."\n";
         }
     }
 
@@ -2744,7 +2744,7 @@ class WordPressAdminTheme
      */
     public function renderLoginHeaderStyles(): void
     {
-        echo '<style id="rl-login-custom-styles">' . $this->getLoginCss() . '</style>' . "\n";
+        echo '<style id="rl-login-custom-styles">'.$this->getLoginCss().'</style>'."\n";
     }
 
     /**

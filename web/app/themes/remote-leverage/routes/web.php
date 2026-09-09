@@ -66,6 +66,14 @@ Route::get('referral-dashboard', function (Request $request) {
     return $isLoginTab ? view('pages.referrer-portal') : view('pages.referrer-register');
 })->name('referrer.dashboard.legacy');
 
+Route::get('partner-dashboard', function () {
+    return redirect()->route('partner.portal');
+});
+
+Route::get('partners', function () {
+    return view('archive-rl_partner');
+});
+
 // Email Signature Generator (replaces rl-social-kit)
 Route::get('tools/signature-generator', function () {
     return view('pages.signature-generator');

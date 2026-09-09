@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_call:
+    secrets:
+      ACF_PRO_KEY:
+        required: true
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    name: Composer, Pint, Pest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, bcmath, zip
+          coverage: none
+          tools: composer
+
+      - name: Cache Composer (Bedrock root)
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock', 'web/app/themes/remote-leverage/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Configure ACF PRO Composer auth
+        env:
+          ACF_PRO_KEY: ${{ secrets.ACF_PRO_KEY }}
+        run: |
+          if [ -z "$ACF_PRO_KEY" ]; then
+            echo "Missing GitHub Actions secret ACF_PRO_KEY"
+            exit 1
+          fi
+          composer config --global http-basic.connect.advancedcustomfields.com "$ACF_PRO_KEY" "https://remoteleverage.com"
+
+      - name: Install Bedrock root dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Install theme dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction --working-dir=web/app/themes/remote-leverage
+
+      - name: Pint
+        run: vendor/bin/pint --test
+        working-directory: web/app/themes/remote-leverage
+
+      - name: Pest
+        run: vendor/bin/pest
+        working-directory: web/app/themes/remote-leverage
+
+  assets:
+    name: Vite production build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/app/themes/remote-leverage
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/app/themes/remote-leverage/package-lock.json
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build assets
+        run: npm run build

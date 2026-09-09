@@ -91,16 +91,16 @@
           </div>
           <livewire:booking.multistep-booking-wizard 
             skin="naked"
-            :enable-isolated-fields="$enableIsolatedFields"
-            :enableIsolatedFields="$enableIsolatedFields"
-            :isolated-steps="$isolatedSteps"
-            :isolatedSteps="$isolatedSteps"
-            :hide-profile-header="$hideProfileHeader"
-            :hideProfileHeader="$hideProfileHeader"
-            :hide-progress-bar="$hideProgressBar"
-            :hideProgressBar="$hideProgressBar"
-            :button-text="$formButtonText"
-            :buttonText="$formButtonText"
+            :enable-isolated-fields="(bool) ($enableIsolatedFields ?? false)"
+            :enableIsolatedFields="(bool) ($enableIsolatedFields ?? false)"
+            :isolated-steps="is_array($isolatedSteps ?? null) ? $isolatedSteps : []"
+            :isolatedSteps="is_array($isolatedSteps ?? null) ? $isolatedSteps : []"
+            :hide-profile-header="(bool) ($hideProfileHeader ?? false)"
+            :hideProfileHeader="(bool) ($hideProfileHeader ?? false)"
+            :hide-progress-bar="(bool) ($hideProgressBar ?? false)"
+            :hideProgressBar="(bool) ($hideProgressBar ?? false)"
+            :button-text="$formButtonText ?? 'Next: Pick a Date'"
+            :buttonText="$formButtonText ?? 'Next: Pick a Date'"
           />
         </div>
       </div>
