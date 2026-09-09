@@ -105,6 +105,58 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
             ->toContain('#wpbody-content > .notice:not(.rl-keep-notice)');
     });
 
+    it('generates unified admin bar CSS containing brand ISO, dropdown styles, and sticky header fixes', function () {
+        $theme = new WordPressAdminTheme();
+        $css = $theme->getAdminBarCss();
+
+        expect($css)->toContain('#wpadminbar')
+            ->toContain('#09090b !important')
+            ->toContain('.rl-brand-iso')
+            ->toContain('.rl-brand-text')
+            ->toContain('.rl-notif-bar-trigger')
+            ->toContain('.rl-notif-drawer')
+            ->toContain('#wp-admin-bar-customize')
+            ->toContain('#wp-admin-bar-search')
+            ->toContain('body.admin-bar header.sticky')
+            ->toContain('@media screen and (max-width: 782px)');
+    });
+
+    it('removes customize and search clutter and configures admin console navigation', function () {
+        $theme = new WordPressAdminTheme();
+        $adminBar = new \WP_Admin_Bar();
+
+        // Seed nodes that exist by default on front-end
+        $adminBar->add_node(['id' => 'customize', 'title' => 'Customize']);
+        $adminBar->add_node(['id' => 'search', 'title' => 'Search']);
+
+        $theme->customizeAdminBarLogo($adminBar);
+
+        // Clutter nodes removed
+        expect($adminBar->get_node('customize'))->toBeNull()
+            ->and($adminBar->get_node('search'))->toBeNull();
+
+        // Navigation nodes added
+        $siteName = $adminBar->get_node('site-name');
+        expect($siteName)->not->toBeNull()
+            ->and($siteName['title'])->toContain('rl-brand-iso')
+            ->and($siteName['title'])->toContain('Remote Leverage');
+
+        $dashboard = $adminBar->get_node('rl-sub-dashboard');
+        expect($dashboard)->not->toBeNull()
+            ->and($dashboard['parent'])->toBe('site-name')
+            ->and($dashboard['title'])->toBe('Admin Console');
+
+        $leads = $adminBar->get_node('rl-sub-leads');
+        expect($leads)->not->toBeNull()
+            ->and($leads['parent'])->toBe('site-name')
+            ->and($leads['title'])->toBe('Leads & Submissions');
+
+        $site = $adminBar->get_node('rl-sub-site');
+        expect($site)->not->toBeNull()
+            ->and($site['parent'])->toBe('site-name')
+            ->and($site['title'])->toBe('View Live Website');
+    });
+
     it('strictly contains zero unicode emojis', function () {
         $theme = new WordPressAdminTheme();
 
@@ -112,7 +164,7 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
         $theme->renderNotificationsCenterMarkup();
         $markup = ob_get_clean();
 
-        $allContent = $theme->getGlobalAdminCss() . $theme->getLoginCss() . $theme->customizeFooterText() . $markup;
+        $allContent = $theme->getGlobalAdminCss() . $theme->getAdminBarCss() . $theme->getLoginCss() . $theme->customizeFooterText() . $markup;
 
         // Regex detecting any Unicode emojis
         $emojiPattern = '/[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F700}-\x{1F77F}\x{1F780}-\x{1F7FF}\x{1F800}-\x{1F8FF}\x{1F900}-\x{1F9FF}\x{1FA00}-\x{1FA6F}\x{1FA70}-\x{1FAFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u';
@@ -120,3 +172,4 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
         expect(preg_match($emojiPattern, $allContent))->toBe(0);
     });
 });
+

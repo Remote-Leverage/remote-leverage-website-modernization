@@ -18,9 +18,12 @@ class WordPressAdminTheme
     {
         if (function_exists('add_action')) {
             add_action('admin_enqueue_scripts', [$this, 'enqueueGlobalAdminStyles'], 99);
+            add_action('wp_enqueue_scripts', [$this, 'enqueueSiteAdminBarStyles'], 99);
+            add_action('wp_head', [$this, 'printSiteAdminBarStylesFallback'], 99);
             add_action('admin_bar_menu', [$this, 'customizeAdminBarLogo'], 999);
             add_action('admin_head', [$this, 'injectAdminFavicon']);
             add_action('admin_footer', [$this, 'renderNotificationsCenterMarkup'], 999);
+            add_action('wp_footer', [$this, 'renderSiteNotificationsCenterMarkup'], 999);
             add_action('login_head', [$this, 'injectAdminFavicon']);
             add_action('login_head', [$this, 'renderLoginHeaderStyles'], 99);
             add_action('login_enqueue_scripts', [$this, 'enqueueLoginStyles'], 99);
@@ -79,7 +82,10 @@ class WordPressAdminTheme
         $wp_admin_bar->remove_node('themes');
         $wp_admin_bar->remove_node('widgets');
         $wp_admin_bar->remove_node('menus');
+        $wp_admin_bar->remove_node('customize');
+        $wp_admin_bar->remove_node('search');
 
+        $adminUrl = function_exists('admin_url') ? admin_url('/') : '/wp-admin/';
         $leadsUrl = function_exists('admin_url') ? admin_url('admin.php?page=rl-leads') : '#';
         $siteUrl = function_exists('home_url') ? home_url('/') : '/';
 
@@ -90,6 +96,13 @@ class WordPressAdminTheme
             'meta'  => [
                 'title' => 'Remote Leverage Admin',
             ],
+        ]);
+
+        $wp_admin_bar->add_node([
+            'id'     => 'rl-sub-dashboard',
+            'parent' => 'site-name',
+            'title'  => 'Admin Console',
+            'href'   => $adminUrl,
         ]);
 
         $wp_admin_bar->add_node([
@@ -434,7 +447,7 @@ class WordPressAdminTheme
     public function enqueueGlobalAdminStyles(): void
     {
         if (function_exists('wp_add_inline_style')) {
-            wp_add_inline_style('wp-admin', $this->getGlobalAdminCss());
+            \wp_add_inline_style('wp-admin', $this->getGlobalAdminCss());
         }
     }
 
@@ -444,8 +457,624 @@ class WordPressAdminTheme
     public function enqueueLoginStyles(): void
     {
         if (function_exists('wp_add_inline_style')) {
-            wp_add_inline_style('login', $this->getLoginCss());
+            \wp_add_inline_style('login', $this->getLoginCss());
         }
+    }
+
+    /**
+     * Enqueue modern shadcn/ui zinc admin bar styles on front-end site view when toolbar is showing.
+     */
+    public function enqueueSiteAdminBarStyles(): void
+    {
+        if (function_exists('is_admin_bar_showing') && ! \is_admin_bar_showing()) {
+            return;
+        }
+
+        if (function_exists('wp_enqueue_style')) {
+            \wp_enqueue_style('admin-bar');
+        }
+
+        if (function_exists('wp_add_inline_style')) {
+            \wp_add_inline_style('admin-bar', $this->getAdminBarCss());
+        }
+    }
+
+    /**
+     * Fallback to output admin bar styles in <head> if style handle was not rendered.
+     */
+    public function printSiteAdminBarStylesFallback(): void
+    {
+        if (function_exists('is_admin_bar_showing') && ! \is_admin_bar_showing()) {
+            return;
+        }
+
+        if (! function_exists('wp_style_is') || ! \wp_style_is('admin-bar', 'done')) {
+            echo '<style id="rl-admin-bar-site-css">' . $this->getAdminBarCss() . '</style>' . "\n";
+        }
+    }
+
+    /**
+     * Render the slide-out Notifications Center drawer on the front-end when toolbar is showing.
+     */
+    public function renderSiteNotificationsCenterMarkup(): void
+    {
+        if (function_exists('is_admin_bar_showing') && ! \is_admin_bar_showing()) {
+            return;
+        }
+
+        $this->renderNotificationsCenterMarkup();
+    }
+
+    /**
+     * Generate modern shadcn/ui zinc unified admin bar CSS for both admin view and site view.
+     */
+    public function getAdminBarCss(): string
+    {
+        $whiteIsoUri = $this->getIsoDataUri('#FFFFFF');
+
+        return "
+            /* ==========================================================================
+               REMOTE LEVERAGE UNIFIED ADMIN BAR THEME (SHADCN/UI ZINC AESTHETIC)
+               ========================================================================== */
+
+            /* --- 1. Top Admin Bar Container (#wpadminbar) --- */
+            #wpadminbar {
+                background: #09090b !important;
+                border-bottom: 1px solid #27272a !important;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+                color: #a1a1aa !important;
+            }
+
+            #wpadminbar #wp-admin-bar-wp-logo,
+            #wpadminbar #wp-admin-bar-comments,
+            #wpadminbar #wp-admin-bar-rl-brand-header,
+            #wpadminbar #wp-admin-bar-customize,
+            #wpadminbar #wp-admin-bar-search {
+                display: none !important;
+            }
+
+            #wpadminbar .ab-item,
+            #wpadminbar a.ab-item {
+                color: #a1a1aa !important;
+                font-size: 13px !important;
+                font-weight: 500 !important;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+                transition: color 0.15s ease, background-color 0.15s ease !important;
+            }
+
+            #wpadminbar .ab-item:hover,
+            #wpadminbar a.ab-item:hover,
+            #wpadminbar li.hover > .ab-item,
+            #wpadminbar .ab-top-menu > li:hover > .ab-item {
+                color: #fafafa !important;
+                background-color: #18181b !important;
+            }
+
+            #wpadminbar .ab-icon,
+            #wpadminbar .ab-item:before,
+            #wpadminbar .ab-icon:before {
+                color: #a1a1aa !important;
+                transition: color 0.15s ease !important;
+            }
+
+            #wpadminbar .ab-item:hover .ab-icon,
+            #wpadminbar .ab-item:hover:before,
+            #wpadminbar .ab-item:hover .ab-icon:before,
+            #wpadminbar li.hover .ab-icon:before {
+                color: #fafafa !important;
+            }
+
+            /* --- 2. Dropdown Submenus (.menupop .ab-sub-wrapper) --- */
+            #wpadminbar .menupop .ab-sub-wrapper,
+            #wpadminbar .shortlink-input {
+                background: #09090b !important;
+                border: 1px solid #27272a !important;
+                border-radius: 8px !important;
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2) !important;
+                padding: 4px !important;
+            }
+
+            #wpadminbar .ab-submenu .ab-item {
+                color: #a1a1aa !important;
+                border-radius: 6px !important;
+                padding: 4px 12px !important;
+                font-size: 13px !important;
+                font-weight: 500 !important;
+            }
+
+            #wpadminbar .ab-submenu .ab-item:hover {
+                color: #ffffff !important;
+                background-color: #27272a !important;
+            }
+
+            /* --- 3. Remote Leverage Admin Bar Brand / ISO --- */
+            #wpadminbar #wp-admin-bar-site-name > .ab-item:before,
+            #wpadminbar #wp-admin-bar-site-name .ab-icon,
+            #wpadminbar #wp-admin-bar-site-name .ab-icon:before {
+                display: none !important;
+                content: '' !important;
+            }
+
+            #wpadminbar #wp-admin-bar-site-name > .ab-item {
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+                padding: 0 12px 0 10px !important;
+            }
+
+            #wpadminbar .rl-brand-iso {
+                width: 18px !important;
+                height: 18px !important;
+                background-image: url(\"{$whiteIsoUri}\") !important;
+                background-size: contain !important;
+                background-position: center !important;
+                background-repeat: no-repeat !important;
+                display: inline-block !important;
+                vertical-align: middle !important;
+                flex-shrink: 0 !important;
+            }
+
+            #wpadminbar .rl-brand-text {
+                font-weight: 600 !important;
+                color: #fafafa !important;
+                letter-spacing: -0.01em !important;
+                font-size: 13px !important;
+            }
+
+            /* --- 4. User Account & Avatar Styling --- */
+            #wpadminbar #wp-admin-bar-my-account > .ab-item {
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+            }
+
+            #wpadminbar #wp-admin-bar-my-account img.avatar {
+                border-radius: 9999px !important;
+                border: 1px solid #27272a !important;
+                width: 20px !important;
+                height: 20px !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                float: none !important;
+                vertical-align: middle !important;
+            }
+
+            #wpadminbar #wp-admin-bar-user-info {
+                padding: 8px 12px !important;
+                height: auto !important;
+                border-bottom: 1px solid #27272a !important;
+                margin-bottom: 4px !important;
+                background: transparent !important;
+            }
+
+            #wpadminbar #wp-admin-bar-user-info .display-name {
+                color: #fafafa !important;
+                font-weight: 600 !important;
+                font-size: 13px !important;
+            }
+
+            #wpadminbar #wp-admin-bar-user-info .username {
+                color: #71717a !important;
+                font-size: 11px !important;
+            }
+
+            #wpadminbar #wp-admin-bar-user-info img.avatar {
+                border-radius: 9999px !important;
+                border: 1px solid #27272a !important;
+                width: 36px !important;
+                height: 36px !important;
+                margin-right: 8px !important;
+            }
+
+            /* --- 5. Notifications Bell Trigger --- */
+            #wpadminbar #wp-admin-bar-rl-notifications {
+                display: block !important;
+            }
+
+            #wpadminbar #wp-admin-bar-rl-notifications > .ab-item {
+                padding: 0 !important;
+                background: transparent !important;
+            }
+
+            .rl-notif-bar-trigger {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                position: relative !important;
+                cursor: pointer !important;
+                height: 32px !important;
+                width: 38px !important;
+                color: #a1a1aa !important;
+                transition: color 0.15s ease, background 0.15s ease !important;
+            }
+
+            .rl-notif-bar-trigger:hover,
+            body.rl-notif-open .rl-notif-bar-trigger {
+                color: #ffffff !important;
+                background: #18181b !important;
+            }
+
+            .rl-notif-bell-icon {
+                width: 16px !important;
+                height: 16px !important;
+                stroke: currentColor !important;
+            }
+
+            .rl-notif-badge {
+                position: absolute !important;
+                top: 5px !important;
+                right: 5px !important;
+                min-width: 14px !important;
+                height: 14px !important;
+                border-radius: 9999px !important;
+                background: #09090b !important;
+                color: #ffffff !important;
+                border: 1px solid #3f3f46 !important;
+                font-size: 9px !important;
+                font-weight: 700 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 0 3px !important;
+                line-height: 1 !important;
+                box-shadow: 0 0 0 1.5px #18181b !important;
+            }
+
+            /* --- 6. Notifications Slide-Over Drawer & Backdrop --- */
+            .rl-notif-backdrop {
+                position: fixed !important;
+                inset: 0 !important;
+                background: rgba(9, 9, 11, 0.45) !important;
+                backdrop-filter: blur(2px) !important;
+                z-index: 100049 !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+                transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+
+            body.rl-notif-open .rl-notif-backdrop {
+                opacity: 1 !important;
+                pointer-events: auto !important;
+            }
+
+            .rl-notif-drawer {
+                position: fixed !important;
+                top: 0 !important;
+                right: 0 !important;
+                width: 420px !important;
+                max-width: calc(100vw - 20px) !important;
+                height: 100vh !important;
+                z-index: 100050 !important;
+                background: #ffffff !important;
+                box-shadow: -4px 0 28px rgba(0, 0, 0, 0.15) !important;
+                border-left: 1px solid #e4e4e7 !important;
+                transform: translateX(100%) !important;
+                transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+                display: flex !important;
+                flex-direction: column !important;
+                box-sizing: border-box !important;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            }
+
+            body.rl-notif-open .rl-notif-drawer {
+                transform: translateX(0) !important;
+            }
+
+            .rl-notif-drawer-header {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                padding: 16px 20px !important;
+                border-bottom: 1px solid #f4f4f5 !important;
+                background: #ffffff !important;
+            }
+
+            .rl-notif-header-title-wrap {
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+            }
+
+            .rl-notif-header-icon {
+                width: 18px !important;
+                height: 18px !important;
+                color: #18181b !important;
+            }
+
+            .rl-notif-header-title {
+                margin: 0 !important;
+                padding: 0 !important;
+                font-size: 15px !important;
+                font-weight: 600 !important;
+                color: #09090b !important;
+            }
+
+            .rl-notif-pill {
+                background: #f4f4f5 !important;
+                color: #71717a !important;
+                font-size: 11px !important;
+                font-weight: 600 !important;
+                padding: 2px 8px !important;
+                border-radius: 9999px !important;
+            }
+
+            .rl-notif-header-actions {
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+            }
+
+            .rl-notif-btn-clear {
+                background: transparent !important;
+                border: none !important;
+                color: #71717a !important;
+                font-size: 12px !important;
+                font-weight: 500 !important;
+                cursor: pointer !important;
+                padding: 4px 8px !important;
+                border-radius: 4px !important;
+                transition: color 0.15s ease, background 0.15s ease !important;
+            }
+
+            .rl-notif-btn-clear:hover {
+                color: #09090b !important;
+                background: #f4f4f5 !important;
+            }
+
+            .rl-notif-btn-close {
+                background: transparent !important;
+                border: none !important;
+                font-size: 22px !important;
+                line-height: 1 !important;
+                color: #71717a !important;
+                cursor: pointer !important;
+                padding: 2px 6px !important;
+                border-radius: 4px !important;
+                transition: color 0.15s ease !important;
+            }
+
+            .rl-notif-btn-close:hover {
+                color: #09090b !important;
+            }
+
+            .rl-notif-drawer-body {
+                flex: 1 1 auto !important;
+                overflow-y: auto !important;
+                padding: 16px 20px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 12px !important;
+                background: #fafafa !important;
+            }
+
+            .rl-notif-card {
+                background: #ffffff !important;
+                border: 1px solid #e4e4e7 !important;
+                border-left: 3px solid #18181b !important;
+                border-radius: 8px !important;
+                padding: 12px 14px !important;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 6px !important;
+                transition: opacity 0.2s ease, transform 0.2s ease !important;
+            }
+
+            .rl-notif-card.is-dismissing {
+                opacity: 0 !important;
+                transform: translateX(20px) !important;
+            }
+
+            .rl-notif-card.rl-notif-warning {
+                border-left-color: #f59e0b !important;
+            }
+
+            .rl-notif-card.rl-notif-error {
+                border-left-color: #ef4444 !important;
+            }
+
+            .rl-notif-card.rl-notif-info {
+                border-left-color: #71717a !important;
+            }
+
+            .rl-notif-card.rl-notif-success {
+                border-left-color: #10b981 !important;
+            }
+
+            .rl-notif-card-header {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+            }
+
+            .rl-notif-tag {
+                font-size: 10px !important;
+                font-weight: 600 !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.04em !important;
+                padding: 2px 6px !important;
+                border-radius: 4px !important;
+                background: #f4f4f5 !important;
+                color: #52525b !important;
+                border: 1px solid #e4e4e7 !important;
+            }
+
+            .rl-tag-warning {
+                background: #fef3c7 !important;
+                color: #92400e !important;
+                border-color: #fde68a !important;
+            }
+
+            .rl-tag-error {
+                background: #fee2e2 !important;
+                color: #991b1b !important;
+                border-color: #fecaca !important;
+            }
+
+            .rl-tag-success {
+                background: #d1fae5 !important;
+                color: #065f46 !important;
+                border-color: #a7f3d0 !important;
+            }
+
+            .rl-tag-info {
+                background: #f4f4f5 !important;
+                color: #3f3f46 !important;
+                border-color: #e4e4e7 !important;
+            }
+
+            .rl-notif-dismiss-item-btn {
+                background: transparent !important;
+                border: none !important;
+                color: #a1a1aa !important;
+                font-size: 16px !important;
+                cursor: pointer !important;
+                width: 20px !important;
+                height: 20px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                border-radius: 4px !important;
+                line-height: 1 !important;
+                transition: all 0.15s ease !important;
+            }
+
+            .rl-notif-dismiss-item-btn:hover {
+                color: #09090b !important;
+                background: #e4e4e7 !important;
+            }
+
+            .rl-notif-card-body {
+                font-size: 12px !important;
+                color: #09090b !important;
+                line-height: 1.45 !important;
+            }
+
+            .rl-notif-card-body p {
+                margin: 0 !important;
+            }
+
+            .rl-notif-card-body code {
+                background: #f4f4f5 !important;
+                border: 1px solid #e4e4e7 !important;
+                border-radius: 4px !important;
+                padding: 1px 5px !important;
+                font-size: 11px !important;
+                color: #09090b !important;
+            }
+
+            .rl-notif-empty-state {
+                flex: 1 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                text-align: center !important;
+                padding: 40px 24px !important;
+            }
+
+            .rl-notif-empty-icon {
+                width: 44px !important;
+                height: 44px !important;
+                border-radius: 50% !important;
+                background: #f4f4f5 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                margin-bottom: 12px !important;
+            }
+
+            .rl-notif-empty-icon svg {
+                width: 20px !important;
+                height: 20px !important;
+                stroke: #10b981 !important;
+            }
+
+            .rl-notif-empty-title {
+                font-size: 14px !important;
+                font-weight: 600 !important;
+                color: #09090b !important;
+                margin: 0 0 4px 0 !important;
+            }
+
+            .rl-notif-empty-desc {
+                font-size: 12px !important;
+                color: #71717a !important;
+                margin: 0 !important;
+                line-height: 1.4 !important;
+                max-width: 260px !important;
+            }
+
+            .rl-notif-drawer-footer {
+                padding: 12px 20px !important;
+                border-top: 1px solid #f4f4f5 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                font-size: 11px !important;
+                color: #a1a1aa !important;
+                background: #ffffff !important;
+            }
+
+            .rl-notif-footer-text {
+                color: #a1a1aa !important;
+            }
+
+            .rl-notif-link-subtle {
+                background: transparent !important;
+                border: none !important;
+                color: #71717a !important;
+                font-size: 11px !important;
+                cursor: pointer !important;
+                text-decoration: underline !important;
+                padding: 0 !important;
+            }
+
+            .rl-notif-link-subtle:hover {
+                color: #09090b !important;
+            }
+
+            /* --- 7. Sticky Header & Mobile Responsive Adjustments --- */
+            body.admin-bar header.sticky {
+                top: 32px !important;
+            }
+
+            @media screen and (max-width: 782px) {
+                #wpadminbar {
+                    height: 46px !important;
+                    position: fixed !important;
+                }
+                #wpadminbar .ab-item,
+                #wpadminbar a.ab-item {
+                    height: 46px !important;
+                    line-height: 46px !important;
+                    padding: 0 8px !important;
+                }
+                .rl-notif-bar-trigger {
+                    height: 46px !important;
+                    width: 44px !important;
+                }
+                .rl-notif-badge {
+                    top: 10px !important;
+                    right: 8px !important;
+                }
+                #wpadminbar #wp-admin-bar-site-name > .ab-item {
+                    height: 46px !important;
+                    padding: 0 12px 0 10px !important;
+                }
+                #wpadminbar .rl-brand-iso {
+                    width: 20px !important;
+                    height: 20px !important;
+                }
+                #wpadminbar .menupop .ab-sub-wrapper {
+                    top: 46px !important;
+                }
+                body.admin-bar header.sticky {
+                    top: 46px !important;
+                }
+            }
+        ";
     }
 
     /**
@@ -507,79 +1136,7 @@ class WordPressAdminTheme
             }
 
             /* --- 2. Top Admin Bar (#wpadminbar) --- */
-            #wpadminbar {
-                background: #09090b !important;
-                border-bottom: 1px solid #27272a !important;
-                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-            }
-            #wpadminbar #wp-admin-bar-wp-logo,
-            #wpadminbar #wp-admin-bar-comments,
-            #wpadminbar #wp-admin-bar-rl-brand-header {
-                display: none !important;
-            }
-            #wpadminbar .ab-item,
-            #wpadminbar a.ab-item {
-                color: #a1a1aa !important;
-                font-size: 13px !important;
-                font-weight: 500 !important;
-                transition: color 0.15s ease, background-color 0.15s ease !important;
-            }
-            #wpadminbar .ab-item:hover,
-            #wpadminbar a.ab-item:hover,
-            #wpadminbar li.hover > .ab-item,
-            #wpadminbar .ab-top-menu > li:hover > .ab-item {
-                color: #fafafa !important;
-                background-color: #18181b !important;
-            }
-            #wpadminbar .menupop .ab-sub-wrapper,
-            #wpadminbar .shortlink-input {
-                background: #09090b !important;
-                border: 1px solid #27272a !important;
-                border-radius: 8px !important;
-                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2) !important;
-                padding: 4px !important;
-            }
-            #wpadminbar .ab-submenu .ab-item {
-                color: #a1a1aa !important;
-                border-radius: 6px !important;
-                padding: 4px 12px !important;
-            }
-            #wpadminbar .ab-submenu .ab-item:hover {
-                color: #ffffff !important;
-                background-color: #27272a !important;
-            }
-
-            /* --- Remote Leverage Admin Bar Brand / ISO --- */
-            #wpadminbar #wp-admin-bar-site-name > .ab-item:before,
-            #wpadminbar #wp-admin-bar-site-name .ab-icon,
-            #wpadminbar #wp-admin-bar-site-name .ab-icon:before {
-                display: none !important;
-                content: '' !important;
-            }
-            #wpadminbar #wp-admin-bar-site-name > .ab-item {
-                display: flex !important;
-                align-items: center !important;
-                gap: 8px !important;
-                padding: 0 12px 0 10px !important;
-            }
-            #wpadminbar .rl-brand-iso {
-                width: 18px !important;
-                height: 18px !important;
-                background-image: url(\"{$whiteIsoUri}\") !important;
-                background-size: contain !important;
-                background-position: center !important;
-                background-repeat: no-repeat !important;
-                display: inline-block !important;
-                vertical-align: middle !important;
-                flex-shrink: 0 !important;
-            }
-            #wpadminbar .rl-brand-text {
-                font-weight: 600 !important;
-                color: #fafafa !important;
-                letter-spacing: -0.01em !important;
-                font-size: 13px !important;
-            }
+            {$this->getAdminBarCss()}
 
             /* --- 3. Left Navigation Menu (#adminmenu) --- */
             #adminmenuback,
@@ -1390,328 +1947,7 @@ class WordPressAdminTheme
                 border-left-color: #71717a !important;
             }
 
-            /* Admin Bar Notifications Bell Trigger */
-            #wpadminbar #wp-admin-bar-rl-notifications {
-                display: block !important;
-            }
-            #wpadminbar #wp-admin-bar-rl-notifications > .ab-item {
-                padding: 0 !important;
-                background: transparent !important;
-            }
-            .rl-notif-bar-trigger {
-                display: inline-flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                position: relative !important;
-                cursor: pointer !important;
-                height: 32px !important;
-                width: 38px !important;
-                color: #a1a1aa !important;
-                transition: color 0.15s ease, background 0.15s ease !important;
-            }
-            .rl-notif-bar-trigger:hover,
-            body.rl-notif-open .rl-notif-bar-trigger {
-                color: #ffffff !important;
-                background: rgba(255, 255, 255, 0.08) !important;
-            }
-            .rl-notif-bell-icon {
-                width: 16px !important;
-                height: 16px !important;
-                stroke: currentColor !important;
-            }
-            .rl-notif-badge {
-                position: absolute !important;
-                top: 5px !important;
-                right: 5px !important;
-                min-width: 14px !important;
-                height: 14px !important;
-                border-radius: 9999px !important;
-                background: #09090b !important;
-                color: #ffffff !important;
-                border: 1px solid #3f3f46 !important;
-                font-size: 9px !important;
-                font-weight: 700 !important;
-                display: inline-flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                padding: 0 3px !important;
-                line-height: 1 !important;
-                box-shadow: 0 0 0 1.5px #18181b !important;
-            }
 
-            /* Notifications Slide-Over Drawer & Backdrop */
-            .rl-notif-backdrop {
-                position: fixed !important;
-                inset: 0 !important;
-                background: rgba(9, 9, 11, 0.35) !important;
-                backdrop-filter: blur(2px) !important;
-                z-index: 100049 !important;
-                opacity: 0 !important;
-                pointer-events: none !important;
-                transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-            }
-            body.rl-notif-open .rl-notif-backdrop {
-                opacity: 1 !important;
-                pointer-events: auto !important;
-            }
-            .rl-notif-drawer {
-                position: fixed !important;
-                top: 0 !important;
-                right: 0 !important;
-                width: 420px !important;
-                max-width: calc(100vw - 20px) !important;
-                height: 100vh !important;
-                z-index: 100050 !important;
-                background: #ffffff !important;
-                box-shadow: -4px 0 28px rgba(0, 0, 0, 0.12) !important;
-                border-left: 1px solid #e4e4e7 !important;
-                transform: translateX(100%) !important;
-                transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
-                display: flex !important;
-                flex-direction: column !important;
-                box-sizing: border-box !important;
-            }
-            body.rl-notif-open .rl-notif-drawer {
-                transform: translateX(0) !important;
-            }
-            .rl-notif-drawer-header {
-                display: flex !important;
-                align-items: center !important;
-                justify-content: space-between !important;
-                padding: 16px 20px !important;
-                border-bottom: 1px solid #f4f4f5 !important;
-                background: #ffffff !important;
-            }
-            .rl-notif-header-title-wrap {
-                display: flex !important;
-                align-items: center !important;
-                gap: 8px !important;
-            }
-            .rl-notif-header-icon {
-                width: 16px !important;
-                height: 16px !important;
-                stroke: #09090b !important;
-            }
-            .rl-notif-header-title {
-                font-size: 15px !important;
-                font-weight: 700 !important;
-                color: #09090b !important;
-                margin: 0 !important;
-                letter-spacing: -0.01em !important;
-            }
-            .rl-notif-pill {
-                background: #f4f4f5 !important;
-                color: #09090b !important;
-                font-size: 11px !important;
-                font-weight: 600 !important;
-                padding: 2px 8px !important;
-                border-radius: 9999px !important;
-                border: 1px solid #e4e4e7 !important;
-            }
-            .rl-notif-header-actions {
-                display: flex !important;
-                align-items: center !important;
-                gap: 6px !important;
-            }
-            .rl-notif-btn-clear {
-                background: transparent !important;
-                border: none !important;
-                color: #71717a !important;
-                font-size: 12px !important;
-                font-weight: 500 !important;
-                cursor: pointer !important;
-                padding: 4px 8px !important;
-                border-radius: 4px !important;
-                transition: all 0.15s ease !important;
-            }
-            .rl-notif-btn-clear:hover {
-                color: #09090b !important;
-                background: #f4f4f5 !important;
-            }
-            .rl-notif-btn-close {
-                background: transparent !important;
-                border: none !important;
-                color: #71717a !important;
-                font-size: 20px !important;
-                cursor: pointer !important;
-                width: 28px !important;
-                height: 28px !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                border-radius: 6px !important;
-                transition: all 0.15s ease !important;
-                line-height: 1 !important;
-            }
-            .rl-notif-btn-close:hover {
-                color: #09090b !important;
-                background: #f4f4f5 !important;
-            }
-            .rl-notif-drawer-body {
-                flex: 1 !important;
-                overflow-y: auto !important;
-                padding: 16px 20px !important;
-                display: flex !important;
-                flex-direction: column !important;
-                gap: 12px !important;
-            }
-            .rl-notif-card {
-                background: #fafafa !important;
-                border: 1px solid #e4e4e7 !important;
-                border-left: 3px solid #18181b !important;
-                border-radius: 8px !important;
-                padding: 12px 14px !important;
-                display: flex !important;
-                flex-direction: column !important;
-                gap: 6px !important;
-                transition: opacity 0.2s ease, transform 0.2s ease !important;
-            }
-            .rl-notif-card.is-dismissing {
-                opacity: 0 !important;
-                transform: translateX(20px) !important;
-            }
-            .rl-notif-card.rl-notif-warning {
-                border-left-color: #f59e0b !important;
-            }
-            .rl-notif-card.rl-notif-error {
-                border-left-color: #ef4444 !important;
-            }
-            .rl-notif-card.rl-notif-info {
-                border-left-color: #71717a !important;
-            }
-            .rl-notif-card.rl-notif-success {
-                border-left-color: #10b981 !important;
-            }
-            .rl-notif-card-header {
-                display: flex !important;
-                align-items: center !important;
-                justify-content: space-between !important;
-            }
-            .rl-notif-tag {
-                font-size: 10px !important;
-                font-weight: 600 !important;
-                text-transform: uppercase !important;
-                letter-spacing: 0.04em !important;
-                padding: 2px 6px !important;
-                border-radius: 4px !important;
-                background: #f4f4f5 !important;
-                color: #52525b !important;
-                border: 1px solid #e4e4e7 !important;
-            }
-            .rl-tag-warning {
-                background: #fef3c7 !important;
-                color: #92400e !important;
-                border-color: #fde68a !important;
-            }
-            .rl-tag-error {
-                background: #fee2e2 !important;
-                color: #991b1b !important;
-                border-color: #fecaca !important;
-            }
-            .rl-tag-success {
-                background: #d1fae5 !important;
-                color: #065f46 !important;
-                border-color: #a7f3d0 !important;
-            }
-            .rl-tag-info {
-                background: #f4f4f5 !important;
-                color: #3f3f46 !important;
-                border-color: #e4e4e7 !important;
-            }
-            .rl-notif-dismiss-item-btn {
-                background: transparent !important;
-                border: none !important;
-                color: #a1a1aa !important;
-                font-size: 16px !important;
-                cursor: pointer !important;
-                width: 20px !important;
-                height: 20px !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                border-radius: 4px !important;
-                line-height: 1 !important;
-                transition: all 0.15s ease !important;
-            }
-            .rl-notif-dismiss-item-btn:hover {
-                color: #09090b !important;
-                background: #e4e4e7 !important;
-            }
-            .rl-notif-card-body {
-                font-size: 12px !important;
-                color: #09090b !important;
-                line-height: 1.45 !important;
-            }
-            .rl-notif-card-body p {
-                margin: 0 !important;
-            }
-            .rl-notif-card-body code {
-                background: #f4f4f5 !important;
-                border: 1px solid #e4e4e7 !important;
-                border-radius: 4px !important;
-                padding: 1px 5px !important;
-                font-size: 11px !important;
-                color: #09090b !important;
-            }
-            .rl-notif-empty-state {
-                flex: 1 !important;
-                display: flex !important;
-                flex-direction: column !important;
-                align-items: center !important;
-                justify-content: center !important;
-                text-align: center !important;
-                padding: 40px 24px !important;
-            }
-            .rl-notif-empty-icon {
-                width: 44px !important;
-                height: 44px !important;
-                border-radius: 50% !important;
-                background: #f4f4f5 !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                margin-bottom: 12px !important;
-            }
-            .rl-notif-empty-icon svg {
-                width: 20px !important;
-                height: 20px !important;
-                stroke: #10b981 !important;
-            }
-            .rl-notif-empty-title {
-                font-size: 14px !important;
-                font-weight: 600 !important;
-                color: #09090b !important;
-                margin: 0 0 4px 0 !important;
-            }
-            .rl-notif-empty-desc {
-                font-size: 12px !important;
-                color: #71717a !important;
-                margin: 0 !important;
-                line-height: 1.4 !important;
-                max-width: 260px !important;
-            }
-            .rl-notif-drawer-footer {
-                padding: 12px 20px !important;
-                border-top: 1px solid #f4f4f5 !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: space-between !important;
-                font-size: 11px !important;
-                color: #a1a1aa !important;
-                background: #ffffff !important;
-            }
-            .rl-notif-link-subtle {
-                background: transparent !important;
-                border: none !important;
-                color: #71717a !important;
-                font-size: 11px !important;
-                cursor: pointer !important;
-                text-decoration: underline !important;
-                padding: 0 !important;
-            }
-            .rl-notif-link-subtle:hover {
-                color: #09090b !important;
-            }
 
             /* --- 9. Post Boxes & Modern Dashboard Widgets (.postbox) --- */
             #dashboard-widgets .postbox-container .empty-container {
