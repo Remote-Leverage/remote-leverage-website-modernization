@@ -24,6 +24,7 @@ jobs:
   ci:
     name: Quality gates
     uses: ./.github/workflows/ci.yml
+    secrets: inherit
 
   deploy:
     name: Build and deploy
@@ -46,12 +47,16 @@ jobs:
       - name: Build and push image
         env:
           IMAGE: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          ACF_PRO_KEY: ${{ secrets.ACF_PRO_KEY }}
         run: |
-          docker build \
+          python3 -c 'import json,os,sys; json.dump({"http-basic":{"connect.advancedcustomfields.com":{"username":os.environ["ACF_PRO_KEY"],"password":"https://remoteleverage.com"}}}, sys.stdout)' > "$RUNNER_TEMP/composer-auth.json"
+          DOCKER_BUILDKIT=1 docker build \
             --platform linux/amd64 \
+            --secret id=composer_auth,src="$RUNNER_TEMP/composer-auth.json" \
             --tag "$IMAGE:$IMAGE_TAG" \
             --tag "$IMAGE:${GITHUB_SHA}" \
             .
+          rm -f "$RUNNER_TEMP/composer-auth.json"
           docker push "$IMAGE:$IMAGE_TAG"
           docker push "$IMAGE:${GITHUB_SHA}"
 

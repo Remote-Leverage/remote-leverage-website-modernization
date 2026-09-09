@@ -23,6 +23,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      secrets:
+        - composer_auth
     ports:
       - "8080:80"
     env_file:
@@ -43,6 +45,10 @@ services:
       - ./web/app/uploads:/var/www/html/web/app/uploads
       - ./web/app/themes/remote-leverage/app:/var/www/html/web/app/themes/remote-leverage/app
       - ./web/app/themes/remote-leverage/resources:/var/www/html/web/app/themes/remote-leverage/resources
+
+secrets:
+  composer_auth:
+    file: ./auth.json
 
 volumes:
   rl-local-mysql:

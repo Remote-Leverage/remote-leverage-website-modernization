@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [main]
   workflow_call:
+    secrets:
+      ACF_PRO_KEY:
+        required: true
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -33,6 +36,16 @@ jobs:
           path: ~/.composer/cache
           key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock', 'web/app/themes/remote-leverage/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
+
+      - name: Configure ACF PRO Composer auth
+        env:
+          ACF_PRO_KEY: ${{ secrets.ACF_PRO_KEY }}
+        run: |
+          if [ -z "$ACF_PRO_KEY" ]; then
+            echo "Missing GitHub Actions secret ACF_PRO_KEY"
+            exit 1
+          fi
+          composer config --global http-basic.connect.advancedcustomfields.com "$ACF_PRO_KEY" "https://remoteleverage.com"
 
       - name: Install Bedrock root dependencies
         run: composer install --prefer-dist --no-progress --no-interaction

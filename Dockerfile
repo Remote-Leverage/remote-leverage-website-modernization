@@ -43,7 +43,10 @@ WORKDIR /app
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
 COPY composer.json composer.lock ./
-RUN mkdir -p web/app/plugins web/app/mu-plugins web/app/themes \
+RUN --mount=type=secret,id=composer_auth,required=false \
+    mkdir -p /root/.composer \
+    && if [ -f /run/secrets/composer_auth ]; then cp /run/secrets/composer_auth /root/.composer/auth.json && chmod 600 /root/.composer/auth.json; fi \
+    && mkdir -p web/app/plugins web/app/mu-plugins web/app/themes \
     && composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-progress --no-scripts
 
 COPY web/app/themes/remote-leverage/composer.json \
@@ -54,7 +57,10 @@ RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interacti
 
 COPY . .
 COPY --from=assets /theme/public web/app/themes/remote-leverage/public
-RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-progress --no-scripts \
+RUN --mount=type=secret,id=composer_auth,required=false \
+    mkdir -p /root/.composer \
+    && if [ -f /run/secrets/composer_auth ]; then cp /run/secrets/composer_auth /root/.composer/auth.json && chmod 600 /root/.composer/auth.json; fi \
+    && composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-progress --no-scripts \
     && composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-progress \
          --working-dir=web/app/themes/remote-leverage --no-scripts
 
