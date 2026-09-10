@@ -597,6 +597,13 @@ class MultistepBookingWizard extends Component
                 $this->meetingUrl = '#';
                 $this->bookingReference = (string) $lead->uuid;
             }
+
+            // A successful booking now navigates to a dedicated thank-you page
+            // (with its own "confirm via email" steps and social proof) rather
+            // than rendering a confirmation state inline in the widget.
+            $this->redirect(home_url('/vathankyou/'));
+
+            return;
         } catch (\Throwable $e) {
             Log::error('Error executing booking in wizard: '.$e->getMessage(), ['exception' => $e]);
             $this->errorMessage = 'An error occurred processing your consultation. Please check your information or try again.';
