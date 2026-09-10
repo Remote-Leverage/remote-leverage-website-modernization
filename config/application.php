@@ -144,17 +144,34 @@ if (env('ACF_PRO_KEY')) {
 }
 
 /**
- * Redis object cache (wp-plugin/redis-cache) -- optional. Only defined when
- * REDIS_HOST is set, so environments without Redis are unaffected.
+ * Redis object cache (Till Krüss Redis Object Cache drop-in).
+ * Enabled when WP_REDIS_HOST is set; the drop-in is copied into web/app/object-cache.php at image build.
  */
-if (env('REDIS_HOST')) {
-    Config::define('WP_REDIS_HOST', env('REDIS_HOST'));
-    Config::define('WP_REDIS_PORT', env('REDIS_PORT') ?: 6379);
-    Config::define('WP_REDIS_PASSWORD', env('REDIS_PASSWORD'));
-    Config::define('WP_REDIS_SCHEME', 'tls');
+if (env('WP_REDIS_HOST')) {
+    Config::define('WP_REDIS_HOST', env('WP_REDIS_HOST'));
+    Config::define('WP_REDIS_PORT', env('WP_REDIS_PORT') ?: 6379);
+    Config::define('WP_REDIS_CLIENT', env('WP_REDIS_CLIENT') ?: 'phpredis');
+    Config::define('WP_REDIS_PREFIX', env('WP_REDIS_PREFIX') ?: 'rl:');
+    Config::define('WP_REDIS_DATABASE', env('WP_REDIS_DATABASE') ?: 0);
     Config::define('WP_REDIS_TIMEOUT', 1);
     Config::define('WP_REDIS_READ_TIMEOUT', 1);
-    Config::define('WP_CACHE_KEY_SALT', WP_ENV . ':' . env('WP_HOME'));
+    Config::define('WP_REDIS_MAXTTL', 86400);
+    Config::define('WP_REDIS_GRACEFUL', true);
+
+    if (env('WP_REDIS_PASSWORD')) {
+        Config::define('WP_REDIS_PASSWORD', env('WP_REDIS_PASSWORD'));
+    }
+
+    if (env('WP_REDIS_SCHEME')) {
+        Config::define('WP_REDIS_SCHEME', env('WP_REDIS_SCHEME'));
+    }
+
+    if ((env('WP_REDIS_SCHEME') ?: 'tcp') === 'tls') {
+        Config::define('WP_REDIS_SSL_CONTEXT', [
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+        ]);
+    }
 }
 
 /**

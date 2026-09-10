@@ -51,7 +51,6 @@
     "vlucas/phpdotenv": "^5.0",
     "wordpress/mcp-adapter": "^0.6.1",
     "wp-plugin/google-site-kit": "^1.187",
-    "wp-plugin/redis-cache": "^2.8",
     "wp-theme/twentytwentyfive": "^1.0"
   },
   "require-dev": {
