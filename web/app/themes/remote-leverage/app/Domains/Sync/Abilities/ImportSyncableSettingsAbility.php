@@ -75,4 +75,13 @@ class ImportSyncableSettingsAbility extends Ability
     {
         return 'site';
     }
+
+    /**
+     * See ExportSyncableSettingsAbility::meta() — show_in_rest (not `public`)
+     * is what unlocks the REST run endpoint on WordPress 7.1+.
+     */
+    public function meta(): array
+    {
+        return ['show_in_rest' => true];
+    }
 }

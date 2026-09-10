@@ -50,4 +50,16 @@ class ExportSyncableSettingsAbility extends Ability
     {
         return 'site';
     }
+
+    /**
+     * show_in_rest (not the broader "public") is what WordPress 7.1 requires
+     * for the /wp-abilities/v1/.../run REST endpoint to even consider this
+     * ability — otherwise it 404s before our own permission() check runs.
+     * Leaving `public` unset keeps this out of general ability listings and
+     * MCP's default-server auto-discovery (which is keyed off `public`).
+     */
+    public function meta(): array
+    {
+        return ['show_in_rest' => true];
+    }
 }

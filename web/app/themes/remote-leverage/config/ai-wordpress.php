@@ -1,5 +1,13 @@
 <?php
 
+use App\Ai\Abilities\CreateLandingPageAbility;
+use App\Ai\Abilities\ListPatternsAbility;
+use App\Ai\Abilities\UpdateLandingPageContentAbility;
+use App\Domains\Sync\Abilities\ExportLandingPageAbility;
+use App\Domains\Sync\Abilities\ExportSyncableSettingsAbility;
+use App\Domains\Sync\Abilities\ImportLandingPageAbility;
+use App\Domains\Sync\Abilities\ImportSyncableSettingsAbility;
+
 return [
 
     /*
@@ -17,15 +25,15 @@ return [
 
     'abilities' => [
         // Landing-page composition — exposed to MCP clients (meta.mcp.public).
-        \App\Ai\Abilities\ListPatternsAbility::class,
-        \App\Ai\Abilities\CreateLandingPageAbility::class,
-        \App\Ai\Abilities\UpdateLandingPageContentAbility::class,
+        ListPatternsAbility::class,
+        CreateLandingPageAbility::class,
+        UpdateLandingPageContentAbility::class,
 
         // Local↔remote settings/page sync — REST-only, invoked by wp rl:sync:*.
-        \App\Domains\Sync\Abilities\ExportSyncableSettingsAbility::class,
-        \App\Domains\Sync\Abilities\ImportSyncableSettingsAbility::class,
-        \App\Domains\Sync\Abilities\ExportLandingPageAbility::class,
-        \App\Domains\Sync\Abilities\ImportLandingPageAbility::class,
+        ExportSyncableSettingsAbility::class,
+        ImportSyncableSettingsAbility::class,
+        ExportLandingPageAbility::class,
+        ImportLandingPageAbility::class,
     ],
 
 ];

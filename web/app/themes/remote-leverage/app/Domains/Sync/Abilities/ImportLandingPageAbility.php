@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Domains\Sync\Abilities;
 
 use App\Domains\Sync\SyncCapability;
-use RuntimeException;
 use Roots\AcornAi\Abilities\Ability;
+use RuntimeException;
 use WP_Error;
 
 /**
@@ -98,5 +98,14 @@ class ImportLandingPageAbility extends Ability
     public function category(): ?string
     {
         return 'site';
+    }
+
+    /**
+     * See ExportSyncableSettingsAbility::meta() — show_in_rest (not `public`)
+     * is what unlocks the REST run endpoint on WordPress 7.1+.
+     */
+    public function meta(): array
+    {
+        return ['show_in_rest' => true];
     }
 }

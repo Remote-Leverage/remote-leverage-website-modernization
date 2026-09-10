@@ -18,6 +18,11 @@ fi
 if wp core is-installed --allow-root >/dev/null 2>&1; then
   wp acorn optimize --allow-root || true
   chown -R www-data:www-data /var/www/html/web/app/cache || true
+
+  if [ -n "${REDIS_HOST:-}" ]; then
+    wp plugin activate redis-cache --allow-root || true
+    wp redis enable --allow-root || true
+  fi
 fi
 
 php-fpm -D

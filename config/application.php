@@ -144,6 +144,20 @@ if (env('ACF_PRO_KEY')) {
 }
 
 /**
+ * Redis object cache (wp-plugin/redis-cache) -- optional. Only defined when
+ * REDIS_HOST is set, so environments without Redis are unaffected.
+ */
+if (env('REDIS_HOST')) {
+    Config::define('WP_REDIS_HOST', env('REDIS_HOST'));
+    Config::define('WP_REDIS_PORT', env('REDIS_PORT') ?: 6379);
+    Config::define('WP_REDIS_PASSWORD', env('REDIS_PASSWORD'));
+    Config::define('WP_REDIS_SCHEME', 'tls');
+    Config::define('WP_REDIS_TIMEOUT', 1);
+    Config::define('WP_REDIS_READ_TIMEOUT', 1);
+    Config::define('WP_CACHE_KEY_SALT', WP_ENV . ':' . env('WP_HOME'));
+}
+
+/**
  * Custom Settings
  */
 Config::define('AUTOMATIC_UPDATER_DISABLED', true);

@@ -21,7 +21,7 @@ class CreateLandingPageAbility extends Ability
     {
         return 'Creates a new WordPress landing page by composing an ordered list of already-registered '.
             'Remote Leverage block patterns (see list-patterns for valid slugs). Always creates a draft '.
-            "unless status=publish is explicitly requested and the caller has publish_pages. Does not author ".
+            'unless status=publish is explicitly requested and the caller has publish_pages. Does not author '.
             'new block types or patterns — only assembles existing ones. Returns the new post ID, edit URL, '.
             'and a block-validity audit.';
     }
