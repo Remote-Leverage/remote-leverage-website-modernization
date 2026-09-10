@@ -1967,4 +1967,58 @@ class BlockDefaults
 
         return self::patternBlock('roles-pricing-grid', array_merge($data, $overrides), ['align' => 'full']);
     }
+
+    public static function renderAboutHero(array $overrides = []): string
+    {
+        $data = [
+            'headline' => 'The world leader in staffing solutions',
+            'subtitle' => 'Great talent changes everything. <strong>Remote Leverage makes global hiring easier.</strong> We find top 1% global talent, you hire direct.',
+            'button_text' => 'BOOK A CONSULTATION',
+            'button_url' => '#booking-footer',
+            'badge_text' => '2.5K+ pre-vetted candidates',
+            'trusted_title' => 'TRUSTED BY SCALING TEAMS GLOBALLY',
+        ];
+
+        return self::patternBlock('about-hero', array_merge($data, $overrides), ['align' => 'full']);
+    }
+
+    public static function renderAboutStats(array $overrides = []): string
+    {
+        $data = [
+            'section_title' => 'Why businesses choose us',
+        ];
+
+        return self::patternBlock('about-stats', array_merge($data, $overrides));
+    }
+
+    public static function renderAboutNarrative(array $overrides = []): string
+    {
+        $data = [
+            'title_prefix' => 'About',
+            'title' => 'Remote Leverage',
+            'badge_text' => 'Remote Leverage',
+        ];
+
+        return self::patternBlock('about-narrative', array_merge($data, $overrides));
+    }
+
+    public static function renderAboutTalentBanner(array $overrides = []): string
+    {
+        $data = [
+            'banner_text' => 'Great talent changes everything',
+        ];
+
+        return self::patternBlock('about-talent-banner', array_merge($data, $overrides), ['align' => 'full']);
+    }
+
+    public static function renderResultsPreview(array $overrides = []): string
+    {
+        $data = [
+            'section_title' => 'Real Businesses, Real Results',
+            'section_desc' => 'Every business needs the same thing – talent that helps them move faster, cut costs, and grow with confidence.',
+        ];
+
+        return self::patternBlock('results-preview', array_merge($data, $overrides));
+    }
 }
+
