@@ -19,8 +19,8 @@ still need migrating from the legacy templates. Local URLs point at the
 | Compare Athena | 🔧 Needs migration | https://remoteleverage.com/compare-athena/ | https://remoteleverage-v2.test/compare-athena/ |
 | Referral | 🔧 Needs migration | https://remoteleverage.com/referral/ | https://remoteleverage-v2.test/referral/ |
 | Thank You | 👀 Custom template, needs review | https://remoteleverage.com/vathankyou/ | https://remoteleverage-v2.test/vathankyou/ |
-| Terms of Use | 📄 Plain text, low priority | https://remoteleverage.com/terms-of-use/ | https://remoteleverage-v2.test/terms-of-use/ |
-| Privacy Policy | 📄 Plain text, low priority | https://remoteleverage.com/privacy-policy/ | https://remoteleverage-v2.test/privacy-policy/ |
+| Terms of Use | ✅ Done — Legal Document template | https://remoteleverage.com/terms-of-use/ | https://remoteleverage-v2.test/terms-of-use/ |
+| Privacy Policy | ✅ Done — Legal Document template | https://remoteleverage.com/privacy-policy/ | https://remoteleverage-v2.test/privacy-policy/ |
 | Partners Archive | 🆕 New in v2 — not live on production yet | *(doesn't exist yet)* | https://remoteleverage-v2.test/partners/ |
 | Hire VA 4 Preview | — Local-only draft, not on production | *(doesn't exist)* | https://remoteleverage-v2.test/hire-va-4-preview/ |
 

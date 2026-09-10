@@ -576,3 +576,25 @@ if (! class_exists('WP_Admin_Bar')) {
         }
     }
 }
+
+if (! function_exists('wp_strip_all_tags')) {
+    function wp_strip_all_tags($text, $remove_breaks = false)
+    {
+        $text = preg_replace('@<(script|style)[^>]*?>.*?</\\1>@si', '', (string) $text);
+        $text = strip_tags($text);
+
+        return $remove_breaks ? trim(preg_replace('/[\r\n\t ]+/', ' ', $text)) : $text;
+    }
+}
+
+if (! function_exists('sanitize_title')) {
+    function sanitize_title($title)
+    {
+        $title = strtolower(trim((string) $title));
+        $title = html_entity_decode($title, ENT_QUOTES, 'UTF-8');
+        $title = preg_replace('/[^a-z0-9\s-]/', '', $title);
+        $title = preg_replace('/[\s-]+/', '-', $title);
+
+        return trim($title, '-');
+    }
+}

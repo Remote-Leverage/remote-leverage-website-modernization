@@ -206,10 +206,107 @@ export function rlBookingWizardIsolated(config = {}) {
 
 window.rlBookingWizardIsolated = rlBookingWizardIsolated;
 
+/**
+ * Highlights the section currently being read in the legal-document sidebar nav.
+ *
+ * Uses a scroll listener rather than IntersectionObserver because legal sections
+ * vary wildly in length — a long clause can leave no heading inside an observer
+ * band at all, which reads to the user as the highlight falling off.
+ */
+function rlLegalToc() {
+  return {
+    active: '',
+
+    observe() {
+      const headings = Array.from(document.querySelectorAll('article h2[id]'));
+
+      if (!headings.length) {
+        return;
+      }
+
+      const OFFSET = 120; // Sticky header (80px) plus breathing room.
+      const nav = this.$el.querySelector('nav');
+
+      const update = () => {
+        let current = headings[0].id;
+
+        for (const heading of headings) {
+          if (heading.getBoundingClientRect().top > OFFSET) {
+            break;
+          }
+          current = heading.id;
+        }
+
+        // Bottom of the page: the last section is what's on screen, even though
+        // its heading scrolled past the offset line a long way back.
+        if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) {
+          current = headings[headings.length - 1].id;
+        }
+
+        if (current === this.active) {
+          return;
+        }
+
+        this.active = current;
+        this.revealActiveLink(nav, current);
+      };
+
+      let ticking = false;
+
+      const onScroll = () => {
+        if (ticking) {
+          return;
+        }
+
+        ticking = true;
+
+        requestAnimationFrame(() => {
+          update();
+          ticking = false;
+        });
+      };
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll, { passive: true });
+
+      update();
+    },
+
+    /**
+     * Keep the highlighted link visible when the section list is long enough to
+     * scroll on its own. Adjusts the nav's own scrollTop rather than calling
+     * scrollIntoView, which would also scroll the page and fight the reader.
+     */
+    revealActiveLink(nav, id) {
+      if (!nav || nav.scrollHeight <= nav.clientHeight) {
+        return;
+      }
+
+      const link = nav.querySelector(`[data-toc-link="${id}"]`);
+
+      if (!link) {
+        return;
+      }
+
+      const linkTop = link.offsetTop - nav.offsetTop;
+      const linkBottom = linkTop + link.offsetHeight;
+
+      if (linkTop < nav.scrollTop) {
+        nav.scrollTop = linkTop - 12;
+      } else if (linkBottom > nav.scrollTop + nav.clientHeight) {
+        nav.scrollTop = linkBottom - nav.clientHeight + 12;
+      }
+    },
+  };
+}
+
+window.rlLegalToc = rlLegalToc;
+
 const registerAlpine = () => {
   if (window.Alpine) {
     window.Alpine.data('phoneInputComponent', phoneInputComponent);
     window.Alpine.data('rlBookingWizardIsolated', rlBookingWizardIsolated);
+    window.Alpine.data('rlLegalToc', rlLegalToc);
   }
 };
 
