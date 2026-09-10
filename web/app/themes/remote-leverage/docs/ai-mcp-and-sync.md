@@ -76,19 +76,19 @@ call *out* to a remote environment's REST API, not baked into any container.
 
 ```
 # Push local settings (Calendly tokens, webhook URLs, etc.) to staging
-wp acorn rl:sync:settings --push --env=staging
+wp acorn rl:sync:settings --push --target=staging
 
 # Pull staging's current settings down to local
-wp acorn rl:sync:settings --pull --env=staging
+wp acorn rl:sync:settings --pull --target=staging
 
 # Push a local landing page (by local post ID) to staging
-wp acorn rl:sync:page 123 --push --env=staging
+wp acorn rl:sync:page 123 --push --target=staging
 
 # Pull a page down from staging (by its post ID *on staging*) into local
-wp acorn rl:sync:page 0 --pull --remote-post-id=456 --env=staging
+wp acorn rl:sync:page 0 --pull --remote-post-id=456 --target=staging
 ```
 
-Swap `--env=staging` for `--env=production` once `PRODUCTION_SYNC_*` is set.
+Swap `--target=staging` for `--target=production` once `PRODUCTION_SYNC_*` is set.
 Both commands print which keys/pages actually changed — they never silently
 overwrite without saying so.
 

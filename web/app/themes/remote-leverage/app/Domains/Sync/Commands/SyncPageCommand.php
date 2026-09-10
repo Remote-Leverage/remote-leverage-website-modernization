@@ -16,7 +16,7 @@ class SyncPageCommand extends Command
         {--push : Push a local page to the remote environment}
         {--pull : Pull a page down from the remote environment into this (local) one}
         {--remote-post-id= : Required with --pull; the post ID on the remote environment to export}
-        {--env=staging : Target environment key from config/rl-sync.php}';
+        {--target=staging : Target environment key from config/rl-sync.php (named to avoid colliding with Artisan\'s built-in --env option)}';
 
     /**
      * @var string
@@ -28,7 +28,7 @@ class SyncPageCommand extends Command
     {
         $push = (bool) $this->option('push');
         $pull = (bool) $this->option('pull');
-        $env = (string) $this->option('env');
+        $env = (string) $this->option('target');
         $postId = (int) $this->argument('post_id');
 
         if ($push === $pull) {

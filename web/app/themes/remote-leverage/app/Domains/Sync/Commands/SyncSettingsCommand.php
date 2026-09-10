@@ -14,7 +14,7 @@ class SyncSettingsCommand extends Command
      */
     protected $signature = 'rl:sync:settings {--push : Push local values to the remote environment}
         {--pull : Pull remote values down to this (local) environment}
-        {--env=staging : Target environment key from config/rl-sync.php}';
+        {--target=staging : Target environment key from config/rl-sync.php (named to avoid colliding with Artisan\'s built-in --env option)}';
 
     /**
      * @var string
@@ -26,7 +26,7 @@ class SyncSettingsCommand extends Command
     {
         $push = (bool) $this->option('push');
         $pull = (bool) $this->option('pull');
-        $env = (string) $this->option('env');
+        $env = (string) $this->option('target');
 
         if ($push === $pull) {
             $this->error('Pass exactly one of --push or --pull.');

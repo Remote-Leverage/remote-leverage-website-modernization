@@ -2,27 +2,12 @@
   use App\Support\BlockDefaults;
 
   $globeUrl = BlockDefaults::hireVaImg('globe-1.png');
-  $cards = [
-    [
-      'title' => 'No Recurring Fees - Hire Direct',
-      'desc' => 'Pay once when you hire. No monthly markups, no hidden costs, no contracts keeping you tied down.',
-      'icon' => '<svg class="w-6 h-6 text-brand-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
-    ],
-    [
-      'title' => 'Fluent English',
-      'desc' => 'Every candidate is vetted for professional English proficiency, clear communication, and seamless timezone overlap.',
-      'icon' => '<svg class="w-6 h-6 text-brand-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
-    ],
-    [
-      'title' => '30% Discount on Future Hires',
-      'desc' => 'Scaling your team? Enjoy an automatic 30% discount on placement fees for every subsequent hire.',
-      'icon' => '<svg class="w-6 h-6 text-brand-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>',
-    ],
-    [
-      'title' => 'No Contracts',
-      'desc' => 'You hold all the leverage. You hire directly onto your own payroll or contractor setup with zero lock-ins.',
-      'icon' => '<svg class="w-6 h-6 text-brand-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
-    ],
+
+  $cardIcons = [
+    '<svg class="w-6 h-6 text-brand-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+    '<svg class="w-6 h-6 text-brand-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+    '<svg class="w-6 h-6 text-brand-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>',
+    '<svg class="w-6 h-6 text-brand-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
   ];
 @endphp
 
@@ -32,7 +17,11 @@
     {{-- Section Heading --}}
     <div class="max-w-3xl mb-12 sm:mb-16">
       <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold font-display text-brand-hero tracking-tight leading-[1.08]">
-        Why hire through<br class="hidden sm:inline"> Remote Leverage?
+        @if (($headline ?? '') === 'Why hire through Remote Leverage?')
+          Why hire through<br class="hidden sm:inline"> Remote Leverage?
+        @else
+          {{ $headline }}
+        @endif
       </h2>
     </div>
 
@@ -56,7 +45,7 @@
 
           {{-- Value Statement --}}
           <h3 class="text-2xl sm:text-3xl font-bold font-display text-white leading-snug tracking-tight mb-4">
-            We've helped more than 2,000 businesses hire top talent across LatAm, the Caribbean and the EU.
+            {{ $proofTitle }}
           </h3>
           <p class="text-white/80 text-sm leading-relaxed max-w-md">
             Tap into vetted international professionals who integrate directly into your operations, saving up to 70% compared to local hires.
@@ -77,10 +66,10 @@
 
       {{-- Right Column: Single Vertical Stack of 4 Horizontal Cards --}}
       <div class="lg:col-span-7 flex flex-col gap-4 sm:gap-5 justify-between">
-        @foreach ($cards as $card)
+        @foreach ($cards as $i => $card)
           <div class="bg-white rounded-card-md p-6 sm:p-7 border border-black/5 shadow-xs hover:shadow-sm hover:border-brand-purple/20 transition-all duration-200 flex items-start gap-5">
             <div class="w-12 h-12 rounded-xl bg-brand-purple/10 flex items-center justify-center shrink-0">
-              {!! $card['icon'] !!}
+              {!! $cardIcons[$i % count($cardIcons)] !!}
             </div>
             <div>
               <h4 class="text-lg sm:text-xl font-bold font-display text-brand-hero tracking-tight">
