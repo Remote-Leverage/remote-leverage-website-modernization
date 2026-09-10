@@ -16,8 +16,10 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Lazy;
 use Livewire\Component;
 
+#[Lazy]
 class MultistepBookingWizard extends Component
 {
     // Step progression (1: Details, 2: Date, 3: Time & Confirm)
@@ -731,6 +733,20 @@ class MultistepBookingWizard extends Component
         } catch (\Throwable $e) {
             // Silently swallow analytics errors to avoid breaking booking UX
         }
+    }
+
+    /**
+     * Rendered while `lazy` on the <livewire:booking.multistep-booking-wizard>
+     * tag defers the real mount until the component scrolls into view — a
+     * bare fallback here would collapse to zero height and could miss the
+     * intersection observer's trigger entirely. Height is an approximation
+     * of the real widget; adjust if it causes visible layout shift.
+     */
+    public function placeholder(array $params = []): string
+    {
+        return <<<'HTML'
+        <div class="animate-pulse rounded-2xl bg-white/10 min-h-120 w-full"></div>
+        HTML;
     }
 
     public function render(): View

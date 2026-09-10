@@ -50,6 +50,7 @@
     "log1x/acf-composer": "^3.4",
     "posthog/posthog-php": "^4.13",
     "roots/acorn": "^6.0",
+    "roots/acorn-ai": "^0.1.2",
     "sentry/sentry-laravel": "^4.27"
   },
   "require-dev": {
