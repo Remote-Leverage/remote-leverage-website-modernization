@@ -88,6 +88,7 @@ class HandleLeadCreatedForBooking
                         'meeting_id' => $result['meeting_id'],
                         'provider' => $result['provider'],
                         'meet_url' => $result['meet_url'] ?? null,
+                        'start_time' => $result['start_time'] ?? $preferredSlot,
                     ]
                 );
 

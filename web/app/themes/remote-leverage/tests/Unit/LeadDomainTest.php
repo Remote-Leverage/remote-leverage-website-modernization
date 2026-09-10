@@ -424,4 +424,78 @@ describe('Lead Domain', function () {
         expect($textQuery->count())->toBe(1)
             ->and($textQuery->first()->name)->toBe('John Enterprise');
     });
+
+    test('findRecentBookingForSlot ignores dispatch-stage logs and only matches a real Scheduling consumption success for the same slot', function () {
+        $activityLogger = new LeadActivityLogger;
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Priya Nair',
+            'email' => 'priya@growthco.com',
+            'status' => 'captured',
+        ]);
+
+        $bookedSlot = '2026-10-01T14:00:00+00:00';
+
+        // Step 1 of the wizard: partial-capture dispatch. logDispatch() always
+        // writes outcome=succeeded — that only means "the event fired," not
+        // "a meeting was booked" — so this must NOT satisfy the guard.
+        $activityLogger->logDispatch(
+            leadId: $lead->id,
+            eventType: 'LeadCreated',
+            actorDomain: 'Lead',
+        );
+
+        expect($activityLogger->findRecentBookingForSlot('priya@growthco.com', $bookedSlot))->toBeNull();
+
+        // The real booking submission a few seconds later: Scheduling's
+        // consumption-stage log is the only thing that should match.
+        $activityLogger->logConsumption(
+            leadId: $lead->id,
+            eventType: 'LeadCreated',
+            actorDomain: 'Scheduling',
+            outcome: 'succeeded',
+            description: 'Scheduled consultation meeting (calendly: cal_123)',
+            payload: ['meeting_id' => 'cal_123', 'provider' => 'calendly', 'meet_url' => 'https://calendly.com/x', 'start_time' => $bookedSlot],
+        );
+
+        $match = $activityLogger->findRecentBookingForSlot('priya@growthco.com', $bookedSlot);
+        expect($match)->not->toBeNull()
+            ->and($match->payload['meeting_id'])->toBe('cal_123')
+            ->and($activityLogger->findRecentBookingForSlot('nobody-else@growthco.com', $bookedSlot))->toBeNull();
+
+        // A different slot is a fresh booking request, not a duplicate — must
+        // NOT match, so BookMeetingAction falls through to a real Calendly call.
+        expect($activityLogger->findRecentBookingForSlot('priya@growthco.com', '2026-10-02T09:00:00+00:00'))->toBeNull();
+    });
+
+    test('findPriorBookingForDifferentSlot finds a real prior Calendly booking to cancel, ignoring dedup placeholders and non-Calendly bookings', function () {
+        $activityLogger = new LeadActivityLogger;
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Marcus Webb',
+            'email' => 'marcus@scaleup.io',
+            'status' => 'captured',
+        ]);
+
+        $originalSlot = '2026-10-01T14:00:00+00:00';
+        $newSlot = '2026-10-03T16:00:00+00:00';
+
+        // Original real booking.
+        $activityLogger->logConsumption(
+            leadId: $lead->id,
+            eventType: 'LeadCreated',
+            actorDomain: 'Scheduling',
+            outcome: 'succeeded',
+            payload: ['meeting_id' => 'cal_original', 'provider' => 'calendly', 'meet_url' => 'https://calendly.com/x', 'start_time' => $originalSlot],
+        );
+
+        $match = $activityLogger->findPriorBookingForDifferentSlot('marcus@scaleup.io', $newSlot);
+        expect($match)->not->toBeNull()
+            ->and($match->payload['meeting_id'])->toBe('cal_original');
+
+        // Same slot as the "new" one being booked — nothing to cancel.
+        expect($activityLogger->findPriorBookingForDifferentSlot('marcus@scaleup.io', $originalSlot))->toBeNull();
+    });
 });

@@ -32,6 +32,17 @@ class TrackingServiceProvider extends ServiceProvider
     {
         $this->app->make(TrackingHooks::class)->register();
 
-        Event::listen(LeadCreated::class, [HandleLeadCreatedForTracking::class, 'handle']);
+        // Deferred: Customer.io + PostHog are both live API calls that nothing
+        // in the request depends on — see LeadServiceProvider::boot() for why
+        // these were blocking the booking wizard's response. The inner
+        // closure is `static` and uses the global app() helper (not
+        // $this->app) so it never captures $this — see that same method's
+        // comment for why: a non-static closure here previously crashed with
+        // a fatal out-of-memory error while serializable-closure tried to
+        // serialize the whole ServiceProvider/container graph, silently
+        // dropping the deferred work every time.
+        Event::listen(LeadCreated::class, function (LeadCreated $event) {
+            dispatch(static fn () => app(HandleLeadCreatedForTracking::class)->handle($event))->afterResponse();
+        });
     }
 }

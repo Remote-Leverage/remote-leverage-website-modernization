@@ -37,14 +37,23 @@ class BookMeetingAction
         Log::info('Executing BookMeetingAction', $data->toArray());
 
         // Duplicate-booking guard A: has this email already had a successful
-        // booking logged within the last 5 minutes? Short-circuits without
-        // touching Calendly/Google at all.
-        if ($this->activityLogger->hasRecentSuccessfulBooking($data->email)) {
+        // booking logged for this EXACT slot within the last 5 minutes? Short-
+        // circuits without touching Calendly/Google at all — but only for a
+        // genuine repeat of the same slot. A different slot is treated as a
+        // fresh (re)booking request below, not a duplicate.
+        $existingSlotBooking = $this->activityLogger->findRecentBookingForSlot(
+            $data->email,
+            $startTime->toIso8601String()
+        );
+
+        if ($existingSlotBooking) {
+            $payload = $existingSlotBooking->payload ?? [];
+
             return [
                 'success' => true,
-                'provider' => 'calendly',
-                'meeting_id' => 'deduplicated',
-                'meet_url' => null,
+                'provider' => $payload['provider'] ?? 'calendly',
+                'meeting_id' => $payload['meeting_id'] ?? 'deduplicated',
+                'meet_url' => $payload['meet_url'] ?? null,
                 'start_time' => $startTime->toIso8601String(),
                 'end_time' => $endTime->toIso8601String(),
                 'client_name' => $data->name,
@@ -145,6 +154,8 @@ class BookMeetingAction
 
                 $meetUrl = $meetUrl ?: ($invitee['scheduling_url'] ?? 'https://meet.google.com/rl-strategy-'.substr(md5($data->email), 0, 8));
 
+                $this->cancelPriorBookingForDifferentSlot($data->email, $startTime->toIso8601String());
+
                 return [
                     'success' => true,
                     'provider' => 'calendly',
@@ -178,6 +189,8 @@ class BookMeetingAction
 
         $meetUrl = $appointment['conferenceData']['entryPoints'][0]['uri'] ?? 'https://meet.google.com/rl-consult';
 
+        $this->cancelPriorBookingForDifferentSlot($data->email, $startTime->toIso8601String());
+
         return [
             'success' => true,
             'provider' => 'google_calendar',
@@ -188,5 +201,38 @@ class BookMeetingAction
             'client_name' => $data->name,
             'client_email' => $data->email,
         ];
+    }
+
+    /**
+     * Bonus reschedule support: if this email had a prior real Calendly
+     * booking at a different slot, cancel it now that a new one has just been
+     * made — otherwise a "changed my mind" resubmission would leave a stray
+     * duplicate meeting on the calendar instead of moving it. Best-effort:
+     * failure here is logged but never blocks the new booking from
+     * succeeding, since the user's new meeting already exists either way.
+     */
+    protected function cancelPriorBookingForDifferentSlot(string $email, string $newStartTimeIso): void
+    {
+        $priorBooking = $this->activityLogger->findPriorBookingForDifferentSlot($email, $newStartTimeIso);
+
+        if (! $priorBooking) {
+            return;
+        }
+
+        $meetingId = $priorBooking->payload['meeting_id'] ?? null;
+
+        if (! $meetingId) {
+            return;
+        }
+
+        $cancelled = $this->calendlyClient->cancelScheduledEvent(
+            $meetingId,
+            'Rescheduled to a new time via the booking form.'
+        );
+
+        Log::{$cancelled ? 'info' : 'warning'}(
+            'BookMeetingAction: '.($cancelled ? 'cancelled' : 'failed to cancel')
+                ." prior Calendly booking {$meetingId} for {$email} after rebooking a different slot."
+        );
     }
 }

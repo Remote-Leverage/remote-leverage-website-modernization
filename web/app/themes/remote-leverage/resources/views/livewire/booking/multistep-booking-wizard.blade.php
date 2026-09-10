@@ -230,9 +230,16 @@
                       <button
                         type="button"
                         wire:click="selectDate('{{ $cell['date'] }}')"
+                        wire:target="selectDate('{{ $cell['date'] }}')"
+                        wire:loading.attr="disabled"
+                        wire:loading.class="opacity-60 cursor-wait"
                         class="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white text-brand-purple font-bold text-base sm:text-lg flex items-center justify-center shadow-lg hover:scale-115 active:scale-95 transition-all duration-200 ease-out cursor-pointer hover:shadow-2xl"
                       >
-                        <span>{{ $cell['day'] }}</span>
+                        <span wire:loading.remove wire:target="selectDate('{{ $cell['date'] }}')">{{ $cell['day'] }}</span>
+                        <svg wire:loading wire:target="selectDate('{{ $cell['date'] }}')" class="animate-spin h-4 w-4 text-brand-purple" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
                       </button>
                     @else
                       <div class="w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center text-white/60 text-base sm:text-lg font-normal select-none transition-opacity duration-200">
@@ -710,6 +717,9 @@
                   <button
                     type="button"
                     wire:click="selectDate('{{ $cell['date'] }}')"
+                    wire:target="selectDate('{{ $cell['date'] }}')"
+                    wire:loading.attr="disabled"
+                    wire:loading.class="opacity-60 cursor-wait"
                     @disabled($cell['isPast'] || ! $cell['hasAvailability'])
                     class="mx-auto h-9 w-9 rounded-full text-xs font-semibold flex items-center justify-center transition-all duration-150
                       {{ $cell['isSelected'] ? 'bg-brand-purple text-white font-bold shadow-md shadow-brand-purple/30 scale-105' : '' }}
@@ -717,7 +727,11 @@
                       {{ ! $cell['hasAvailability'] || $cell['isPast'] ? 'text-slate-300 cursor-not-allowed' : '' }}
                     "
                   >
-                    <span>{{ $cell['day'] }}</span>
+                    <span wire:loading.remove wire:target="selectDate('{{ $cell['date'] }}')">{{ $cell['day'] }}</span>
+                    <svg wire:loading wire:target="selectDate('{{ $cell['date'] }}')" class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
                   </button>
                 @endif
               @endforeach

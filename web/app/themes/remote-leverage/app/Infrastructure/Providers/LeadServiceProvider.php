@@ -56,35 +56,77 @@ class LeadServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Steps 1-3b below are all "fire and forget" notification/CRM side effects
+        // that nothing in the request depends on — none of their return values
+        // are read by the booking wizard. Running them synchronously (with no
+        // queue configured — config('queue.default') is 'sync' — every one of
+        // these blocks the Livewire response) is what made both the step-1
+        // partial-capture submission and the final booking submission feel
+        // slow: up to five sequential external calls (HubSpot, Slack, webhook,
+        // email, Customer.io/PostHog) before the user sees anything happen.
+        // dispatch(...)->afterResponse() defers each to run after the response
+        // has already been sent to the browser (Acorn's request-handling hooks
+        // into WordPress's `shutdown` action specifically to flush the response
+        // via fastcgi_finish_request() before calling the container's
+        // terminating() callbacks, which is what this relies on).
+
         // 1. Automatically sync to HubSpot on LeadCreated
+        //
+        // The inner closure passed to dispatch() MUST be `static` and MUST NOT
+        // reference $this or $this->app: dispatch()'s job-preparation pipeline
+        // always runs the closure through laravel/serializable-closure (even
+        // for ->afterResponse(), since the same code path is shared with real
+        // queue connections), and a non-static closure captures $this — here,
+        // the entire ServiceProvider bound to the whole Application/container
+        // graph — which serializable-closure then tries to serialize. That
+        // blew the memory limit and fatally crashed silently during request
+        // termination, so the closure never ran at all and every one of these
+        // side effects was just dropped with no error visible to the request.
+        // The global app() helper (not $this->app) avoids the capture entirely.
         Event::listen(LeadCreated::class, function (LeadCreated $event) {
-            $gateway = $this->app->make(HubSpotGateway::class);
-            $logger = $this->app->make(LeadActivityLogger::class);
+            dispatch(static function () use ($event) {
+                $gateway = app(HubSpotGateway::class);
+                $logger = app(LeadActivityLogger::class);
 
-            $contactId = $gateway->syncContact($event->lead);
+                $contactId = $gateway->syncContact($event->lead);
 
-            $logger->logConsumption(
-                leadId: $event->lead->id,
-                eventType: 'LeadCreated',
-                actorDomain: 'Lead',
-                outcome: $contactId ? 'succeeded' : 'failed',
-                description: $contactId ? "Synced contact to HubSpot (ID: {$contactId})" : 'HubSpot contact sync failed',
-                payload: ['hubspot_contact_id' => $contactId]
-            );
+                $logger->logConsumption(
+                    leadId: $event->lead->id,
+                    eventType: 'LeadCreated',
+                    actorDomain: 'Lead',
+                    outcome: $contactId ? 'succeeded' : 'failed',
+                    description: $contactId ? "Synced contact to HubSpot (ID: {$contactId})" : 'HubSpot contact sync failed',
+                    payload: ['hubspot_contact_id' => $contactId]
+                );
+            })->afterResponse();
         });
 
         // 2. Dispatch Slack notification on LeadCreated (partial) and LeadBookingCompleted (final)
-        Event::listen(LeadCreated::class, [HandleLeadEventsForSlack::class, 'handleCreated']);
-        Event::listen(LeadBookingCompleted::class, [HandleLeadEventsForSlack::class, 'handleBookingCompleted']);
+        Event::listen(LeadCreated::class, function (LeadCreated $event) {
+            dispatch(static fn () => app(HandleLeadEventsForSlack::class)->handleCreated($event))->afterResponse();
+        });
+        Event::listen(LeadBookingCompleted::class, function (LeadBookingCompleted $event) {
+            dispatch(static fn () => app(HandleLeadEventsForSlack::class)->handleBookingCompleted($event))->afterResponse();
+        });
 
         // 3. Dispatch Outgoing Webhook on LeadCreated (partial) and LeadBookingCompleted (final)
-        Event::listen(LeadCreated::class, [HandleLeadEventsForWebhook::class, 'handleCreated']);
-        Event::listen(LeadBookingCompleted::class, [HandleLeadEventsForWebhook::class, 'handleBookingCompleted']);
+        Event::listen(LeadCreated::class, function (LeadCreated $event) {
+            dispatch(static fn () => app(HandleLeadEventsForWebhook::class)->handleCreated($event))->afterResponse();
+        });
+        Event::listen(LeadBookingCompleted::class, function (LeadBookingCompleted $event) {
+            dispatch(static fn () => app(HandleLeadEventsForWebhook::class)->handleBookingCompleted($event))->afterResponse();
+        });
 
         // 3b. Notify admin-configured recipient emails on LeadCreated (WR-102)
-        Event::listen(LeadCreated::class, [HandleLeadEventsForEmailNotification::class, 'handleCreated']);
+        Event::listen(LeadCreated::class, function (LeadCreated $event) {
+            dispatch(static fn () => app(HandleLeadEventsForEmailNotification::class)->handleCreated($event))->afterResponse();
+        });
 
-        // 4. Attribute completed bookings to referrers
+        // 4. Attribute completed bookings to referrers — kept synchronous
+        // (unlike 1-3b above): this is reward/payout bookkeeping rather than a
+        // notification, it's DB-only with no external calls so it's not what
+        // was making anything feel slow, and guaranteed execution matters
+        // more here than shaving off latency the user wouldn't even notice.
         Event::listen(
             LeadBookingCompleted::class,
             [HandleLeadBookingCompletedForReferrer::class, 'handle']

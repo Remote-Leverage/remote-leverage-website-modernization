@@ -334,6 +334,46 @@ class CalendlyClient
     }
 
     /**
+     * Cancel a scheduled event. Used when a repeat booking submission picks a
+     * different slot than an earlier one for the same email — the earlier
+     * meeting is superseded rather than left on the calendar as a stray
+     * duplicate. Best-effort: failure here should never block the new
+     * booking from succeeding, so callers should treat a false return as
+     * "log it and move on," not a reason to fail the request.
+     */
+    public function cancelScheduledEvent(string $eventUriOrUuid, string $reason = 'Rescheduled to a new time.'): bool
+    {
+        $uuid = str_starts_with($eventUriOrUuid, 'http')
+            ? basename(rtrim($eventUriOrUuid, '/'))
+            : $eventUriOrUuid;
+
+        try {
+            $response = $this->sendWithFailover(
+                fn (string $token) => Http::withToken($token)
+                    ->timeout(15)
+                    ->post("https://api.calendly.com/scheduled_events/{$uuid}/cancellation", [
+                        'reason' => $reason,
+                    ])
+            );
+
+            if (! $response || ! $response->successful()) {
+                Log::warning('CalendlyClient: failed to cancel scheduled event', [
+                    'event' => $eventUriOrUuid,
+                    'status' => $response?->status(),
+                ]);
+
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('CalendlyClient Cancellation Exception: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
      * Fetch scheduled event details by URI or UUID.
      */
     public function getScheduledEvent(string $eventUriOrUuid): ?array

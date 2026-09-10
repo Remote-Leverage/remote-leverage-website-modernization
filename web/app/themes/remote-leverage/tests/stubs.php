@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonImmutable;
 use Illuminate\Container\Container;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Events\Dispatcher;
@@ -296,7 +297,11 @@ if (! function_exists('current_time')) {
 if (! function_exists('now')) {
     function now()
     {
-        return new DateTimeImmutable;
+        // CarbonImmutable extends DateTimeImmutable, so this is a drop-in
+        // replacement for any existing usage, but also supports subMinutes(),
+        // addDays(), etc. — needed by app code (e.g. LeadActivityLogger)
+        // that expects Laravel's real now() helper.
+        return CarbonImmutable::now();
     }
 }
 
