@@ -8,14 +8,20 @@
   <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
     
     {{-- Header --}}
-    <div class="text-center max-w-3xl mx-auto mb-12 sm:mb-14">
-      <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold font-display text-brand-hero tracking-tight mb-3">
-        {{ $headline }}
-      </h2>
-      <p class="text-base sm:text-lg text-text-muted font-medium">
-        {{ $subheadline }}
-      </p>
-    </div>
+    @if (! empty($headline) || ! empty($subheadline))
+      <div class="text-center max-w-3xl mx-auto mb-12 sm:mb-14">
+        @if (! empty($headline))
+          <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold font-display text-brand-hero tracking-tight mb-3">
+            {!! $headline !!}
+          </h2>
+        @endif
+        @if (! empty($subheadline))
+          <p class="text-base sm:text-lg text-text-muted font-medium">
+            {{ $subheadline }}
+          </p>
+        @endif
+      </div>
+    @endif
 
     {{-- Single Unified Comparison Card Box --}}
     <div class="max-w-4xl mx-auto bg-white rounded-card-lg p-8 sm:p-12 border border-black/5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] mb-12">
@@ -23,18 +29,25 @@
         
         {{-- Left: Hiring on your own --}}
         <div class="md:col-span-5 text-center md:text-left">
-          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 text-red-600 text-xs font-bold uppercase tracking-wider mb-4">
-            <span>Traditional DIY</span>
-          </div>
+          @if (! empty($card1Image))
+            <img src="{{ $card1Image }}" alt="" loading="lazy" decoding="async" class="h-10 w-auto max-w-40 object-contain mb-4 mx-auto md:mx-0">
+          @endif
+          @if (! empty($card1Pill))
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 text-red-600 text-xs font-bold uppercase tracking-wider mb-4">
+              <span>{{ $card1Pill }}</span>
+            </div>
+          @endif
           <h3 class="text-xl sm:text-2xl font-bold font-display text-brand-hero tracking-tight mb-3">
-            Hiring on your own
+            {{ $card1Title }}
           </h3>
           <p class="text-text-muted text-sm sm:text-base leading-relaxed mb-2">
-            4 to 8 weeks of posting, screening, and interviewing.
+            {{ $card1Line1 }}
           </p>
-          <p class="text-text-muted text-sm sm:text-base leading-relaxed">
-            Payroll, taxes, and compliance all on you.
-          </p>
+          @if (! empty($card1Line2))
+            <p class="text-text-muted text-sm sm:text-base leading-relaxed">
+              {{ $card1Line2 }}
+            </p>
+          @endif
         </div>
 
         {{-- Center: Arrow Connector --}}
@@ -52,18 +65,25 @@
 
         {{-- Right: Hiring with Remote Leverage --}}
         <div class="md:col-span-5 text-center md:text-left md:pl-4">
-          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-[#00D67D] text-xs font-bold uppercase tracking-wider mb-4">
-            <span>Remote Leverage Way</span>
-          </div>
+          @if (! empty($card2Image))
+            <img src="{{ $card2Image }}" alt="" loading="lazy" decoding="async" class="h-10 w-auto max-w-40 object-contain mb-4 mx-auto md:mx-0">
+          @endif
+          @if (! empty($card2Pill))
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-status-success text-xs font-bold uppercase tracking-wider mb-4">
+              <span>{{ $card2Pill }}</span>
+            </div>
+          @endif
           <h3 class="text-xl sm:text-2xl font-bold font-display text-brand-purple tracking-tight mb-3">
-            Hiring with Remote Leverage
+            {{ $card2Title }}
           </h3>
           <p class="text-text-primary font-medium text-sm sm:text-base leading-relaxed mb-2">
-            Interview the top 1% in 72 hours.
+            {{ $card2Line1 }}
           </p>
-          <p class="text-text-primary font-medium text-sm sm:text-base leading-relaxed">
-            We handle payroll, compliance, and onboarding.
-          </p>
+          @if (! empty($card2Line2))
+            <p class="text-text-primary font-medium text-sm sm:text-base leading-relaxed">
+              {{ $card2Line2 }}
+            </p>
+          @endif
         </div>
 
       </div>

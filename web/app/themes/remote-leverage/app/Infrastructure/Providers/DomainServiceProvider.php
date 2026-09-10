@@ -11,6 +11,7 @@ use App\Infrastructure\WordPress\Admin\MarketingDashboard;
 use App\Infrastructure\WordPress\Admin\PartnerHubAdmin;
 use App\Infrastructure\WordPress\Admin\ReferralAdminDashboard;
 use App\Infrastructure\WordPress\Admin\WordPressAdminTheme;
+use App\Infrastructure\WordPress\PostTypes\CaseStudyPostType;
 use App\Infrastructure\WordPress\PostTypes\PartnerPostType;
 use Illuminate\Support\ServiceProvider;
 
@@ -43,6 +44,7 @@ class DomainServiceProvider extends ServiceProvider
         }
 
         $this->app->singleton(PartnerPostType::class, fn () => new PartnerPostType);
+        $this->app->singleton(CaseStudyPostType::class, fn () => new CaseStudyPostType);
         $this->app->singleton(LeadsAdminDashboard::class, fn () => new LeadsAdminDashboard);
         $this->app->singleton(WordPressAdminTheme::class, fn () => new WordPressAdminTheme);
         $this->app->singleton(MarketingDashboard::class, fn () => new MarketingDashboard);
@@ -59,6 +61,7 @@ class DomainServiceProvider extends ServiceProvider
     {
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
         $this->app->make(PartnerPostType::class)->register();
+        $this->app->make(CaseStudyPostType::class)->register();
         $this->app->make(LeadsAdminDashboard::class)->register();
         $this->app->make(WordPressAdminTheme::class)->register();
         $this->app->make(MarketingDashboard::class)->register();

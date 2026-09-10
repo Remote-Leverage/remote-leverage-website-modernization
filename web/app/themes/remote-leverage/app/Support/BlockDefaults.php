@@ -1681,4 +1681,290 @@ class BlockDefaults
             ],
         ];
     }
+
+    /**
+     * Full 77-item video testimonial grid used on the /reviews/ page
+     * (identical dataset to vaThankYouTestimonials(), migrated 1:1 from
+     * the live site's "Client Reviews" section).
+     */
+    public static function renderReviewsTestimonials(array $overrides = []): string
+    {
+        $data = [];
+        self::encodeRepeater('testimonials', 'field_testimonials_block_testimonials', self::vaThankYouTestimonials(), $data);
+
+        return self::patternBlock('testimonials', array_merge($data, $overrides));
+    }
+
+    // --- VA PRICING TALENT MARQUEE (vapricing / reviews hero) ---
+    public static function vaPricingTalentCards(): array
+    {
+        return [
+            [
+                'name' => 'Agustín Sosa',
+                'title' => 'Legal Assistant',
+                'desc' => '5+ years of experience as a detail-oriented Legal Assistant, skilled in document preparation, case management, legal research, and client communication, supporting attorneys in corporate and litigation matters.',
+                'logo' => self::homeImg('Frame-74.png'),
+                'bg' => self::homeImg('cont-01.png'),
+            ],
+            [
+                'name' => 'Fernando Almeida',
+                'title' => 'Sales (BDR)',
+                'desc' => '3+ years of experience in B2B SaaS outbound sales. Consistently top 10% of the team. Fluent in cold calling, cold emailing, and LinkedIn outreach.',
+                'logo' => self::homeImg('amazon-01.png'),
+                'bg' => self::homeImg('con-04.png'),
+            ],
+            [
+                'name' => 'André Vilalobos',
+                'title' => 'Graphic Designer',
+                'desc' => '8+ years of experience helping brands of all sizes, from small and mid-sized businesses to big companies, look professional, polished, and unmistakably them.',
+                'logo' => self::homeImg('State-Farm-01.png'),
+                'bg' => self::homeImg('con-07.png'),
+            ],
+            [
+                'name' => 'Juliana Silva',
+                'title' => 'Lead Generation (SDR)',
+                'desc' => '6+ years of experience as an SDR, skilled in prospecting, active listening, clear communication, time management, and handling rejection to consistently generate and qualify sales leads.',
+                'logo' => self::homeImg('mercado.png'),
+                'bg' => self::homeImg('cont-02.png'),
+            ],
+            [
+                'name' => 'Laura Valentina',
+                'title' => 'Customer Support',
+                'desc' => '+4 years in B2B SaaS customer support, I\'ve supported customers in North America, Europe, and Latin America, adapting to different cultural expectations and communication styles while handling email, chat, and phone support.',
+                'logo' => self::homeImg('Bank-of-America-01.png'),
+                'bg' => self::homeImg('con-08.png'),
+            ],
+            [
+                'name' => 'Valeria Andrea',
+                'title' => 'Medical / Healthcare',
+                'desc' => '4+ years of experience in fast-paced clinic and hospital settings. Skilled in EMR systems (Epic, Cerner), patient intake, vital signs, and assisting physicians with exams and procedures.',
+                'logo' => self::homeImg('Allstate-01.png'),
+                'bg' => self::homeImg('con-05.png'),
+            ],
+            [
+                'name' => 'Sofía Pérez',
+                'title' => 'Marketing',
+                'desc' => '4+ years of experience as a results-driven marketing professional, skilled in content creation, social media strategy, campaign management, and data analysis to drive brand awareness and customer engagement.',
+                'logo' => self::homeImg('Frame-74-1.png'),
+                'bg' => self::homeImg('cont-03.png'),
+            ],
+            [
+                'name' => 'Luana Dias',
+                'title' => 'Executive Assistant',
+                'desc' => '3+ years of experience supporting C-level executives in fast-paced environments. I thrive on organization, anticipate needs, and protect my executive\'s time like it\'s my own.',
+                'logo' => self::homeImg('NU-bank-01.png'),
+                'bg' => self::homeImg('con-06.png'),
+            ],
+        ];
+    }
+
+    public static function renderVaPricingTalentMarquee(array $overrides = []): string
+    {
+        $data = [];
+        self::encodeRepeater('talent_cards', 'field_talent_marquee_block_talent_cards', self::vaPricingTalentCards(), $data);
+
+        return self::patternBlock('talent-marquee', array_merge($data, $overrides), ['align' => 'full']);
+    }
+
+    // --- ROLES PRICING GRID (vapricing / reviews funnel) ---
+    public static function rolesPricingGridCards(): array
+    {
+        return [
+            [
+                'photo' => self::homeImg('Group-81.jpg'),
+                'title' => 'Administrative Assistant',
+                'price' => '$6-$10 Per Hour',
+                'intro' => 'Virtual Administrative Assistants makes your work life easier by:',
+                'tasks' => implode("\n", [
+                    'Managing phone and email communication',
+                    'Daily admin to keep businesses running',
+                    'Organizing calendars, setting appointments',
+                    'Handling invoices and payments',
+                    'They own daily admin so you can focus on more important tasks.',
+                ]),
+                'tools' => json_encode([
+                    self::homeImg('office-1.png'),
+                    self::homeImg('google_work-1.png'),
+                    self::homeImg('slack-1.png'),
+                    self::homeImg('asana-1.png'),
+                    self::homeImg('trello-1.png'),
+                    self::homeImg('zoom-1.png'),
+                ]),
+                'cta_text' => 'Interview Assistants',
+                'cta_url' => '#booking-footer',
+            ],
+            [
+                'photo' => self::homeImg('Group-82.jpg'),
+                'title' => 'Lead Generation (SDR)',
+                'price' => '$6-$10 Per Hour',
+                'intro' => 'Lead Generation Virtual Assistants find new customers for your business by:',
+                'tasks' => implode("\n", [
+                    'Calling new & old prospects',
+                    'Emailing and texting leads',
+                    'Following up on leads',
+                    'Booking sales meetings',
+                    'They are great at connecting with people to grow your business.',
+                ]),
+                'tools' => json_encode([
+                    self::homeImg('11-2.png'),
+                    self::homeImg('hubspot-1.png'),
+                    self::homeImg('Logos_tools-1.png'),
+                    self::homeImg('out-1.png'),
+                    self::homeImg('reply-1.png'),
+                    self::homeImg('zoom-2.png'),
+                ]),
+                'cta_text' => 'Interview Assistants',
+                'cta_url' => '#booking-footer',
+            ],
+            [
+                'photo' => self::homeImg('Group-83.jpg'),
+                'title' => 'Sales (BDR)',
+                'price' => '$6-$10 Per Hour',
+                'intro' => 'Sales Virtual Assistants help you generate and close sales by:',
+                'tasks' => implode("\n", [
+                    'Finding new leads with calls and emails',
+                    'Following up with interested leads',
+                    'Setting up sales meetings',
+                    'Giving sales presentations and demos',
+                    'They communicate effectively and guide customers towards a purchase.',
+                ]),
+                'tools' => json_encode([
+                    self::homeImg('apolo-1.png'),
+                    self::homeImg('hubspot-1.png'),
+                    self::homeImg('Logos_tools-2.png'),
+                    self::homeImg('Logos_tools-1.png'),
+                    self::homeImg('reply-1.png'),
+                    self::homeImg('zoom-2.png'),
+                ]),
+                'cta_text' => 'Interview Assistants',
+                'cta_url' => '#booking-footer',
+            ],
+            [
+                'photo' => self::homeImg('Group-85.jpg'),
+                'title' => 'Medical / Healthcare',
+                'price' => '$6-$10 Per Hour',
+                'intro' => 'Medical / Healthcare Assistants help practices of all sizes grow by:',
+                'tasks' => implode("\n", [
+                    'Improve patient scheduling, intake',
+                    'Reduce no-shows',
+                    'Process medical records',
+                    'Handle insurance claims',
+                    'They are HIPAA compliant and help you focus on patient care and experience.',
+                ]),
+                'tools' => json_encode([
+                    self::homeImg('ada-1.png'),
+                    self::homeImg('advancedmd-1.png'),
+                    self::homeImg('boomerang-1.png'),
+                    self::homeImg('Logos_tools-3.png'),
+                    self::homeImg('tomorrow-1.png'),
+                    self::homeImg('office-1.png'),
+                ]),
+                'cta_text' => 'Interview Assistants',
+                'cta_url' => '#booking-footer',
+            ],
+            [
+                'photo' => self::homeImg('Group-87-1.jpg'),
+                'title' => 'Marketing',
+                'price' => '$6-$10 Per Hour',
+                'intro' => 'Marketing Virtual Assistants maximize your advertising budget and reach by:',
+                'tasks' => implode("\n", [
+                    'Strategize omnichannel campaigns',
+                    'Managing your paid ad campaigns',
+                    'Analyzing data to optimize spending',
+                    'Preparing ROI reports on marketing campigns',
+                    'They make every ad dollar count and bring quality leads to your business.',
+                ]),
+                'tools' => json_encode([
+                    self::homeImg('hubspot-1.png'),
+                    self::homeImg('advancedmd-1-1.png'),
+                    self::homeImg('Braze.png'),
+                    self::homeImg('Customer.png'),
+                    self::homeImg('Logos_tools-1.png'),
+                    self::homeImg('office-1-1.png'),
+                ]),
+                'cta_text' => 'Interview Assistants',
+                'cta_url' => '#booking-footer',
+            ],
+            [
+                'photo' => self::homeImg('Group-89.jpg'),
+                'title' => 'Legal Assistant',
+                'price' => '$6-$10 Per Hour',
+                'intro' => 'Legal Virtual Assistant help attorneys and law firms reclaim billable hours by:',
+                'tasks' => implode("\n", [
+                    'Handling client communications',
+                    'Preparing & drafting documents',
+                    'Managing billing and invoicing',
+                    'Organizing calendars and dockets',
+                    'They provide specialized support to help you focus on practing law.',
+                ]),
+                'tools' => json_encode([
+                    self::homeImg('Clio.png'),
+                    self::homeImg('Drive.png'),
+                    self::homeImg('Imanage.png'),
+                    self::homeImg('Legalon.png'),
+                    self::homeImg('Surepoint.png'),
+                    self::homeImg('Zapier.png'),
+                ]),
+                'cta_text' => 'Interview Assistants',
+                'cta_url' => '#booking-footer',
+            ],
+            [
+                'photo' => self::homeImg('Group-91.jpg'),
+                'title' => 'Bookkeeping Assistant',
+                'price' => '$6-$10 Per Hour',
+                'intro' => 'Bookkeeping Virtual Assistants help businesses stay on top of their finances by:',
+                'tasks' => implode("\n", [
+                    'Recording and categorizing transactions',
+                    'Reconciling financial statements',
+                    'Managing accounts payable & receivable',
+                    'Generating financial reports',
+                    'They keep your books accurate so you can focus on scaling your business.',
+                ]),
+                'tools' => json_encode([
+                    self::homeImg('book.png'),
+                    self::homeImg('xero.png'),
+                    self::homeImg('puzzle.png'),
+                    self::homeImg('intuit.png'),
+                    self::homeImg('rillet.png'),
+                    self::homeImg('zenI.png'),
+                ]),
+                'cta_text' => 'Interview Assistants',
+                'cta_url' => '#booking-footer',
+            ],
+            [
+                'photo' => self::homeImg('Group-93.jpg'),
+                'title' => 'Executive Assistant',
+                'price' => '$6-$10 Per Hour',
+                'intro' => 'Executive Virtual Assistants help busy leaders maximize their productivity by:',
+                'tasks' => implode("\n", [
+                    'Managing calendars & meetings',
+                    'Drafting emails & correspondence',
+                    'Coordinating projects & deadlines',
+                    'Anticipating leadership needs',
+                    'They act as your right hand so you can focus on leading.',
+                ]),
+                'tools' => json_encode([
+                    self::homeImg('ChatGPT.png'),
+                    self::homeImg('Clickup.png'),
+                    self::homeImg('clockwise.png'),
+                    self::homeImg('Jotform.png'),
+                    self::homeImg('Notion.png'),
+                    self::homeImg('Zapier.png'),
+                ]),
+                'cta_text' => 'Interview Assistants',
+                'cta_url' => '#booking-footer',
+            ],
+        ];
+    }
+
+    public static function renderRolesPricingGrid(array $overrides = []): string
+    {
+        $data = [
+            'headline' => 'Virtual Assistant Roles',
+            '_headline' => 'field_roles_pricing_grid_block_headline',
+        ];
+        self::encodeRepeater('cards', 'field_roles_pricing_grid_block_cards', self::rolesPricingGridCards(), $data);
+
+        return self::patternBlock('roles-pricing-grid', array_merge($data, $overrides), ['align' => 'full']);
+    }
 }
