@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libxml2-dev \
       libzip-dev \
       unzip \
+      $PHPIZE_DEPS \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install -j"$(nproc)" \
       bcmath \
@@ -34,7 +35,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       pdo_mysql \
       soap \
       zip \
-    && rm -rf /var/lib/apt/lists/*
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && rm -rf /tmp/pear /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -63,7 +66,12 @@ RUN --mount=type=secret,id=composer_auth,required=false \
     && if [ -f /run/secrets/composer_auth ]; then cp /run/secrets/composer_auth /root/.composer/auth.json && chmod 600 /root/.composer/auth.json; fi \
     && composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-progress --no-scripts \
     && composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-progress \
-         --working-dir=web/app/themes/remote-leverage --no-scripts
+         --working-dir=web/app/themes/remote-leverage --no-scripts \
+    && curl -fsSL -o /tmp/redis-cache.zip \
+         "https://downloads.wordpress.org/plugin/redis-cache.2.8.0.zip" \
+    && unzip -q /tmp/redis-cache.zip -d web/app/plugins \
+    && cp web/app/plugins/redis-cache/includes/object-cache.php web/app/object-cache.php \
+    && rm -f /tmp/redis-cache.zip
 
 FROM php-base AS runtime
 

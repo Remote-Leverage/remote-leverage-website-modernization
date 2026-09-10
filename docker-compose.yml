@@ -19,6 +19,16 @@ services:
     volumes:
       - rl-local-mysql:/var/lib/mysql
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   app:
     build:
       context: .
@@ -38,8 +48,14 @@ services:
       DB_USER: root
       DB_PASSWORD: root
       SKIP_CHOWN: "1"
+      WP_REDIS_HOST: redis
+      WP_REDIS_PORT: "6379"
+      WP_REDIS_CLIENT: phpredis
+      WP_REDIS_PREFIX: "local:"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - ./web/app/uploads:/var/www/html/web/app/uploads
