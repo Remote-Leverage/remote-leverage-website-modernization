@@ -34,6 +34,19 @@ class ListPatternsAbility extends Ability
         return current_user_can('edit_pages');
     }
 
+    /**
+     * Takes no parameters, but must still declare a non-empty schema: WP core's
+     * WP_Ability::invoke_callback() only passes $input through to the
+     * execute_callback when the input schema is non-empty, while acorn-ai's
+     * wrapping closure (fn (array $input) => ...) always requires one
+     * argument — an empty schema causes a zero-arg call and an
+     * ArgumentCountError.
+     */
+    public function inputSchema(): array
+    {
+        return ['type' => 'object', 'properties' => []];
+    }
+
     public function category(): ?string
     {
         return 'site';

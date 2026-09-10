@@ -31,9 +31,11 @@ class SyncClient
     {
         $url = rtrim($this->baseUrl(), '/')."/wp-json/wp-abilities/v1/abilities/{$abilityName}/run";
 
+        // The wp-abilities/v1 run endpoint expects the ability's own input
+        // wrapped in an "input" envelope, not passed as the raw POST body.
         $response = Http::withBasicAuth($this->user(), $this->appPassword())
             ->acceptJson()
-            ->post($url, $input);
+            ->post($url, ['input' => $input]);
 
         if ($response->failed()) {
             throw new RuntimeException(

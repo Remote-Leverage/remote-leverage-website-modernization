@@ -30,6 +30,7 @@ class DomainServiceProvider extends ServiceProvider
         LivewireServiceProvider::class,
         RouteServiceProvider::class,
         SyncServiceProvider::class,
+        AiServiceProvider::class,
     ];
 
     /**

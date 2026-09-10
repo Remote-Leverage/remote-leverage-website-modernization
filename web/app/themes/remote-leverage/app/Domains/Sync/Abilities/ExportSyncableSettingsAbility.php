@@ -46,6 +46,16 @@ class ExportSyncableSettingsAbility extends Ability
         return true;
     }
 
+    /**
+     * See ListPatternsAbility::inputSchema() — a non-empty schema is required
+     * even for a no-parameter ability, or acorn-ai's execute_callback wrapper
+     * gets called with zero arguments and throws.
+     */
+    public function inputSchema(): array
+    {
+        return ['type' => 'object', 'properties' => []];
+    }
+
     public function category(): ?string
     {
         return 'site';
