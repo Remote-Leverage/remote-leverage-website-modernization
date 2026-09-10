@@ -17,85 +17,82 @@
 @endphp
 
 @section('content')
-    <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
-        {{-- Hero --}}
-        <div class="max-w-3xl mb-14 sm:mb-16">
-            <span class="inline-flex items-center px-3 py-1 rounded-full bg-brand-purple/10 text-brand-purple text-xs font-bold tracking-wide uppercase mb-5">
+    {{-- Hero: dark gradient band matching the case-study single template family --}}
+    <div class="w-full" style="background-image:linear-gradient(65deg, #270028 0%, #4E1450 100%)">
+        <div class="max-w-[1260px] mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-14 sm:pt-20 sm:pb-16">
+            <span class="inline-flex items-center text-xs font-bold tracking-[0.1em] text-white uppercase mb-4">
                 Case Studies
             </span>
-            <h1 class="font-display text-3xl sm:text-4xl lg:text-[44px] font-bold text-black tracking-[-0.03em] leading-tight mb-5">
+            <h1 class="font-display text-3xl sm:text-4xl lg:text-[48px] font-medium text-[#FFFBFF] tracking-[0.01em] leading-tight mb-5 max-w-2xl">
                 Real Hiring Outcomes. Exceptional Remote Talent.
             </h1>
-            <p class="text-base sm:text-lg text-black/70 leading-relaxed">
+            <p class="text-base sm:text-lg font-light text-white/85 leading-relaxed max-w-2xl mb-14">
                 These case studies show what happens when companies hire exceptional remote talent. See how founders and teams use Remote Leverage to expand capacity, improve execution, and scale with confidence.
             </p>
-        </div>
 
-        {{-- Client logo marquee --}}
-        @if (! empty($allCaseStudies))
-            <div class="rl-logo-marquee-wrapper px-4 overflow-hidden py-4 mb-16 sm:mb-20 maskshadow">
-                <div class="animate-marquee-logos flex items-center gap-12 sm:gap-14">
-                    @foreach (array_merge($allCaseStudies, $allCaseStudies) as $cs)
-                        @php
-                            $logoUrl = get_the_post_thumbnail_url($cs->ID, 'medium');
-                        @endphp
-                        @if (! empty($logoUrl))
-                            <div class="rl-logo-marquee-item shrink-0">
-                                {{-- filter-none/opacity-100: these client logos are opaque PNGs (not
-                                transparent-background marks), so the shared marquee mono-silhouette
-                                filter (brightness(0)) would render them as solid black squares --}}
-                                <img src="{{ $logoUrl }}" alt="{{ get_the_title($cs) }}" width="140" height="48"
-                                    class="h-10 w-auto object-contain filter-none opacity-100" loading="lazy" decoding="async">
-                            </div>
-                        @endif
-                    @endforeach
+            {{-- Client logo marquee --}}
+            @if (! empty($allCaseStudies))
+                <div class="px-4 overflow-hidden py-4 maskshadow">
+                    <div class="animate-marquee-logos flex items-center gap-12 sm:gap-14">
+                        @foreach (array_merge($allCaseStudies, $allCaseStudies) as $cs)
+                            @php
+                                $logoUrl = get_post_meta($cs->ID, 'case_study_index_logo', true) ?: get_the_post_thumbnail_url($cs->ID, 'medium');
+                            @endphp
+                            @if (! empty($logoUrl))
+                                <div class="shrink-0 h-8 flex items-center">
+                                    <img src="{{ $logoUrl }}" alt="{{ get_the_title($cs) }}" width="140" height="32"
+                                        class="h-8 w-auto max-w-[140px] object-contain brightness-0 [filter:brightness(0)_saturate(100%)_invert(37%)_sepia(89%)_saturate(4211%)_hue-rotate(280deg)_brightness(101%)_contrast(101%)]"
+                                        loading="lazy" decoding="async">
+                                </div>
+                            @endif
+                        @endforeach
+                    </div>
                 </div>
-            </div>
-        @endif
+            @endif
+        </div>
+    </div>
 
-        {{-- Case study cards --}}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-card">
+    {{-- Case study cards --}}
+    <div class="w-full max-w-[1260px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach ($allCaseStudies as $cs)
                 @php
                     $tags = get_post_meta($cs->ID, 'case_study_tags', true);
                     $tags = is_array($tags) ? $tags : (json_decode((string) $tags, true) ?: []);
-                    $logoUrl = get_the_post_thumbnail_url($cs->ID, 'medium');
+                    $logoUrl = get_post_meta($cs->ID, 'case_study_index_logo', true) ?: get_the_post_thumbnail_url($cs->ID, 'medium');
                 @endphp
-                <a href="{{ get_permalink($cs) }}"
-                    class="bg-white rounded-card p-card flex flex-col border border-black/4 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300">
-                    <div class="mb-6 h-10 flex items-center">
+                <div class="bg-white rounded-[5px] p-8 sm:p-10 flex flex-col border border-[#FB33FF]">
+                    <div class="mb-8 h-12 flex items-center">
                         @if ($logoUrl)
                             <img src="{{ $logoUrl }}" alt="{{ get_the_title($cs) }}"
-                                class="max-h-10 w-auto max-w-40 object-contain" loading="lazy" decoding="async">
+                                class="max-h-12 w-auto max-w-44 object-contain [filter:brightness(0)_saturate(100%)_invert(11%)_sepia(52%)_saturate(3207%)_hue-rotate(276deg)_brightness(90%)_contrast(101%)]"
+                                loading="lazy" decoding="async">
                         @else
-                            <span class="font-display text-sm font-bold text-brand-purple uppercase tracking-wide">
+                            <span class="font-display text-sm font-bold text-[#4E1450] uppercase tracking-wide">
                                 {{ get_the_title($cs) }}
                             </span>
                         @endif
                     </div>
 
-                    <h3 class="font-display text-lg font-bold text-black tracking-[-0.02em] leading-snug mb-5 grow">
+                    <h3 class="font-display text-xl sm:text-2xl font-medium text-black tracking-[-0.01em] leading-snug mb-6 grow">
                         {{ get_the_title($cs) }}
                     </h3>
 
                     @if (! empty($tags))
-                        <div class="flex flex-wrap gap-2 mb-5">
+                        <div class="flex flex-wrap gap-2 mb-6">
                             @foreach ($tags as $tag)
-                                <span class="text-[11px] font-medium text-black/60 bg-black/4 rounded-full px-2.5 py-1">
+                                <span class="text-sm font-medium text-[#4E1450] bg-[#FECEFF] rounded-full px-4.5 py-2">
                                     {{ $tag }}
                                 </span>
                             @endforeach
                         </div>
                     @endif
 
-                    <span class="text-sm font-bold text-brand-purple inline-flex items-center gap-1">
+                    <a href="{{ get_permalink($cs) }}"
+                        class="inline-flex items-center justify-center bg-[#4E1450] hover:bg-[#3A0F3D] text-white text-sm font-bold rounded-md px-8 py-3.5 transition-colors self-start">
                         Read More
-                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="5" y1="12" x2="19" y2="12"/>
-                            <polyline points="12 5 19 12 12 19"/>
-                        </svg>
-                    </span>
-                </a>
+                    </a>
+                </div>
             @endforeach
         </div>
     </div>
