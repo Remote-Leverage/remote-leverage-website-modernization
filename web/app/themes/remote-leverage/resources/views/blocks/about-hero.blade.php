@@ -40,44 +40,36 @@
                     @endif
 
                     {{-- Floating Talent Avatars --}}
-                    {{-- Avatar 1: North America --}}
+                    {{-- Avatar 1: North America (Top Right) --}}
                     <div class="absolute top-[28%] right-[22%] w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-white shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:scale-110">
-                        <img src="{{ \App\Support\BlockDefaults::resolveImageUrl(\App\Support\BlockDefaults::getAttachmentId('Person_04.png')) ?: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80' }}"
+                        <img src="{{ \App\Support\BlockDefaults::homeImg('Person_04.png') }}"
                             alt="Talent" class="w-full h-full rounded-full object-cover">
                     </div>
 
-                    {{-- Avatar 2: Latin America (Left) --}}
+                    {{-- Avatar 2: Latin America (Top Left) --}}
                     <div class="absolute top-[42%] left-[12%] w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-white shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:scale-110">
-                        <img src="{{ \App\Support\BlockDefaults::resolveImageUrl(\App\Support\BlockDefaults::getAttachmentId('person_01.png')) ?: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80' }}"
+                        <img src="{{ \App\Support\BlockDefaults::homeImg('person_01.png') }}"
                             alt="Talent" class="w-full h-full rounded-full object-cover">
                     </div>
 
-                    {{-- Avatar 3: Latin America (Center) --}}
+                    {{-- Avatar 3: Latin America (Center Right) --}}
                     <div class="absolute top-[52%] left-[36%] w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-white shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:scale-110">
-                        <img src="{{ \App\Support\BlockDefaults::resolveImageUrl(\App\Support\BlockDefaults::getAttachmentId('person_02.png')) ?: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80' }}"
+                        <img src="{{ \App\Support\BlockDefaults::homeImg('person_02.png') }}"
                             alt="Talent" class="w-full h-full rounded-full object-cover">
                     </div>
 
-                    {{-- Avatar 4: South America (Bottom) --}}
+                    {{-- Avatar 4: South America (Bottom Center) --}}
                     <div class="absolute bottom-[24%] left-[24%] w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-white shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:scale-110">
-                        <img src="{{ \App\Support\BlockDefaults::resolveImageUrl(\App\Support\BlockDefaults::getAttachmentId('Person_03.png')) ?: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80' }}"
+                        <img src="{{ \App\Support\BlockDefaults::homeImg('Person_03.png') }}"
                             alt="Talent" class="w-full h-full rounded-full object-cover">
                     </div>
                 </div>
 
                 {{-- Bottom Overlapping 2.5K+ Trust Badge --}}
-                <div class="mt-2 flex items-center gap-3 self-center sm:self-end sm:mr-6">
-                    <div class="flex -space-x-2">
-                        <img class="inline-block h-8 w-8 rounded-full ring-2 ring-[#250D4A] object-cover"
-                            src="{{ \App\Support\BlockDefaults::resolveImageUrl(\App\Support\BlockDefaults::getAttachmentId('person_01.png')) ?: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100' }}"
-                            alt="">
-                        <img class="inline-block h-8 w-8 rounded-full ring-2 ring-[#250D4A] object-cover"
-                            src="{{ \App\Support\BlockDefaults::resolveImageUrl(\App\Support\BlockDefaults::getAttachmentId('person_02.png')) ?: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100' }}"
-                            alt="">
-                        <img class="inline-block h-8 w-8 rounded-full ring-2 ring-[#250D4A] object-cover"
-                            src="{{ \App\Support\BlockDefaults::resolveImageUrl(\App\Support\BlockDefaults::getAttachmentId('Person_04.png')) ?: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100' }}"
-                            alt="">
-                    </div>
+                <div class="mt-4 flex items-center gap-3 self-center sm:self-end sm:mr-6">
+                    <img class="h-8 w-auto object-contain"
+                        src="{{ \App\Support\BlockDefaults::homeImg('Group-207.png') }}"
+                        alt="Talent Team">
                     <div class="flex items-center gap-2">
                         {{-- Verified Blue Badge --}}
                         <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 27 27" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -101,19 +93,13 @@
             @endif
 
             {{-- Client Logos Marquee --}}
-            <div class="relative w-full overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-                <div class="flex items-center gap-12 sm:gap-16 whitespace-nowrap animate-marquee">
-                    @foreach ($logos as $logo)
-                        <div class="inline-flex items-center justify-center flex-shrink-0 opacity-80 hover:opacity-100 transition-opacity">
-                            <img src="{{ $logo['src'] ?? $logo['url'] ?? '' }}" alt="{{ $logo['alt'] ?? $logo['name'] ?? '' }}" width="120" height="40"
-                                loading="lazy" decoding="async" class="h-8 sm:h-9 w-auto object-contain brightness-0 invert">
-                        </div>
-                    @endforeach
-                    {{-- Duplicate for continuous marquee loop --}}
-                    @foreach ($logos as $logo)
-                        <div class="inline-flex items-center justify-center flex-shrink-0 opacity-80 hover:opacity-100 transition-opacity" aria-hidden="true">
-                            <img src="{{ $logo['src'] ?? $logo['url'] ?? '' }}" alt="" width="120" height="40"
-                                loading="lazy" decoding="async" class="h-8 sm:h-9 w-auto object-contain brightness-0 invert">
+            <div class="rl-logo-marquee-wrapper rl-logo-marquee-dark overflow-hidden py-2 [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
+                <div class="animate-marquee-logos flex items-center gap-12 sm:gap-16">
+                    @foreach (array_merge($logos, $logos) as $logo)
+                        @continue(! is_array($logo))
+                        <div class="rl-logo-marquee-item shrink-0">
+                            <img src="{{ $logo['src'] ?? '' }}" alt="{{ $logo['alt'] ?? '' }}" width="140" height="48"
+                                loading="lazy" decoding="async">
                         </div>
                     @endforeach
                 </div>

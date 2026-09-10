@@ -327,6 +327,15 @@
     opacity: 1;
     transform: scale(1.05);
   }
+
+  .rl-logo-marquee-dark .rl-logo-marquee-item img {
+    filter: brightness(0) invert(1) !important;
+    opacity: 0.8;
+  }
+
+  .rl-logo-marquee-dark .rl-logo-marquee-item:hover img {
+    opacity: 1;
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════
