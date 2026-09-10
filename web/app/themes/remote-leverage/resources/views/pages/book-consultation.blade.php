@@ -27,7 +27,7 @@
       </div>
 
       {{-- Embed Reactive Multistep Booking Funnel --}}
-      <livewire:booking.multistep-booking-wizard />
+      <livewire:booking.multistep-booking-wizard :lazy="false" />
 
     </div>
   </div>

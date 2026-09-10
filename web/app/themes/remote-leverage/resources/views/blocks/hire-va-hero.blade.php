@@ -89,8 +89,9 @@
               </p>
             @endif
           </div>
-          <livewire:booking.multistep-booking-wizard 
+          <livewire:booking.multistep-booking-wizard
             skin="naked"
+            :lazy="false"
             :enable-isolated-fields="(bool) ($enableIsolatedFields ?? false)"
             :enableIsolatedFields="(bool) ($enableIsolatedFields ?? false)"
             :isolated-steps="is_array($isolatedSteps ?? null) ? $isolatedSteps : []"
