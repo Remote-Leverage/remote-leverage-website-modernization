@@ -2,7 +2,7 @@
   $union5Url = asset('images/hire-va-4/Union-5.png');
 @endphp
 
-<section id="booking-footer" class="py-16 sm:py-20 lg:py-24 text-white relative overflow-hidden" style="background: radial-gradient(84.9% 75.5% at 65.45% 17.36%, #8A2BE2 0%, #250D4A 100%);">
+<section id="booking-footer" class="py-16 sm:py-20 lg:py-24 text-white relative overflow-hidden min-h-screen" style="background: radial-gradient(84.9% 75.5% at 65.45% 17.36%, #8A2BE2 0%, #250D4A 100%);">
   {{-- Subtle Background Glow / Texture --}}
   <div class="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]"></div>
 
@@ -17,7 +17,7 @@
         </div>
 
         <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold font-display text-white tracking-tight leading-[1.08] mb-8">
-          Smarter support starts here. Flexible, skilled, and ready to go.
+          {{ $headline }}
         </h2>
 
         <div class="space-y-6 max-w-lg">

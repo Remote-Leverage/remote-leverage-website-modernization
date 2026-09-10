@@ -84,8 +84,13 @@ class BookingFooterBlock extends Block
      */
     public function with()
     {
+        // get_field() can fail to resolve the block's own data override when this
+        // block is deep in a page with many preceding ACF blocks (ACF's block-id
+        // hashing/meta-store lookup misses it), so read the raw block data first.
+        $headline = $this->block->data['headline'] ?? get_field('headline');
+
         return [
-            'headline' => get_field('headline') ?: 'Smarter support starts here. Flexible, skilled, and ready to go.',
+            'headline' => $headline ?: 'Smarter support starts here. Flexible, skilled, and ready to go.',
         ];
     }
 

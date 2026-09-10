@@ -40,7 +40,7 @@ class AffiliateHeroBlock extends Block
 
         return [
             'headline' => BlockDefaults::cleanText(($hasGetField ? get_field('headline') : null) ?: 'Remote Leverage Affiliate Program'),
-            'subheadline' => BlockDefaults::cleanText(($hasGetField ? get_field('subheadline') : null) ?: 'Help Your Network Scale. Earn $1,000 for Every Hire &amp; Pass on $500 in Savings.'),
+            'subheadline' => BlockDefaults::cleanText(($hasGetField ? get_field('subheadline') : null) ?: 'Help Your Network Scale.<br><strong>Earn $1,000 for Every Hire &amp; Pass on $500 in Savings.</strong>'),
             'primaryCtaText' => ($hasGetField ? get_field('primary_cta_text') : null) ?: 'Apply to Join Now',
             'primaryCtaUrl' => ($hasGetField ? get_field('primary_cta_url') : null) ?: '/referrer-register',
             'secondaryCtaText' => ($hasGetField ? get_field('secondary_cta_text') : null) ?: 'Book a Strategy Call',
