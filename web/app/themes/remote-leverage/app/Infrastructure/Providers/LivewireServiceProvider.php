@@ -33,6 +33,13 @@ class LivewireServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if (class_exists(Livewire::class)) {
+            // Livewire's own <script> tag has no defer/async by default, so Chrome
+            // treats it as a high-priority, critical-path request regardless of its
+            // position at the end of <body> — deferring it removes it from that
+            // path without changing when it effectively runs (defer already fires
+            // right before DOMContentLoaded, same as a script at the end of body).
+            Livewire::useScriptTagAttributes(['defer' => true]);
+
             Livewire::component('booking.multistep-booking-wizard', MultistepBookingWizard::class);
             Livewire::component('multistep-booking-wizard', MultistepBookingWizard::class);
 

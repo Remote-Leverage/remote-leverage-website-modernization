@@ -268,6 +268,13 @@
     width: max-content;
     animation: marquee-right 45s linear infinite;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-marquee-left,
+    .animate-marquee-right {
+      animation-play-state: paused;
+    }
+  }
   .animate-marquee-right:hover {
     animation-play-state: paused;
   }
@@ -370,8 +377,6 @@
   height: 65%;
   z-index: 2;
   background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.4) 30%, black 100%);
   mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.4) 30%, black 100%);
   pointer-events: none;
@@ -502,8 +507,6 @@
   height: 70%;
   z-index: 2;
   background: rgba(255,255,255,0.1);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 30%, black 100%);
   mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 30%, black 100%);
   transition: background 0.3s ease;

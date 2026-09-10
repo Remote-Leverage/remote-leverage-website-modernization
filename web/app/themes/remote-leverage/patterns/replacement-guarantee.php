@@ -48,8 +48,8 @@
 
         <!-- wp:column {"width":"48%"} -->
         <div class="wp-block-column" style="flex-basis:48%">
-            <!-- wp:image {"sizeSlug":"large","linkDestination":"none","align":"right"} -->
-            <figure class="wp-block-image alignright size-large"><img src="<?php echo esc_url(set_url_scheme(get_template_directory_uri().'/public/images/home/Group-59-1-e1780958571501.webp', 'https')); ?>" alt="12-Month Replacement Guarantee Badge"/></figure>
+            <!-- wp:image {"width":578,"height":545,"sizeSlug":"large","linkDestination":"none","align":"right"} -->
+            <figure class="wp-block-image alignright size-large"><img src="<?php echo esc_url(set_url_scheme(get_template_directory_uri().'/public/images/home/Group-59-1-e1780958571501.webp', 'https')); ?>" alt="12-Month Replacement Guarantee Badge" width="578" height="545" loading="lazy" decoding="async"/></figure>
             <!-- /wp:image -->
         </div>
         <!-- /wp:column -->
