@@ -29,6 +29,7 @@ class DomainServiceProvider extends ServiceProvider
         ContentAuditServiceProvider::class,
         LivewireServiceProvider::class,
         RouteServiceProvider::class,
+        SyncServiceProvider::class,
     ];
 
     /**
