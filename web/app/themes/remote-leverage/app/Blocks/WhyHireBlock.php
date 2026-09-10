@@ -130,8 +130,6 @@ class WhyHireBlock extends Block
 
     /**
      * The default 4 feature cards, used when no per-instance override is set.
-     *
-     * @return array
      */
     public function defaultCards(): array
     {
@@ -157,13 +155,13 @@ class WhyHireBlock extends Block
 
     /**
      * Resolve the feature cards, falling back to the site-wide defaults.
-     *
-     * @return array
      */
     public function cards(): array
     {
         $custom = get_field('cards');
-        $cards = (! empty($custom) && is_array($custom)) ? $custom : $this->defaultCards();
+        $cards = (! empty($custom) && is_array($custom))
+            ? $custom
+            : $this->defaultCards();
 
         return array_map(function ($card) {
             $card['title'] = BlockDefaults::cleanText($card['title'] ?? '');
