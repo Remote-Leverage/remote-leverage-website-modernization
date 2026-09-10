@@ -103,7 +103,11 @@ class BlockDefaults
             return false;
         }
 
-        $saved = $editor->save($destPath, 'image/webp');
+        try {
+            $saved = $editor->save($destPath, 'image/webp');
+        } catch (\Throwable $e) {
+            return false;
+        }
 
         return ! is_wp_error($saved) && is_file($destPath);
     }
@@ -1764,6 +1768,14 @@ class BlockDefaults
         self::encodeRepeater('talent_cards', 'field_talent_marquee_block_talent_cards', self::vaPricingTalentCards(), $data);
 
         return self::patternBlock('talent-marquee', array_merge($data, $overrides), ['align' => 'full']);
+    }
+
+    public static function renderVaPricingTalentGrid(array $overrides = []): string
+    {
+        $data = [];
+        self::encodeRepeater('talent_cards', 'field_talent_grid_block_talent_cards', self::vaPricingTalentCards(), $data);
+
+        return self::patternBlock('talent-grid', array_merge($data, $overrides));
     }
 
     // --- ROLES PRICING GRID (vapricing / reviews funnel) ---
