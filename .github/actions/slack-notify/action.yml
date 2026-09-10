@@ -1,0 +1,86 @@
+name: Slack pipeline notify
+description: Post CI/CD success or failure to Slack and mention the PR/commit author.
+
+inputs:
+  status:
+    description: success or failure
+    required: true
+  title:
+    description: Notification title, e.g. CI or Staging deploy
+    required: true
+  details:
+    description: Job result summary
+    required: false
+    default: ""
+  github-user:
+    description: GitHub login to mention
+    required: true
+  author-email:
+    description: Author email for Slack users.lookupByEmail
+    required: false
+    default: ""
+  author-name:
+    description: Display name
+    required: false
+    default: ""
+  subject:
+    description: PR title or commit subject
+    required: false
+    default: ""
+  pr-url:
+    required: false
+    default: ""
+  slack-bot-token:
+    required: false
+    default: ""
+  slack-channel-id:
+    required: false
+    default: ""
+  slack-webhook-url:
+    required: false
+    default: ""
+  user-map-json:
+    description: Optional JSON object of github_login -> Slack user id (U…)
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Build Slack payload
+      id: payload
+      shell: bash
+      env:
+        GITHUB_USER: ${{ inputs.github-user }}
+        AUTHOR_EMAIL: ${{ inputs.author-email }}
+        AUTHOR_NAME: ${{ inputs.author-name }}
+        NOTIFY_STATUS: ${{ inputs.status }}
+        NOTIFY_TITLE: ${{ inputs.title }}
+        NOTIFY_DETAILS: ${{ inputs.details }}
+        NOTIFY_SUBJECT: ${{ inputs.subject }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        PR_URL: ${{ inputs.pr-url }}
+        BRANCH: ${{ github.head_ref || github.ref_name }}
+        SLACK_GITHUB_USER_MAP: ${{ inputs.user-map-json }}
+        SLACK_BOT_TOKEN: ${{ inputs.slack-bot-token }}
+        SLACK_CHANNEL_ID: ${{ inputs.slack-channel-id }}
+        SLACK_WEBHOOK_URL: ${{ inputs.slack-webhook-url }}
+      run: bash "${GITHUB_ACTION_PATH}/notify.sh"
+
+    - name: Post to Slack (API)
+      if: ${{ steps.payload.outputs.skip != 'true' && steps.payload.outputs.mode == 'api' }}
+      uses: slackapi/slack-github-action@v4
+      with:
+        method: chat.postMessage
+        token: ${{ inputs.slack-bot-token }}
+        payload-file-path: ${{ steps.payload.outputs.payload }}
+        errors: true
+
+    - name: Post to Slack (webhook)
+      if: ${{ steps.payload.outputs.skip != 'true' && steps.payload.outputs.mode == 'webhook' }}
+      uses: slackapi/slack-github-action@v4
+      with:
+        webhook: ${{ inputs.slack-webhook-url }}
+        webhook-type: incoming-webhook
+        payload-file-path: ${{ steps.payload.outputs.payload }}
+        errors: true

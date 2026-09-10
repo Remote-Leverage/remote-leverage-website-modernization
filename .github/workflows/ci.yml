@@ -82,3 +82,27 @@ jobs:
 
       - name: Build assets
         run: npm run build
+
+  notify:
+    name: Slack
+    if: ${{ always() && !cancelled() && github.event_name == 'pull_request' }}
+    needs: [php, assets]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Notify Slack
+        uses: ./.github/actions/slack-notify
+        with:
+          status: ${{ (needs.php.result == 'success' && needs.assets.result == 'success') && 'success' || 'failure' }}
+          title: CI
+          details: php=${{ needs.php.result }}, assets=${{ needs.assets.result }}
+          github-user: ${{ github.event.pull_request.user.login }}
+          author-name: ${{ github.event.pull_request.user.login }}
+          subject: ${{ github.event.pull_request.title }}
+          pr-url: ${{ github.event.pull_request.html_url }}
+          slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          slack-channel-id: ${{ vars.SLACK_CI_CHANNEL_ID || secrets.SLACK_CHANNEL_ID }}
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          user-map-json: ${{ vars.SLACK_GITHUB_USER_MAP }}
