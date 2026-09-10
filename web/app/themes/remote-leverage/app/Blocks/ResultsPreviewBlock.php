@@ -62,22 +62,22 @@ class ResultsPreviewBlock extends Block
                 'layout' => 'block',
                 'button_label' => 'Add Card',
             ])
-                ->addImage('image', ['label' => 'Client Logo', 'return_format' => 'url'])
-                ->addText('tag_1', ['label' => 'Tag 1'])
-                ->addText('tag_2', ['label' => 'Tag 2'])
-                ->addText('tag_3', ['label' => 'Tag 3'])
-                ->addText('title', ['label' => 'Client / Company Name'])
-                ->addTextarea('desc', ['label' => 'Description', 'rows' => 3])
-                ->addTextarea('quote_text', ['label' => 'Quote Text', 'rows' => 3])
-                ->addText('quote_author', ['label' => 'Quote Author / Citation'])
-                ->addText('stat_1_value', ['label' => 'Stat 1 Value'])
-                ->addText('stat_1_label', ['label' => 'Stat 1 Label'])
-                ->addText('stat_2_value', ['label' => 'Stat 2 Value'])
-                ->addText('stat_2_label', ['label' => 'Stat 2 Label'])
-                ->addText('stat_3_value', ['label' => 'Stat 3 Value'])
-                ->addText('stat_3_label', ['label' => 'Stat 3 Label'])
-                ->addUrl('link_url', ['label' => 'Full Story Link'])
-                ->addText('link_text', ['label' => 'Link Text', 'default_value' => 'READ THE FULL STORY'])
+            ->addImage('image', ['label' => 'Client Logo', 'return_format' => 'url'])
+            ->addText('tag_1', ['label' => 'Tag 1'])
+            ->addText('tag_2', ['label' => 'Tag 2'])
+            ->addText('tag_3', ['label' => 'Tag 3'])
+            ->addText('title', ['label' => 'Client / Company Name'])
+            ->addTextarea('desc', ['label' => 'Description', 'rows' => 3])
+            ->addTextarea('quote_text', ['label' => 'Quote Text', 'rows' => 3])
+            ->addText('quote_author', ['label' => 'Quote Author / Citation'])
+            ->addText('stat_1_value', ['label' => 'Stat 1 Value'])
+            ->addText('stat_1_label', ['label' => 'Stat 1 Label'])
+            ->addText('stat_2_value', ['label' => 'Stat 2 Value'])
+            ->addText('stat_2_label', ['label' => 'Stat 2 Label'])
+            ->addText('stat_3_value', ['label' => 'Stat 3 Value'])
+            ->addText('stat_3_label', ['label' => 'Stat 3 Label'])
+            ->addUrl('link_url', ['label' => 'Full Story Link'])
+            ->addText('link_text', ['label' => 'Link Text', 'default_value' => 'READ THE FULL STORY'])
             ->endRepeater();
 
         return $fields->build();
@@ -118,7 +118,9 @@ class ResultsPreviewBlock extends Block
     public function cards(): array
     {
         $custom = get_field('cards');
-        $cards = (! empty($custom) && is_array($custom)) ? $custom : $this->defaultCards();
+        $cards = (! empty($custom) && is_array($custom))
+            ? $custom
+            : $this->defaultCards();
 
         return array_map(function ($card) {
             $card['title'] = BlockDefaults::cleanText($card['title'] ?? '');

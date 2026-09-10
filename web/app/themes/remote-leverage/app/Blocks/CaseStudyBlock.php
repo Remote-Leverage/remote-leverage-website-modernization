@@ -84,16 +84,16 @@ class CaseStudyBlock extends Block
                 'layout' => 'table',
                 'button_label' => 'Add Info Item',
             ])
-                ->addText('label', ['label' => 'Label'])
-                ->addText('value', ['label' => 'Value'])
+            ->addText('label', ['label' => 'Label'])
+            ->addText('value', ['label' => 'Value'])
             ->endRepeater()
             ->addRepeater('stats', [
                 'label' => 'Hero Stat Tiles',
                 'layout' => 'table',
                 'button_label' => 'Add Stat',
             ])
-                ->addText('value', ['label' => 'Value'])
-                ->addText('label', ['label' => 'Label'])
+            ->addText('value', ['label' => 'Value'])
+            ->addText('label', ['label' => 'Label'])
             ->endRepeater()
             ->addTextarea('quote_text', ['label' => 'Client Quote', 'rows' => 3])
             ->addImage('quote_photo', ['label' => 'Quote Headshot', 'return_format' => 'url'])
@@ -104,26 +104,26 @@ class CaseStudyBlock extends Block
                 'layout' => 'block',
                 'button_label' => 'Add Section',
             ])
-                ->addText('heading', ['label' => 'Section Heading (leave blank for an untitled closing paragraph)'])
-                ->addSelect('type', [
-                    'label' => 'Section Type',
-                    'choices' => [
-                        'richtext' => 'Rich Text',
-                        'stats' => 'Stat Tiles',
-                        'table' => 'Metric / Outcome Table',
-                    ],
-                    'default_value' => 'richtext',
-                ])
-                ->addWysiwyg('body', [
-                    'label' => 'Body (used when Section Type is Rich Text)',
-                    'media_upload' => 0,
-                    'toolbar' => 'basic',
-                ])
-                ->addTextarea('rows_raw', [
-                    'label' => 'Rows (used when Section Type is Stat Tiles or Table)',
-                    'instructions' => 'One row per line, formatted value|label (Stat Tiles) or metric|outcome (Table).',
-                    'rows' => 4,
-                ])
+            ->addText('heading', ['label' => 'Section Heading (leave blank for an untitled closing paragraph)'])
+            ->addSelect('type', [
+                'label' => 'Section Type',
+                'choices' => [
+                    'richtext' => 'Rich Text',
+                    'stats' => 'Stat Tiles',
+                    'table' => 'Metric / Outcome Table',
+                ],
+                'default_value' => 'richtext',
+            ])
+            ->addWysiwyg('body', [
+                'label' => 'Body (used when Section Type is Rich Text)',
+                'media_upload' => 0,
+                'toolbar' => 'basic',
+            ])
+            ->addTextarea('rows_raw', [
+                'label' => 'Rows (used when Section Type is Stat Tiles or Table)',
+                'instructions' => 'One row per line, formatted value|label (Stat Tiles) or metric|outcome (Table).',
+                'rows' => 4,
+            ])
             ->endRepeater()
             ->addText('video_name', ['label' => 'Video Attribution Name'])
             ->addText('video_caption', ['label' => 'Video Caption'])
@@ -136,7 +136,9 @@ class CaseStudyBlock extends Block
     public function infoItems(): array
     {
         $items = function_exists('get_field') ? get_field('info_items') : null;
-        $items = (! empty($items) && is_array($items)) ? $items : [];
+        $items = (! empty($items) && is_array($items))
+            ? $items
+            : [];
 
         return array_map(fn ($row) => [
             'label' => BlockDefaults::cleanText($row['label'] ?? ''),
@@ -147,7 +149,9 @@ class CaseStudyBlock extends Block
     public function stats(): array
     {
         $items = function_exists('get_field') ? get_field('stats') : null;
-        $items = (! empty($items) && is_array($items)) ? $items : [];
+        $items = (! empty($items) && is_array($items))
+            ? $items
+            : [];
 
         return array_map(fn ($row) => [
             'value' => BlockDefaults::cleanText($row['value'] ?? ''),
@@ -158,7 +162,9 @@ class CaseStudyBlock extends Block
     public function sections(): array
     {
         $items = function_exists('get_field') ? get_field('sections') : null;
-        $items = (! empty($items) && is_array($items)) ? $items : [];
+        $items = (! empty($items) && is_array($items))
+            ? $items
+            : [];
 
         return array_map(function ($row) {
             $type = $row['type'] ?? 'richtext';

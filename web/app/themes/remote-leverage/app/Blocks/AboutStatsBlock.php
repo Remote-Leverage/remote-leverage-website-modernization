@@ -56,18 +56,18 @@ class AboutStatsBlock extends Block
                 'layout' => 'block',
                 'button_label' => 'Add Column',
             ])
-                ->addImage('icon', ['label' => 'Icon', 'return_format' => 'url'])
-                ->addText('headline_value', ['label' => 'Headline Value (e.g. 70%)'])
-                ->addText('headline_label', ['label' => 'Headline Label'])
-                ->addText('category_label', ['label' => 'Category Label (e.g. REACH & SCALE)'])
-                ->addText('stat_1_value', ['label' => 'Stat 1 Value'])
-                ->addText('stat_1_label', ['label' => 'Stat 1 Label'])
-                ->addText('stat_2_value', ['label' => 'Stat 2 Value'])
-                ->addText('stat_2_label', ['label' => 'Stat 2 Label'])
-                ->addText('stat_3_value', ['label' => 'Stat 3 Value'])
-                ->addText('stat_3_label', ['label' => 'Stat 3 Label'])
-                ->addText('stat_4_value', ['label' => 'Stat 4 Value'])
-                ->addText('stat_4_label', ['label' => 'Stat 4 Label'])
+            ->addImage('icon', ['label' => 'Icon', 'return_format' => 'url'])
+            ->addText('headline_value', ['label' => 'Headline Value (e.g. 70%)'])
+            ->addText('headline_label', ['label' => 'Headline Label'])
+            ->addText('category_label', ['label' => 'Category Label (e.g. REACH & SCALE)'])
+            ->addText('stat_1_value', ['label' => 'Stat 1 Value'])
+            ->addText('stat_1_label', ['label' => 'Stat 1 Label'])
+            ->addText('stat_2_value', ['label' => 'Stat 2 Value'])
+            ->addText('stat_2_label', ['label' => 'Stat 2 Label'])
+            ->addText('stat_3_value', ['label' => 'Stat 3 Value'])
+            ->addText('stat_3_label', ['label' => 'Stat 3 Label'])
+            ->addText('stat_4_value', ['label' => 'Stat 4 Value'])
+            ->addText('stat_4_label', ['label' => 'Stat 4 Label'])
             ->endRepeater();
 
         return $fields->build();
@@ -109,7 +109,9 @@ class AboutStatsBlock extends Block
     public function columns(): array
     {
         $custom = get_field('columns');
-        $columns = (! empty($custom) && is_array($custom)) ? $custom : $this->defaultColumns();
+        $columns = (! empty($custom) && is_array($custom))
+            ? $custom
+            : $this->defaultColumns();
 
         return array_map(function ($col) {
             $col['headline_value'] = BlockDefaults::cleanText($col['headline_value'] ?? '');

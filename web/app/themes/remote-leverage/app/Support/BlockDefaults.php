@@ -2033,4 +2033,3 @@ class BlockDefaults
         return self::patternBlock('results-preview', array_merge($data, $overrides));
     }
 }
-

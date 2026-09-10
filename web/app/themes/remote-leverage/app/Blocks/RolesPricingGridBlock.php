@@ -60,20 +60,20 @@ class RolesPricingGridBlock extends Block
                 'layout' => 'block',
                 'button_label' => 'Add Role Card',
             ])
-                ->addImage('photo', ['label' => 'Role Photo', 'return_format' => 'url'])
-                ->addText('title', ['label' => 'Role Title'])
-                ->addText('price', ['label' => 'Hourly Price', 'default_value' => '$6-$10 Per Hour'])
-                ->addText('intro', ['label' => 'Intro Line (e.g. "X Assistants help you by:")'])
-                ->addTextarea('tasks', [
-                    'label' => 'Task Checklist (one per line, last line is the closing sentence)',
-                    'rows' => 6,
-                ])
-                ->addTextarea('tools', [
-                    'label' => 'Tool Logo URLs (one per line)',
-                    'rows' => 4,
-                ])
-                ->addText('cta_text', ['label' => 'CTA Text', 'default_value' => 'Interview Assistants'])
-                ->addText('cta_url', ['label' => 'CTA URL', 'default_value' => '#booking-footer'])
+            ->addImage('photo', ['label' => 'Role Photo', 'return_format' => 'url'])
+            ->addText('title', ['label' => 'Role Title'])
+            ->addText('price', ['label' => 'Hourly Price', 'default_value' => '$6-$10 Per Hour'])
+            ->addText('intro', ['label' => 'Intro Line (e.g. "X Assistants help you by:")'])
+            ->addTextarea('tasks', [
+                'label' => 'Task Checklist (one per line, last line is the closing sentence)',
+                'rows' => 6,
+            ])
+            ->addTextarea('tools', [
+                'label' => 'Tool Logo URLs (one per line)',
+                'rows' => 4,
+            ])
+            ->addText('cta_text', ['label' => 'CTA Text', 'default_value' => 'Interview Assistants'])
+            ->addText('cta_url', ['label' => 'CTA URL', 'default_value' => '#booking-footer'])
             ->endRepeater();
 
         return $fields->build();
