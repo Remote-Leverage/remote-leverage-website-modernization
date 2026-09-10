@@ -1,7 +1,7 @@
 @php
   $heroBgUrl = get_template_directory_uri().'/public/images/affiliate/Gradient_04.png';
 @endphp
-<section class="relative overflow-hidden bg-cover bg-center min-h-screen py-16 sm:py-20 lg:py-24" style="background-image: url('{{ $heroBgUrl }}')">
+<section class="relative overflow-hidden bg-cover bg-center min-h-[90vh] flex items-center py-16 sm:py-20 lg:py-24" style="background-image: url('{{ $heroBgUrl }}')">
   <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
 
