@@ -88,7 +88,8 @@ COPY docker/www.conf /usr/local/etc/php-fpm.d/www.conf
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh \
-    && rm -f /usr/local/etc/php-fpm.d/zz-docker.conf
+    && rm -f /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && nginx -t
 
 WORKDIR /var/www/html
 COPY --from=build --chown=www-data:www-data /app /var/www/html
