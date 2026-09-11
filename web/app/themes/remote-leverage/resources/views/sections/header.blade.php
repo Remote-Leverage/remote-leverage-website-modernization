@@ -31,7 +31,7 @@
                         'fallback_cb' => function () {
                             return '
                                   <ul class="flex items-center gap-7 xl:gap-9 text-[17px] font-display font-medium text-slate-900">
-                                    <!-- Reviews Dropdown --><li class="relative group">
+                                    <!-- Reviews Dropdown --><li class="menu-item relative group">
                                       <a href="'.home_url('/reviews').'" class="flex items-center gap-1.5 py-2 hover:text-brand-purple transition-colors cursor-pointer focus:outline-none">
                                         <span>Reviews</span>
                                         <svg class="w-4 h-4 text-slate-700 group-hover:text-brand-purple transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -51,7 +51,7 @@
                                       </ul>
                                     </li>
                     
-                                    <!-- Roles Dropdown --><li class="relative group">
+                                    <!-- Roles Dropdown --><li class="menu-item relative group">
                                       <a href="'.home_url('/admin-virtual-assistants/').'" class="flex items-center gap-1.5 py-2 hover:text-brand-purple transition-colors cursor-pointer focus:outline-none">
                                         <span>Roles</span>
                                         <svg class="w-4 h-4 text-slate-700 group-hover:text-brand-purple transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
