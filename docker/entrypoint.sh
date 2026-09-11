@@ -7,8 +7,9 @@ fi
 
 mkdir -p /var/www/html/web/app/cache/acorn/framework/views \
          /var/www/html/web/app/cache/acorn/framework/cache \
-         /var/www/html/web/app/cache/acorn/logs
-chown -R www-data:www-data /var/www/html/web/app/cache || true
+         /var/www/html/web/app/cache/acorn/logs \
+         /var/cache/nginx/fastcgi
+chown -R www-data:www-data /var/www/html/web/app/cache /var/cache/nginx || true
 
 if [ "${SKIP_CHOWN:-0}" != "1" ]; then
   mkdir -p /var/www/html/web/app/uploads

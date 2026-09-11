@@ -80,8 +80,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends nginx procps \
     && curl -fsSL -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
     && chmod +x /usr/local/bin/wp \
     && rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf \
-    && mkdir -p /var/www/html/web/app/uploads \
-    && chown -R www-data:www-data /var/www/html
+    && mkdir -p /var/www/html/web/app/uploads /var/cache/nginx/fastcgi \
+    && chown -R www-data:www-data /var/www/html /var/cache/nginx
 
 COPY docker/php.ini /usr/local/etc/php/conf.d/wordpress.ini
 COPY docker/www.conf /usr/local/etc/php-fpm.d/www.conf
