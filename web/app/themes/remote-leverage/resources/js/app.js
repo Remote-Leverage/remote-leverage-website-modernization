@@ -594,17 +594,17 @@ if (window.Alpine) {
 
 
 /**
- * Initialise the Alpine islands that Livewire's boot leaves behind.
+ * Safety net for [x-data] islands Alpine's own walk did not reach.
  *
- * Livewire/Alpine are injected lazily (see bootLivewire), i.e. after DOM ready.
- * Livewire starts Alpine but only walks its own component trees, so standalone
- * [x-data] islands already in the document — the FAQ accordion, the testimonials
- * modal — are never initialised and sit inert. Walking them explicitly fixes that.
+ * Alpine.start() — run from Livewire.start(), see startLivewire below — walks the
+ * whole document and initialises every island itself, so this is normally a no-op.
+ * It stays as a fallback for markup injected after that walk.
  *
  * Skips anything Alpine has already initialised (its own marker), which keeps this
- * idempotent and safe to re-run after Livewire morphs. Islands *inside* Livewire
- * components are included: Alpine never ran start() here, so nothing else would
- * initialise them and e.g. the phone field's country selector stays inert.
+ * idempotent and safe to re-run after Livewire morphs. Never call it before
+ * Alpine.start(): initialising a tree early runs its directives against a set of
+ * plugins that are not registered yet (x-collapse et al) and double-initialises it
+ * when the real walk arrives.
  */
 function initAlpineIslands() {
   const Alpine = window.Alpine;
@@ -632,19 +632,56 @@ function initAlpineIslands() {
 
 window.rlInitAlpineIslands = initAlpineIslands;
 
-/**
- * Alpine may already be running by the time we ask (Livewire's inline start runs
- * synchronously once its script loads), so listen for the event *and* poll briefly
- * for the case where it fired before this handler was attached.
- */
-function watchForAlpine() {
-  document.addEventListener('alpine:initialized', () => initAlpineIslands());
+let alpineStarted = false;
 
+document.addEventListener('alpine:initialized', () => {
+  alpineStarted = true;
+  initAlpineIslands();
+});
+
+/**
+ * Start Livewire (and with it Alpine) by hand.
+ *
+ * livewire.js only self-starts from a DOMContentLoaded listener it registers when
+ * the bundle executes. We inject that bundle lazily (see bootLivewire), always
+ * after DOMContentLoaded has already fired, so that listener never runs: without
+ * this call Livewire.start() is never reached, every wire: component stays inert
+ * and Alpine never registers the plugin directives Livewire bundles — which is
+ * what the "[x-collapse] without first installing the Collapse plugin" warnings
+ * on the FAQ accordions were.
+ */
+function startLivewire() {
+  if (window.__rlLivewireStarted || alpineStarted) {
+    return true;
+  }
+
+  const livewire = window.Livewire;
+
+  if (!livewire || typeof livewire.start !== 'function') {
+    return false;
+  }
+
+  window.__rlLivewireStarted = true;
+
+  // Alpine.data() has to be registered before Alpine.start(), which Livewire.start()
+  // calls internally. The alpine:init listener covers this too; doing it here keeps
+  // it true regardless of listener ordering.
+  registerAlpine();
+  livewire.start();
+
+  return true;
+}
+
+/**
+ * The script's load event is the primary trigger; the poll covers the case where
+ * it fired before the handler was attached (cached bundle) or never fires at all.
+ */
+function watchForLivewire() {
   let attempts = 0;
   const poll = setInterval(() => {
     attempts += 1;
 
-    if (initAlpineIslands() || attempts > 40) {
+    if (startLivewire() || attempts > 100) {
       clearInterval(poll);
     }
   }, 50);
@@ -674,10 +711,13 @@ function bootLivewire() {
     // Dynamically inserted scripts default to async; keep Livewire's file +
     // inline start() in source order.
     script.async = false;
+    if (orig.src) {
+      script.addEventListener('load', () => startLivewire());
+    }
     document.body.appendChild(script);
   });
 
-  watchForAlpine();
+  watchForLivewire();
 }
 
 function scheduleLivewire() {

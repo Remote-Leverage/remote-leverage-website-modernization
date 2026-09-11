@@ -10,6 +10,7 @@ use App\Domains\ContentAudit\Actions\ConvertElementorPostAction;
 use App\Domains\ContentAudit\Actions\GenerateSignatureHtmlAction;
 use App\Domains\ContentAudit\Commands\AuditElementorCommand;
 use App\Domains\ContentAudit\Commands\ConvertElementorCommand;
+use App\Domains\ContentAudit\Commands\ImportBlogPostsCommand;
 use App\Domains\ContentAudit\Services\ElementorAuditService;
 use App\Domains\ContentAudit\Services\PrismAiAuditor;
 use Illuminate\Support\ServiceProvider;
@@ -29,6 +30,7 @@ class ContentAuditServiceProvider extends ServiceProvider
             $this->commands([
                 AuditElementorCommand::class,
                 ConvertElementorCommand::class,
+                ImportBlogPostsCommand::class,
             ]);
         }
     }

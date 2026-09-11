@@ -49,8 +49,10 @@
         </div>
       @else
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          @while (have_posts()) @php(the_post())
+          @while (have_posts())
             @php
+              the_post();
+
               $postId = get_the_ID();
               $thumb = get_the_post_thumbnail_url($postId, 'medium_large');
               $cats = get_the_category();
