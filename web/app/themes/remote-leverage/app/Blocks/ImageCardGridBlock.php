@@ -53,9 +53,12 @@ class ImageCardGridBlock extends Block
         return [
             'headline' => BlockDefaults::cleanText($field('headline') ?: ''),
             'subheadline' => BlockDefaults::cleanText($field('subheadline') ?: ''),
+            'columns' => (int) ($field('columns') ?: 4),
+            'titleSize' => $field('card_title_size') ?: 'small',
             'cards' => array_map(fn ($c) => [
                 'image' => BlockDefaults::resolveImageUrl($c['image'] ?? ''),
-                'title' => $c['title'] ?? '',
+                'eyebrow' => $c['eyebrow'] ?? '',
+                'title' => BlockDefaults::cleanText($c['title'] ?? ''),
                 'text' => $c['text'] ?? '',
             ], $cards),
         ];
@@ -67,14 +70,25 @@ class ImageCardGridBlock extends Block
 
         $fields
             ->addText('headline', ['label' => 'Headline'])
-            ->addTextarea('subheadline', ['label' => 'Subheadline', 'rows' => 2])
+            ->addTextarea('subheadline', ['label' => 'Subheadline', 'rows' => 3])
+            ->addSelect('columns', [
+                'label' => 'Columns',
+                'choices' => [4 => '4 across', 3 => '3 across'],
+                'default_value' => 4,
+            ])
+            ->addSelect('card_title_size', [
+                'label' => 'Card Title Size',
+                'choices' => ['small' => 'Small (15px)', 'large' => 'Large (27px)'],
+                'default_value' => 'small',
+            ])
             ->addRepeater('cards', [
                 'label' => 'Cards',
                 'button_label' => 'Add card',
                 'min' => 1,
             ])
             ->addImage('image', ['label' => 'Image', 'return_format' => 'url'])
-            ->addText('title', ['label' => 'Title'])
+            ->addText('eyebrow', ['label' => 'Eyebrow', 'instructions' => 'Optional small label above the title (e.g. a step number).'])
+            ->addTextarea('title', ['label' => 'Title', 'rows' => 2, 'instructions' => 'Inline <br> allowed.'])
             ->addTextarea('text', ['label' => 'Text', 'rows' => 3])
             ->endRepeater();
 

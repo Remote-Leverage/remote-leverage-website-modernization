@@ -72,6 +72,7 @@
   --color-table-competitor: #D94900;
   --color-table-leverage: #00D982;
   --color-step-numeral: #878EA0;
+  --color-roles-surface: #250D4A;
   --color-brand-purple-deep: #6200A4;
   --color-brand-navy: #342567;
   --color-brand-midnight: #18112C;
@@ -1706,5 +1707,66 @@ h2.wp-block-heading,
   .rl-legal-doc h2.wp-block-heading {
     font-size: 1.5rem !important;
     margin-top: 2.75rem !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* TALENT CAROUSEL (centre mode)                               */
+/* ═══════════════════════════════════════════════════════════ */
+/* Ported from the legacy rl-elementor-blocks guarantee carousel: 280px cards
+   overlapping by 25px a side, the centred one scaled up and frosted. The scale
+   lives here rather than in utilities because it keys off [data-rl-center],
+   which the carousel script sets. */
+
+.rl-talent-carousel-track {
+  padding: 40px 0;
+}
+
+.rl-talent-card {
+  width: 280px;
+  margin: 0 -25px;
+  z-index: 1;
+}
+
+.rl-talent-card[data-rl-center] {
+  z-index: 100;
+}
+
+.rl-talent-card-inner {
+  background: #ffffff;
+  border-radius: 24px;
+  overflow: hidden;
+  padding: 12px 12px 0 12px;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.04);
+  transform: scale(0.85);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rl-talent-card[data-rl-center] .rl-talent-card-inner {
+  transform: scale(1.05);
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 0.15);
+}
+
+.rl-talent-card-image {
+  aspect-ratio: 4 / 5;
+  background: #d8dde8;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.rl-talent-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-talent-card-inner {
+    transition: none;
   }
 }

@@ -317,6 +317,244 @@ function rlLegalToc() {
 
 window.rlLegalToc = rlLegalToc;
 
+/**
+ * Horizontal card carousel: auto-advance, arrow buttons, and pointer drag.
+ *
+ * Deliberately plain JS rather than an Alpine component — Alpine only loads lazily
+ * (see the rl-livewire-scripts island loader below), so a carousel built on it is
+ * dead until the reader happens to scroll near it. Native scroll-snap still does the
+ * actual scrolling, so touch and trackpad work even before this runs.
+ */
+function initCarousels() {
+  document.querySelectorAll('[data-rl-carousel]').forEach((root) => {
+    const track = root.querySelector('[data-rl-carousel-track]');
+
+    if (!track || track.dataset.rlCarouselReady) {
+      return;
+    }
+
+    track.dataset.rlCarouselReady = '1';
+
+    const prev = root.querySelector('[data-rl-carousel-prev]');
+    const next = root.querySelector('[data-rl-carousel-next]');
+    const GAP = 10;
+    const DELAY = 4000;
+
+    const maxScroll = () => track.scrollWidth - track.clientWidth;
+
+    const step = () => {
+      const card = track.querySelector('[data-rl-carousel-card]');
+
+      return card ? card.offsetWidth + GAP : track.clientWidth * 0.8;
+    };
+
+    const sync = () => {
+      markCentre();
+
+      const max = maxScroll();
+
+      if (prev) {
+        prev.disabled = track.scrollLeft <= 1;
+      }
+
+      if (next) {
+        next.disabled = max <= 1 || track.scrollLeft >= max - 1;
+      }
+    };
+
+    const advance = (direction) => {
+      track.scrollBy({ left: step() * direction, behavior: 'smooth' });
+    };
+
+    // --- auto-advance -------------------------------------------------------
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let timer = null;
+    let paused = false;
+    let resumeTimer = null;
+
+    const tick = () => {
+      if (paused || document.hidden || maxScroll() <= 1) {
+        return;
+      }
+
+      if (isCentre) {
+        const next = centreIndex() + 1;
+        goToIndex(next >= cards().length ? 0 : next);
+      } else if (track.scrollLeft >= maxScroll() - 1) {
+        track.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        advance(1);
+      }
+    };
+
+    const start = () => {
+      if (!reduceMotion && !timer) {
+        timer = setInterval(tick, DELAY);
+      }
+    };
+
+    const stop = () => {
+      clearInterval(timer);
+      timer = null;
+    };
+
+    // A manual interaction holds autoplay off for a while so it doesn't yank the
+    // track back out from under the reader.
+    const hold = () => {
+      paused = true;
+      clearTimeout(resumeTimer);
+      resumeTimer = setTimeout(() => { paused = false; }, DELAY * 2);
+    };
+
+    root.addEventListener('pointerenter', () => { paused = true; });
+    root.addEventListener('pointerleave', () => { paused = false; });
+    root.addEventListener('focusin', () => { paused = true; });
+    root.addEventListener('focusout', () => { paused = false; });
+
+    prev?.addEventListener('click', () => { hold(); advance(-1); });
+    next?.addEventListener('click', () => { hold(); advance(1); });
+
+    // --- pointer drag -------------------------------------------------------
+    let dragging = false;
+    let moved = false;
+    let originX = 0;
+    let originLeft = 0;
+
+    track.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+
+      dragging = true;
+      moved = false;
+      originX = event.clientX;
+      originLeft = track.scrollLeft;
+      hold();
+    });
+
+    track.addEventListener('pointermove', (event) => {
+      if (!dragging) {
+        return;
+      }
+
+      const delta = event.clientX - originX;
+
+      if (!moved && Math.abs(delta) > 3) {
+        moved = true;
+        track.style.scrollSnapType = 'none';
+        track.classList.add('cursor-grabbing');
+        track.setPointerCapture?.(event.pointerId);
+      }
+
+      if (moved) {
+        track.scrollLeft = originLeft - delta;
+      }
+    });
+
+    const endDrag = () => {
+      if (!dragging) {
+        return;
+      }
+
+      dragging = false;
+      track.style.scrollSnapType = '';
+      track.classList.remove('cursor-grabbing');
+    };
+
+    track.addEventListener('pointerup', endDrag);
+    track.addEventListener('pointercancel', endDrag);
+
+    // Swallow the click that ends a drag so cards don't activate mid-swipe.
+    track.addEventListener('click', (event) => {
+      if (moved) {
+        event.preventDefault();
+        event.stopPropagation();
+        moved = false;
+      }
+    }, true);
+
+    // --- centre mode ---------------------------------------------------------
+    // Ported from the legacy rl-elementor-blocks guarantee carousel (slick
+    // centerMode) without pulling in jQuery + slick: the card nearest the track's
+    // centre gets [data-rl-center], and CSS does the scale/elevation from there.
+    const isCentre = root.hasAttribute('data-rl-carousel-center');
+    const dots = [...root.querySelectorAll('[data-rl-carousel-dot]')];
+
+    const cards = () => [...track.querySelectorAll('[data-rl-carousel-card]')];
+
+    const centreIndex = () => {
+      const mid = track.scrollLeft + track.clientWidth / 2;
+      let best = 0;
+      let bestGap = Infinity;
+
+      cards().forEach((card, i) => {
+        const gap = Math.abs(card.offsetLeft + card.offsetWidth / 2 - mid);
+
+        if (gap < bestGap) {
+          bestGap = gap;
+          best = i;
+        }
+      });
+
+      return best;
+    };
+
+    const markCentre = () => {
+      if (!isCentre) {
+        return;
+      }
+
+      const active = centreIndex();
+
+      cards().forEach((card, i) => {
+        card.toggleAttribute('data-rl-center', i === active);
+      });
+
+      dots.forEach((dot, i) => {
+        dot.setAttribute('aria-current', i === active ? 'true' : 'false');
+      });
+    };
+
+    const goToIndex = (i) => {
+      const card = cards()[i];
+
+      if (!card) {
+        return;
+      }
+
+      track.scrollTo({
+        left: card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2,
+        behavior: 'smooth',
+      });
+    };
+
+    dots.forEach((dot, i) => {
+      dot.addEventListener('click', () => { hold(); goToIndex(i); });
+    });
+
+    track.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('resize', sync, { passive: true });
+    document.addEventListener('visibilitychange', () => { document.hidden ? stop() : start(); });
+
+    sync();
+
+    // Only run autoplay while the carousel is actually on screen.
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver((entries) => {
+        entries.forEach((entry) => (entry.isIntersecting ? start() : stop()));
+      }, { threshold: 0.2 }).observe(root);
+    } else {
+      start();
+    }
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initCarousels);
+} else {
+  initCarousels();
+}
+
 const registerAlpine = () => {
   if (window.Alpine) {
     window.Alpine.data('phoneInputComponent', phoneInputComponent);
