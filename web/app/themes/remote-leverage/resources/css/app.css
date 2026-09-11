@@ -1652,3 +1652,16 @@ h2.wp-block-heading,
     margin-top: 2.75rem !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* HEADING METRICS PARITY WITH PRODUCTION                      */
+/* ═══════════════════════════════════════════════════════════ */
+/* Production serves static Inter faces, which carry no optical-size axis. v2
+   loads variable Inter (`opsz 14..32`), whose automatic optical sizing narrows
+   large text by ~5% and shifts where headlines wrap. Turning it off on display
+   type keeps v2's headline metrics identical to production's. */
+
+h1, h2, h3, h4, h5, h6,
+.font-display {
+  font-optical-sizing: none;
+}
