@@ -103,7 +103,10 @@ class ElementorProseExtractor
 
         foreach (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as $tag) {
             $found = $widget->getElementsByTagName($tag);
-            if ($found->length) { $node = $found->item(0); break; }
+            if ($found->length) {
+                $node = $found->item(0);
+                break;
+            }
         }
 
         return $node ? $this->headingBlock($node) : [];

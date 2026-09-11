@@ -9,7 +9,6 @@
  *
  * Run with: wp eval-file scripts/build-comparison-patterns.php
  */
-
 $motherPath = get_theme_file_path('patterns/comparison-full.php');
 $src = file_get_contents($motherPath);
 $mother = parse_blocks(substr($src, strpos($src, '<!-- wp:')));
@@ -31,7 +30,7 @@ $pages = [
         'competitor' => null,
         // The ads variant runs condensed tables; recovered from production.
         'tables' => ['at-a-glance' => 0, 'comparing-costs' => 1, 'money-goes' => 2,
-                     'screening' => 3, 'replacement-policies' => 4, 'full-comparison' => 5],
+            'screening' => 3, 'replacement-policies' => 4, 'full-comparison' => 5],
         'tableSource' => 'comparison-wing-ads-tables.json',
     ],
     'comparison-athena-full' => [
@@ -65,22 +64,35 @@ function rl_set_rows(array $block, array $rows): array
     $n = count($rows);
 
     if ($name === 'acf/data-table') {
-        foreach (array_keys($d) as $k) { if (preg_match('/^_?rows_\\d+_/', $k)) { unset($d[$k]); } }
+        foreach (array_keys($d) as $k) {
+            if (preg_match('/^_?rows_\\d+_/', $k)) {
+                unset($d[$k]);
+            }
+        }
         $d['rows'] = $n;
         foreach ($rows as $i => [$label, $a, $b]) {
-            $d["rows_{$i}_feature"] = $label; $d["_rows_{$i}_feature"] = 'field_data_table_block_rows_feature';
-            $d["rows_{$i}_diy"] = $a;         $d["_rows_{$i}_diy"] = 'field_data_table_block_rows_diy';
-            $d["rows_{$i}_rl"] = $b;          $d["_rows_{$i}_rl"] = 'field_data_table_block_rows_rl';
+            $d["rows_{$i}_feature"] = $label;
+            $d["_rows_{$i}_feature"] = 'field_data_table_block_rows_feature';
+            $d["rows_{$i}_diy"] = $a;
+            $d["_rows_{$i}_diy"] = 'field_data_table_block_rows_diy';
+            $d["rows_{$i}_rl"] = $b;
+            $d["_rows_{$i}_rl"] = 'field_data_table_block_rows_rl';
         }
     } else {
         $K = 'field_cost_comparison_block_';
-        foreach (array_keys($d) as $k) { if (preg_match('/^_?table_[12]_rows_\\d+_/', $k)) { unset($d[$k]); } }
+        foreach (array_keys($d) as $k) {
+            if (preg_match('/^_?table_[12]_rows_\\d+_/', $k)) {
+                unset($d[$k]);
+            }
+        }
         $d['table_1_rows'] = $n;
         $d['table_2_rows'] = $n;
         foreach ($rows as $i => [$label, $a, $b]) {
             foreach (['1' => $a, '2' => $b] as $t => $val) {
-                $d["table_{$t}_rows_{$i}_label"] = $label; $d["_table_{$t}_rows_{$i}_label"] = $K."table_{$t}_rows_label";
-                $d["table_{$t}_rows_{$i}_value"] = $val;   $d["_table_{$t}_rows_{$i}_value"] = $K."table_{$t}_rows_value";
+                $d["table_{$t}_rows_{$i}_label"] = $label;
+                $d["_table_{$t}_rows_{$i}_label"] = $K."table_{$t}_rows_label";
+                $d["table_{$t}_rows_{$i}_value"] = $val;
+                $d["_table_{$t}_rows_{$i}_value"] = $K."table_{$t}_rows_value";
             }
         }
     }
@@ -95,18 +107,28 @@ function rl_rename(array $block, array $map): array
 {
     $walk = function ($v) use (&$walk, $map) {
         if (is_string($v)) {
-            foreach ($map as $from => $to) { $v = str_replace($from, $to, $v); }
+            foreach ($map as $from => $to) {
+                $v = str_replace($from, $to, $v);
+            }
 
             return $v;
         }
-        if (is_array($v)) { return array_map($walk, $v); }
+        if (is_array($v)) {
+            return array_map($walk, $v);
+        }
 
         return $v;
     };
 
-    if (! empty($block['attrs']['data'])) { $block['attrs']['data'] = $walk($block['attrs']['data']); }
-    if (! empty($block['innerHTML'])) { $block['innerHTML'] = $walk($block['innerHTML']); }
-    if (! empty($block['innerContent'])) { $block['innerContent'] = $walk($block['innerContent']); }
+    if (! empty($block['attrs']['data'])) {
+        $block['attrs']['data'] = $walk($block['attrs']['data']);
+    }
+    if (! empty($block['innerHTML'])) {
+        $block['innerHTML'] = $walk($block['innerHTML']);
+    }
+    if (! empty($block['innerContent'])) {
+        $block['innerContent'] = $walk($block['innerContent']);
+    }
     if (! empty($block['innerBlocks'])) {
         $block['innerBlocks'] = array_map(fn ($b) => rl_rename($b, $map), $block['innerBlocks']);
     }
@@ -123,7 +145,9 @@ foreach ($pages as $slug => $cfg) {
     $kept = [];
     foreach ($mother as $b) {
         $key = $b['attrs']['metadata']['name'] ?? '';
-        if (in_array($key, $cfg['exclude'], true)) { continue; }
+        if (in_array($key, $cfg['exclude'], true)) {
+            continue;
+        }
 
         if (isset($cfg['tables'][$key], $tableData[$cfg['tables'][$key]])) {
             $b = rl_set_rows($b, $tableData[$cfg['tables'][$key]]['rows']);
@@ -138,7 +162,9 @@ foreach ($pages as $slug => $cfg) {
     }
 
     $content = '';
-    foreach ($kept as $b) { $content .= serialize_block($b); }
+    foreach ($kept as $b) {
+        $content .= serialize_block($b);
+    }
 
     $header = "<?php\n\n/**\n * Title: {$cfg['title']}\n * Slug: remote-leverage/{$slug}\n * Categories: remote-leverage\n"
         ." * Description: {$cfg['desc']}\n *\n * GENERATED from patterns/comparison-full.php — do not edit by hand.\n"

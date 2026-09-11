@@ -2,6 +2,7 @@
 
 namespace App\Blocks;
 
+use App\Support\BlockDefaults;
 use Log1x\AcfComposer\Block;
 use StoutLogic\AcfBuilder\FieldsBuilder;
 
@@ -91,7 +92,7 @@ class BookingFooterBlock extends Block
 
         return [
             'headline' => $headline ?: 'Book a free consultation',
-            'mapImage' => \App\Support\BlockDefaults::resolveImageUrl(
+            'mapImage' => BlockDefaults::resolveImageUrl(
                 (function_exists('get_field') ? get_field('map_image') : null) ?: 506
             ),
             'description' => (function_exists('get_field') ? get_field('description') : null)

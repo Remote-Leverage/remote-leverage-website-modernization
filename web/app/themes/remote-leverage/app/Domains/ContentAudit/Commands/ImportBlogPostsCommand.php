@@ -47,7 +47,9 @@ class ImportBlogPostsCommand extends Command
                 continue;
             }
 
-            foreach ($decoded as $post) { $posts[$post['id']] = $post; }
+            foreach ($decoded as $post) {
+                $posts[$post['id']] = $post;
+            }
         }
 
         if (! $posts) {
@@ -67,7 +69,9 @@ class ImportBlogPostsCommand extends Command
         $done = 0;
 
         foreach ($posts as $post) {
-            if ($limit > 0 && $done >= $limit) { break; }
+            if ($limit > 0 && $done >= $limit) {
+                break;
+            }
             $done++;
 
             $slug = $post['slug'];
@@ -100,7 +104,9 @@ class ImportBlogPostsCommand extends Command
                 continue;
             }
 
-            if ($existing) { $payload['ID'] = $existing->ID; }
+            if ($existing) {
+                $payload['ID'] = $existing->ID;
+            }
 
             $id = wp_insert_post(wp_slash($payload), true);
 
@@ -144,10 +150,14 @@ class ImportBlogPostsCommand extends Command
             $ids = [];
 
             foreach ($post[$key] ?? [] as $remote) {
-                if (isset($map[$remote])) { $ids[] = (int) $map[$remote]; }
+                if (isset($map[$remote])) {
+                    $ids[] = (int) $map[$remote];
+                }
             }
 
-            if ($ids) { wp_set_object_terms($id, $ids, $tax); }
+            if ($ids) {
+                wp_set_object_terms($id, $ids, $tax);
+            }
         }
 
         // Uncategorized is WordPress's default, not an editorial choice — drop it
@@ -162,15 +172,21 @@ class ImportBlogPostsCommand extends Command
 
     private function attachFeaturedImage(int $postId, int $remoteMediaId): void
     {
-        if (get_post_thumbnail_id($postId)) { return; }
+        if (get_post_thumbnail_id($postId)) {
+            return;
+        }
 
         $response = wp_remote_get("https://remoteleverage.com/wp-json/wp/v2/media/{$remoteMediaId}?_fields=source_url", ['timeout' => 30]);
 
-        if (is_wp_error($response)) { return; }
+        if (is_wp_error($response)) {
+            return;
+        }
 
         $url = json_decode((string) wp_remote_retrieve_body($response), true)['source_url'] ?? null;
 
-        if (! $url) { return; }
+        if (! $url) {
+            return;
+        }
 
         $existing = attachment_url_to_postid(str_replace('https://remoteleverage.com', home_url(), $url));
 
@@ -186,6 +202,8 @@ class ImportBlogPostsCommand extends Command
 
         $attachmentId = media_sideload_image($url, $postId, null, 'id');
 
-        if (! is_wp_error($attachmentId)) { set_post_thumbnail($postId, $attachmentId); }
+        if (! is_wp_error($attachmentId)) {
+            set_post_thumbnail($postId, $attachmentId);
+        }
     }
 }
