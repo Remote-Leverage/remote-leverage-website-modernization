@@ -40,6 +40,21 @@
   --font-display: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
   --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
 
+  /* Comparison-page type scale — taken from production's computed styles so the
+     competitor pages share one named scale instead of repeating magic numbers. */
+  --text-display: 46px;
+  --text-display--line-height: 53px;
+  --text-display--letter-spacing: -1.44px;
+  --text-lead: 20px;
+  --text-lead--line-height: 25px;
+  --text-lead--letter-spacing: -0.6px;
+  --text-card: 15px;
+  --text-card--line-height: 20px;
+  --text-card--letter-spacing: -0.45px;
+  --text-cta: 17px;
+  --text-cta--line-height: 17px;
+  --text-cta--letter-spacing: -0.45px;
+
   /* Brand Colors */
   --color-brand-purple: #8A2BE2;
   --color-brand-purple-deep: #6200A4;
@@ -1677,16 +1692,4 @@ h2.wp-block-heading,
     font-size: 1.5rem !important;
     margin-top: 2.75rem !important;
   }
-}
-
-/* ═══════════════════════════════════════════════════════════ */
-/* HEADING METRICS PARITY WITH PRODUCTION                      */
-/* ═══════════════════════════════════════════════════════════ */
-/* Production serves static Inter faces, which carry no optical-size axis.
-   Variable Inter can still apply opsz; turning it off on display type keeps
-   headline metrics identical to production. */
-
-h1, h2, h3, h4, h5, h6,
-.font-display {
-  font-optical-sizing: none;
 }

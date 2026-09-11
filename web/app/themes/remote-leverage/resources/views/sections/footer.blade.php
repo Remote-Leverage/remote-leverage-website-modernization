@@ -1,5 +1,6 @@
 <footer class="content-info bg-black text-slate-300">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
+  <div class="w-full px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
+    <div class="rl-container">
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8">
 
       <!-- Brand & Mission Column -->
@@ -146,5 +147,6 @@
       </div>
     </div>
 
+    </div>
   </div>
 </footer>

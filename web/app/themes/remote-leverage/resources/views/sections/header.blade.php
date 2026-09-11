@@ -1,6 +1,7 @@
 <header
     class="sticky top-0 z-40 w-full bg-bg-light border-b border-slate-200/60 transition-all duration-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="w-full px-4 sm:px-6 lg:px-8">
+        <div class="rl-container">
         <div class="flex items-center justify-between h-20">
 
             <!-- Brand Logo -->
@@ -137,6 +138,7 @@
                 </button>
             </div>
 
+        </div>
         </div>
     </div>
 
