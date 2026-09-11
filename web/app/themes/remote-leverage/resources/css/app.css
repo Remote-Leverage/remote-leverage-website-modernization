@@ -5,12 +5,40 @@
 @source "../**/*.js";
 @source "../../patterns/**/*.php";
 
+/* Latin (+ latin-ext) Inter variable from @fontsource-variable/inter.
+   League Spartan and Poppins were unused; Inter Display is the same
+   outline with optical sizing, which we turn off on headings below. */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../fonts/inter-latin-ext-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../fonts/inter-latin-wght-italic.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @theme {
   /* Fonts */
-  --font-display: "Inter Display", "Inter", system-ui, -apple-system, sans-serif;
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-spartan: "League Spartan", sans-serif;
-  --font-poppins: "Poppins", sans-serif;
+  --font-display: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
 
   /* Brand Colors */
   --color-brand-purple: #8A2BE2;
@@ -1656,10 +1684,9 @@ h2.wp-block-heading,
 /* ═══════════════════════════════════════════════════════════ */
 /* HEADING METRICS PARITY WITH PRODUCTION                      */
 /* ═══════════════════════════════════════════════════════════ */
-/* Production serves static Inter faces, which carry no optical-size axis. v2
-   loads variable Inter (`opsz 14..32`), whose automatic optical sizing narrows
-   large text by ~5% and shifts where headlines wrap. Turning it off on display
-   type keeps v2's headline metrics identical to production's. */
+/* Production serves static Inter faces, which carry no optical-size axis.
+   Variable Inter can still apply opsz; turning it off on display type keeps
+   headline metrics identical to production. */
 
 h1, h2, h3, h4, h5, h6,
 .font-display {

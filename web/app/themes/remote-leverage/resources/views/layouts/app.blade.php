@@ -8,19 +8,14 @@
 
     <link rel="icon" type="image/svg+xml" href="{{ Vite::asset('resources/images/logo-icon-black.svg') }}">
 
+    {{-- Latin Inter variable (headings + body). Hashed by Vite so CloudFront can cache it. --}}
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ Vite::asset('resources/fonts/inter-latin-wght-normal.woff2') }}">
+
     @if (is_front_page())
         {{-- Match .rl-hero-group::before. Preload the WebP used as the hero background
              so Chrome does not fetch a leftover PNG from an older preload. --}}
         <link rel="preload" as="image" href="/app/themes/remote-leverage/public/images/home/Map.webp" fetchpriority="high">
     @endif
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Inter+Display:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=League+Spartan:wght@600;700;800&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Inter+Display:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=League+Spartan:wght@600;700;800&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" media="print" onload="this.media='all'">
-    <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Inter+Display:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=League+Spartan:wght@600;700;800&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
-    </noscript>
 
     <script type="application/ld+json">
     {
