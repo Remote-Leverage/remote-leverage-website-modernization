@@ -1513,7 +1513,6 @@ h2.wp-block-heading,
   pointer-events: none;
   z-index: 0;
   opacity: 0.45;
-  background: url('/app/themes/remote-leverage/public/images/home/Map.webp') no-repeat center / contain;
 }
 
 /* Booking Footer Pattern */
@@ -1533,7 +1532,6 @@ h2.wp-block-heading,
   pointer-events: none;
   z-index: 0;
   opacity: 0.35;
-  background: url('/app/themes/remote-leverage/public/images/home/Map.webp') no-repeat bottom center / contain;
 }
 
 .rl-booking-footer-group .wp-block-columns {

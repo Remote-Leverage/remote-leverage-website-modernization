@@ -8,15 +8,6 @@
 
     <link rel="icon" type="image/svg+xml" href="{{ Vite::asset('resources/images/logo-icon-black.svg') }}">
 
-    {{-- Latin Inter variable (headings + body). Hashed by Vite so CloudFront can cache it. --}}
-    <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ Vite::asset('resources/fonts/inter-latin-wght-normal.woff2') }}">
-
-    @if (is_front_page())
-        {{-- Match .rl-hero-group::before. Preload the WebP used as the hero background
-             so Chrome does not fetch a leftover PNG from an older preload. --}}
-        <link rel="preload" as="image" href="/app/themes/remote-leverage/public/images/home/Map.webp" fetchpriority="high">
-    @endif
-
     <script type="application/ld+json">
     {
       "@@context": "https://schema.org",

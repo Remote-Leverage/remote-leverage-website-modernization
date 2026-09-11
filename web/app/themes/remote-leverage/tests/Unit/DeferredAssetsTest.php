@@ -2,14 +2,16 @@
 
 declare(strict_types=1);
 
-test('homepage layout preloads Map.webp and defers Livewire scripts', function () {
+test('homepage layout defers Livewire scripts and does not preload a missing Map.webp', function () {
     $layout = file_get_contents(dirname(__DIR__, 2).'/resources/views/layouts/app.blade.php');
 
     expect($layout)
-        ->toContain('/app/themes/remote-leverage/public/images/home/Map.webp')
         ->toContain('id="rl-livewire-scripts"')
         ->toContain('@livewireScripts')
-        ->not->toContain('Map.png');
+        ->not->toContain('Map.webp')
+        ->not->toContain('Map.png')
+        ->not->toContain('rel="preload" as="font"')
+        ->not->toContain('fonts.googleapis.com');
 });
 
 test('app.css does not eagerly fetch intl-tel-input flag sprites', function () {
