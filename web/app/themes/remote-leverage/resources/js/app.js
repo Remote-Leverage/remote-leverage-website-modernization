@@ -116,8 +116,12 @@ export function phoneInputComponent(config = {}) {
       input.addEventListener('blur', sync);
 
       const wire = this.getWire();
-      if (wire && wire.phone && this.iti) {
-        this.iti.setNumber(wire.phone);
+      // Livewire hands this back as a reactive proxy, not always a plain string —
+      // intl-tel-input calls .indexOf() on it and throws if it isn't one.
+      const phone = wire && typeof wire.phone === 'string' ? wire.phone : '';
+
+      if (phone && this.iti) {
+        this.iti.setNumber(phone);
         setTimeout(adjustPhonePadding, 10);
       }
     },
@@ -588,6 +592,64 @@ if (window.Alpine) {
   document.addEventListener('alpine:init', registerAlpine);
 }
 
+
+/**
+ * Initialise the Alpine islands that Livewire's boot leaves behind.
+ *
+ * Livewire/Alpine are injected lazily (see bootLivewire), i.e. after DOM ready.
+ * Livewire starts Alpine but only walks its own component trees, so standalone
+ * [x-data] islands already in the document — the FAQ accordion, the testimonials
+ * modal — are never initialised and sit inert. Walking them explicitly fixes that.
+ *
+ * Skips anything Alpine has already initialised (its own marker), which keeps this
+ * idempotent and safe to re-run after Livewire morphs. Islands *inside* Livewire
+ * components are included: Alpine never ran start() here, so nothing else would
+ * initialise them and e.g. the phone field's country selector stays inert.
+ */
+function initAlpineIslands() {
+  const Alpine = window.Alpine;
+
+  if (!Alpine || typeof Alpine.initTree !== 'function') {
+    return false;
+  }
+
+  registerAlpine();
+
+  document.querySelectorAll('[x-data]').forEach((el) => {
+    if (el._x_dataStack) {
+      return;
+    }
+
+    try {
+      Alpine.initTree(el);
+    } catch (error) {
+      console.error('Alpine island failed to initialise', el, error);
+    }
+  });
+
+  return true;
+}
+
+window.rlInitAlpineIslands = initAlpineIslands;
+
+/**
+ * Alpine may already be running by the time we ask (Livewire's inline start runs
+ * synchronously once its script loads), so listen for the event *and* poll briefly
+ * for the case where it fired before this handler was attached.
+ */
+function watchForAlpine() {
+  document.addEventListener('alpine:initialized', () => initAlpineIslands());
+
+  let attempts = 0;
+  const poll = setInterval(() => {
+    attempts += 1;
+
+    if (initAlpineIslands() || attempts > 40) {
+      clearInterval(poll);
+    }
+  }, 50);
+}
+
 function bootLivewire() {
   if (window.__rlLivewireBooted) {
     return;
@@ -614,6 +676,8 @@ function bootLivewire() {
     script.async = false;
     document.body.appendChild(script);
   });
+
+  watchForAlpine();
 }
 
 function scheduleLivewire() {

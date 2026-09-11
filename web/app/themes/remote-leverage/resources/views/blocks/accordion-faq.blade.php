@@ -1,4 +1,5 @@
-<div class="w-full pt-12">
+<div class="w-full px-4 sm:px-6 lg:px-8 pt-12">
+    <div class="rl-container">
     @if (! empty($headline))
         <h2 class="font-display text-4xl sm:text-5xl lg:text-[48px] font-bold leading-[1.1] tracking-[-0.03em] text-black mb-12 sm:mb-16 text-left">
             {{ $headline }}
@@ -72,4 +73,5 @@
             {!! $schemaJson !!}
         </script>
     @endif
+</div>
 </div>

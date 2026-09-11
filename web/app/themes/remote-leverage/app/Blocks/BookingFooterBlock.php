@@ -91,6 +91,9 @@ class BookingFooterBlock extends Block
 
         return [
             'headline' => $headline ?: 'Book a free consultation',
+            'mapImage' => \App\Support\BlockDefaults::resolveImageUrl(
+                (function_exists('get_field') ? get_field('map_image') : null) ?: 506
+            ),
             'description' => (function_exists('get_field') ? get_field('description') : null)
                 ?: 'During this meeting we will go over the role you’re planning to hire for, what the process looks like, answer any questions you have, and proceed to next steps.',
         ];
@@ -106,6 +109,11 @@ class BookingFooterBlock extends Block
         $fields = new FieldsBuilder('booking_footer');
 
         $fields
+            ->addImage('map_image', [
+                'label' => 'Background Map',
+                'return_format' => 'url',
+                'instructions' => 'Sits over the dark band, as production does. Leave blank for the default world map.',
+            ])
             ->addTextarea('description', [
                 'label' => 'Description',
                 'default_value' => 'During this meeting we will go over the role you’re planning to hire for, what the process looks like, answer any questions you have, and proceed to next steps.',
