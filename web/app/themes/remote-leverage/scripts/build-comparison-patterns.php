@@ -29,6 +29,10 @@ $pages = [
         'page' => 408,
         'exclude' => ['hiring-easy', 'full-picture', 'how-competitor-works', 'competitor-roles'],
         'competitor' => null,
+        // The ads variant runs condensed tables; recovered from production.
+        'tables' => ['at-a-glance' => 0, 'comparing-costs' => 1, 'money-goes' => 2,
+                     'screening' => 3, 'replacement-policies' => 4, 'full-comparison' => 5],
+        'tableSource' => 'comparison-wing-ads-tables.json',
     ],
     'comparison-athena-full' => [
         'title' => 'Full Page - Comparison (Athena)',
