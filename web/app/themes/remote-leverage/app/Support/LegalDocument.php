@@ -49,7 +49,7 @@ class LegalDocument
     {
         static $cache = [];
 
-        $key = md5($this->html . serialize($this->levels));
+        $key = md5($this->html.serialize($this->levels));
 
         if (isset($cache[$key])) {
             return $cache[$key];
@@ -57,35 +57,39 @@ class LegalDocument
 
         $sections = [];
         $used = [];
-        $pattern = '/<h([' . implode('', $this->levels) . '])([^>]*)>(.*?)<\/h\1>/is';
+        $pattern = '/<h(['.implode('', $this->levels).'])([^>]*)>(.*?)<\/h\1>/is';
 
-        $html = preg_replace_callback($pattern, function (array $match) use (&$sections, &$used): string {
-            [$full, $level, $attributes, $inner] = $match;
+        $html = preg_replace_callback(
+            $pattern,
+            function (array $match) use (&$sections, &$used): string {
+                [$full, $level, $attributes, $inner] = $match;
 
-            $text = trim(html_entity_decode(wp_strip_all_tags($inner), ENT_QUOTES, 'UTF-8'));
+                $text = trim(html_entity_decode(wp_strip_all_tags($inner), ENT_QUOTES, 'UTF-8'));
 
-            if ($text === '') {
-                return $full;
-            }
+                if ($text === '') {
+                    return $full;
+                }
 
-            // Respect an id the editor set by hand; otherwise derive a stable one.
-            if (preg_match('/\sid=(["\'])(.*?)\1/i', $attributes, $existing)) {
-                $id = $existing[2];
-            } else {
-                $id = $this->uniqueSlug($text, $used);
-                $attributes .= ' id="' . esc_attr($id) . '"';
-            }
+                // Respect an id the editor set by hand; otherwise derive a stable one.
+                if (preg_match('/\sid=(["\'])(.*?)\1/i', $attributes, $existing)) {
+                    $id = $existing[2];
+                } else {
+                    $id = $this->uniqueSlug($text, $used);
+                    $attributes .= ' id="'.esc_attr($id).'"';
+                }
 
-            $used[$id] = true;
+                $used[$id] = true;
 
-            $sections[] = [
-                'id' => $id,
-                'text' => $text,
-                'level' => (int) $level,
-            ];
+                $sections[] = [
+                    'id' => $id,
+                    'text' => $text,
+                    'level' => (int) $level,
+                ];
 
-            return '<h' . $level . $attributes . '>' . $inner . '</h' . $level . '>';
-        }, $this->html);
+                return '<h'.$level.$attributes.'>'.$inner.'</h'.$level.'>';
+            },
+            $this->html,
+        );
 
         return $cache[$key] = [
             'html' => $html ?? $this->html,
@@ -103,7 +107,7 @@ class LegalDocument
         $suffix = 2;
 
         while (isset($used[$slug])) {
-            $slug = $base . '-' . $suffix++;
+            $slug = $base.'-'.$suffix++;
         }
 
         return $slug;

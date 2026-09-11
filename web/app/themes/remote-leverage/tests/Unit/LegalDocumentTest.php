@@ -11,9 +11,7 @@ it('adds an id to every section heading', function () {
 });
 
 it('builds a table of contents from the section headings', function () {
-    $html = '<p>Intro.</p>'
-        . '<h2 class="wp-block-heading">Consent</h2><p>a</p>'
-        . '<h2 class="wp-block-heading">Log Files</h2><p>b</p>';
+    $html = '<p>Intro.</p><h2 class="wp-block-heading">Consent</h2><p>a</p><h2 class="wp-block-heading">Log Files</h2><p>b</p>';
 
     expect((new LegalDocument($html))->sections())->toBe([
         ['id' => 'consent', 'text' => 'Consent', 'level' => 2],
