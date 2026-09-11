@@ -60,11 +60,18 @@
   --text-eyebrow: 27px;
   --text-eyebrow--line-height: 32px;
   --text-eyebrow--letter-spacing: -0.81px;
+  --text-step: 36px;
+  --text-step--line-height: 36px;
+  --text-step--letter-spacing: -1.08px;
+  --text-numeral: 201px;
+  --text-numeral--line-height: 232px;
+  --text-numeral--letter-spacing: -6.03px;
 
   /* Brand Colors */
   --color-brand-purple: #8A2BE2;
   --color-table-competitor: #D94900;
   --color-table-leverage: #00D982;
+  --color-step-numeral: #878EA0;
   --color-brand-purple-deep: #6200A4;
   --color-brand-navy: #342567;
   --color-brand-midnight: #18112C;
