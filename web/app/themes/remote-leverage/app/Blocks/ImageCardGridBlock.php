@@ -54,6 +54,8 @@ class ImageCardGridBlock extends Block
             'headline' => BlockDefaults::cleanText($field('headline') ?: ''),
             'subheadline' => BlockDefaults::cleanText($field('subheadline') ?: ''),
             'columns' => (int) ($field('columns') ?: 4),
+            'ctaText' => $field('cta_text') ?: '',
+            'ctaUrl' => $field('cta_url') ?: '#booking-footer',
             'titleSize' => $field('card_title_size') ?: 'small',
             'cards' => array_map(fn ($c) => [
                 'image' => BlockDefaults::resolveImageUrl($c['image'] ?? ''),
@@ -90,7 +92,12 @@ class ImageCardGridBlock extends Block
             ->addText('eyebrow', ['label' => 'Eyebrow', 'instructions' => 'Optional small label above the title (e.g. a step number).'])
             ->addTextarea('title', ['label' => 'Title', 'rows' => 2, 'instructions' => 'Inline <br> allowed.'])
             ->addTextarea('text', ['label' => 'Text', 'rows' => 3])
-            ->endRepeater();
+            ->endRepeater()
+            ->addText('cta_text', [
+                'label' => 'Footer CTA Text',
+                'instructions' => 'Optional full-width button below the grid. Leave blank to hide.',
+            ])
+            ->addUrl('cta_url', ['label' => 'Footer CTA URL', 'default_value' => '#booking-footer']);
 
         return $fields->build();
     }

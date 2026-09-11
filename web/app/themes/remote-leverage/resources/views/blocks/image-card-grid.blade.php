@@ -56,6 +56,13 @@
                 @endforeach
             </div>
 
+            @if ($ctaText)
+                <a href="{{ $ctaUrl }}"
+                   class="mt-2.5 flex w-full items-center justify-center rounded-pill bg-brand-purple hover:bg-brand-purple-deep px-8 py-5 text-center font-bold uppercase text-white text-lead transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple focus-visible:ring-offset-2">
+                    {{ $ctaText }}
+                </a>
+            @endif
+
         </div>
     </div>
 </section>
