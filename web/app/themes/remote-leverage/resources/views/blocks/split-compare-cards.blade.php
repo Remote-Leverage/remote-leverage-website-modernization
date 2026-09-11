@@ -25,7 +25,7 @@
                             @endif
 
                             @if (! empty($card['body']))
-                                <div class="text-card text-black [&_p]:mb-4 [&_p:last-child]:mb-0 [&_strong]:font-bold">
+                                <div class="text-card text-black [&_p]:mb-4 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-2 [&_li]:leading-relaxed [&_li]:marker:text-brand-purple">
                                     {!! $card['body'] !!}
                                 </div>
                             @endif

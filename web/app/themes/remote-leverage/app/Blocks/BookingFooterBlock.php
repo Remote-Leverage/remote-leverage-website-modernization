@@ -90,7 +90,9 @@ class BookingFooterBlock extends Block
         $headline = $this->block->data['headline'] ?? get_field('headline');
 
         return [
-            'headline' => $headline ?: 'Smarter support starts here. Flexible, skilled, and ready to go.',
+            'headline' => $headline ?: 'Book a free consultation',
+            'description' => (function_exists('get_field') ? get_field('description') : null)
+                ?: 'During this meeting we will go over the role you’re planning to hire for, what the process looks like, answer any questions you have, and proceed to next steps.',
         ];
     }
 
@@ -104,9 +106,14 @@ class BookingFooterBlock extends Block
         $fields = new FieldsBuilder('booking_footer');
 
         $fields
+            ->addTextarea('description', [
+                'label' => 'Description',
+                'default_value' => 'During this meeting we will go over the role you’re planning to hire for, what the process looks like, answer any questions you have, and proceed to next steps.',
+                'rows' => 3,
+            ])
             ->addTextarea('headline', [
                 'label' => 'Headline',
-                'default_value' => 'Smarter support starts here. Flexible, skilled, and ready to go.',
+                'default_value' => 'Book a free consultation',
                 'rows' => 2,
             ]);
 

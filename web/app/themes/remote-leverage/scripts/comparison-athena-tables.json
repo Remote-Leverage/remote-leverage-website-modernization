@@ -1,0 +1,131 @@
+[
+    {
+        "c1": "Athena",
+        "c2": "Remote Leverage",
+        "rows": [
+            [
+                "Sourcing",
+                "Philippines-based talent pool",
+                "Latin America and the Caribbean"
+            ],
+            [
+                "Time to Hire",
+                "2 – 3 weeks, possible waitlist",
+                "2 - 3 days"
+            ],
+            [
+                "Onboarding",
+                "1 - 2 weeks",
+                "Ready to onboard day of hiring"
+            ],
+            [
+                "Roles",
+                "Only Executive Assistants",
+                "Hire from 50+ roles"
+            ],
+            [
+                "Industries",
+                "No industry-specific matching",
+                "Sources for industry experience"
+            ],
+            [
+                "Scalability",
+                "No discounts",
+                "30% off additional hires"
+            ],
+            [
+                "Contract Obligation",
+                "12 months",
+                "0 months"
+            ]
+        ]
+    },
+    {
+        "c1": "Athena",
+        "c2": "Remote Leverage",
+        "rows": [
+            [
+                "Upfront / placement",
+                "$0 upfront",
+                "40% of VA's yearly salary"
+            ],
+            [
+                "Recurring monthly",
+                "$3,000/month",
+                "VA wage"
+            ],
+            [
+                "Year 1 total",
+                "$36,000",
+                "One time fee + VA wage"
+            ],
+            [
+                "Year 2 total",
+                "$72,000",
+                "Year 1 total + VA wage"
+            ],
+            [
+                "Cost of additional hires",
+                "$3,000/month per EA",
+                "30% off placement fee within 12 months of first hire"
+            ],
+            [
+                "Buyout fee",
+                "$24,000",
+                "$0"
+            ]
+        ]
+    },
+    {
+        "c1": "Athena",
+        "c2": "Remote Leverage",
+        "rows": [
+            [
+                "Reaches the VA",
+                "~30% of your monthly fee",
+                "100% of wages"
+            ],
+            [
+                "Goes to the agency / platform",
+                "~70% of your monthly fee",
+                "One-time placement fee"
+            ]
+        ]
+    },
+    {
+        "c1": "Athena",
+        "c2": "Remote Leverage",
+        "rows": [
+            [
+                "Hiring model",
+                "Managed service",
+                "Recruiting (direct hire)"
+            ],
+            [
+                "Cost structure",
+                "Recurring monthly fee",
+                "One-time flat placement fee"
+            ],
+            [
+                "Who employs the VA",
+                "Athena",
+                "You"
+            ],
+            [
+                "Time to placement",
+                "2 – 3 weeks",
+                "2 - 3 days"
+            ],
+            [
+                "Replacement window",
+                "Unknown",
+                "12 months"
+            ],
+            [
+                "Best for",
+                "Founders who want a fully managed experience with built-in coaching, oversight, and who don't mind the higher cost or 12-month commitment",
+                "Founders and operators ready to manage a direct hire and prefer to keep recurring overhead off the books"
+            ]
+        ]
+    }
+]
