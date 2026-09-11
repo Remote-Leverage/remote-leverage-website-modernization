@@ -42,4 +42,9 @@ export default defineConfig({
       '@images': '/resources/images',
     },
   },
+  build: {
+    // intl-tel-input, Sentry, and PostHog are dynamic imports. Vite's default
+    // modulepreload would fetch them on every page even when they never run.
+    modulePreload: false,
+  },
 })

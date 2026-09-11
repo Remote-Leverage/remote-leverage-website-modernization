@@ -1,5 +1,4 @@
 @import "tailwindcss" theme(static);
-@import "intl-tel-input/build/css/intlTelInput.css";
 
 @source "../../app/**/*.php";
 @source "../**/*.blade.php";
@@ -921,18 +920,36 @@
   }
 }
 
+/* Desktop dropdowns work before Alpine/Livewire boot */
+@media (min-width: 1024px) {
+  .rl-desktop-nav .sub-menu {
+    display: none;
+  }
+
+  .rl-desktop-nav .menu-item.group:hover > .sub-menu,
+  .rl-desktop-nav .menu-item.group:focus-within > .sub-menu {
+    display: flex;
+  }
+
+  .rl-desktop-nav .menu-item.group:hover > a svg,
+  .rl-desktop-nav .menu-item.group:focus-within > a svg {
+    transform: rotate(180deg);
+  }
+}
+
+.group\/mobile-sub > summary {
+  list-style: none;
+}
+
+.group\/mobile-sub > summary::-webkit-details-marker {
+  display: none;
+}
+
 /* ───────────────────────────────────────────────────────────
    Intl-tel-input (rl-elementor-blocks parity)
 ─────────────────────────────────────────────────────────── */
-:root {
-  --iti-hover-color: transparent !important;
-  --iti-path-flags-1x: url("https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/img/flags.png?1");
-  --iti-path-flags-2x: url("https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/img/flags@2x.png?1");
-  --iti-path-globe-1x: url("https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/img/globe.png");
-  --iti-path-globe-2x: url("https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/img/globe@2x.png");
-}
-
 .iti {
+  --iti-hover-color: transparent !important;
   width: 100% !important;
   position: relative !important;
   display: block !important;

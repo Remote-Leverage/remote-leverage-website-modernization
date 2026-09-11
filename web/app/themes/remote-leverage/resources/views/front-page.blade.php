@@ -16,17 +16,7 @@
                 @endphp
             </div>
         @else
-            <div x-data="{
-                activeVideo: null,
-                openModal(url) {
-                    this.activeVideo = url;
-                    document.body.style.overflow = 'hidden';
-                },
-                closeModal() {
-                    this.activeVideo = null;
-                    document.body.style.overflow = 'auto';
-                }
-            }" class="w-full font-display text-text-body antialiased overflow-x-hidden">
+            <div class="w-full font-display text-text-body antialiased overflow-x-hidden">
 
                 {{-- ═══════════════════════════════════════════════════════════ --}}
                 {{-- SECTION 0 · HERO                                           --}}
@@ -786,6 +776,19 @@
                     </div>
                 </section>
 
+                {{-- Alpine lives here (below the fold) so livewire.min.js stays
+                     off the TTI path. Video modal + FAQ need it; the hero does not. --}}
+                <div x-data="{
+                    activeVideo: null,
+                    openModal(url) {
+                        this.activeVideo = url;
+                        document.body.style.overflow = 'hidden';
+                    },
+                    closeModal() {
+                        this.activeVideo = null;
+                        document.body.style.overflow = 'auto';
+                    }
+                }">
                 {{-- ═══════════════════════════════════════════════════════════ --}}
                 {{-- SECTION 7 · RESULTS, NOT PROMISES (TESTIMONIALS + FAQ)    --}}
                 {{-- ═══════════════════════════════════════════════════════════ --}}
@@ -1166,6 +1169,8 @@
                                 allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe>
                         </template>
                     </div>
+                </div>
+
                 </div>
 
             </div>

@@ -5,12 +5,37 @@ function loadIntlTelInput() {
   if (window.intlTelInput) return Promise.resolve(window.intlTelInput);
   if (itiLoadPromise) return itiLoadPromise;
 
-  itiLoadPromise = import('intl-tel-input/intlTelInputWithUtils').then((mod) => {
+  itiLoadPromise = Promise.all([
+    import('intl-tel-input/intlTelInputWithUtils'),
+    import('intl-tel-input/build/css/intlTelInput.css'),
+  ]).then(([mod]) => {
     window.intlTelInput = mod.default;
     return window.intlTelInput;
   });
 
   return itiLoadPromise;
+}
+
+function whenVisible(el, callback, rootMargin = '200px') {
+  if (!el) {
+    callback();
+    return;
+  }
+
+  const rect = el.getBoundingClientRect();
+  if (rect.top < window.innerHeight + 200 && rect.bottom > -200) {
+    callback();
+    return;
+  }
+
+  const io = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) {
+      io.disconnect();
+      callback();
+    }
+  }, { rootMargin });
+
+  io.observe(el);
 }
 
 export function phoneInputComponent(config = {}) {
@@ -97,19 +122,9 @@ export function phoneInputComponent(config = {}) {
       }
     },
     init() {
-      loadIntlTelInput();
-
-      if (window.intlTelInput) {
-        this.initIti();
-      } else {
-        const check = setInterval(() => {
-          if (window.intlTelInput) {
-            clearInterval(check);
-            this.initIti();
-          }
-        }, 30);
-        setTimeout(() => clearInterval(check), 3000);
-      }
+      whenVisible(this.$el, () => {
+        loadIntlTelInput().then(() => this.initIti());
+      });
     },
   };
 }
@@ -314,6 +329,101 @@ if (window.Alpine) {
   registerAlpine();
 } else {
   document.addEventListener('alpine:init', registerAlpine);
+}
+
+function bootLivewire() {
+  if (window.__rlLivewireBooted) {
+    return;
+  }
+  window.__rlLivewireBooted = true;
+
+  const tpl = document.getElementById('rl-livewire-scripts');
+  if (!tpl) {
+    return;
+  }
+
+  tpl.content.querySelectorAll('script').forEach((orig) => {
+    const script = document.createElement('script');
+    Array.from(orig.attributes).forEach((attr) => {
+      script.setAttribute(attr.name, attr.value);
+    });
+    if (orig.src) {
+      script.src = orig.src;
+    } else {
+      script.textContent = orig.textContent;
+    }
+    // Dynamically inserted scripts default to async; keep Livewire's file +
+    // inline start() in source order.
+    script.async = false;
+    document.body.appendChild(script);
+  });
+}
+
+function scheduleLivewire() {
+  const targets = document.querySelectorAll('[wire\\:id], [wire\\:snapshot], [x-data], #booking-footer');
+  if (!targets.length) {
+    return;
+  }
+
+  const nearViewport = Array.from(targets).some((el) => {
+    const rect = el.getBoundingClientRect();
+    return rect.top < window.innerHeight + 800;
+  });
+
+  if (nearViewport || window.location.hash === '#booking-footer') {
+    bootLivewire();
+    return;
+  }
+
+  const io = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) {
+      io.disconnect();
+      bootLivewire();
+    }
+  }, { rootMargin: '800px 0px' });
+
+  targets.forEach((el) => io.observe(el));
+
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('a[href*="booking-footer"]')) {
+      bootLivewire();
+    }
+  }, true);
+}
+
+function initMobileNav() {
+  const button = document.querySelector('[data-rl-nav-toggle]');
+  const panel = document.getElementById('rl-mobile-nav');
+  if (!button || !panel) {
+    return;
+  }
+
+  const iconOpen = button.querySelector('[data-rl-nav-open]');
+  const iconClose = button.querySelector('[data-rl-nav-close]');
+
+  const setOpen = (open) => {
+    button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    panel.hidden = !open;
+    if (iconOpen) {
+      iconOpen.hidden = open;
+    }
+    if (iconClose) {
+      iconClose.hidden = !open;
+    }
+  };
+
+  setOpen(false);
+  button.addEventListener('click', () => setOpen(panel.hidden));
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    initMobileNav();
+    scheduleLivewire();
+  });
+} else {
+  initMobileNav();
+  scheduleLivewire();
 }
 
 // Expose global placeholders so early callers don't throw

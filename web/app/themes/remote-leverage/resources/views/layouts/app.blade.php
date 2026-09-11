@@ -9,10 +9,9 @@
     <link rel="icon" type="image/svg+xml" href="{{ Vite::asset('resources/images/logo-icon-black.svg') }}">
 
     @if (is_front_page())
-        {{-- The hero's decorative map graphic (.rl-hero-group::before in app.css) is the page's actual
-             LCP element, but as a CSS background-image it's otherwise invisible to the preload scanner
-             and can't carry fetchpriority via HTML — this preload does both. --}}
-        <link rel="preload" as="image" href="/app/uploads/home/Map.png" fetchpriority="high">
+        {{-- Match .rl-hero-group::before. Preload the WebP used as the hero background
+             so Chrome does not fetch a leftover PNG from an older preload. --}}
+        <link rel="preload" as="image" href="/app/themes/remote-leverage/public/images/home/Map.webp" fetchpriority="high">
     @endif
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -96,6 +95,10 @@
 
     @php(do_action('get_footer'))
     @php(wp_footer())
-    @livewireScripts
+    {{-- Cloned into the document when a Livewire/Alpine island is near the viewport
+         so livewire.min.js (and Alpine) stay off the TTI critical path. --}}
+    <template id="rl-livewire-scripts">
+      @livewireScripts
+    </template>
   </body>
 </html>

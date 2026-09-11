@@ -1,4 +1,4 @@
-<header x-data="{ mobileMenuOpen: false }"
+<header
     class="sticky top-0 z-40 w-full bg-bg-light border-b border-slate-200/60 transition-all duration-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-20">
@@ -21,7 +21,7 @@
             <!-- Right Navigation & Consultation CTA (Desktop) -->
             <div class="hidden lg:flex items-center gap-8 xl:gap-10">
                 <!-- Native WordPress Nav Menu -->
-                <nav aria-label="{{ __('Primary Navigation', 'remote-leverage') }}">
+                <nav class="rl-desktop-nav" aria-label="{{ __('Primary Navigation', 'remote-leverage') }}">
                     {!! wp_nav_menu([
                         'theme_location' => 'primary_navigation',
                         'menu_class' => 'flex items-center gap-7 xl:gap-9 text-[17px] font-display font-medium text-slate-900',
@@ -31,14 +31,14 @@
                         'fallback_cb' => function () {
                             return '
                                   <ul class="flex items-center gap-7 xl:gap-9 text-[17px] font-display font-medium text-slate-900">
-                                    <!-- Reviews Dropdown --><li class="relative group" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" @click.outside="open = false">
-                                      <a href="#" @click.prevent="open = !open" class="flex items-center gap-1.5 py-2 hover:text-brand-purple transition-colors cursor-pointer focus:outline-none">
+                                    <!-- Reviews Dropdown --><li class="relative group">
+                                      <a href="'.home_url('/reviews').'" class="flex items-center gap-1.5 py-2 hover:text-brand-purple transition-colors cursor-pointer focus:outline-none">
                                         <span>Reviews</span>
-                                        <svg class="w-4 h-4 text-slate-700 group-hover:text-brand-purple transition-transform duration-200" :class="{ \'rotate-180\': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg class="w-4 h-4 text-slate-700 group-hover:text-brand-purple transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
                                         </svg>
                                       </a>
-                                      <ul x-show="open" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-1" class="absolute left-0 top-full mt-2 min-w-[280px] bg-white rounded-2xl p-2.5 shadow-xl border border-slate-100 z-50 flex flex-col gap-1" style="display: none;">
+                                      <ul class="sub-menu absolute left-0 top-full mt-2 min-w-[280px] bg-white rounded-2xl p-2.5 shadow-xl border border-slate-100 z-50 flex-col gap-1">
                                         <li><a href="' .
                                 home_url('/reviews') .
                                 '" class="block px-4 py-2.5 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Testimonial Reviews</a></li>
@@ -51,14 +51,14 @@
                                       </ul>
                                     </li>
                     
-                                    <!-- Roles Dropdown --><li class="relative group" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" @click.outside="open = false">
-                                      <a href="#" @click.prevent="open = !open" class="flex items-center gap-1.5 py-2 hover:text-brand-purple transition-colors cursor-pointer focus:outline-none">
+                                    <!-- Roles Dropdown --><li class="relative group">
+                                      <a href="'.home_url('/admin-virtual-assistants/').'" class="flex items-center gap-1.5 py-2 hover:text-brand-purple transition-colors cursor-pointer focus:outline-none">
                                         <span>Roles</span>
-                                        <svg class="w-4 h-4 text-slate-700 group-hover:text-brand-purple transition-transform duration-200" :class="{ \'rotate-180\': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg class="w-4 h-4 text-slate-700 group-hover:text-brand-purple transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
                                         </svg>
                                       </a>
-                                      <ul x-show="open" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-1" class="absolute left-0 top-full mt-2 min-w-[320px] bg-white rounded-2xl p-2.5 shadow-xl border border-slate-100 z-50 flex flex-col gap-1 max-h-[480px] overflow-y-auto" style="display: none;">
+                                      <ul class="sub-menu absolute left-0 top-full mt-2 min-w-[320px] bg-white rounded-2xl p-2.5 shadow-xl border border-slate-100 z-50 flex-col gap-1 max-h-[480px] overflow-y-auto">
                                         <li><a href="' .
                                 home_url('/admin-virtual-assistants/') .
                                 '" class="block px-4 py-2 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Admin Virtual Assistants</a></li>
@@ -121,16 +121,16 @@
                     <span>{{ __('Consultation', 'remote-leverage') }}</span>
                 </a>
 
-                <button type="button" @click="mobileMenuOpen = !mobileMenuOpen"
+                <button type="button" data-rl-nav-toggle aria-expanded="false" aria-controls="rl-mobile-nav"
                     class="p-2 rounded-xl text-slate-700 hover:text-brand-purple hover:bg-slate-100 transition-colors focus:outline-none"
                     aria-label="{{ __('Toggle navigation menu', 'remote-leverage') }}">
-                    <svg x-show="!mobileMenuOpen" class="w-6 h-6" fill="none" viewBox="0 0 24 24"
+                    <svg data-rl-nav-open class="w-6 h-6" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
-                    <svg x-show="mobileMenuOpen" class="w-6 h-6" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor" style="display: none;">
+                    <svg data-rl-nav-close class="w-6 h-6" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" hidden>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -141,12 +141,8 @@
     </div>
 
     <!-- Mobile Menu Drawer (Using MobileNavWalker) -->
-    <div x-show="mobileMenuOpen" x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0 -translate-y-4" x-transition:enter-end="opacity-100 translate-y-0"
-        x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
-        x-transition:leave-end="opacity-0 -translate-y-4"
-        class="lg:hidden border-b border-slate-200 bg-[#F4F6FC] px-4 pt-2 pb-6 space-y-4 shadow-xl"
-        style="display: none;">
+    <div id="rl-mobile-nav" hidden
+        class="lg:hidden border-b border-slate-200 bg-[#F4F6FC] px-4 pt-2 pb-6 space-y-4 shadow-xl">
         <nav class="flex flex-col space-y-1">
             {!! wp_nav_menu([
                 'theme_location' => 'primary_navigation',
