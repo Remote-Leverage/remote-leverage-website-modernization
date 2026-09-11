@@ -1719,20 +1719,26 @@ h2.wp-block-heading,
    which the carousel script sets. */
 
 .rl-talent-carousel-track {
-  padding: 40px 0;
+  /* Half-card side padding so the first and last cards can reach dead centre —
+     without it the overlapping cards are narrower than the track and it cannot
+     scroll at all. */
+  padding: 40px calc(50% - 140px);
+  /* Keep the cards' stacking to themselves. Without this the centred card's
+     z-index competes at the root level and paints over the sticky header. */
+  isolation: isolate;
 }
 
-.rl-talent-card {
+.rl-profile-card {
   width: 280px;
   margin: 0 -25px;
   z-index: 1;
 }
 
-.rl-talent-card[data-rl-center] {
-  z-index: 100;
+.rl-profile-card[data-rl-center] {
+  z-index: 2;
 }
 
-.rl-talent-card-inner {
+.rl-profile-card-inner {
   background: #ffffff;
   border-radius: 24px;
   overflow: hidden;
@@ -1744,7 +1750,7 @@ h2.wp-block-heading,
               background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.rl-talent-card[data-rl-center] .rl-talent-card-inner {
+.rl-profile-card[data-rl-center] .rl-profile-card-inner {
   transform: scale(1.05);
   background: rgb(255 255 255 / 0.85);
   backdrop-filter: blur(12px);
@@ -1752,21 +1758,21 @@ h2.wp-block-heading,
   box-shadow: 0 20px 50px rgb(0 0 0 / 0.15);
 }
 
-.rl-talent-card-image {
+.rl-profile-card-image {
   aspect-ratio: 4 / 5;
   background: #d8dde8;
   border-radius: 16px;
   overflow: hidden;
 }
 
-.rl-talent-card-image img {
+.rl-profile-card-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rl-talent-card-inner {
+  .rl-profile-card-inner {
     transition: none;
   }
 }

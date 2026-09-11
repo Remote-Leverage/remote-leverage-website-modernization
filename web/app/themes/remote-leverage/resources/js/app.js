@@ -482,13 +482,26 @@ function initCarousels() {
 
     const cards = () => [...track.querySelectorAll('[data-rl-carousel-card]')];
 
+    // Measured off bounding rects rather than offsetLeft: the track isn't a
+    // positioned ancestor, so offsetLeft reports coordinates from far up the tree.
+    const trackCentre = () => {
+      const rect = track.getBoundingClientRect();
+
+      return rect.left + rect.width / 2;
+    };
+
+    const cardOffset = (card) => {
+      const rect = card.getBoundingClientRect();
+
+      return rect.left + rect.width / 2 - trackCentre();
+    };
+
     const centreIndex = () => {
-      const mid = track.scrollLeft + track.clientWidth / 2;
       let best = 0;
       let bestGap = Infinity;
 
       cards().forEach((card, i) => {
-        const gap = Math.abs(card.offsetLeft + card.offsetWidth / 2 - mid);
+        const gap = Math.abs(cardOffset(card));
 
         if (gap < bestGap) {
           bestGap = gap;
@@ -515,17 +528,14 @@ function initCarousels() {
       });
     };
 
-    const goToIndex = (i) => {
+    const goToIndex = (i, behavior = 'smooth') => {
       const card = cards()[i];
 
       if (!card) {
         return;
       }
 
-      track.scrollTo({
-        left: card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2,
-        behavior: 'smooth',
-      });
+      track.scrollBy({ left: cardOffset(card), behavior });
     };
 
     dots.forEach((dot, i) => {
@@ -537,6 +547,15 @@ function initCarousels() {
     document.addEventListener('visibilitychange', () => { document.hidden ? stop() : start(); });
 
     sync();
+
+    // Centre carousels open on the middle card, as the legacy slick config did.
+    if (isCentre && cards().length) {
+      const middle = Math.floor(cards().length / 2);
+      requestAnimationFrame(() => {
+        goToIndex(middle, 'auto');
+        markCentre();
+      });
+    }
 
     // Only run autoplay while the carousel is actually on screen.
     if ('IntersectionObserver' in window) {
