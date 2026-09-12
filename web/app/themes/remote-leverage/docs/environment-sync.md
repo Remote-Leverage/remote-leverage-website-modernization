@@ -120,9 +120,19 @@ Sized for ~28MB of local data (23.7MB of it `wp_posts`) with no CLI on the far s
 which means no long-running process — every step has to fit inside a normal PHP
 request and be resumable.
 
-1. **Begin** — the importing side opens a session, records the manifest (groups,
-   exceptions, flags), and takes a **backup** of every table it is about to touch.
-   Returns a session id.
+1. **Begin** — the importing side opens a session and records the manifest
+   (groups, exceptions, flags). Returns a session id.
+
+   *Implemented differently from the original plan:* this was specified as a
+   full backup of every affected table before the first row lands. That cannot
+   work on a receiving side with no CLI and no long-running process — dumping
+   `wp_posts` inside one request is exactly what times out. Instead an **undo
+   log** records each row's prior state immediately before it is overwritten.
+   It is bounded by what actually changed rather than by table size, is written
+   incrementally, and covers files as well as rows. Entries are written *before*
+   the change, so a request dying between the two leaves an undo entry for a
+   change that did not happen — harmless — rather than a change with no undo
+   entry, which would be unrecoverable.
 2. **Chunk** — the exporting side streams gzipped, base64-encoded batches. Each chunk
    is checksummed and acknowledged, so a dropped request retries just that chunk.
 3. **Commit** — the importing side applies batches across repeated calls, each
@@ -132,17 +142,38 @@ request and be resumable.
    imported rows, so a naive string replace can't corrupt serialized arrays.
 5. **Finalise** — flush caches, report a row-count diff per group.
 
-If commit fails partway, the session stays open and the backup from step 1 is
-restorable from either screen. Backups are pruned on a retention limit.
+If a batch fails, the session stays open and its undo log intact — the pusher
+deliberately does not tidy up, because cleaning up would discard the only thing
+that can restore the target. `app/rollback-transfer` (or
+`wp acorn rl:sync:rollback <session>`) reverts everything the session wrote,
+files included. Logs are kept after a successful transfer too, since a sync that
+worked but brought the wrong selection needs undoing just as much as one that
+failed, and age out with the session's 20-run retention.
 
 ### Media
 
-Attachment rows travel with `content`; the files travel separately. The exporting
-side sends a manifest of paths plus checksums, the importing side requests only what
-it is missing, and files stream through the same chunked channel. This is what makes
-a synced staging actually render — DB-only sync leaves attachment rows pointing at
-files that aren't on staging's EFS, which is the class of bug that produced the
-broken globe image.
+Attachment rows travel with the `media` dataset; the files travel after them.
+The sender builds a manifest of every file behind those attachments, the target
+answers with the subset it is missing or holds at a different checksum, and only
+those are uploaded — so a re-sync after a partial run moves almost nothing.
+
+An attachment is more than one file. WordPress generates a resized copy per
+registered image size and records them in `_wp_attachment_metadata`, and it does
+not rebuild them on demand. On this install that is the difference between 512
+files and **1,599** (≈140MB): sending only the originals would leave every
+srcset variant 404ing even though the attachment row and its main file arrived.
+
+Files stream in 1MB chunks, written to a temporary name and moved into place
+only once the whole file has arrived and its SHA-256 matches. An interrupted
+transfer therefore leaves a stray `.rl-sync-part` file rather than a truncated
+image that looks present and renders broken.
+
+Paths are the dangerous input here — they arrive from another environment and
+are joined onto the uploads directory to be written. `UploadPath` validates
+rather than sanitises: absolute paths, traversal segments, stream wrappers, null
+bytes, unsafe characters and any extension outside a small allowlist are
+refused outright. A path that does not pass is never written and never even
+requested.
 
 ## 5. Maintenance
 

@@ -18,6 +18,7 @@ class WordPressAdminTheme
     {
         if (function_exists('add_action')) {
             add_action('admin_enqueue_scripts', [$this, 'enqueueGlobalAdminStyles'], 99);
+            add_action('admin_enqueue_scripts', [$this, 'recolorRedisCacheChart'], 100);
             add_action('wp_enqueue_scripts', [$this, 'enqueueSiteAdminBarStyles'], 99);
             add_action('wp_head', [$this, 'printSiteAdminBarStylesFallback'], 99);
             add_action('admin_bar_menu', [$this, 'customizeAdminBarLogo'], 999);
@@ -501,6 +502,57 @@ class WordPressAdminTheme
         if (function_exists('wp_add_inline_style')) {
             \wp_add_inline_style('wp-admin', $this->getGlobalAdminCss());
         }
+    }
+
+    /**
+     * Repaint the Redis Object Cache widget chart in the dashboard accent green.
+     */
+    public function recolorRedisCacheChart(): void
+    {
+        if (! function_exists('wp_add_inline_script') || ! function_exists('wp_script_is')) {
+            return;
+        }
+
+        if (! \wp_script_is('redis-cache', 'enqueued')) {
+            return;
+        }
+
+        \wp_add_inline_script('redis-cache', $this->getRedisCacheChartJs());
+    }
+
+    /**
+     * Return the script that swaps the Redis Object Cache chart's series colour
+     * for the dashboard accent green.
+     *
+     * The plugin builds its ApexCharts options while admin.js parses, and every
+     * chart gets its own deep copy of the palette, so the colour has to be
+     * replaced per chart rather than on the shared defaults. The defaults are
+     * patched too, because the tooltip templates read them at render time. This
+     * runs as an inline script attached to admin.js, which is early enough: the
+     * plugin only renders once jQuery reports the document ready.
+     */
+    public function getRedisCacheChartJs(): string
+    {
+        return <<<'JS'
+            (function () {
+                /* Matches .rl-dash-indicator-green / .rl-dash-bar-fill.rl-stage-3 */
+                var accent = '#10b981';
+
+                if (! window.rediscache || ! window.rediscache.chart_defaults) {
+                    return;
+                }
+
+                window.rediscache.chart_defaults.colors[0] = accent;
+
+                var charts = window.rediscache.charts || {};
+
+                for (var type in charts) {
+                    if (Object.prototype.hasOwnProperty.call(charts, type) && charts[type].colors) {
+                        charts[type].colors[0] = accent;
+                    }
+                }
+            })();
+            JS;
     }
 
     /**

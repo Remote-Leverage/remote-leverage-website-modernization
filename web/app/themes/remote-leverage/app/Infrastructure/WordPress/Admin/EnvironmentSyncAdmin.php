@@ -4,15 +4,22 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\WordPress\Admin;
 
+use App\Domains\Sync\Datasets\Dataset;
+use App\Domains\Sync\Datasets\DatasetRegistry;
 use App\Domains\Sync\Provisioning\SyncCredentialProvisioner;
+use App\Domains\Sync\SyncClient;
 use App\Domains\Sync\SyncEnvironment;
+use App\Domains\Sync\Transfer\SessionStore;
+use App\Domains\Sync\Transfer\TransferManifest;
+use App\Domains\Sync\Transfer\TransferPusher;
 use Throwable;
 
 /**
  * Settings → Environment Sync.
  *
- * Step 1 of docs/environment-sync.md: provisioning only. The dataset transfer
- * UI lands here too, but the credential has to exist before any of it can run.
+ * Credentials, a push form, and the history of transfers this environment has
+ * received. The credential has to exist before any transfer can run, which is
+ * why provisioning sits above the transfer form rather than beside it.
  *
  * The screen is never registered in production — see register(). That is the
  * outermost of the four gates in the design doc; the abilities enforce their
@@ -30,7 +37,12 @@ class EnvironmentSyncAdmin
      */
     private const PASSWORD_TRANSIENT = 'rl_env_sync_password_';
 
-    public function __construct(private readonly SyncCredentialProvisioner $provisioner) {}
+    public function __construct(
+        private readonly SyncCredentialProvisioner $provisioner,
+        private readonly DatasetRegistry $registry,
+        private readonly SessionStore $sessions,
+        private readonly TransferPusher $pusher,
+    ) {}
 
     public function register(): void
     {
@@ -71,6 +83,8 @@ class EnvironmentSyncAdmin
             match ($action) {
                 'provision' => $this->handleProvision(),
                 'revoke' => $this->handleRevoke(),
+                'push' => $this->handlePush(),
+                'rollback' => $this->handleRollback(),
                 default => null,
             };
         } catch (Throwable $e) {
@@ -119,7 +133,8 @@ class EnvironmentSyncAdmin
         }
 
         $this->renderCredentialSection($status);
-        $this->renderNextSteps();
+        $this->renderTransferSection();
+        $this->renderHistory();
 
         echo '</div>';
     }
@@ -225,13 +240,174 @@ class EnvironmentSyncAdmin
         echo '</p>';
     }
 
-    private function renderNextSteps(): void
+    /**
+     * Run a push in-request.
+     *
+     * A full push is ~28 round trips to the target, so the time limit is lifted.
+     * For a large selection the CLI (`wp acorn rl:sync:push`) is the more
+     * reliable path — it is not bound by the web server's own request timeout,
+     * which no amount of set_time_limit() can raise.
+     */
+    private function handlePush(): void
+    {
+        $manifest = TransferManifest::fromArray([
+            'direction' => TransferManifest::PUSH,
+            'datasets' => array_map('sanitize_key', (array) ($_POST['datasets'] ?? [])),
+            'excluded_post_types' => $this->csvField('excluded_post_types'),
+            'excluded_post_ids' => $this->csvField('excluded_post_ids'),
+            'clean_before_import' => array_map('sanitize_key', (array) ($_POST['clean'] ?? [])),
+        ], $this->registry);
+
+        $target = sanitize_key(wp_unslash($_POST['target'] ?? 'staging'));
+
+        @set_time_limit(0);
+
+        $result = $this->pusher->push($manifest, $target);
+
+        set_transient(
+            $this->noticeKey('success'),
+            sprintf(
+                'Pushed %d posts and %d meta rows to %s. Session %s, %d undo entries.',
+                $result['sent']['posts'],
+                $result['sent']['meta'],
+                $target,
+                $result['session_id'],
+                $result['undo_entries'],
+            ),
+            120,
+        );
+    }
+
+    private function handleRollback(): void
+    {
+        $sessionId = sanitize_text_field(wp_unslash($_POST['session_id'] ?? ''));
+        $target = sanitize_key(wp_unslash($_POST['target'] ?? 'staging'));
+
+        $result = (new SyncClient($target))->run('app/rollback-transfer', ['session_id' => $sessionId]);
+
+        if (($result['ok'] ?? false) !== true) {
+            set_transient($this->noticeKey('error'), (string) ($result['error'] ?? 'Rollback failed.'), 120);
+
+            return;
+        }
+
+        set_transient(
+            $this->noticeKey('success'),
+            sprintf('Reverted %d change(s) on %s.', (int) ($result['reverted'] ?? 0), $target),
+            120,
+        );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function csvField(string $name): array
+    {
+        $raw = sanitize_text_field(wp_unslash($_POST[$name] ?? ''));
+
+        return array_values(array_filter(array_map('trim', explode(',', $raw)), fn ($v) => $v !== ''));
+    }
+
+    private function renderTransferSection(): void
     {
         echo '<h2>Transfer</h2>';
-        echo '<p>Dataset selection, push/pull and media sync are not built yet — ';
-        echo 'see <code>docs/environment-sync.md</code> for the design and build order. ';
-        echo 'Credentials are step 1, and also unblock the existing ';
-        echo '<code>wp acorn rl:sync:settings</code> and <code>rl:sync:page</code> commands.</p>';
+
+        $targets = array_keys(array_filter(
+            (array) config('rl-sync.environments', []),
+            fn ($env) => ! empty($env['url']),
+        ));
+
+        if ($targets === []) {
+            echo '<div class="notice notice-warning inline"><p>No remote environments are configured. '
+                .'Add <code>STAGING_SYNC_URL</code>, <code>STAGING_SYNC_USER</code> and '
+                .'<code>STAGING_SYNC_APP_PASSWORD</code> to this environment&rsquo;s <code>.env</code>.</p></div>';
+
+            return;
+        }
+
+        echo '<form method="post" onsubmit="return confirm(\'This overwrites data on the target. Continue?\');">';
+        wp_nonce_field(self::SLUG);
+        echo '<input type="hidden" name="rl_sync_action" value="push">';
+
+        echo '<table class="form-table"><tbody>';
+
+        echo '<tr><th scope="row">Target</th><td><select name="target">';
+        foreach ($targets as $target) {
+            printf('<option value="%1$s">%1$s</option>', esc_attr((string) $target));
+        }
+        echo '</select></td></tr>';
+
+        echo '<tr><th scope="row">Datasets</th><td>';
+        foreach ($this->registry->transferable() as $dataset) {
+            $this->datasetRow($dataset);
+        }
+        echo '<p class="description">Leads, referrals, scheduling and users are never transferred. '
+            .'Content without media leaves posts pointing at attachments the target does not have.</p>';
+        echo '</td></tr>';
+
+        echo '<tr><th scope="row">Skip post types</th><td>'
+            .'<input type="text" name="excluded_post_types" class="regular-text" placeholder="case_study, page">'
+            .'<p class="description">Comma separated.</p></td></tr>';
+
+        echo '<tr><th scope="row">Skip post IDs</th><td>'
+            .'<input type="text" name="excluded_post_ids" class="regular-text" placeholder="7, 12">'
+            .'<p class="description">Comma separated.</p></td></tr>';
+
+        echo '</tbody></table>';
+        echo '<p><button type="submit" class="button button-primary">Push to target</button></p>';
+        echo '</form>';
+
+        echo '<p class="description">A large push is many round trips and can outrun the web server&rsquo;s '
+            .'request timeout. For a full sync prefer <code>wp acorn rl:sync:push --target=staging</code>, '
+            .'which is not bound by it.</p>';
+    }
+
+    private function datasetRow(Dataset $dataset): void
+    {
+        printf(
+            '<p><label><input type="checkbox" name="datasets[]" value="%s"%s> <strong>%s</strong></label>'
+            .' &nbsp; <label><input type="checkbox" name="clean[]" value="%s"> empty on target first</label>'
+            .'<br><span class="description">%s</span></p>',
+            esc_attr($dataset->key),
+            $dataset->defaultSelected ? ' checked' : '',
+            esc_html($dataset->label),
+            esc_attr($dataset->key),
+            esc_html($dataset->description),
+        );
+    }
+
+    private function renderHistory(): void
+    {
+        $sessions = $this->sessions->recent(10);
+
+        echo '<h2>Recent transfers</h2>';
+
+        if ($sessions === []) {
+            echo '<p>No transfers have been received by this environment yet.</p>';
+            echo '<p class="description">This list shows sessions this environment <em>received</em>. '
+                .'A push you send from here is recorded on the target, not locally.</p>';
+
+            return;
+        }
+
+        echo '<table class="widefat striped"><thead><tr>'
+            .'<th>Session</th><th>State</th><th>Datasets</th><th>Rows</th><th>Remapped</th><th></th>'
+            .'</tr></thead><tbody>';
+
+        foreach ($sessions as $session) {
+            $status = $session->toStatusArray();
+            printf(
+                '<tr><td><code>%s</code></td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>',
+                esc_html(substr($status['id'], 0, 8)),
+                esc_html($status['state']),
+                esc_html(implode(', ', $status['datasets'])),
+                (int) $status['total_rows'],
+                (int) $status['remapped_attachments'],
+                $status['error'] ? '<span class="description">'.esc_html($status['error']).'</span>' : '',
+            );
+        }
+
+        echo '</tbody></table>';
     }
 
     private function statusRow(string $label, bool $value): void

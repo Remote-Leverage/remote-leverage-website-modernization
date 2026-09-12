@@ -258,8 +258,22 @@ if (! Capsule::schema()->hasTable('posts')) {
         $table->string('post_status', 20)->default('publish');
         $table->string('post_type', 20)->default('post')->index();
         $table->string('post_name')->default('');
+        $table->string('guid')->default('');
         $table->integer('post_parent')->default(0);
-        $table->timestamp('post_date')->nullable();
+        $table->text('post_excerpt')->nullable();
+        $table->string('comment_status', 20)->default('open');
+        $table->string('ping_status', 20)->default('open');
+        $table->string('post_password')->default('');
+        $table->text('to_ping')->nullable();
+        $table->text('pinged')->nullable();
+        $table->text('post_content_filtered')->nullable();
+        $table->integer('menu_order')->default(0);
+        $table->string('post_mime_type')->default('');
+        $table->integer('comment_count')->default(0);
+        $table->string('post_date')->nullable();
+        $table->string('post_date_gmt')->nullable();
+        $table->string('post_modified')->nullable();
+        $table->string('post_modified_gmt')->nullable();
     });
 }
 
@@ -307,6 +321,38 @@ if (! function_exists('update_option')) {
         $GLOBALS['_wp_mock_options'][$option] = $value;
 
         return true;
+    }
+}
+
+if (! function_exists('delete_option')) {
+    function delete_option($option)
+    {
+        unset($GLOBALS['_wp_mock_options'][$option]);
+
+        return true;
+    }
+}
+
+if (! function_exists('wp_generate_uuid4')) {
+    function wp_generate_uuid4()
+    {
+        return sprintf(
+            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            random_int(0, 0xFFFF), random_int(0, 0xFFFF),
+            random_int(0, 0xFFFF),
+            random_int(0, 0x0FFF) | 0x4000,
+            random_int(0, 0x3FFF) | 0x8000,
+            random_int(0, 0xFFFF), random_int(0, 0xFFFF), random_int(0, 0xFFFF)
+        );
+    }
+}
+
+if (! function_exists('wp_upload_dir')) {
+    function wp_upload_dir()
+    {
+        $base = sys_get_temp_dir().'/rl-sync-tests';
+
+        return ['basedir' => $base, 'baseurl' => 'https://remoteleverage.com/app/uploads'];
     }
 }
 

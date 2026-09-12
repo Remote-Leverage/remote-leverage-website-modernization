@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Infrastructure\Providers;
 
 use App\Domains\Sync\Commands\GrantSyncCapabilityCommand;
+use App\Domains\Sync\Commands\PushTransferCommand;
+use App\Domains\Sync\Commands\RollbackTransferCommand;
 use App\Domains\Sync\Commands\SyncPageCommand;
 use App\Domains\Sync\Commands\SyncSettingsCommand;
 use App\Domains\Sync\Provisioning\SyncCredentialProvisioner;
@@ -26,14 +28,17 @@ class SyncServiceProvider extends ServiceProvider
                 SyncSettingsCommand::class,
                 SyncPageCommand::class,
                 GrantSyncCapabilityCommand::class,
+                PushTransferCommand::class,
+                RollbackTransferCommand::class,
             ]);
         }
 
         $this->app->singleton(SyncCredentialProvisioner::class, fn () => new SyncCredentialProvisioner);
-        $this->app->singleton(
-            EnvironmentSyncAdmin::class,
-            fn ($app) => new EnvironmentSyncAdmin($app->make(SyncCredentialProvisioner::class)),
-        );
+
+        // Autowired rather than hand-constructed: the screen's dependencies grow
+        // as the feature does, and every one of them (registry, session store,
+        // exporter, pusher) is resolvable without configuration.
+        $this->app->singleton(EnvironmentSyncAdmin::class);
     }
 
     /**

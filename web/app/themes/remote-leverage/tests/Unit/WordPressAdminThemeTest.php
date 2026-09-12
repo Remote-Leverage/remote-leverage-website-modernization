@@ -157,6 +157,24 @@ describe('WordPressAdminTheme Branding & Modernization', function () {
             ->and($site['title'])->toBe('View Live Website');
     });
 
+    it('repaints the Redis Object Cache chart in the dashboard accent green', function () {
+        $theme = new WordPressAdminTheme;
+        $js = $theme->getRedisCacheChartJs();
+
+        // Same green as .rl-dash-indicator-green and .rl-dash-bar-fill.rl-stage-3.
+        expect($js)->toContain("var accent = '#10b981';")
+            ->and($theme->getGlobalAdminCss())->toContain('#10b981');
+
+        // The plugin's per-chart options are deep copies of the defaults, so both
+        // the shared palette (read by the tooltips) and each chart must be patched.
+        expect($js)->toContain('window.rediscache.chart_defaults.colors[0] = accent;')
+            ->toContain('charts[type].colors[0] = accent;')
+            ->toContain('window.rediscache.charts || {}');
+
+        // Bails out instead of throwing when the plugin is inactive.
+        expect($js)->toContain('if (! window.rediscache || ! window.rediscache.chart_defaults) {');
+    });
+
     it('strictly contains zero unicode emojis', function () {
         $theme = new WordPressAdminTheme;
 

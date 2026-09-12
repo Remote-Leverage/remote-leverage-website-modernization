@@ -128,6 +128,29 @@ final class DatasetRegistry
         ];
     }
 
+    /**
+     * The order datasets must be imported in.
+     *
+     * Media first, always. Content is rewritten against the attachment ID map
+     * as it is written, so every attachment has to have landed — and every
+     * collision been resolved — before the first post referencing one is
+     * imported. Importing content first would rewrite against a map that is
+     * still empty and leave the references pointing at the source's IDs.
+     *
+     * @param  array<int, string>  $datasets
+     * @return array<int, string>
+     */
+    public function importOrder(array $datasets): array
+    {
+        $order = [self::MEDIA, self::CONTENT, self::SETTINGS];
+
+        $ordered = array_values(array_filter($order, fn (string $k) => in_array($k, $datasets, true)));
+
+        // Anything not in the known order keeps its caller-supplied position at
+        // the end, so adding a dataset without updating this cannot drop it.
+        return array_merge($ordered, array_values(array_diff($datasets, $order)));
+    }
+
     public function get(string $key): Dataset
     {
         $all = $this->all();
