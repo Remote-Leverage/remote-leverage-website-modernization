@@ -7,6 +7,8 @@ use App\Domains\Sync\SyncClient;
 use App\Domains\Sync\SyncNotPermittedException;
 use App\Domains\Sync\Transfer\Export\ContentExporter;
 use App\Domains\Sync\Transfer\Media\MediaFileExporter;
+use App\Domains\Sync\Transfer\Push\PushJobRunner;
+use App\Domains\Sync\Transfer\Push\PushJobStore;
 use App\Domains\Sync\Transfer\TransferManifest;
 use App\Domains\Sync\Transfer\TransferPusher;
 use Illuminate\Support\Facades\DB;
@@ -64,11 +66,16 @@ beforeEach(function () {
 
     $this->registry = new DatasetRegistry;
     $this->client = new FakeSyncClient;
+    $GLOBALS['_wp_mock_options'] = [];
+
     $this->pusher = new TransferPusher(
-        $this->registry,
-        new ContentExporter($this->registry),
-        new MediaFileExporter,
-        fn () => $this->client,
+        new PushJobStore($this->registry),
+        new PushJobRunner(
+            $this->registry,
+            new ContentExporter($this->registry),
+            new MediaFileExporter,
+            fn () => $this->client,
+        ),
     );
 });
 
@@ -184,18 +191,18 @@ describe('the push conversation', function () {
     });
 
     it('walks every post across multiple batches', function () {
-        foreach (range(1, TransferPusher::BATCH_SIZE + 5) as $id) {
+        foreach (range(1, PushJobRunner::BATCH_SIZE + 5) as $id) {
             seedPost($id);
         }
 
         $result = $this->pusher->push(pushManifest(), 'staging');
 
         expect($this->client->chunks())->toHaveCount(2)
-            ->and($result['sent']['posts'])->toBe(TransferPusher::BATCH_SIZE + 5);
+            ->and($result['sent']['posts'])->toBe(PushJobRunner::BATCH_SIZE + 5);
     });
 
     it('sends each post exactly once', function () {
-        foreach (range(1, TransferPusher::BATCH_SIZE + 5) as $id) {
+        foreach (range(1, PushJobRunner::BATCH_SIZE + 5) as $id) {
             seedPost($id);
         }
 
@@ -208,7 +215,7 @@ describe('the push conversation', function () {
         }
 
         expect($ids)->toBe(array_unique($ids))
-            ->and($ids)->toHaveCount(TransferPusher::BATCH_SIZE + 5);
+            ->and($ids)->toHaveCount(PushJobRunner::BATCH_SIZE + 5);
     });
 
     it('sends no chunk at all when nothing matches', function () {
@@ -219,16 +226,21 @@ describe('the push conversation', function () {
     });
 
     it('reports progress as it goes', function () {
-        foreach (range(1, TransferPusher::BATCH_SIZE + 1) as $id) {
+        foreach (range(1, PushJobRunner::BATCH_SIZE + 1) as $id) {
             seedPost($id);
         }
 
         $seen = [];
-        $this->pusher->push(pushManifest(), 'staging', function (string $dataset, array $sent) use (&$seen) {
-            $seen[] = $sent['posts'];
+        $this->pusher->push(pushManifest(), 'staging', function (string $phase, array $status) use (&$seen) {
+            if ($phase === 'rows') {
+                $seen[] = $status['counters']['posts'];
+            }
         });
 
-        expect($seen)->toBe([TransferPusher::BATCH_SIZE, TransferPusher::BATCH_SIZE + 1]);
+        // One callback per step, so the running total is reported as it climbs
+        // and then once more on the step that finds the dataset exhausted.
+        expect($seen)->toContain(PushJobRunner::BATCH_SIZE)
+            ->and(end($seen))->toBe(PushJobRunner::BATCH_SIZE + 1);
     });
 
     it('returns the target\'s closing summary', function () {

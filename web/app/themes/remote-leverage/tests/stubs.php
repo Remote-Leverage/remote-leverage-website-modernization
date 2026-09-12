@@ -120,6 +120,7 @@ $capsule->bootEloquent();
 // Bind the manager as "db" so the DB facade resolves here the same way it does
 // under Acorn — production code uses DB::table(), not Capsule directly.
 $app->instance('db', $capsule->getDatabaseManager());
+$app->instance('db.schema', $capsule->getConnection()->getSchemaBuilder());
 
 // Ensure test schema exists
 if (! Capsule::schema()->hasTable('rl_referrers')) {

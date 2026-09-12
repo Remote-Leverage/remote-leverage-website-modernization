@@ -6,10 +6,14 @@ use App\Ai\Abilities\UpdateLandingPageContentAbility;
 use App\Domains\Sync\Abilities\BeginTransferAbility;
 use App\Domains\Sync\Abilities\CheckMediaFilesAbility;
 use App\Domains\Sync\Abilities\ExportLandingPageAbility;
+use App\Domains\Sync\Abilities\ExportMediaManifestAbility;
 use App\Domains\Sync\Abilities\ExportSyncableSettingsAbility;
+use App\Domains\Sync\Abilities\ExportTransferBatchAbility;
 use App\Domains\Sync\Abilities\FinishTransferAbility;
 use App\Domains\Sync\Abilities\ImportLandingPageAbility;
 use App\Domains\Sync\Abilities\ImportSyncableSettingsAbility;
+use App\Domains\Sync\Abilities\PurgeDatasetAbility;
+use App\Domains\Sync\Abilities\ReadMediaFileAbility;
 use App\Domains\Sync\Abilities\ReceiveMediaFileAbility;
 use App\Domains\Sync\Abilities\ReceiveTransferChunkAbility;
 use App\Domains\Sync\Abilities\RollbackTransferAbility;
@@ -47,6 +51,14 @@ return [
         RollbackTransferAbility::class,
         CheckMediaFilesAbility::class,
         ReceiveMediaFileAbility::class,
+
+        // Pull: the remote acts as the source. All three are read-only.
+        ExportTransferBatchAbility::class,
+        ExportMediaManifestAbility::class,
+        ReadMediaFileAbility::class,
+
+        // Maintenance. Never transfers anything; only empties purgeable datasets.
+        PurgeDatasetAbility::class,
         ExportLandingPageAbility::class,
         ImportLandingPageAbility::class,
     ],

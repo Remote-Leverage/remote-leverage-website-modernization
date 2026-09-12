@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Infrastructure\Providers;
 
 use App\Domains\Sync\Commands\GrantSyncCapabilityCommand;
+use App\Domains\Sync\Commands\PullTransferCommand;
+use App\Domains\Sync\Commands\PurgeDatasetCommand;
 use App\Domains\Sync\Commands\PushTransferCommand;
+use App\Domains\Sync\Commands\RollbackLocalCommand;
 use App\Domains\Sync\Commands\RollbackTransferCommand;
 use App\Domains\Sync\Commands\SyncPageCommand;
 use App\Domains\Sync\Commands\SyncSettingsCommand;
@@ -29,6 +32,9 @@ class SyncServiceProvider extends ServiceProvider
                 SyncPageCommand::class,
                 GrantSyncCapabilityCommand::class,
                 PushTransferCommand::class,
+                PullTransferCommand::class,
+                PurgeDatasetCommand::class,
+                RollbackLocalCommand::class,
                 RollbackTransferCommand::class,
             ]);
         }

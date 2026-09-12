@@ -9,9 +9,11 @@ use App\Domains\Sync\Datasets\DatasetRegistry;
 use App\Domains\Sync\Provisioning\SyncCredentialProvisioner;
 use App\Domains\Sync\SyncClient;
 use App\Domains\Sync\SyncEnvironment;
+use App\Domains\Sync\Transfer\Push\PushJobRunner;
+use App\Domains\Sync\Transfer\Push\PushJobStore;
 use App\Domains\Sync\Transfer\SessionStore;
 use App\Domains\Sync\Transfer\TransferManifest;
-use App\Domains\Sync\Transfer\TransferPusher;
+use App\Domains\Sync\Transfer\UndoLogFactory;
 use Throwable;
 
 /**
@@ -41,7 +43,9 @@ class EnvironmentSyncAdmin
         private readonly SyncCredentialProvisioner $provisioner,
         private readonly DatasetRegistry $registry,
         private readonly SessionStore $sessions,
-        private readonly TransferPusher $pusher,
+        private readonly PushJobStore $jobs,
+        private readonly PushJobRunner $runner,
+        private readonly UndoLogFactory $undoLogs,
     ) {}
 
     public function register(): void
@@ -52,6 +56,7 @@ class EnvironmentSyncAdmin
 
         add_action('admin_menu', [$this, 'addMenuPage']);
         add_action('admin_init', [$this, 'handleActions']);
+        add_action('wp_ajax_rl_sync_push_step', [$this, 'handlePushStep']);
     }
 
     public function addMenuPage(): void
@@ -85,6 +90,7 @@ class EnvironmentSyncAdmin
                 'revoke' => $this->handleRevoke(),
                 'push' => $this->handlePush(),
                 'rollback' => $this->handleRollback(),
+                'rollback_local' => $this->handleRollbackLocal(),
                 default => null,
             };
         } catch (Throwable $e) {
@@ -133,6 +139,7 @@ class EnvironmentSyncAdmin
         }
 
         $this->renderCredentialSection($status);
+        $this->renderRunningJob();
         $this->renderTransferSection();
         $this->renderHistory();
 
@@ -241,12 +248,12 @@ class EnvironmentSyncAdmin
     }
 
     /**
-     * Run a push in-request.
+     * Create the job. Do none of the work.
      *
-     * A full push is ~28 round trips to the target, so the time limit is lifted.
-     * For a large selection the CLI (`wp acorn rl:sync:push`) is the more
-     * reliable path — it is not bound by the web server's own request timeout,
-     * which no amount of set_time_limit() can raise.
+     * The push itself is then driven by the browser, one step per AJAX request,
+     * because running it here is what returned a 504: the whole conversation is
+     * far longer than nginx's proxy timeout, and PHP's own time limit is not
+     * what was being hit.
      */
     private function handlePush(): void
     {
@@ -260,22 +267,75 @@ class EnvironmentSyncAdmin
 
         $target = sanitize_key(wp_unslash($_POST['target'] ?? 'staging'));
 
-        @set_time_limit(0);
+        if ($target === SyncEnvironment::PRODUCTION) {
+            throw new \RuntimeException('Refusing to push to production.');
+        }
 
-        $result = $this->pusher->push($manifest, $target);
+        $job = $this->jobs->create($manifest, $target);
 
-        set_transient(
-            $this->noticeKey('success'),
-            sprintf(
-                'Pushed %d posts and %d meta rows to %s. Session %s, %d undo entries.',
-                $result['sent']['posts'],
-                $result['sent']['meta'],
-                $target,
-                $result['session_id'],
-                $result['undo_entries'],
-            ),
-            120,
-        );
+        set_transient($this->noticeKey('job'), $job->id, HOUR_IN_SECONDS);
+    }
+
+    /**
+     * Advance a push by exactly one step and report progress.
+     *
+     * Each call does a bounded amount of work — one batch of rows, or one chunk
+     * of one file — so no single request can approach the proxy timeout however
+     * large the transfer is.
+     */
+    public function handlePushStep(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Not permitted.'], 403);
+        }
+
+        check_ajax_referer(self::SLUG);
+
+        if (! SyncEnvironment::syncEnabled()) {
+            wp_send_json_error(['message' => 'Sync is not available in this environment.'], 403);
+        }
+
+        $job = $this->jobs->find(sanitize_text_field(wp_unslash($_POST['job'] ?? '')));
+
+        if ($job === null) {
+            wp_send_json_error(['message' => 'Unknown push job.'], 404);
+        }
+
+        $job = $this->runner->step($job);
+        $this->jobs->save($job);
+
+        wp_send_json_success($job->toStatusArray());
+    }
+
+    /**
+     * Undo a transfer imported into this environment, using its own undo log.
+     */
+    private function handleRollbackLocal(): void
+    {
+        $sessionId = sanitize_text_field(wp_unslash($_POST['session_id'] ?? ''));
+        $session = $this->sessions->find($sessionId);
+
+        if ($session === null) {
+            set_transient($this->noticeKey('error'), 'Unknown session.', 60);
+
+            return;
+        }
+
+        $log = $this->undoLogs->for($session->id);
+
+        if (! $log->exists()) {
+            set_transient($this->noticeKey('error'), 'That session has nothing recorded to roll back.', 60);
+
+            return;
+        }
+
+        $applied = $log->rollback();
+        $log->discard();
+
+        $session->fail('Rolled back: '.$applied.' change(s) reverted.');
+        $this->sessions->save($session);
+
+        set_transient($this->noticeKey('success'), "Reverted {$applied} change(s).", 60);
     }
 
     private function handleRollback(): void
@@ -306,6 +366,96 @@ class EnvironmentSyncAdmin
         $raw = sanitize_text_field(wp_unslash($_POST[$name] ?? ''));
 
         return array_values(array_filter(array_map('trim', explode(',', $raw)), fn ($v) => $v !== ''));
+    }
+
+    /**
+     * The progress panel, and the loop that drives it.
+     *
+     * Plain fetch() in a loop rather than anything scheduled: the work only
+     * needs to continue while someone is watching, and a browser-driven loop
+     * needs no cron, no queue and no worker on either environment — none of
+     * which this stack has.
+     */
+    private function renderRunningJob(): void
+    {
+        $jobId = get_transient($this->noticeKey('job'));
+
+        if (! is_string($jobId) || $jobId === '') {
+            return;
+        }
+
+        delete_transient($this->noticeKey('job'));
+
+        $job = $this->jobs->find($jobId);
+
+        if ($job === null) {
+            return;
+        }
+
+        printf(
+            '<div class="notice notice-info"><p><strong>Push in progress</strong> &rarr; %s</p>'
+            .'<p id="rl-sync-progress"><em>Starting...</em></p>'
+            .'<p class="description">Keep this tab open. Each step is a separate request, so the '
+            .'transfer is not bound by the server&rsquo;s request timeout.</p></div>',
+            esc_html($job->target),
+        );
+
+        $this->renderProgressScript($job->id);
+    }
+
+    private function renderProgressScript(string $jobId): void
+    {
+        $payload = wp_json_encode([
+            'ajax' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce(self::SLUG),
+            'job' => $jobId,
+        ]);
+
+        ?>
+        <script>
+        (function () {
+            var cfg = <?php echo $payload; ?>;
+            var out = document.getElementById('rl-sync-progress');
+
+            function step() {
+                var body = new FormData();
+                body.append('action', 'rl_sync_push_step');
+                body.append('_wpnonce', cfg.nonce);
+                body.append('job', cfg.job);
+
+                fetch(cfg.ajax, { method: 'POST', body: body, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (res) {
+                        if (!res.success) {
+                            out.innerHTML = '<strong>Failed:</strong> ' +
+                                ((res.data && res.data.message) || 'unknown error');
+                            return;
+                        }
+
+                        var s = res.data;
+                        out.textContent = s.label;
+
+                        if (s.finished) {
+                            if (s.phase === 'failed' && s.session_id) {
+                                out.innerHTML = out.textContent +
+                                    '<br><em>Session ' + s.session_id +
+                                    ' is still on the target and can be rolled back.</em>';
+                            }
+                            return;
+                        }
+
+                        step();
+                    })
+                    .catch(function (e) {
+                        out.innerHTML = '<strong>Request failed:</strong> ' + e +
+                            '<br><em>Reload to resume from where it stopped.</em>';
+                    });
+            }
+
+            step();
+        })();
+        </script>
+        <?php
     }
 
     private function renderTransferSection(): void
@@ -396,18 +546,43 @@ class EnvironmentSyncAdmin
 
         foreach ($sessions as $session) {
             $status = $session->toStatusArray();
+
+            // The full ID, not a prefix: this is the value you need to roll the
+            // session back, whether from the button beside it or the CLI.
             printf(
-                '<tr><td><code>%s</code></td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>',
-                esc_html(substr($status['id'], 0, 8)),
+                '<tr><td><code style="user-select:all;">%s</code></td>'
+                .'<td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s',
+                esc_html($status['id']),
                 esc_html($status['state']),
                 esc_html(implode(', ', $status['datasets'])),
                 (int) $status['total_rows'],
                 (int) $status['remapped_attachments'],
-                $status['error'] ? '<span class="description">'.esc_html($status['error']).'</span>' : '',
+                $status['error'] ? '<span class="description">'.esc_html($status['error']).'</span> ' : '',
             );
+
+            $this->rollbackButton($status['id']);
+
+            echo '</td></tr>';
         }
 
         echo '</tbody></table>';
+    }
+
+    /**
+     * Undo a transfer this environment received.
+     *
+     * Local, not remote: the sessions listed here are the ones imported into
+     * this install, so the undo log that can reverse them is this one's.
+     */
+    private function rollbackButton(string $sessionId): void
+    {
+        echo '<form method="post" style="display:inline;" '
+            .'onsubmit="return confirm(\'Revert everything this transfer wrote here?\');">';
+        wp_nonce_field(self::SLUG);
+        echo '<input type="hidden" name="rl_sync_action" value="rollback_local">';
+        printf('<input type="hidden" name="session_id" value="%s">', esc_attr($sessionId));
+        echo '<button type="submit" class="button button-small">Roll back</button>';
+        echo '</form>';
     }
 
     private function statusRow(string $label, bool $value): void
