@@ -9,6 +9,9 @@ use App\Domains\Sync\Datasets\DatasetRegistry;
 use App\Domains\Sync\Provisioning\SyncCredentialProvisioner;
 use App\Domains\Sync\SyncClient;
 use App\Domains\Sync\SyncEnvironment;
+use App\Domains\Sync\Transfer\DatasetPurger;
+use App\Domains\Sync\Transfer\Pull\PullJobRunner;
+use App\Domains\Sync\Transfer\Pull\PullJobStore;
 use App\Domains\Sync\Transfer\Push\PushJobRunner;
 use App\Domains\Sync\Transfer\Push\PushJobStore;
 use App\Domains\Sync\Transfer\SessionStore;
@@ -46,6 +49,9 @@ class EnvironmentSyncAdmin
         private readonly PushJobStore $jobs,
         private readonly PushJobRunner $runner,
         private readonly UndoLogFactory $undoLogs,
+        private readonly PullJobStore $pullJobs,
+        private readonly PullJobRunner $pullRunner,
+        private readonly DatasetPurger $purger,
     ) {}
 
     public function register(): void
@@ -57,6 +63,7 @@ class EnvironmentSyncAdmin
         add_action('admin_menu', [$this, 'addMenuPage']);
         add_action('admin_init', [$this, 'handleActions']);
         add_action('wp_ajax_rl_sync_push_step', [$this, 'handlePushStep']);
+        add_action('wp_ajax_rl_sync_pull_step', [$this, 'handlePullStep']);
     }
 
     public function addMenuPage(): void
@@ -91,6 +98,8 @@ class EnvironmentSyncAdmin
                 'push' => $this->handlePush(),
                 'rollback' => $this->handleRollback(),
                 'rollback_local' => $this->handleRollbackLocal(),
+                'pull' => $this->handlePull(),
+                'purge' => $this->handlePurge(),
                 default => null,
             };
         } catch (Throwable $e) {
@@ -140,7 +149,10 @@ class EnvironmentSyncAdmin
 
         $this->renderCredentialSection($status);
         $this->renderRunningJob();
+        $this->renderRunningPull();
         $this->renderTransferSection();
+        $this->renderPullSection();
+        $this->renderMaintenanceSection();
         $this->renderHistory();
 
         echo '</div>';
@@ -308,6 +320,108 @@ class EnvironmentSyncAdmin
     }
 
     /**
+     * Create the pull job. Like push, the work is driven from the browser.
+     */
+    private function handlePull(): void
+    {
+        $manifest = TransferManifest::fromArray([
+            'direction' => TransferManifest::PULL,
+            'datasets' => array_map('sanitize_key', (array) ($_POST['pull_datasets'] ?? [])),
+            'excluded_post_types' => $this->csvField('pull_excluded_post_types'),
+            'excluded_post_ids' => $this->csvField('pull_excluded_post_ids'),
+        ], $this->registry);
+
+        $source = sanitize_key(wp_unslash($_POST['source'] ?? 'staging'));
+        $job = $this->pullJobs->create($manifest, $source);
+
+        set_transient($this->noticeKey('pulljob'), $job->id, HOUR_IN_SECONDS);
+    }
+
+    public function handlePullStep(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Not permitted.'], 403);
+        }
+
+        check_ajax_referer(self::SLUG);
+
+        if (! SyncEnvironment::syncEnabled()) {
+            wp_send_json_error(['message' => 'Sync is not available in this environment.'], 403);
+        }
+
+        $job = $this->pullJobs->find(sanitize_text_field(wp_unslash($_POST['job'] ?? '')));
+
+        if ($job === null) {
+            wp_send_json_error(['message' => 'Unknown pull job.'], 404);
+        }
+
+        $job = $this->pullRunner->step($job);
+        $this->pullJobs->save($job);
+
+        wp_send_json_success($job->toStatusArray());
+    }
+
+    /**
+     * Empty a purgeable dataset, here or on a remote.
+     *
+     * The typed confirmation has to match the environment being emptied, not
+     * just be non-empty: the mistake worth guarding against is purging the
+     * environment you did not mean to, and only naming it proves which one you
+     * had in mind.
+     */
+    private function handlePurge(): void
+    {
+        $dataset = sanitize_key(wp_unslash($_POST['purge_dataset'] ?? ''));
+        $where = sanitize_key(wp_unslash($_POST['purge_where'] ?? 'local'));
+        $typed = sanitize_text_field(wp_unslash($_POST['purge_confirm'] ?? ''));
+
+        $expected = $where === 'local' ? SyncEnvironment::current() : $where;
+
+        if ($typed !== $expected) {
+            set_transient(
+                $this->noticeKey('error'),
+                "Confirmation did not match \"{$expected}\". Nothing was deleted.",
+                60,
+            );
+
+            return;
+        }
+
+        $deleted = $where === 'local'
+            ? $this->purger->purge($dataset)
+            : $this->purgeRemotely($dataset, $where);
+
+        $summary = [];
+
+        foreach ($deleted as $table => $count) {
+            $summary[] = $count < 0 ? "{$table}: table not present" : "{$table}: {$count}";
+        }
+
+        set_transient(
+            $this->noticeKey('success'),
+            'Purged '.$dataset.' on '.$expected.' — '.implode(', ', $summary),
+            120,
+        );
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function purgeRemotely(string $dataset, string $target): array
+    {
+        $result = (new SyncClient($target))->run('app/purge-dataset', [
+            'dataset' => $dataset,
+            'confirm_environment' => $target,
+        ]);
+
+        if (($result['ok'] ?? false) !== true) {
+            throw new \RuntimeException((string) ($result['error'] ?? 'Purge failed.'));
+        }
+
+        return (array) ($result['deleted'] ?? []);
+    }
+
+    /**
      * Undo a transfer imported into this environment, using its own undo log.
      */
     private function handleRollbackLocal(): void
@@ -400,26 +514,28 @@ class EnvironmentSyncAdmin
             esc_html($job->target),
         );
 
-        $this->renderProgressScript($job->id);
+        $this->renderProgressScript($job->id, 'rl_sync_push_step', 'rl-sync-progress');
     }
 
-    private function renderProgressScript(string $jobId): void
+    private function renderProgressScript(string $jobId, string $action, string $elementId): void
     {
         $payload = wp_json_encode([
             'ajax' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce(self::SLUG),
             'job' => $jobId,
+            'action' => $action,
+            'el' => $elementId,
         ]);
 
         ?>
         <script>
         (function () {
             var cfg = <?php echo $payload; ?>;
-            var out = document.getElementById('rl-sync-progress');
+            var out = document.getElementById(cfg.el);
 
             function step() {
                 var body = new FormData();
-                body.append('action', 'rl_sync_push_step');
+                body.append('action', cfg.action);
                 body.append('_wpnonce', cfg.nonce);
                 body.append('job', cfg.job);
 
@@ -458,14 +574,147 @@ class EnvironmentSyncAdmin
         <?php
     }
 
+    private function renderRunningPull(): void
+    {
+        $jobId = get_transient($this->noticeKey('pulljob'));
+
+        if (! is_string($jobId) || $jobId === '') {
+            return;
+        }
+
+        delete_transient($this->noticeKey('pulljob'));
+
+        $job = $this->pullJobs->find($jobId);
+
+        if ($job === null) {
+            return;
+        }
+
+        printf(
+            '<div class="notice notice-info"><p><strong>Pull in progress</strong> &larr; %s</p>'
+            .'<p id="rl-sync-pull-progress"><em>Starting...</em></p>'
+            .'<p class="description">Keep this tab open. This overwrites local data as it goes; '
+            .'use Roll back in Recent transfers to undo it.</p></div>',
+            esc_html($job->source),
+        );
+
+        $this->renderProgressScript($job->id, 'rl_sync_pull_step', 'rl-sync-pull-progress');
+    }
+
+    /**
+     * Pull is the safer direction — everything it overwrites is local — so it
+     * needs a lighter confirmation than push, but it is still destructive here.
+     */
+    private function renderPullSection(): void
+    {
+        $sources = $this->configuredEnvironments();
+
+        if ($sources === []) {
+            return;
+        }
+
+        echo '<h2>Pull from a remote</h2>';
+        echo '<p>Fetches the remote&rsquo;s data into <em>this</em> environment, overwriting what is here. '
+            .'Undoable from Recent transfers below.</p>';
+
+        echo '<form method="post" onsubmit="return confirm(\'This overwrites local data. Continue?\');">';
+        wp_nonce_field(self::SLUG);
+        echo '<input type="hidden" name="rl_sync_action" value="pull">';
+
+        echo '<table class="form-table"><tbody>';
+
+        echo '<tr><th scope="row">Source</th><td><select name="source">';
+        foreach ($sources as $source) {
+            printf('<option value="%1$s">%1$s</option>', esc_attr((string) $source));
+        }
+        echo '</select></td></tr>';
+
+        echo '<tr><th scope="row">Datasets</th><td>';
+        foreach ($this->registry->transferable() as $dataset) {
+            printf(
+                '<p><label><input type="checkbox" name="pull_datasets[]" value="%s"%s> %s</label></p>',
+                esc_attr($dataset->key),
+                $dataset->defaultSelected ? ' checked' : '',
+                esc_html($dataset->label),
+            );
+        }
+        echo '</td></tr>';
+
+        echo '<tr><th scope="row">Skip post types</th><td>'
+            .'<input type="text" name="pull_excluded_post_types" class="regular-text"></td></tr>';
+        echo '<tr><th scope="row">Skip post IDs</th><td>'
+            .'<input type="text" name="pull_excluded_post_ids" class="regular-text"></td></tr>';
+
+        echo '</tbody></table>';
+        echo '<p><button type="submit" class="button">Pull into this environment</button></p>';
+        echo '</form>';
+    }
+
+    /**
+     * Purge: the only thing that may touch leads, referrals and scheduling.
+     *
+     * Kept visually separate from transfer because it is the one irreversible
+     * action on this screen — there is no undo log for a purge, by design.
+     */
+    private function renderMaintenanceSection(): void
+    {
+        echo '<h2>Maintenance</h2>';
+        echo '<p>Empties a dataset that is never copied between environments. '
+            .'<strong>This cannot be undone.</strong></p>';
+
+        echo '<form method="post">';
+        wp_nonce_field(self::SLUG);
+        echo '<input type="hidden" name="rl_sync_action" value="purge">';
+
+        echo '<table class="form-table"><tbody>';
+
+        echo '<tr><th scope="row">Dataset</th><td><select name="purge_dataset">';
+        foreach ($this->registry->purgeable() as $dataset) {
+            $counts = $this->purger->preview($dataset->key);
+            $total = array_sum(array_filter($counts, fn (int $c) => $c >= 0));
+            printf(
+                '<option value="%s">%s (%d rows here)</option>',
+                esc_attr($dataset->key),
+                esc_html($dataset->label),
+                $total,
+            );
+        }
+        echo '</select></td></tr>';
+
+        echo '<tr><th scope="row">Where</th><td><select name="purge_where">';
+        printf('<option value="local">this environment (%s)</option>', esc_html(SyncEnvironment::current()));
+        foreach ($this->configuredEnvironments() as $env) {
+            printf('<option value="%1$s">%1$s</option>', esc_attr((string) $env));
+        }
+        echo '</select></td></tr>';
+
+        echo '<tr><th scope="row">Confirm</th><td>'
+            .'<input type="text" name="purge_confirm" class="regular-text" '
+            .'placeholder="type the environment name" autocomplete="off">'
+            .'<p class="description">Type the name of the environment you are emptying. '
+            .'A mismatch deletes nothing.</p></td></tr>';
+
+        echo '</tbody></table>';
+        echo '<p><button type="submit" class="button button-link-delete">Purge</button></p>';
+        echo '</form>';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function configuredEnvironments(): array
+    {
+        return array_keys(array_filter(
+            (array) config('rl-sync.environments', []),
+            fn ($env) => ! empty($env['url']),
+        ));
+    }
+
     private function renderTransferSection(): void
     {
         echo '<h2>Transfer</h2>';
 
-        $targets = array_keys(array_filter(
-            (array) config('rl-sync.environments', []),
-            fn ($env) => ! empty($env['url']),
-        ));
+        $targets = $this->configuredEnvironments();
 
         if ($targets === []) {
             echo '<div class="notice notice-warning inline"><p>No remote environments are configured. '

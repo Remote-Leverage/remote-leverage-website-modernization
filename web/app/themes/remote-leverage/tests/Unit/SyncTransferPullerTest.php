@@ -8,6 +8,8 @@ use App\Domains\Sync\SyncNotPermittedException;
 use App\Domains\Sync\Transfer\Import\AttachmentReferenceRewriter;
 use App\Domains\Sync\Transfer\Import\ContentImporter;
 use App\Domains\Sync\Transfer\Media\MediaFileExporter;
+use App\Domains\Sync\Transfer\Pull\PullJobRunner;
+use App\Domains\Sync\Transfer\Pull\PullJobStore;
 use App\Domains\Sync\Transfer\SessionStore;
 use App\Domains\Sync\Transfer\TransferManifest;
 use App\Domains\Sync\Transfer\TransferPuller;
@@ -72,12 +74,16 @@ beforeEach(function () {
     $this->client = new FakeSourceClient;
     $this->undoLogs = new UndoLogFactory;
     $this->puller = new TransferPuller(
-        $this->registry,
-        new SessionStore($this->registry),
-        new ContentImporter($this->registry, new AttachmentReferenceRewriter),
+        new PullJobStore($this->registry),
+        new PullJobRunner(
+            $this->registry,
+            new SessionStore($this->registry),
+            new ContentImporter($this->registry, new AttachmentReferenceRewriter),
+            $this->undoLogs,
+            new MediaFileExporter,
+            fn () => $this->client,
+        ),
         $this->undoLogs,
-        new MediaFileExporter,
-        fn () => $this->client,
     );
 });
 
@@ -132,7 +138,7 @@ describe('pulling rows', function () {
 
         expect(DB::table('posts')->where('ID', 5)->first()->post_title)->toBe('From remote')
             ->and(DB::table('postmeta')->where('post_id', 5)->count())->toBe(1)
-            ->and($result['session']['state'])->toBe('complete');
+            ->and($result['session']['phase'])->toBe('done');
     });
 
     it('follows the cursor across batches', function () {
