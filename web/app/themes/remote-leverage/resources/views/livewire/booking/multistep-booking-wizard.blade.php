@@ -494,6 +494,32 @@
                     <label class="block text-[13.5px] font-medium text-slate-900">
                       What's your company's monthly revenue?
                     </label>
+                    @php
+                      $revenueOptions = [
+                        '$0 to $5k Per Month' => '$0k to $5k',
+                        '$5k to $10k Per Month' => '$5k to $10k',
+                        '$10k to $50k Per Month' => '$10k to $50k',
+                        '$50k-$100k Per Month' => '$50k-$100k',
+                        '$100k+ Per Month' => '$100k+',
+                      ];
+                    @endphp
+
+                    @if ($compactFields)
+                      <select
+                        id="default-monthly-revenue"
+                        name="monthlyRevenue"
+                        aria-label="Monthly company revenue"
+                        x-model="monthlyRevenueVal"
+                        wire:model.live="monthlyRevenue"
+                        @change="onFieldInput('monthly_revenue', {{ $stepIdx }})"
+                        class="w-full px-4 py-2.5 h-[48px] rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#F8248A]/15 focus:border-[#F8248A] text-sm text-slate-900 bg-[#F8F9FA] transition"
+                      >
+                        <option value="">Company Revenue per Month</option>
+                        @foreach ($revenueOptions as $val => $label)
+                          <option value="{{ $val }}">{{ $label }}</option>
+                        @endforeach
+                      </select>
+                    @else
                     <div class="flex flex-wrap gap-2.5 pt-0.5">
                       @foreach ([
                         '$0 to $5k Per Month' => '$0k to $5k',
@@ -521,12 +547,13 @@
                         </label>
                       @endforeach
                     </div>
+                    @endif
                     @error('monthlyRevenue') <span class="text-status-alert text-xs block mt-1">{{ $message }}</span> @enderror
                   </div>
 
                 @elseif ($fieldKey === 'name')
-                  {{-- 3. Name (First & Last - Full-Width Stacked) --}}
-                  <div class="space-y-4">
+                  {{-- 3. Name — stacked normally, side by side in narrow contexts. --}}
+                  <div class="{{ $compactFields ? 'grid grid-cols-2 gap-3' : 'space-y-4' }}">
                     <div class="space-y-1.5">
                       <label for="default-first-name" class="block text-[13.5px] font-medium text-slate-900 cursor-pointer">
                         First Name: <span class="text-slate-900">*</span>

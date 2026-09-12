@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace App\Support;
 
 /**
- * Turns a rendered legal document (Privacy Policy, Terms of Use) into content
- * with stable heading anchors plus the table of contents that links to them.
+ * Turns rendered post content into content with stable heading anchors plus the
+ * table of contents that links to them. Used by the legal templates and by
+ * long-form blog posts.
  *
  * The source content stays plain Gutenberg headings/paragraphs/lists so editors
- * keep editing legal copy as ordinary rich text — the anchors and the TOC are
- * derived at render time rather than stored, so adding a section to the document
- * adds it to the sidebar navigation for free.
+ * keep editing copy as ordinary rich text — the anchors and the TOC are derived
+ * at render time rather than stored, so adding a section to the document adds it
+ * to the sidebar navigation for free.
  */
-class LegalDocument
+class DocumentOutline
 {
     /**
      * @param  string  $html  Rendered post content.
@@ -67,6 +68,13 @@ class LegalDocument
                 $text = trim(html_entity_decode(wp_strip_all_tags($inner), ENT_QUOTES, 'UTF-8'));
 
                 if ($text === '') {
+                    return $full;
+                }
+
+                // Furniture that happens to carry a heading — the article summary box,
+                // for one — opts out rather than becoming a navigable section. This is
+                // what production's TOC script does with its own exclusion list.
+                if (preg_match('/\sdata-toc=(["\'])skip\1/i', $attributes)) {
                     return $full;
                 }
 

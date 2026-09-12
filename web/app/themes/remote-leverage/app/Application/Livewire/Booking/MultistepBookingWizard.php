@@ -46,6 +46,10 @@ class MultistepBookingWizard extends Component
 
     public bool $hideProgressBar = false;
 
+    /** Narrow contexts (the article sidebar) need first/last name on one row and
+     *  the revenue picker as a dropdown rather than a wrapping row of pills. */
+    public bool $compactFields = false;
+
     public string $buttonText = 'Next: Pick a Date';
 
     // Step 1: Contact / Qualification Details
@@ -182,6 +186,7 @@ class MultistepBookingWizard extends Component
         array $isolatedSteps = [],
         bool $hideProfileHeader = false,
         bool $hideProgressBar = false,
+        bool $compactFields = false,
         string $buttonText = 'Next: Pick a Date',
         ...$rest
     ): void {
@@ -209,6 +214,12 @@ class MultistepBookingWizard extends Component
         if (isset($rest['hideProgressBar'])) {
             $hideProgressBar = (bool) $rest['hideProgressBar'];
         }
+        if (isset($rest['compact-fields'])) {
+            $compactFields = (bool) $rest['compact-fields'];
+        }
+        if (isset($rest['compactFields'])) {
+            $compactFields = (bool) $rest['compactFields'];
+        }
         if (isset($rest['button-text'])) {
             $buttonText = (string) $rest['button-text'];
         }
@@ -228,6 +239,7 @@ class MultistepBookingWizard extends Component
         $this->isolatedSteps = $isolatedSteps;
         $this->hideProfileHeader = $hideProfileHeader;
         $this->hideProgressBar = $hideProgressBar;
+        $this->compactFields = $compactFields;
         $this->buttonText = $buttonText;
 
         if ($this->enableIsolatedFields) {

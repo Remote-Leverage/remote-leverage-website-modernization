@@ -587,6 +587,13 @@ if (! function_exists('wp_strip_all_tags')) {
     }
 }
 
+if (! function_exists('strip_shortcodes')) {
+    function strip_shortcodes($content)
+    {
+        return preg_replace('/\[\/?[^\]]+\]/', '', (string) $content);
+    }
+}
+
 if (! function_exists('sanitize_title')) {
     function sanitize_title($title)
     {

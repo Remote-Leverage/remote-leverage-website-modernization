@@ -9,7 +9,7 @@
     @php
       the_post();
 
-      $document = new \App\Support\LegalDocument(apply_filters('the_content', get_the_content()));
+      $document = new \App\Support\DocumentOutline(apply_filters('the_content', get_the_content()));
       $sections = $document->sections();
 
       $lastUpdated = get_post_meta(get_the_ID(), 'legal_last_updated', true)
@@ -52,7 +52,7 @@
           {{-- Sidebar navigation --}}
           @if (count($sections) > 1)
             <aside class="hidden lg:block lg:sticky lg:top-28 -mt-10 print:hidden"
-                   x-data="rlLegalToc()"
+                   x-data="rlDocumentToc()"
                    x-init="observe()">
               <nav class="rounded-card border border-slate-200/80 bg-white p-6 shadow-sm max-h-[calc(100vh-9rem)] overflow-y-auto"
                    aria-label="{{ __('On this page', 'remote-leverage') }}">

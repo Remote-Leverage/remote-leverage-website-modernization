@@ -5,6 +5,8 @@
 @source "../**/*.js";
 @source "../../patterns/**/*.php";
 
+@import "./blog.css";
+
 /* Latin (+ latin-ext) Inter variable from @fontsource-variable/inter.
    League Spartan and Poppins were unused; Inter Display is the same
    outline with optical sizing, which we turn off on headings below. */
@@ -996,6 +998,22 @@
   .rl-desktop-nav .menu-item.group:hover > a svg,
   .rl-desktop-nav .menu-item.group:focus-within > a svg {
     transform: rotate(180deg);
+  }
+
+  /* The panel is offset from its trigger by mt-2, and that 8px strip belongs to
+     neither element — so moving the pointer down to the menu drops :hover and the
+     panel closes before it can be reached. This transparent bridge spans the gap.
+     It hangs off the menu item rather than the panel: the Roles panel scrolls
+     (overflow-y:auto), which clips anything drawn outside its own box. Only present
+     while open, so it never sits over the page when the menu is closed. */
+  .rl-desktop-nav .menu-item.group:hover::after,
+  .rl-desktop-nav .menu-item.group:focus-within::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 12px;
   }
 }
 

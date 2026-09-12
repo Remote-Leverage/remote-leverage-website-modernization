@@ -232,7 +232,7 @@ window.rlBookingWizardIsolated = rlBookingWizardIsolated;
  * vary wildly in length — a long clause can leave no heading inside an observer
  * band at all, which reads to the user as the highlight falling off.
  */
-function rlLegalToc() {
+function rlDocumentToc() {
   return {
     active: '',
 
@@ -319,7 +319,7 @@ function rlLegalToc() {
   };
 }
 
-window.rlLegalToc = rlLegalToc;
+window.rlDocumentToc = rlDocumentToc;
 
 /**
  * Horizontal card carousel: auto-advance, arrow buttons, and pointer drag.
@@ -582,7 +582,7 @@ const registerAlpine = () => {
   if (window.Alpine) {
     window.Alpine.data('phoneInputComponent', phoneInputComponent);
     window.Alpine.data('rlBookingWizardIsolated', rlBookingWizardIsolated);
-    window.Alpine.data('rlLegalToc', rlLegalToc);
+    window.Alpine.data('rlDocumentToc', rlDocumentToc);
   }
 };
 

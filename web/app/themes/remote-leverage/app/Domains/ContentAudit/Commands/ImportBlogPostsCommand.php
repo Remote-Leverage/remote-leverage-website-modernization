@@ -21,7 +21,10 @@ class ImportBlogPostsCommand extends Command
         {--dir= : Directory holding the fetched p-*.json files}
         {--limit=0 : Maximum posts to import this run (0 = all)}
         {--with-images : Also sideload featured images}
+        {--author= : User ID or login to attribute posts to (default: the Remote Leverage house account)}
         {--dry-run : Report what would happen without writing}';
+
+    private const HOUSE_AUTHOR_LOGIN = 'remote-leverage';
 
     protected $description = 'Import blog posts from captured production JSON, converting Elementor markup to Gutenberg';
 
@@ -64,6 +67,25 @@ class ImportBlogPostsCommand extends Command
         $limit = (int) $this->option('limit');
         $dry = (bool) $this->option('dry-run');
         $withImages = (bool) $this->option('with-images');
+        $author = $this->resolveAuthor($dry);
+
+        if ($author === 0 && ! $dry) {
+            $this->error('Could not resolve an author. Pass --author=<id|login>.');
+
+            return self::FAILURE;
+        }
+
+        // Production's "Also read" cross-links have no href, so titles are matched
+        // against the imported set to give them a real destination.
+        $linkMap = [];
+
+        foreach ($posts as $candidate) {
+            $key = ElementorProseExtractor::normalise($candidate['title']['rendered'] ?? '');
+
+            if ($key !== '') {
+                $linkMap[$key] = home_url('/blog/'.$candidate['slug'].'/');
+            }
+        }
 
         $created = $updated = $skipped = $failed = 0;
         $done = 0;
@@ -75,7 +97,8 @@ class ImportBlogPostsCommand extends Command
             $done++;
 
             $slug = $post['slug'];
-            $content = $extractor->extract($post['content']['rendered'] ?? '');
+            $rendered = $post['content']['rendered'] ?? '';
+            $content = $extractor->extract($rendered, $linkMap);
 
             if (trim($content) === '') {
                 $this->warn("  {$slug}: no prose extracted, skipped");
@@ -89,10 +112,11 @@ class ImportBlogPostsCommand extends Command
             $payload = [
                 'post_type' => 'post',
                 'post_status' => 'publish',
+                'post_author' => $author,
                 'post_name' => $slug,
-                'post_title' => wp_strip_all_tags($post['title']['rendered'] ?? $slug),
+                'post_title' => $this->title($post['title']['rendered'] ?? $slug),
                 'post_content' => $content,
-                'post_excerpt' => wp_strip_all_tags($post['excerpt']['rendered'] ?? ''),
+                'post_excerpt' => $this->excerpt($extractor->summary($rendered), $content),
                 'post_date' => str_replace('T', ' ', (string) ($post['date'] ?? '')),
                 'post_modified' => str_replace('T', ' ', (string) ($post['modified'] ?? '')),
             ];
@@ -119,6 +143,16 @@ class ImportBlogPostsCommand extends Command
 
             $this->assignTerms($id, $post, $catMap, $tagMap);
 
+            // Always terminal on production, so it is meta the template renders
+            // rather than markup frozen into post_content.
+            $faqs = $extractor->faqs($rendered);
+
+            if ($faqs) {
+                update_post_meta($id, 'rl_faqs', $faqs);
+            } else {
+                delete_post_meta($id, 'rl_faqs');
+            }
+
             if ($withImages && ! empty($post['featured_media'])) {
                 $this->attachFeaturedImage($id, (int) $post['featured_media']);
             }
@@ -132,6 +166,86 @@ class ImportBlogPostsCommand extends Command
             : "Created {$created}, updated {$updated}, skipped {$skipped}, failed {$failed}.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Posts imported without an author land on user 0, which leaves the byline
+     * blank and the author archive empty.
+     *
+     * Production's Elementor header carries per-writer bylines, but they are
+     * published under one house voice here, so everything is attributed to a
+     * single "Remote Leverage" account — created on first run, reused after.
+     */
+    private function resolveAuthor(bool $dry): int
+    {
+        $option = (string) $this->option('author');
+
+        if ($option !== '') {
+            $user = is_numeric($option) ? get_user_by('id', (int) $option) : get_user_by('login', $option);
+
+            return $user ? (int) $user->ID : 0;
+        }
+
+        if ($house = get_user_by('login', self::HOUSE_AUTHOR_LOGIN)) {
+            return (int) $house->ID;
+        }
+
+        if ($dry) {
+            $this->line('  Would create house author "Remote Leverage".');
+
+            return 0;
+        }
+
+        $id = wp_insert_user([
+            'user_login' => self::HOUSE_AUTHOR_LOGIN,
+            'user_nicename' => self::HOUSE_AUTHOR_LOGIN,
+            'display_name' => 'Remote Leverage',
+            'first_name' => 'Remote Leverage',
+            'user_email' => 'editorial@remoteleverage.com',
+            'user_pass' => wp_generate_password(32),
+            'role' => 'author',
+            'description' => 'Our research and staffing team places pre-vetted bilingual talent across Latin America and Europe. Every guide is checked against live market hiring rates, compliance requirements, and the workflows our clients actually run.',
+        ]);
+
+        if (is_wp_error($id)) {
+            $this->error('  house author: '.$id->get_error_message());
+
+            return 0;
+        }
+
+        $this->line('  Created house author "Remote Leverage".');
+
+        return (int) $id;
+    }
+
+    /**
+     * REST returns titles HTML-encoded ("Cold Calling Script &#8211; Free
+     * Download"). Stored as-is, WordPress escapes the ampersand again on output
+     * and the reader sees the entity itself, so decode before saving.
+     */
+    private function title(string $rendered): string
+    {
+        return html_entity_decode(wp_strip_all_tags($rendered), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    /**
+     * Production's REST excerpts are auto-generated from the whole Elementor
+     * template, so they open with the header furniture ("Written by: … 10 MIN
+     * READ Copy Link …"). The hand-written Quick Summary is the real standfirst;
+     * posts without one fall back to the opening paragraph of the article.
+     *
+     * @param  string[]  $summary
+     */
+    private function excerpt(array $summary, string $content): string
+    {
+        $source = $summary[0] ?? '';
+
+        if ($source === '') {
+            preg_match('/<p>(.*?)<\/p>/s', $content, $match);
+            $source = $match[1] ?? '';
+        }
+
+        return wp_trim_words(wp_strip_all_tags($source), 40, '…');
     }
 
     /** @return array<int,int> */
@@ -179,12 +293,16 @@ class ImportBlogPostsCommand extends Command
         $response = wp_remote_get("https://remoteleverage.com/wp-json/wp/v2/media/{$remoteMediaId}?_fields=source_url", ['timeout' => 30]);
 
         if (is_wp_error($response)) {
+            $this->warn('  media '.$remoteMediaId.': '.$response->get_error_message());
+
             return;
         }
 
         $url = json_decode((string) wp_remote_retrieve_body($response), true)['source_url'] ?? null;
 
         if (! $url) {
+            $this->warn('  media '.$remoteMediaId.': not readable on production (unpublished?)');
+
             return;
         }
 
@@ -202,8 +320,14 @@ class ImportBlogPostsCommand extends Command
 
         $attachmentId = media_sideload_image($url, $postId, null, 'id');
 
-        if (! is_wp_error($attachmentId)) {
-            set_post_thumbnail($postId, $attachmentId);
+        // Downloads fail transiently often enough that silence here hides real
+        // gaps — a re-run picks them up, but only if the run said something.
+        if (is_wp_error($attachmentId)) {
+            $this->warn('  media '.$remoteMediaId.': '.$attachmentId->get_error_message());
+
+            return;
         }
+
+        set_post_thumbnail($postId, $attachmentId);
     }
 }

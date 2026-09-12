@@ -1,0 +1,1384 @@
+/* ═══════════════════════════════════════════════════════════ */
+/* PRODUCTION BLOG COMPONENTS                                  */
+/* ═══════════════════════════════════════════════════════════ */
+/* Ported verbatim from production's rl-elementor-blocks        */
+/* stylesheet so the blog index and article pages match the     */
+/* live site exactly. Class names are production's, so the      */
+/* Blade markup mirrors its DOM and these rules apply as-is.    */
+/*                                                             */
+/* Deliberately NOT ported: the @font-face for Gilroy (no font  */
+/* file, and unused), the global `body { font-family }` and     */
+/* bare `h1..h6` rules (they would leak across the whole site — */
+/* the heading rule is scoped below instead), and production's  */
+/* nav, footer, lead-form and Gravity Forms styles, which v2    */
+/* already has its own versions of.                             */
+
+:root {
+	--rl-brand-purple: #520054;
+	--rl-brand-purple-light: #270028;
+	--rl-brand-pink-light: #FAF0F6;
+	--rl-brand-purple-gray: #F1EBF1;
+	--rl-text-dark: #270028;
+	--rl-text-gray: #666666;
+	--rl-border-color: #E5E5E5;
+	--rl-font-main: 'Inter Display', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	--rl-font-hero: 'Inter Display', sans-serif;
+	--rl-color01: #FDB8FF;
+	--rl-color02: #FEEBFF;
+	--rl-color03: #DBBEDC;
+	--rl-color-black: #000;
+	--rl-color-white: #FFF;
+}
+
+.rl-blog-article-template {
+	font-family: var(--rl-font-main);
+	color: var(--rl-text-dark);
+}
+
+.rl-blog-article-template * {
+	box-sizing: border-box;
+}
+
+/* Production applies this to every h1-h6 on the site. Scoped here so it cannot
+   reach the marketing pages, which have their own heading scale — but the scope
+   goes in :where(), which adds no specificity. That matters: production's rule is
+   a bare element selector (0,0,1) that loses to .rl-header-title's white (0,1,0),
+   and scoping it normally would raise it to (0,1,1) and turn the hero title black. */
+:where(.rl-blog-article-template) h1,
+:where(.rl-blog-article-template) h2,
+:where(.rl-blog-article-template) h3,
+:where(.rl-blog-article-template) h4,
+:where(.rl-blog-article-template) h5,
+:where(.rl-blog-article-template) h6 {
+	font-family: var(--rl-font-hero);
+	color: black;
+}
+
+/* ===== Layout Grid (Sidebar & Main content) ===== */
+
+
+.rl-layout-container {
+	margin-top: 40px;
+}
+
+@media (min-width: 900px) {
+	.rl-article-sidebar {
+		position: sticky;
+		top: 40px;
+		height: max-content;
+	}
+}
+
+/* ===== Sidebar Meta Data ===== */
+
+.rl-meta-data {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	border-bottom: 2px solid var(--rl-brand-pink-light);
+	padding-bottom: 12px;
+	margin-bottom: 24px;
+}
+
+.rl-read-time {
+	font-size: 14px;
+	font-weight: 700;
+	letter-spacing: 0.5px;
+	text-transform: uppercase;
+}
+
+.rl-copy-link {
+	font-size: 14px;
+	color: var(--rl-brand-purple);
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+/* ===== Header Widget ===== */
+
+.rl-article-header-wrapper {
+	background-color: var(--rl-brand-purple);
+	color: #ffffff;
+	padding: 40px 20px;
+	display: flex;
+	justify-content: center;
+	/* Production caps the hero at its 1182.67px container; v2 runs the purple
+	   edge to edge instead. The inner is pinned to 1103px — what the capped
+	   version resolved to — so the image and title land in the same place. */
+	width: 100%;
+}
+
+.rl-header-inner {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	/* 1380px container less its 2x20px padding — the article grid's content box. */
+	max-width: 1340px;
+	margin: 0 auto;
+	gap: 40px;
+}
+
+@media (min-width: 900px) {
+	.rl-article-header-wrapper {
+		/* 20px horizontal to match .rl-article-layout's padding, so the hero image
+		   and the contents column share a left edge at every viewport width. */
+		padding: 80px 20px;
+	}
+	.rl-header-inner {
+		flex-direction: row;
+		align-items: center;
+	}
+}
+
+.rl-header-left {
+	flex: 0 0 100%;
+	background-color: #3b003d; /* Darker wrapper for the image */
+	border-radius: 12px;
+	overflow: hidden;
+	min-height: 250px;
+}
+
+@media (min-width: 900px) {
+	.rl-header-left {
+		flex: 0 0 45%;
+	}
+}
+
+.rl-header-featured-image {
+	width: 100%;
+	height: 100% !important;
+	object-fit: cover;
+	display: block;
+}
+
+.rl-header-right {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+
+@media (min-width: 900px) {
+	.rl-header-right {
+		flex: 1;
+		padding-left: 20px;
+	}
+}
+
+.rl-header-breadcrumbs {
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 1.5px;
+	margin-bottom: 24px;
+	color: var(--rl-brand-pink-light);
+}
+
+.rl-header-breadcrumbs a {
+	color: inherit;
+	text-decoration: none;
+	transition: opacity 0.3s ease;
+}
+
+.rl-header-breadcrumbs a:hover {
+	opacity: 0.8;
+	text-decoration: underline;
+}
+
+.rl-header-title {
+	font-family: var(--rl-font-hero) !important;
+	font-size: 32px;
+	line-height: 1.25;
+	font-weight: 500;
+	margin: 0 0 40px 0;
+	color: #ffffff;
+}
+
+@media (min-width: 900px) {
+	.rl-header-title {
+		font-size: 42px;
+	}
+}
+
+.rl-header-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 30px;
+	align-items: center;
+	border-top: 1px solid rgba(255, 255, 255, 0.15);
+	padding-top: 24px;
+}
+
+.rl-header-meta-item {
+	display: flex;
+	align-items: center;
+}
+
+.rl-author-avatar {
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	object-fit: cover;
+	margin-right: 16px;
+}
+
+.rl-meta-details {
+	display: flex;
+	flex-direction: column;
+}
+
+.rl-meta-label {
+	font-size: 11px;
+	color: rgba(255, 255, 255, 0.6);
+	margin-bottom: 6px;
+	font-weight: 600;
+}
+
+.rl-meta-value {
+	font-size: 13px;
+	font-weight: 500;
+	color: #ffffff;
+}
+
+/* ===== Summary Section (Pink Box) ===== */
+
+.rl-summary-box {
+	background-color: var(--rl-brand-pink-light);
+	border-radius: 8px;
+	padding: 32px 48px;
+	margin-bottom: 40px;
+}
+
+.rl-summary-content p {
+	font-size: 16px;
+	line-height: 1.6;
+	margin-bottom: 16px;
+	color: var(--rl-text-dark);
+	&:not(:last-child) {
+		padding-bottom: 16px;
+		border-bottom: solid 1px #EBD4EC;
+	}
+}
+
+.rl-summary-content p:last-child {
+	margin-bottom: 0;
+}
+
+/* ===== Author Bio Widget ===== */
+
+.rl-author-bio-card {
+	display: flex;
+	align-items: flex-start;
+	background-color: var(--rl-brand-purple-gray); /* Light pink background */
+	border-radius: 12px;
+	padding: 32px;
+	margin-top: 40px;
+	gap: 24px;
+}
+
+.rl-author-avatar {
+	flex-shrink: 0;
+	height: 100px !important;
+	width: 100px !important;
+	border-radius: 4px !important; /* Square with slight rounding */
+	overflow: hidden;
+}
+
+.rl-author-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.rl-author-info {
+	flex: 1;
+}
+
+.rl-author-name {
+	font-size: 24px;
+	font-weight: 600;
+	margin: 0 0 6px 0;
+	color: #270028 !important; /* Deep deep purple */
+	font-family: var(--rl-font-hero);
+}
+
+.rl-author-role {
+	font-size: 15px;
+	color: #735674; /* Muted purple role */
+	font-weight: 500;
+	margin: 0 0 16px 0;
+}
+
+.rl-author-text {
+	font-size: 16px;
+	line-height: 1.6;
+	color: var(--rl-text-dark);
+	margin: 0;
+}
+
+/* ===== Table of Content ===== */
+
+.rl-table-of-content {
+    margin-bottom: 32px;
+    border: 1px solid #E5E5E5;
+    border-radius: 12px;
+    padding: 32px;
+    background-color: #FBFBFB;
+}
+
+.rl-toc-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding-bottom: 16px;
+	margin-bottom: 16px;
+}
+
+.rl-toc-read-time {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--rl-text-dark);
+	text-transform: uppercase;
+}
+
+.rl-toc-copy-link {
+    font-size: 14px;
+    color: #520054;
+    text-decoration: underline;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.rl-toc-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.rl-toc-item {
+	margin-bottom: 18px;
+}
+
+.rl-toc-item:last-child {
+	margin-bottom: 0;
+}
+
+.rl-toc-item a {
+	color: var(--rl-text-dark);
+	text-decoration: none;
+	font-size: 14px;
+	font-weight: 500;
+	transition: color 0.2s;
+}
+
+.rl-toc-item a:hover {
+	color: var(--rl-brand-purple);
+}
+
+/* ===== FAQ Accordion ===== */
+
+.rl-faq-section {
+	margin: 40px 0;
+}
+
+.rl-faq-section h3 {
+	font-size: 28px;
+	margin-bottom: 24px;
+}
+
+.rl-accordion-item {
+	border-bottom: 1px solid var(--rl-brand-purple-light);
+}
+
+.rl-accordion-header {
+    width: 100%;
+    background: none !important;
+    border: none !important;
+    text-align: left;
+    padding: 20px 0 !important;
+    font-size: 24px !important;
+    font-weight: 600 !important;
+    color: var(--rl-text-dark) !important;
+    cursor: pointer !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+
+.rl-accordion-header[aria-expanded="true"] .rl-icon-toggle::after {
+	transform: rotate(90deg);
+	opacity: 0;
+}
+
+.rl-accordion-content {
+	display: none;
+	padding: 0 0 20px 0;
+	font-size: 16px;
+	line-height: 1.6;
+	color: var(--rl-text-gray);
+}
+
+.rl-accordion-header[aria-expanded="true"] + .rl-accordion-content {
+	display: block;
+}
+
+/* ===== Sales Talent Carousel ===== */
+
+.rl-talent-carousel-wrapper {
+	display: flex;
+	align-items: center;
+	background-color: #F8F8F8;
+	padding: 32px;
+	border-radius: 8px;
+	margin: 40px 0;
+	gap: 40px;
+}
+
+.rl-talent-intro {
+	flex-shrink: 0;
+	width: 200px;
+}
+
+.rl-talent-intro h3 {
+	font-size: 20px;
+	margin-top: 0;
+	margin-bottom: 16px;
+}
+
+.rl-btn-primary {
+	display: inline-block;
+	background-color: var(--rl-brand-purple);
+	color: #ffffff;
+	text-decoration: none;
+	padding: 12px 20px;
+	border-radius: 4px;
+	font-weight: 600;
+	font-size: 14px;
+}
+
+.rl-talent-carousel {
+	flex: 1;
+	overflow: hidden;
+	display: flex;
+	gap: 16px;
+}
+
+.rl-article-talent-card {
+	background: #ffffff;
+	border-radius: 8px;
+	overflow: hidden;
+	box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+	flex-shrink: 0;
+	position: relative;
+}
+
+.rl-talent-image {
+	width: 100%;
+	height: 180px;
+	object-fit: cover;
+	display: block;
+}
+
+.rl-talent-info-banner {
+	padding: 12px;
+	background: #ffffff;
+	position: relative;
+}
+
+.rl-talent-flag {
+	position: absolute;
+	top: -15px;
+	right: 12px;
+	width: 24px;
+	height: 24px;
+	background-color: #eee;
+	border-radius: 50%;
+	border: 2px solid #ffffff;
+	/* In a real project, we'd map .rl-flag-ar to a background image URL */
+}
+
+.rl-talent-details strong {
+	display: block;
+	font-size: 14px;
+	margin-bottom: 2px;
+}
+
+.rl-talent-details span {
+	display: block;
+	font-size: 12px;
+	color: var(--rl-text-gray);
+}
+
+/* ===== Blog Index Header Widget ===== */
+
+.rl-blog-index-header {
+	background-color: #25104A; /* Darker purple from mockup */
+	color: #ffffff;
+	padding: 60px 20px;
+	display: flex;
+	justify-content: center;
+}
+
+.rl-index-header-inner {
+	width: 100%;
+	max-width: 1320px;
+	display: flex;
+	flex-direction: column;
+}
+
+.rl-index-label {
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 1.5px;
+	margin-bottom: 16px;
+	color: var(--rl-brand-pink-light);
+}
+
+.rl-index-title {
+	font-size: 40px;
+	font-weight: 500;
+	margin: 0 0 24px 0;
+	color: #ffffff;
+	line-height: 1.2;
+	font-family: var(--rl-font-hero) !important;
+}
+
+@media (min-width: 900px) {
+	.rl-index-title {
+		font-size: 48px;
+	}
+}
+
+.rl-index-description {
+	font-size: 16px;
+	line-height: 1.6;
+	color: rgba(255, 255, 255, 0.85);
+	max-width: 700px;
+	margin: 0;
+}
+
+/* ===== Blog Index Filter Widget ===== */
+
+.rl-blog-index-filter-bar {
+	background-color: #2B1856; /* Mid purple */
+	padding: 0 20px;
+	display: flex;
+	justify-content: center;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rl-filter-inner {
+	width: 100%;
+	max-width: 1320px;
+    overflow-x: auto; /* Enable scrolling for many tabs on mobile */
+}
+
+.rl-filter-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	gap: 32px;
+	align-items: center;
+}
+
+.rl-filter-item {
+	display: inline-block;
+}
+
+.rl-filter-link {
+	display: block;
+	padding: 24px 0;
+	color: rgba(255, 255, 255, 0.7) !important;
+	text-decoration: none !important;
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	position: relative;
+	transition: color 0.2s;
+	white-space: nowrap;
+}
+
+.rl-filter-link:hover,
+.rl-filter-link.rl-active-filter {
+	color: #e500e5 !important; /* Bright pink accent */
+}
+
+.rl-filter-link.rl-active-filter::after {
+	content: '';
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 3px;
+	background-color: #e500e5 !important; /* Bright pink underline */
+}
+
+/* ===== Blog Index Grid Widget ===== */
+
+.rl-blog-index-grid-wrapper {
+	padding: 60px 20px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	background-color: #ffffff;
+}
+
+.rl-posts-grid {
+	width: 100%;
+	max-width: 1320px;
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 60px 30px;
+}
+
+@media (min-width: 600px) {
+	.rl-posts-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (min-width: 1024px) {
+	.rl-posts-grid {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}
+
+.rl-post-card {
+	display: flex;
+	flex-direction: column;
+}
+
+.rl-post-image-link {
+	display: block;
+	width: 100%;
+	height: 280px;
+	background-color: var(--rl-brand-pink-light); /* Placeholder bg */
+	margin-bottom: 20px;
+	overflow: hidden;
+}
+
+.rl-post-image {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+	transition: transform 0.3s ease;
+}
+
+.rl-post-image-link:hover .rl-post-image {
+	transform: scale(1.05); /* Subtle zoom on hover */
+}
+
+.rl-post-image-placeholder {
+	width: 100%;
+	height: 100%;
+	background-color: var(--rl-brand-pink-light);
+}
+
+.rl-post-meta {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 12px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.5px;
+	text-transform: uppercase;
+}
+
+.rl-post-category {
+	color: var(--rl-brand-purple);
+}
+
+.rl-post-date {
+	color: var(--rl-text-gray);
+}
+
+.rl-post-title {
+	font-size: 18px;
+	line-height: 1.4;
+	font-weight: 500;
+	margin: 0;
+}
+
+.rl-post-title a {
+	color: var(--rl-text-dark);
+	text-decoration: none;
+	transition: color 0.2s;
+}
+
+.rl-post-title a:hover {
+	color: var(--rl-brand-purple);
+}
+
+/* ===== Blog Index Pagination ===== */
+
+.rl-pagination {
+	width: 100%;
+	max-width: 1320px;
+	margin: 60px auto 0;
+	display: flex;
+	justify-content: center;
+}
+
+.rl-pagination .page-numbers {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.rl-pagination .page-numbers li {
+	display: inline-flex;
+}
+
+.rl-pagination .page-numbers a,
+.rl-pagination .page-numbers span {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 40px;
+	height: 40px;
+	padding: 0 10px;
+	border: 1px solid var(--rl-border-color, #e0e0e0);
+	border-radius: 4px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--rl-text-dark, #1a1a1a);
+	text-decoration: none;
+	transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+	line-height: 1;
+}
+
+.rl-pagination .page-numbers a:hover {
+	background-color: var(--rl-brand-purple, #3b003d);
+	color: #ffffff;
+	border-color: var(--rl-brand-purple, #3b003d);
+}
+
+.rl-pagination .page-numbers .current {
+	background-color: var(--rl-brand-purple, #3b003d);
+	color: #ffffff;
+	border-color: var(--rl-brand-purple, #3b003d);
+}
+
+.rl-pagination .page-numbers .dots {
+	border-color: transparent;
+	background: transparent;
+}
+
+/* ===== Also Read Widget ===== */
+
+.rl-also-read-box {
+	background-color: var(--rl-brand-purple-gray);
+	border-radius: 12px;
+	padding: 32px;
+	margin: 40px 0;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.rl-also-read-label {
+	font-size: 14px;
+	font-weight: 600;
+	color: #270028;
+}
+
+.rl-also-read-link {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--rl-brand-purple) !important;
+	text-decoration: none;
+	line-height: 1.4;
+	transition: opacity 0.3s ease;
+}
+
+.rl-also-read-link:hover {
+	opacity: 0.8;
+}
+
+/* ===== Production overrides (their "Developer CSS" block, applied last) ===== */
+					.rl-table-of-content, .rl-summary-box { margin-bottom: 0; }
+.rl-author-bio-card { margin-top: 0;}
+
+/* Banner Section */
+.rl-header-left { flex: 0 0 35%; }
+.rl-header-right { padding-left: 0; }
+.rl-header-author .rl-author-avatar { height: 44px !important; width: 44px !important; border-radius: 50% !important; }
+.rl-header-breadcrumbs { font-size: 14px; line-height: 20px; font-weight: 600; margin-bottom: 10px; color: var(--rl-color-white); }
+.rl-header-title { line-height: 54px; font-weight: 400; margin: 0 0 20px 0; }
+.rl-header-meta { border-top: none; padding-top: 0; }
+.rl-meta-label { font-size: 14px; line-height: 22px; margin-bottom: 0px; font-weight: 500; color: var(--rl-color03); }
+.rl-meta-value { font-size: 14px; line-height: 22px; color: var(--rl-color03); }
+.rl-header-author .rl-meta-label, .rl-header-author .rl-meta-value { color: var(--rl-color-white); }
+
+/* Summary Box */
+.rl-summary-box { background: var(--rl-color02); border: 0.5px solid var(--rl-color01); padding: 30px 40px; }
+.rl-summary-content p { line-height: 24px; margin-bottom: 18px; font-weight: 400; color: var(--rl-color-black); }
+.rl-summary-content p { &:not(:last-child) { padding-bottom: 18px; } }
+
+/* Lead From Wrapper */
+
+/* Table of content */
+.rl-table-of-content { border: 1px solid #DADADA; border-radius: 10px; padding: 20px 30px 30px; }
+.rl-toc-header { padding-bottom: 20px; margin-bottom: 0; }
+.rl-toc-read-time { font-size: 16px; line-height: 24px; font-weight: 700; color: var(--rl-color-black); }
+.rl-toc-item a { color: var(--rl-color-black) !important; font-size: 16px; line-height: 24px; font-weight: 400; }
+.rl-toc-copy-link { font-size: 16px; line-height: 24px; color: #640466 !important; text-decoration: underline !important; font-weight: 400; }
+
+/* Table */
+.rl-table-headline { font-family: var(--rl-font-hero); font-size: 24px; line-height: 32px; font-weight: 400; margin-bottom: 14px; margin-top: 0px; color: var(--rl-color-black); }
+
+/* FAQ */
+.rl-faq-section h3 { font-size: 36px; line-height: 48px; }
+.rl-accordion-item:first-child { border-top: 1px solid #2C012D; }
+.rl-accordion-header { padding: 5px 0 !important; font-size: 24px !important; line-height: 48px !important; font-weight: 500 !important; color: var(--rl-color-black) !important; }
+.rl-accordion-content { padding: 0; }
+
+/* Author Box */
+.rl-author-bio-card { border-radius: 10px; padding: 30px 25px; gap: 15px; }
+.rl-author-bio-card .rl-author-avatar { margin-right: 0px; }
+.rl-author-bio-card .rl-author-role { margin: 0px 0 5px 0; }
+.rl-author-bio-card .rl-author-name { font-size: 24px; line-height: 22px; font-weight: 400; }
+.rl-author-bio-card .rl-author-text { font-size: 14px; line-height: 22px; color: var(--rl-color-black); }
+
+.rl-also-read-box { border-radius: 10px; padding: 20px 25px; gap: 10px; }
+
+/* Carousel */
+.rl-talent-carousel-wrapper { padding: 0; gap: 0; border: 0.5px solid #FDB8FF; border-radius: 10px; background: #FFF; display:flex; overflow:hidden; align-items:stretch; }
+.rl-talent-carousel { flex:1; min-width:0; }
+.rl-swiper-talent { flex:1; min-width:0; }
+.rl-article-talent-card {  position:relative; margin-left: 5px; margin-right: 5px; width: 220px; }
+.rl-talent-intro { width: 250px; padding: 30px; height: stretch; justify-content: center; display: flex; flex-direction: column; background-color: #F4F4F4; border-radius: 10px 0 0 10px; }
+/* The live page overrides the intro to pink via Elementor per-container custom CSS
+   (.elementor-element-86e45b5 { .rl-talent-intro { background-color: #FFEBFF } }),
+   which is not in the plugin stylesheet this file was ported from. */
+.rl-talent-intro { background-color: #FFEBFF; }
+.rl-talent-intro h3 { font-size: 20px; line-height: 24px; margin-bottom: 28px; }
+.rl-btn-primary { background-color: #650467; color: #ffffff !important; font-weight: 500; font-size: 16px; line-height: 20px; border: 0.5px solid #DB00E1; text-align: center; }
+.rl-talent-image { height: 265px !important; }
+.rl-talent-info-banner { background: #FFFFFFE6; position: absolute; bottom: 0; width: 90%; margin: 10px; border-radius: 6px; }
+.rl-swiper-talent { padding: 15px 0;}
+.rl-talent-flag { top: 10px; right: 10px; border: none; }
+.rl-talent-details strong { font-size: 20px; font-weight: 600; line-height: 20px; color: #26251E; }
+.rl-talent-details span { font-size: 13px; font-weight: 400; line-height: 23px; color: #26251E; letter-spacing: -0.42px; }
+
+@media screen and (max-width: 767px) {
+	.rl-summary-box, .rl-author-bio-card, .rl-table-of-content { padding: 20px; }
+	.rl-talent-carousel-wrapper * { min-width: 0; }
+	.rl-talent-carousel-wrapper { flex-direction: column; }
+	.rl-swiper-talent { width: 100%; min-width: 0; }
+	.rl-talent-intro { width: 100%; }
+	.rl-accordion-header { text-wrap: auto; font-size: 16px !important; line-height: 30px !important; }
+	.rl-header-title { font-size: 27px; line-height: 36px; }
+	.rl-author-bio-card { flex-direction: column; }
+	.rl-faq-section h3 { font-size: 28px; line-height: 35px; }
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ARTICLE LAYOUT                                              */
+/* ═══════════════════════════════════════════════════════════ */
+/* Production builds this with Elementor flex containers rather */
+/* than the .rl-layout-container class its stylesheet ships     */
+/* (that class is dead code on the live site). Values are read  */
+/* off the container's generated CSS: 1140px content width, a   */
+/* 30% sidebar, 40px gap, and column-reverse on mobile so the   */
+/* article comes before the sidebar on a phone.                 */
+
+/* Three columns: contents, article, booking form. DOM order is the reading order,
+   so the stacked layout on narrow screens needs no reordering. The container is the
+   theme's own 1380px site width rather than production's 1140px, because two
+   sidebars at 1140 would leave the article around 350px wide. */
+.rl-article-layout {
+	display: flex;
+	flex-direction: column;
+	gap: 32px;
+	width: 100%;
+	max-width: 1380px;
+	margin: 40px auto;
+	padding: 0 20px;
+}
+
+.rl-article-sidebar {
+	display: flex;
+	flex-direction: column;
+	gap: 36px;
+	width: 100%;
+}
+
+.rl-article-main {
+	display: flex;
+	flex-direction: column;
+	gap: 36px;
+	width: 100%;
+	min-width: 0;
+}
+
+/* Two columns first: the article keeps its measure and the form comes alongside,
+   with the contents list above the article. */
+@media (min-width: 1000px) {
+	.rl-article-layout {
+		flex-direction: row;
+		flex-wrap: wrap;
+		gap: 40px;
+		align-items: flex-start;
+	}
+
+	.rl-article-sidebar--toc {
+		order: 1;
+		width: 100%;
+	}
+
+	.rl-article-main {
+		order: 2;
+		flex: 1 1 auto;
+		width: auto;
+	}
+
+	.rl-article-sidebar--form {
+		order: 3;
+		width: 340px;
+		flex: 0 0 340px;
+		position: sticky;
+		/* The site header is sticky at 81px; anything less and the column scrolls
+		   up underneath it. */
+		top: 101px;
+		height: max-content;
+	}
+}
+
+/* Full three-column layout once there is room for the contents list beside the
+   article without squeezing the measure. */
+@media (min-width: 1280px) {
+	.rl-article-layout {
+		flex-wrap: nowrap;
+	}
+
+	.rl-article-sidebar--toc {
+		width: 260px;
+		flex: 0 0 260px;
+		position: sticky;
+		top: 101px;
+		height: max-content;
+	}
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ARTICLE PROSE                                               */
+/* ═══════════════════════════════════════════════════════════ */
+/* Production has no dedicated prose rules — the body inherits  */
+/* the Elementor kit's 16px Inter and headings fall back to     */
+/* --rl-font-hero. These restate that explicitly, because v2's  */
+/* own .entry-content / .wp-block-heading rules are `!important` */
+/* and tuned for 42px marketing titles.                         */
+/*                                                              */
+/* Every selector is a DIRECT child of .rl-article-body. That is */
+/* deliberate: the summary box and the "Also read" box arrive    */
+/* through post_content too, so they sit in here alongside the   */
+/* prose — and a descendant selector would outrank the ported    */
+/* .rl-summary-content / .rl-also-read-link rules and undo their */
+/* spacing and colour.                                           */
+
+.rl-blog-article-template .rl-article-body {
+	font-size: 16px;
+	line-height: 1.6;
+	color: var(--rl-text-dark);
+}
+
+.rl-blog-article-template .rl-article-body > p {
+	font-size: 16px;
+	line-height: 1.6;
+	margin: 0 0 20px 0;
+	color: var(--rl-text-dark);
+}
+
+.rl-blog-article-template .rl-article-body > :first-child {
+	margin-top: 0 !important;
+}
+
+.rl-blog-article-template .rl-article-body > :last-child {
+	margin-bottom: 0;
+}
+
+.rl-blog-article-template .rl-article-body > h2,
+.rl-blog-article-template .rl-article-body > h2.wp-block-heading {
+	font-family: var(--rl-font-hero) !important;
+	font-size: 32px !important;
+	line-height: 1.3 !important;
+	font-weight: 500 !important;
+	letter-spacing: normal !important;
+	color: var(--rl-color-black) !important;
+	margin: 40px 0 16px 0 !important;
+	scroll-margin-top: 7rem;
+}
+
+.rl-blog-article-template .rl-article-body > h3,
+.rl-blog-article-template .rl-article-body > h3.wp-block-heading {
+	font-family: var(--rl-font-hero) !important;
+	font-size: 24px !important;
+	line-height: 1.35 !important;
+	font-weight: 500 !important;
+	letter-spacing: normal !important;
+	color: var(--rl-color-black) !important;
+	margin: 32px 0 12px 0 !important;
+	scroll-margin-top: 7rem;
+}
+
+.rl-blog-article-template .rl-article-body > h4,
+.rl-blog-article-template .rl-article-body > h4.wp-block-heading {
+	font-family: var(--rl-font-hero) !important;
+	font-size: 18px !important;
+	line-height: 1.4 !important;
+	font-weight: 600 !important;
+	color: var(--rl-color-black) !important;
+	margin: 24px 0 10px 0 !important;
+	scroll-margin-top: 7rem;
+}
+
+.rl-blog-article-template .rl-article-body > :is(p, ul, ol, blockquote, h2, h3, h4) a {
+	color: var(--rl-brand-purple);
+	text-decoration: underline;
+	overflow-wrap: break-word;
+}
+
+.rl-blog-article-template .rl-article-body > ul,
+.rl-blog-article-template .rl-article-body > ol {
+	margin: 0 0 20px 0;
+	padding-left: 24px;
+	font-size: 16px;
+	line-height: 1.6;
+	color: var(--rl-text-dark);
+}
+
+.rl-blog-article-template .rl-article-body > ul { list-style: disc; }
+.rl-blog-article-template .rl-article-body > ol { list-style: decimal; }
+
+.rl-blog-article-template .rl-article-body > :is(ul, ol) li {
+	margin-bottom: 8px;
+}
+
+.rl-blog-article-template .rl-article-body > blockquote {
+	margin: 32px 0;
+	padding-left: 20px;
+	border-left: 3px solid var(--rl-brand-purple);
+	color: var(--rl-brand-purple-light);
+}
+
+.rl-blog-article-template .rl-article-body > * img {
+	max-width: 100%;
+	height: auto;
+}
+
+/* Comparison tables: production caps them at the column width and scrolls. */
+.rl-blog-article-template .rl-article-body > .wp-block-table {
+	margin: 32px 0;
+	overflow-x: auto;
+}
+
+.rl-blog-article-template .rl-article-body > .wp-block-table table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 15px;
+}
+
+.rl-blog-article-template .rl-article-body > .wp-block-table :is(th, td) {
+	padding: 12px 15px;
+	text-align: left;
+	vertical-align: middle;
+	border-bottom: 1px solid #2C012D;
+	background-color: #FFFAFF;
+	color: var(--rl-color-black);
+}
+
+.rl-blog-article-template .rl-article-body > .wp-block-table th {
+	font-weight: 600;
+	background-color: var(--rl-brand-pink-light);
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* TALENT CAROUSEL TRACK                                       */
+/* ═══════════════════════════════════════════════════════════ */
+/* The card class is .rl-article-talent-card, not production's  */
+/* .rl-talent-card: v2 already uses that name for the hero      */
+/* marquee card, which forces a 12px white border, a lavender   */
+/* background and a fixed size with !important. Sharing the     */
+/* name put that frame around every carousel photo.             */
+/* ═══════════════════════════════════════════════════════════ */
+/* Production drives this with slick, which injects its own     */
+/* .slick-track { display: flex } around the cards. v2 does not */
+/* load slick, so without this the cards are plain block        */
+/* elements and stack into one tall column. A scrolling flex    */
+/* row gives the same result with no carousel library.          */
+
+.rl-swiper-talent {
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	overflow-x: auto;
+	scroll-snap-type: x proximity;
+	scrollbar-width: thin;
+	-webkit-overflow-scrolling: touch;
+}
+
+.rl-article-talent-card {
+	flex: 0 0 220px;
+	scroll-snap-align: start;
+}
+
+.rl-talent-image {
+	width: 100%;
+	object-fit: cover;
+	display: block;
+	border-radius: 6px;
+}
+
+@media (max-width: 767px) {
+	.rl-swiper-talent {
+		padding-left: 15px;
+		padding-right: 15px;
+	}
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* SIDEBAR LEAD FORM                                           */
+/* ═══════════════════════════════════════════════════════════ */
+/* Production's sidebar form (the rl_headless_calendly_multistep */
+/* widget renders a Gravity Form into this shell). v2 has no    */
+/* Gravity Forms, so the shell is reproduced here and v2's own  */
+/* booking wizard is dropped inside it in its chrome-less skin. */
+
+.rl-lead-form-wrapper {
+	background: var(--rl-color02);
+	border: 0.5px solid var(--rl-color01);
+	border-radius: 10px;
+	padding: 30px;
+}
+
+.rl-lead-form-headline {
+	font-family: var(--rl-font-hero);
+	font-size: 22px;
+	line-height: 28px;
+	font-weight: 700;
+	color: var(--rl-color-black);
+	text-align: center;
+	margin: 0 0 20px 0;
+}
+
+.rl-lead-form-headline span {
+	display: block;
+	font-size: 24px;
+}
+
+@media (max-width: 767px) {
+	.rl-lead-form-wrapper { padding: 20px; }
+}
+
+/* The summary box keeps its own "Quick Summary" heading. Production sizes it from
+   the hello-elementor h2 default; restated here because v2 has no such default and
+   the article-body heading rules deliberately do not reach inside components. */
+.rl-blog-article-template .rl-summary-content h2 {
+	font-family: var(--rl-font-hero);
+	font-size: 28px;
+	line-height: 1.25;
+	font-weight: 500;
+	color: var(--rl-color-black);
+	margin: 0 0 16px 0;
+}
+
+.rl-blog-article-template .rl-summary-content h2 strong {
+	font-weight: 500;
+}
+
+/* Table of contents: smaller than production's 16px so the list is shorter and
+   pushes the form less far down the sidebar. */
+.rl-table-of-content .rl-toc-item a {
+	font-size: 14px;
+	line-height: 20px;
+}
+
+.rl-table-of-content .rl-toc-item {
+	margin-bottom: 12px;
+}
+
+.rl-toc-read-time,
+.rl-toc-copy-link {
+	font-size: 14px !important;
+	line-height: 20px;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* SIDEBAR FORM — COMPACT                                      */
+/* ═══════════════════════════════════════════════════════════ */
+/* The theme's booking wizard is built for a full-width column. */
+/* In the sidebar shell it needs to read like production's      */
+/* form: placeholder-only fields, tight rows, small print.      */
+/* Labels stay in the DOM for screen readers rather than being  */
+/* removed, since the placeholder alone is not an accessible    */
+/* name.                                                        */
+
+.rl-lead-form-wrapper label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* The consent checkbox's own label must stay visible — it is the disclosure. */
+.rl-lead-form-wrapper label:has(input[type="checkbox"]),
+.rl-lead-form-wrapper label.rl-consent-label {
+	position: static;
+	width: auto;
+	height: auto;
+	margin: 0;
+	overflow: visible;
+	clip: auto;
+	white-space: normal;
+}
+
+.rl-lead-form-wrapper input[type="text"],
+.rl-lead-form-wrapper input[type="email"],
+.rl-lead-form-wrapper input[type="tel"],
+.rl-lead-form-wrapper select {
+	padding-top: 8px !important;
+	padding-bottom: 8px !important;
+	font-size: 14px !important;
+	line-height: 20px !important;
+	border-radius: 8px !important;
+}
+
+.rl-lead-form-wrapper button {
+	font-size: 15px !important;
+	padding-top: 14px !important;
+	padding-bottom: 14px !important;
+}
+
+/* The phone widget's country selector is a button too, and has to stay compact. */
+.rl-lead-form-wrapper .iti button,
+.rl-lead-form-wrapper .iti__selected-country,
+.rl-lead-form-wrapper .iti__selected-flag {
+	font-size: 13px !important;
+	padding-top: 0 !important;
+	padding-bottom: 0 !important;
+}
+
+/* The small-print rule below must not reach the button's own label. */
+.rl-lead-form-wrapper button span {
+	font-size: inherit;
+	line-height: inherit;
+}
+
+.rl-lead-form-wrapper p,
+.rl-lead-form-wrapper span {
+	font-size: 11px;
+	line-height: 15px;
+}
+
+.rl-lead-form-wrapper .rl-lead-form-headline {
+	font-size: 20px;
+	line-height: 26px;
+}
+
+.rl-lead-form-wrapper .rl-lead-form-headline span {
+	font-size: 22px;
+	line-height: 28px;
+}
+
+/* Tighten the vertical rhythm the wizard sets with utility spacing. */
+.rl-lead-form-wrapper .space-y-4 > * + *,
+.rl-lead-form-wrapper .space-y-6 > * + * {
+	margin-top: 10px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* FAQ ACCORDION — SPACING & TRANSITION                        */
+/* ═══════════════════════════════════════════════════════════ */
+/* Production toggles the answer with display:none/block, which */
+/* cannot animate, and pairs a 48px line-height header with a   */
+/* zero-padding answer — so a two-line question gets a big gap  */
+/* and the answer butts against the row below. Both fixed here. */
+
+.rl-accordion-header {
+	padding: 18px 0 !important;
+	line-height: 1.35 !important;
+	gap: 24px;
+}
+
+.rl-accordion-question {
+	flex: 1 1 auto;
+}
+
+.rl-icon-toggle {
+	display: inline-flex;
+	flex: 0 0 auto;
+	color: var(--rl-brand-purple);
+	transition: transform 0.3s ease;
+}
+
+.rl-accordion-header[aria-expanded="true"] .rl-icon-toggle {
+	transform: rotate(180deg);
+}
+
+/* 0fr -> 1fr animates to the answer's natural height. The inner wrapper is the
+   grid item; it must be overflow:hidden with min-height:0 or it will not collapse. */
+.rl-accordion-content {
+	display: grid;
+	grid-template-rows: 0fr;
+	padding: 0;
+	transition: grid-template-rows 0.3s ease;
+}
+
+.rl-accordion-content > .rl-accordion-answer {
+	min-height: 0;
+	overflow: hidden;
+}
+
+/* Matches the ported rule's specificity and comes later, so `display: grid` wins
+   over its `display: block`. */
+.rl-accordion-header[aria-expanded="true"] + .rl-accordion-content {
+	display: grid;
+	grid-template-rows: 1fr;
+}
+
+.rl-accordion-answer > :first-child { margin-top: 0; }
+
+/* The closing gap is a margin on the last child, not padding on the wrapper:
+   padding is not collapsed by min-height:0, so it would leave the answer 20px
+   tall when closed instead of 0. */
+.rl-accordion-answer > :last-child { margin-bottom: 20px; }
+
+.rl-accordion-answer p {
+	font-size: 16px;
+	line-height: 1.6;
+	color: var(--rl-text-gray);
+	margin: 0 0 12px 0;
+}
+
+@media (max-width: 767px) {
+	.rl-accordion-header {
+		padding: 14px 0 !important;
+		gap: 16px;
+	}
+}
+
+/* Drag affordance for the talent carousel. The script swaps in .cursor-grabbing
+   once a drag actually starts. */
+.rl-swiper-talent {
+	cursor: grab;
+}
+
+.rl-swiper-talent.cursor-grabbing {
+	cursor: grabbing;
+	user-select: none;
+}
