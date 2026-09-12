@@ -7,6 +7,8 @@ namespace App\Infrastructure\Providers;
 use App\Domains\Sync\Commands\GrantSyncCapabilityCommand;
 use App\Domains\Sync\Commands\SyncPageCommand;
 use App\Domains\Sync\Commands\SyncSettingsCommand;
+use App\Domains\Sync\Provisioning\SyncCredentialProvisioner;
+use App\Infrastructure\WordPress\Admin\EnvironmentSyncAdmin;
 use Illuminate\Support\ServiceProvider;
 
 class SyncServiceProvider extends ServiceProvider
@@ -26,5 +28,22 @@ class SyncServiceProvider extends ServiceProvider
                 GrantSyncCapabilityCommand::class,
             ]);
         }
+
+        $this->app->singleton(SyncCredentialProvisioner::class, fn () => new SyncCredentialProvisioner);
+        $this->app->singleton(
+            EnvironmentSyncAdmin::class,
+            fn ($app) => new EnvironmentSyncAdmin($app->make(SyncCredentialProvisioner::class)),
+        );
+    }
+
+    /**
+     * Bootstrap the Settings → Environment Sync screen.
+     *
+     * The screen gates itself on SyncEnvironment::syncEnabled(), so this is safe
+     * to call unconditionally — it registers no hooks in production.
+     */
+    public function boot(): void
+    {
+        $this->app->make(EnvironmentSyncAdmin::class)->register();
     }
 }
