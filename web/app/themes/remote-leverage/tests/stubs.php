@@ -117,6 +117,10 @@ $capsule->addConnection([
 $capsule->setAsGlobal();
 $capsule->bootEloquent();
 
+// Bind the manager as "db" so the DB facade resolves here the same way it does
+// under Acorn — production code uses DB::table(), not Capsule directly.
+$app->instance('db', $capsule->getDatabaseManager());
+
 // Ensure test schema exists
 if (! Capsule::schema()->hasTable('rl_referrers')) {
     Capsule::schema()->create('rl_referrers', function ($table) {
@@ -239,6 +243,32 @@ if (! Capsule::schema()->hasTable('rl_lead_activity_logs')) {
         $table->string('description', 500)->nullable();
         $table->text('payload')->nullable();
         $table->timestamp('created_at')->nullable();
+    });
+}
+
+// WordPress core tables the environment-sync exporter reads. Only the columns
+// the sync actually touches — this is a shape for querying against, not a
+// faithful reproduction of WordPress's schema.
+if (! Capsule::schema()->hasTable('posts')) {
+    Capsule::schema()->create('posts', function ($table) {
+        $table->increments('ID');
+        $table->integer('post_author')->default(0);
+        $table->string('post_title')->default('');
+        $table->text('post_content')->nullable();
+        $table->string('post_status', 20)->default('publish');
+        $table->string('post_type', 20)->default('post')->index();
+        $table->string('post_name')->default('');
+        $table->integer('post_parent')->default(0);
+        $table->timestamp('post_date')->nullable();
+    });
+}
+
+if (! Capsule::schema()->hasTable('postmeta')) {
+    Capsule::schema()->create('postmeta', function ($table) {
+        $table->increments('meta_id');
+        $table->integer('post_id')->default(0)->index();
+        $table->string('meta_key')->nullable();
+        $table->text('meta_value')->nullable();
     });
 }
 
