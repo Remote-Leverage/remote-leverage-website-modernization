@@ -14,6 +14,7 @@ use App\Domains\Sync\Commands\SyncPageCommand;
 use App\Domains\Sync\Commands\SyncSettingsCommand;
 use App\Domains\Sync\Provisioning\SyncCredentialProvisioner;
 use App\Infrastructure\WordPress\Admin\EnvironmentSyncAdmin;
+use App\Infrastructure\WordPress\Admin\EnvironmentSyncScreen;
 use Illuminate\Support\ServiceProvider;
 
 class SyncServiceProvider extends ServiceProvider
@@ -44,6 +45,7 @@ class SyncServiceProvider extends ServiceProvider
         // Autowired rather than hand-constructed: the screen's dependencies grow
         // as the feature does, and every one of them (registry, session store,
         // exporter, pusher) is resolvable without configuration.
+        $this->app->singleton(EnvironmentSyncScreen::class);
         $this->app->singleton(EnvironmentSyncAdmin::class);
     }
 
