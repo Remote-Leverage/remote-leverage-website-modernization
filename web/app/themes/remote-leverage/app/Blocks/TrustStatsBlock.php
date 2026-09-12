@@ -64,7 +64,10 @@ class TrustStatsBlock extends Block
             ])
             ->addTextarea('timeframe', [
                 'label' => 'Timeframe Text',
-                'default_value' => "Last 12\nMonths",
+                // No default_value: ACF bakes it into the saved block JSON, where
+                // WordPress's slash-stripping eats the backslash and leaves a bare
+                // "n" ("Last 12nMonths"). Left empty, the field falls through to the
+                // PHP default in fields() below, which never round-trips through JSON.
                 'rows' => 2,
             ]);
 
