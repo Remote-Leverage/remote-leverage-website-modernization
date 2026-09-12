@@ -61,6 +61,48 @@ class PullJobStore
     }
 
     /**
+     * The job still in flight, if there is one.
+     *
+     * Only one transfer may be running at a time. Two overlapping runs would
+     * interleave their writes on the target and, worse, interleave their undo
+     * entries — rolling either one back would then restore rows the other had
+     * legitimately changed.
+     */
+    public function active(): ?PullJob
+    {
+        foreach (array_reverse($this->ids()) as $id) {
+            $job = $this->find($id);
+
+            if ($job !== null && ! $job->isFinished()) {
+                return $job;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Abandon an in-flight job.
+     *
+     * Deliberately does not roll back: what already landed on the target may be
+     * exactly what you wanted, and discarding it should be a separate, explicit
+     * choice made from the session list.
+     */
+    public function cancel(string $id): bool
+    {
+        $job = $this->find($id);
+
+        if ($job === null || $job->isFinished()) {
+            return false;
+        }
+
+        $job->fail('Cancelled.');
+        $this->save($job);
+
+        return true;
+    }
+
+    /**
      * @return array<int, string>
      */
     public function ids(): array

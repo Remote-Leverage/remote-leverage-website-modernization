@@ -79,6 +79,16 @@ class PushJobRunner
 
         $job->sessionId = (string) ($response['session']['id'] ?? '');
         $job->datasets = $this->registry->importOrder($job->manifest->datasets);
+
+        // Counted once, here, so the progress bar has a denominator from the
+        // first step rather than appearing to stall at an unknown total.
+        $posts = 0;
+
+        foreach ($job->datasets as $dataset) {
+            $posts += $this->exporter->count($job->manifest, $dataset);
+        }
+
+        $job->totals = ['posts' => $posts, 'files' => 0];
         $job->datasetIndex = 0;
         $job->cursor = 0;
         $job->phase = $job->datasets === [] ? PushJob::PHASE_FINISH : PushJob::PHASE_ROWS;
@@ -164,6 +174,7 @@ class PushJobRunner
         )));
         $job->fileIndex = 0;
         $job->fileOffset = 0;
+        $job->totals['files'] = count($job->fileQueue);
         $job->phase = $job->fileQueue === [] ? PushJob::PHASE_FINISH : PushJob::PHASE_MEDIA_FILES;
     }
 

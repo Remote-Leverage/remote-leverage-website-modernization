@@ -101,6 +101,12 @@ class PullJobRunner
                 .($batch['error'] ?? 'unknown reason'));
         }
 
+        // The source reports its count on the opening batch of each dataset;
+        // this side cannot know it any other way.
+        if ($job->cursor === 0 && isset($batch['total'])) {
+            $job->totals['posts'] = ($job->totals['posts'] ?? 0) + (int) $batch['total'];
+        }
+
         if (($batch['done'] ?? false) === true) {
             $job->datasetIndex++;
             $job->cursor = 0;
@@ -165,6 +171,7 @@ class PullJobRunner
         )));
         $job->fileIndex = 0;
         $job->fileOffset = 0;
+        $job->totals['files'] = count($job->fileQueue);
         $job->phase = $job->fileQueue === [] ? PullJob::PHASE_FINISH : PullJob::PHASE_MEDIA_FILES;
     }
 

@@ -118,6 +118,26 @@ class SessionStore
     }
 
     /**
+     * The session still being written to, if any.
+     *
+     * "Open" or "importing" both count: a session that was begun and then
+     * abandoned still owns the target until someone finishes, rolls back, or
+     * cancels it.
+     */
+    public function active(): ?TransferSession
+    {
+        foreach (array_reverse($this->ids()) as $id) {
+            $session = $this->find($id);
+
+            if ($session instanceof TransferSession && ! $session->isFinished()) {
+                return $session;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Drop the oldest sessions beyond RETENTION.
      */
     private function prune(): void

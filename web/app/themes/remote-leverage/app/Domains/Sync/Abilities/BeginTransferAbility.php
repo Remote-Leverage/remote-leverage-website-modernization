@@ -42,6 +42,21 @@ class BeginTransferAbility extends TransferAbility
             return ['ok' => false, 'error' => $e->getMessage()];
         }
 
+        // Refuse to open a second session while one is still running. This is
+        // the guard that matters most, because it holds however the transfer was
+        // started — a stale browser tab, a CLI run, or a second operator — and
+        // it is the one whose absence let abandoned "importing" sessions pile up.
+        $running = $this->sessions->active();
+
+        if ($running !== null && ($input['force'] ?? false) !== true) {
+            return [
+                'ok' => false,
+                'error' => 'A transfer is already in progress on this environment (session '
+                    .$running->id.', '.$running->state.'). Finish, roll back, or cancel it first.',
+                'blocking_session' => $running->toStatusArray(),
+            ];
+        }
+
         $session = $this->sessions->create($manifest);
 
         return [
@@ -56,6 +71,11 @@ class BeginTransferAbility extends TransferAbility
         return [
             'type' => 'object',
             'properties' => [
+                'force' => [
+                    'type' => 'boolean',
+                    'description' => 'Open a session even though another is still running. '
+                        .'Only for recovering from an abandoned transfer.',
+                ],
                 'manifest' => [
                     'type' => 'object',
                     'description' => 'Transfer manifest: direction, datasets, exclusions and '

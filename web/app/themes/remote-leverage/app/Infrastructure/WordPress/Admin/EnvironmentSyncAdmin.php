@@ -100,6 +100,7 @@ class EnvironmentSyncAdmin
                 'rollback_local' => $this->handleRollbackLocal(),
                 'pull' => $this->handlePull(),
                 'purge' => $this->handlePurge(),
+                'cancel_job' => $this->handleCancelJob(),
                 default => null,
             };
         } catch (Throwable $e) {
@@ -283,6 +284,8 @@ class EnvironmentSyncAdmin
             throw new \RuntimeException('Refusing to push to production.');
         }
 
+        $this->assertNothingInFlight();
+
         $job = $this->jobs->create($manifest, $target);
 
         set_transient($this->noticeKey('job'), $job->id, HOUR_IN_SECONDS);
@@ -332,6 +335,9 @@ class EnvironmentSyncAdmin
         ], $this->registry);
 
         $source = sanitize_key(wp_unslash($_POST['source'] ?? 'staging'));
+
+        $this->assertNothingInFlight();
+
         $job = $this->pullJobs->create($manifest, $source);
 
         set_transient($this->noticeKey('pulljob'), $job->id, HOUR_IN_SECONDS);
@@ -422,6 +428,46 @@ class EnvironmentSyncAdmin
     }
 
     /**
+     * Refuse to start a transfer while another is unfinished.
+     *
+     * Two overlapping runs interleave their writes and, worse, interleave their
+     * undo entries — rolling either one back would then restore rows the other
+     * had legitimately changed. Cancelling is explicit rather than automatic so
+     * an abandoned run is never silently discarded.
+     */
+    private function assertNothingInFlight(): void
+    {
+        $push = $this->jobs->active();
+        $pull = $this->pullJobs->active();
+
+        if ($push === null && $pull === null) {
+            return;
+        }
+
+        $kind = $push !== null ? 'push' : 'pull';
+        $id = $push !== null ? $push->id : $pull->id;
+
+        throw new \RuntimeException(
+            "A {$kind} is already in progress ({$id}). Cancel it before starting another."
+        );
+    }
+
+    private function handleCancelJob(): void
+    {
+        $id = sanitize_text_field(wp_unslash($_POST['job_id'] ?? ''));
+
+        $cancelled = $this->jobs->cancel($id) || $this->pullJobs->cancel($id);
+
+        set_transient(
+            $this->noticeKey($cancelled ? 'success' : 'error'),
+            $cancelled
+                ? 'Transfer cancelled. Anything already written is still there — roll back the session to undo it.'
+                : 'That transfer is not running.',
+            60,
+        );
+    }
+
+    /**
      * Undo a transfer imported into this environment, using its own undo log.
      */
     private function handleRollbackLocal(): void
@@ -490,48 +536,139 @@ class EnvironmentSyncAdmin
      * needs no cron, no queue and no worker on either environment — none of
      * which this stack has.
      */
+    /**
+     * Show whatever transfer is in flight, whether it was just started or was
+     * left running by an earlier page load.
+     *
+     * Reading the store rather than only a transient matters: a tab closed
+     * mid-transfer would otherwise leave a job that blocks new runs with nothing
+     * on screen explaining why.
+     */
     private function renderRunningJob(): void
     {
-        $jobId = get_transient($this->noticeKey('job'));
+        $job = $this->jobs->active();
 
-        if (! is_string($jobId) || $jobId === '') {
-            return;
+        if ($job !== null) {
+            $this->renderProgressPanel(
+                $job->toStatusArray(),
+                'Push in progress',
+                '&rarr; '.$job->target,
+                'rl_sync_push_step',
+                'rl-sync-progress',
+                (bool) get_transient($this->noticeKey('job')),
+            );
+
+            delete_transient($this->noticeKey('job'));
         }
-
-        delete_transient($this->noticeKey('job'));
-
-        $job = $this->jobs->find($jobId);
-
-        if ($job === null) {
-            return;
-        }
-
-        printf(
-            '<div class="notice notice-info"><p><strong>Push in progress</strong> &rarr; %s</p>'
-            .'<p id="rl-sync-progress"><em>Starting...</em></p>'
-            .'<p class="description">Keep this tab open. Each step is a separate request, so the '
-            .'transfer is not bound by the server&rsquo;s request timeout.</p></div>',
-            esc_html($job->target),
-        );
-
-        $this->renderProgressScript($job->id, 'rl_sync_push_step', 'rl-sync-progress');
     }
 
-    private function renderProgressScript(string $jobId, string $action, string $elementId): void
+    private function renderRunningPull(): void
     {
+        $job = $this->pullJobs->active();
+
+        if ($job !== null) {
+            $this->renderProgressPanel(
+                $job->toStatusArray(),
+                'Pull in progress',
+                '&larr; '.$job->source,
+                'rl_sync_pull_step',
+                'rl-sync-pull-progress',
+                (bool) get_transient($this->noticeKey('pulljob')),
+            );
+
+            delete_transient($this->noticeKey('pulljob'));
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $status
+     * @param  bool  $autostart  Whether to begin stepping immediately. False for a
+     *                           job found already running, so reloading the page
+     *                           does not silently resume something you left.
+     */
+    private function renderProgressPanel(
+        array $status,
+        string $title,
+        string $subject,
+        string $action,
+        string $elementId,
+        bool $autostart,
+    ): void {
+        $percent = $status['percent'];
+
+        echo '<div class="notice notice-info">';
+        printf('<p><strong>%s</strong> %s</p>', esc_html($title), wp_kses_post($subject));
+
+        // An indeterminate bar until a total is known, rather than a confident 0%.
+        printf(
+            '<progress id="%s-bar" style="width:100%%;height:1.4rem;" max="100"%s></progress>',
+            esc_attr($elementId),
+            $percent === null ? '' : ' value="'.(int) $percent.'"',
+        );
+
+        printf(
+            '<p id="%s">%s</p>',
+            esc_attr($elementId),
+            esc_html((string) $status['label']),
+        );
+
+        printf(
+            '<p class="description">%s</p>',
+            $autostart
+                ? 'Keep this tab open. Each step is a separate request, so the transfer is not '
+                    .'bound by the server&rsquo;s request timeout.'
+                : 'This transfer was left unfinished. Resume it, or cancel it to start a different one.'
+        );
+
+        echo '<p>';
+
+        if (! $autostart) {
+            printf(
+                '<button type="button" class="button" onclick="rlSyncResume_%s()">Resume</button> ',
+                esc_attr(str_replace('-', '_', $elementId)),
+            );
+        }
+
+        $this->cancelButton((string) $status['id']);
+        echo '</p></div>';
+
+        $this->renderProgressScript((string) $status['id'], $action, $elementId, $autostart);
+    }
+
+    private function cancelButton(string $jobId): void
+    {
+        echo '<form method="post" style="display:inline;" '
+            .'onsubmit="return confirm(\'Cancel this transfer? Anything already written stays until you roll the session back.\');">';
+        wp_nonce_field(self::SLUG);
+        echo '<input type="hidden" name="rl_sync_action" value="cancel_job">';
+        printf('<input type="hidden" name="job_id" value="%s">', esc_attr($jobId));
+        echo '<button type="submit" class="button">Cancel transfer</button>';
+        echo '</form>';
+    }
+
+    private function renderProgressScript(
+        string $jobId,
+        string $action,
+        string $elementId,
+        bool $autostart,
+    ): void {
         $payload = wp_json_encode([
             'ajax' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce(self::SLUG),
             'job' => $jobId,
             'action' => $action,
             'el' => $elementId,
+            'autostart' => $autostart,
         ]);
+
+        $fn = 'rlSyncResume_'.str_replace('-', '_', $elementId);
 
         ?>
         <script>
         (function () {
             var cfg = <?php echo $payload; ?>;
             var out = document.getElementById(cfg.el);
+            var bar = document.getElementById(cfg.el + '-bar');
 
             function step() {
                 var body = new FormData();
@@ -551,7 +688,15 @@ class EnvironmentSyncAdmin
                         var s = res.data;
                         out.textContent = s.label;
 
+                        if (s.percent === null) {
+                            bar.removeAttribute('value');
+                        } else {
+                            bar.value = s.percent;
+                            out.textContent = s.label + '  (' + s.percent + '%)';
+                        }
+
                         if (s.finished) {
+                            if (s.phase === 'done') { bar.value = 100; }
                             if (s.phase === 'failed' && s.session_id) {
                                 out.innerHTML = out.textContent +
                                     '<br><em>Session ' + s.session_id +
@@ -564,41 +709,16 @@ class EnvironmentSyncAdmin
                     })
                     .catch(function (e) {
                         out.innerHTML = '<strong>Request failed:</strong> ' + e +
-                            '<br><em>Reload to resume from where it stopped.</em>';
+                            '<br><em>Reload and resume to continue from where it stopped.</em>';
                     });
             }
 
-            step();
+            window[<?php echo wp_json_encode($fn); ?>] = step;
+
+            if (cfg.autostart) { step(); }
         })();
         </script>
         <?php
-    }
-
-    private function renderRunningPull(): void
-    {
-        $jobId = get_transient($this->noticeKey('pulljob'));
-
-        if (! is_string($jobId) || $jobId === '') {
-            return;
-        }
-
-        delete_transient($this->noticeKey('pulljob'));
-
-        $job = $this->pullJobs->find($jobId);
-
-        if ($job === null) {
-            return;
-        }
-
-        printf(
-            '<div class="notice notice-info"><p><strong>Pull in progress</strong> &larr; %s</p>'
-            .'<p id="rl-sync-pull-progress"><em>Starting...</em></p>'
-            .'<p class="description">Keep this tab open. This overwrites local data as it goes; '
-            .'use Roll back in Recent transfers to undo it.</p></div>',
-            esc_html($job->source),
-        );
-
-        $this->renderProgressScript($job->id, 'rl_sync_pull_step', 'rl-sync-pull-progress');
     }
 
     /**

@@ -38,6 +38,7 @@ final class PullJob
      * @param  array<int, string>  $datasets
      * @param  array<int, array{path: string, size: int, sha256: string}>  $fileQueue
      * @param  array<string, int>  $counters
+     * @param  array<string, int>  $totals  Work expected, for the progress bar.
      */
     public function __construct(
         public readonly string $id,
@@ -52,6 +53,7 @@ final class PullJob
         public int $fileIndex = 0,
         public int $fileOffset = 0,
         public array $counters = ['posts' => 0, 'meta' => 0, 'files' => 0],
+        public array $totals = ['posts' => 0, 'files' => 0],
         public ?string $error = null,
         public readonly int $createdAt = 0,
         public int $updatedAt = 0,
@@ -100,10 +102,51 @@ final class PullJob
             'counters' => $this->counters,
             'files_total' => count($this->fileQueue),
             'files_done' => $this->fileIndex,
+            'totals' => $this->totals,
+            'units_done' => $this->unitsDone(),
+            'units_total' => $this->unitsTotal(),
+            'percent' => $this->percent(),
             'finished' => $this->isFinished(),
             'error' => $this->error,
             'label' => $this->label(),
         ];
+    }
+
+    /**
+     * Progress is counted in units of work — one post row or one file — rather
+     * than bytes or time.
+     *
+     * They are not equal-cost (a 4MB video is several steps, a post is part of
+     * one), so the bar is an approximation and deliberately so: an honest
+     * "roughly this far through" beats a precise number that stalls for minutes
+     * on a single large file.
+     */
+    public function unitsDone(): int
+    {
+        return ($this->counters['posts'] ?? 0) + ($this->counters['files'] ?? 0);
+    }
+
+    public function unitsTotal(): int
+    {
+        return max(
+            ($this->totals['posts'] ?? 0) + ($this->totals['files'] ?? 0),
+            $this->unitsDone(),
+        );
+    }
+
+    /**
+     * Null until there is a total to measure against, so the UI can show an
+     * indeterminate bar rather than a confident and wrong 0%.
+     */
+    public function percent(): ?int
+    {
+        $total = $this->unitsTotal();
+
+        if ($total <= 0) {
+            return $this->phase === self::PHASE_DONE ? 100 : null;
+        }
+
+        return (int) min(100, round(($this->unitsDone() / $total) * 100));
     }
 
     private function label(): string
@@ -140,6 +183,7 @@ final class PullJob
             'file_index' => $this->fileIndex,
             'file_offset' => $this->fileOffset,
             'counters' => $this->counters,
+            'totals' => $this->totals,
             'error' => $this->error,
             'created_at' => $this->createdAt,
             'updated_at' => $this->updatedAt,
@@ -164,6 +208,7 @@ final class PullJob
             fileIndex: (int) ($data['file_index'] ?? 0),
             fileOffset: (int) ($data['file_offset'] ?? 0),
             counters: (array) ($data['counters'] ?? []),
+            totals: (array) ($data['totals'] ?? ['posts' => 0, 'files' => 0]),
             error: isset($data['error']) ? (string) $data['error'] : null,
             createdAt: (int) ($data['created_at'] ?? 0),
             updatedAt: (int) ($data['updated_at'] ?? 0),

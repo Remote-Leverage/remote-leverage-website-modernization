@@ -51,15 +51,23 @@ class ExportTransferBatchAbility extends TransferAbility
             return ['ok' => false, 'error' => "Dataset \"{$dataset}\" is not part of this transfer."];
         }
 
+        $after = max(0, (int) ($input['after'] ?? 0));
+
         $ids = $this->exporter->postIdBatch(
             $manifest,
             $dataset,
-            max(0, (int) ($input['after'] ?? 0)),
+            $after,
             min(100, max(1, (int) ($input['limit'] ?? 25))),
         );
 
+        // Counted only on the opening batch: the puller needs a denominator for
+        // its progress bar, and repeating the COUNT on every batch would add a
+        // full table scan per chunk for a number that does not change.
+        $total = $after === 0 ? $this->exporter->count($manifest, $dataset) : null;
+
         if ($ids === []) {
-            return ['ok' => true, 'posts' => [], 'meta' => [], 'last_id' => 0, 'done' => true];
+            return ['ok' => true, 'posts' => [], 'meta' => [], 'last_id' => 0, 'done' => true,
+                'total' => $total];
         }
 
         return [
@@ -68,6 +76,7 @@ class ExportTransferBatchAbility extends TransferAbility
             'meta' => $this->exporter->postMetaRows($ids),
             'last_id' => (int) end($ids),
             'done' => false,
+            'total' => $total,
         ];
     }
 
