@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Providers;
 
+use App\Infrastructure\Console\Commands\RunDeployTasksCommand;
 use App\Infrastructure\WordPress\Admin\CalendlyAdminDashboard;
 use App\Infrastructure\WordPress\Admin\ContentAuditAdmin;
 use App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
@@ -52,6 +53,10 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(PartnerHubAdmin::class, fn () => new PartnerHubAdmin);
         $this->app->singleton(ReferralAdminDashboard::class, fn () => new ReferralAdminDashboard);
         $this->app->singleton(CalendlyAdminDashboard::class, fn () => new CalendlyAdminDashboard);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([RunDeployTasksCommand::class]);
+        }
     }
 
     /**
