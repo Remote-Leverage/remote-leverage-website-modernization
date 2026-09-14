@@ -5,12 +5,12 @@
  * Categories: remote-leverage
  * Description: High-converting final call-to-action with embedded reactive booking wizard.
  */
-$imgBase = get_template_directory_uri().'/public/images/home';
+$map = \App\Support\BlockDefaults::homeImg('Map.webp');
 ?>
 <!-- wp:group {"align":"full","className":"relative overflow-hidden rl-booking-footer-group","style":{"spacing":{"padding":{"top":"6rem","bottom":"6rem"}}},"backgroundColor":"brand-dark-violet","textColor":"white","layout":{"type":"constrained","contentSize":"1380px"}} -->
 <div class="wp-block-group alignfull relative overflow-hidden rl-booking-footer-group has-white-color has-brand-dark-violet-background-color has-text-color has-background" id="booking-footer" style="padding-top:6rem;padding-bottom:6rem">
     <!-- wp:html -->
-    <div class="absolute inset-x-0 bottom-0 h-full max-h-[640px] bg-no-repeat bg-bottom bg-contain opacity-25 pointer-events-none" style="background-image:url('<?php echo esc_url($imgBase.'/Map.webp'); ?>')" aria-hidden="true"></div>
+    <div class="absolute inset-x-0 bottom-0 h-full max-h-[640px] bg-no-repeat bg-bottom bg-contain opacity-25 pointer-events-none" style="background-image:url('<?php echo esc_url($map); ?>')" aria-hidden="true"></div>
     <!-- /wp:html -->
 
     <!-- wp:columns {"verticalAlignment":"center","className":"relative z-10","style":{"spacing":{"blockGap":"4rem"}}} -->

@@ -14,6 +14,47 @@ class BlockDefaults
         add_filter('acf/load_value', [self::class, 'filterLoadValue'], 10, 3);
         add_filter('acf/format_value/type=image', [self::class, 'filterImageFormatValue'], 20, 3);
         add_filter('wp_content_img_tag', [self::class, 'filterContentImgTag']);
+        add_filter('the_content', [self::class, 'rewriteLocalAbsoluteUrls'], 1);
+        add_filter('the_excerpt', [self::class, 'rewriteLocalAbsoluteUrls'], 1);
+        add_filter('wp_get_attachment_url', [self::class, 'rewriteLocalAbsoluteUrls']);
+    }
+
+    /**
+     * Gutenberg patterns saved locally bake in http://remoteleverage-v2.test (and
+     * similar) absolute URLs. Rewrite them to the current home URL so staging
+     * does not emit mixed-content http requests (PageSpeed Best Practices).
+     */
+    public static function rewriteLocalAbsoluteUrls(mixed $html, mixed $home = null): string
+    {
+        if (! is_string($html) || $html === '') {
+            return is_string($html) ? $html : '';
+        }
+
+        $homeUrl = is_string($home) && preg_match('#^https?://#', $home) === 1
+            ? $home
+            : (function_exists('home_url') ? home_url() : '');
+        $homeUrl = rtrim((string) $homeUrl, '/');
+        if ($homeUrl === '') {
+            return $html;
+        }
+
+        $from = [
+            'http://remoteleverage-v2.test',
+            'https://remoteleverage-v2.test',
+            'http://127.0.0.1:8080',
+            'https://127.0.0.1:8080',
+            'http://localhost:8080',
+            'https://localhost:8080',
+        ];
+
+        $html = str_replace($from, $homeUrl, $html);
+
+        $host = parse_url($homeUrl, PHP_URL_HOST);
+        if (is_string($host) && $host !== '' && str_starts_with($homeUrl, 'https://')) {
+            $html = str_replace('http://'.$host, 'https://'.$host, $html);
+        }
+
+        return $html;
     }
 
     /**

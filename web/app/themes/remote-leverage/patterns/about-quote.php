@@ -14,7 +14,7 @@
                 <div x-data="{ playing: false }" class="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-md group">
                     <video x-ref="video"
                         src="/app/themes/remote-leverage/public/videos/5-minute-VSL_Horizontal_V01.mp4"
-                        poster="http://remoteleverage-v2.test/app/uploads/2026/09/magnific_EqBRpqJuuO-1-1.png"
+                        poster="<?php echo esc_url(\App\Support\BlockDefaults::homeImg('magnific_EqBRpqJuuO-1-1.png')); ?>"
                         class="w-full h-full object-cover"
                         playsinline
                         controls
