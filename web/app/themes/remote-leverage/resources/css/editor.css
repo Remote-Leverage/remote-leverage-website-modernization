@@ -13,7 +13,7 @@
 .editor-styles-wrapper .wp-block-heading {
   font-family: var(--font-display) !important;
   font-weight: 700 !important;
-  color: var(--color-text-body) !important;
+  color: var(--color-text-body);
   letter-spacing: -0.03em !important;
 }
 
@@ -40,6 +40,55 @@
   line-height: 34px !important;
   letter-spacing: -0.015em !important;
   color: var(--color-text-body) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* HIGH-PRIORITY TEXT WHITE RULES FOR DARK BLOCKS IN EDITOR   */
+/* ═══════════════════════════════════════════════════════════ */
+.editor-styles-wrapper .text-white,
+.editor-styles-wrapper .text-white h1,
+.editor-styles-wrapper .text-white h2,
+.editor-styles-wrapper .text-white h3,
+.editor-styles-wrapper .text-white h4,
+.editor-styles-wrapper .text-white p,
+.editor-styles-wrapper .text-white span,
+.editor-styles-wrapper .text-bg-light,
+.editor-styles-wrapper .text-bg-light *,
+.editor-styles-wrapper h1.text-white,
+.editor-styles-wrapper h2.text-white,
+.editor-styles-wrapper h3.text-white,
+.editor-styles-wrapper h4.text-white,
+.editor-styles-wrapper p.text-white,
+.editor-styles-wrapper .rl-samples-hero-banner h1,
+.editor-styles-wrapper .rl-samples-hero-banner p,
+.editor-styles-wrapper .rl-samples-hero-banner span,
+.editor-styles-wrapper #booking-footer h2,
+.editor-styles-wrapper #booking-footer p,
+.editor-styles-wrapper #booking-footer span,
+.editor-styles-wrapper .bg-roles-surface h1,
+.editor-styles-wrapper .bg-roles-surface h2,
+.editor-styles-wrapper .bg-roles-surface h3,
+.editor-styles-wrapper .bg-roles-surface p,
+.editor-styles-wrapper [class*="bg-[#18112C]"] h1,
+.editor-styles-wrapper [class*="bg-[#18112C]"] h2,
+.editor-styles-wrapper [class*="bg-[#18112C]"] p,
+.editor-styles-wrapper [class*="bg-[#250D4A]"] h1,
+.editor-styles-wrapper [class*="bg-[#250D4A]"] h2,
+.editor-styles-wrapper [class*="bg-[#250D4A]"] p {
+  color: #ffffff !important;
+}
+
+.editor-styles-wrapper .text-white\/90,
+.editor-styles-wrapper .text-white\/95,
+.editor-styles-wrapper .rl-samples-hero-banner p,
+.editor-styles-wrapper [class*="bg-[#18112C]"] p,
+.editor-styles-wrapper [class*="bg-[#250D4A]"] p {
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+.editor-styles-wrapper .text-lavender-tint,
+.editor-styles-wrapper [class*="text-[#DDE2F6]"] {
+  color: #DDE2F6 !important;
 }
 
 /* Button styles in block editor using design tokens */

@@ -225,6 +225,84 @@ export function rlBookingWizardIsolated(config = {}) {
 
 window.rlBookingWizardIsolated = rlBookingWizardIsolated;
 
+export function rlAudioPlayer(initialDuration = '0:45') {
+  return {
+    playing: false,
+    currentTime: '0:00',
+    durationTime: initialDuration,
+    progress: 0,
+    init() {
+      window.addEventListener('paused-externally', (e) => {
+        if (this.$refs.audio && this.$refs.audio !== e.target) {
+          this.playing = false;
+        }
+      });
+    },
+    toggle() {
+      const audio = this.$refs.audio;
+      if (!audio) return;
+      if (this.playing) {
+        audio.pause();
+        this.playing = false;
+      } else {
+        document.querySelectorAll('audio').forEach((a) => {
+          if (a !== audio) {
+            a.pause();
+            a.dispatchEvent(new CustomEvent('paused-externally'));
+          }
+        });
+        audio.play().catch(() => {});
+        this.playing = true;
+      }
+    },
+    seek(event) {
+      const track = this.$refs.track;
+      if (!track) return;
+      const rect = track.getBoundingClientRect();
+      const clickX = event.clientX - rect.left;
+      const width = rect.width;
+      const percent = Math.max(0, Math.min(1, clickX / width));
+      const audio = this.$refs.audio;
+      if (audio && audio.duration) {
+        audio.currentTime = percent * audio.duration;
+        this.progress = percent * 100;
+      }
+    },
+    onLoadedMetadata() {
+      const audio = this.$refs.audio;
+      if (audio && !isNaN(audio.duration) && audio.duration > 0) {
+        this.durationTime = this.formatTime(audio.duration);
+      }
+    },
+    onTimeUpdate() {
+      const audio = this.$refs.audio;
+      if (audio && !isNaN(audio.duration) && audio.duration > 0) {
+        this.progress = (audio.currentTime / audio.duration) * 100;
+        this.currentTime = this.formatTime(audio.currentTime);
+      }
+    },
+    onEnded() {
+      this.playing = false;
+      this.progress = 0;
+      this.currentTime = '0:00';
+    },
+    formatTime(sec) {
+      if (isNaN(sec) || sec === null || sec === undefined) return '0:00';
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return m + ':' + (s < 10 ? '0' : '') + s;
+    },
+  };
+}
+
+window.rlAudioPlayer = rlAudioPlayer;
+window.formatTime = function (sec) {
+  if (isNaN(sec) || sec === null || sec === undefined) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return m + ':' + (s < 10 ? '0' : '') + s;
+};
+
 /**
  * Highlights the section currently being read in the legal-document sidebar nav.
  *
@@ -583,6 +661,7 @@ const registerAlpine = () => {
     window.Alpine.data('phoneInputComponent', phoneInputComponent);
     window.Alpine.data('rlBookingWizardIsolated', rlBookingWizardIsolated);
     window.Alpine.data('rlDocumentToc', rlDocumentToc);
+    window.Alpine.data('rlAudioPlayer', rlAudioPlayer);
   }
 };
 

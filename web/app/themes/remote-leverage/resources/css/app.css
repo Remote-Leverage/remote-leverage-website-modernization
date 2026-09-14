@@ -7,6 +7,15 @@
 
 @import "./blog.css";
 
+/* Inter Display font matching production 1:1 */
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../fonts/InterVariable.ttf") format("truetype");
+}
+
 /* Latin (+ latin-ext) Inter variable from @fontsource-variable/inter.
    League Spartan and Poppins were unused; Inter Display is the same
    outline with optical sizing, which we turn off on headings below. */
@@ -39,7 +48,7 @@
 
 @theme {
   /* Fonts */
-  --font-display: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Inter Display", "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
   --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
 
   /* Comparison-page type scale — taken from production's computed styles so the

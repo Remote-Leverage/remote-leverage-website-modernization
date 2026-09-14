@@ -9,12 +9,12 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 lg:items-center">
 
         <div class="flex flex-col">
-          <h2 class="font-display font-bold text-bg-light text-4xl sm:text-5xl lg:text-hero mb-6">
+          <h2 class="font-display font-bold text-bg-light text-4xl sm:text-5xl lg:text-hero mb-6" style="color: #ffffff !important;">
             {!! $headline !!}
           </h2>
 
           @if (! empty($description))
-            <p class="max-w-[574px] text-white text-lg lg:text-lead">
+            <p class="max-w-[574px] text-white text-lg lg:text-lead" style="color: #ffffff !important;">
               {!! $description !!}
             </p>
           @endif
