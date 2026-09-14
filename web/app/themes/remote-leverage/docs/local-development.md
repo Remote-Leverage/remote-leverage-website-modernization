@@ -173,11 +173,11 @@ curl https://remoteleverage-v2.test/api/health
 
 Only three, all Composer-managed:
 
-| Plugin | Why |
-| :--- | :--- |
-| `advanced-custom-fields-pro` | Block fields and the partner field group |
-| `google-site-kit` | GTM container injection (and the home for LinkedIn/Meta tags) |
-| `mcp-adapter` | Exposes the Abilities API to MCP clients |
+| Plugin | Status (local, 2026-09-14) | Why |
+| :--- | :--- | :--- |
+| `advanced-custom-fields-pro` 6.8.9 | active | Block fields and the partner field group |
+| `mcp-adapter` 0.6.1 | active | Exposes the Abilities API to MCP clients |
+| `google-site-kit` 1.187.0 | **inactive** | GTM container injection (and the home for LinkedIn/Meta tags) — nothing is injected while it is off |
 
 `redis-cache` is not in `composer.json` — it is downloaded in the `Dockerfile` and activated by the entrypoint, so it exists in containers only.
 

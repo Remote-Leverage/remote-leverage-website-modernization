@@ -4,7 +4,7 @@ A ground-up rebuild of [remoteleverage.com](https://remoteleverage.com) on **Roo
 
 This repository *is* the new platform. It is not live yet — it runs locally and on staging while content is migrated off production. See [Replacing production](#replacing-production) for exactly what stands between here and the DNS flip.
 
-> **Status of this document.** Everything below was verified against the code on **2026-09-14**. Content-migration counts come from [`docs/content-migration-next-phase-plan.md`](web/app/themes/remote-leverage/docs/content-migration-next-phase-plan.md) (audited 2026-09-10) and could not be re-verified in this pass — the local database was not running. Treat page counts as "as of 2026-09-10", everything else as current.
+> **Status of this document.** Verified against the code and the local database on **2026-09-14**. Production-side counts (233 pages, 119 posts, 2 partners) come from the audit in [`docs/content-migration-checklist.md`](web/app/themes/remote-leverage/docs/content-migration-checklist.md) (2026-09-10); everything describing *local* state was re-queried directly.
 
 ---
 
@@ -190,7 +190,7 @@ flowchart LR
         V2b["✅ 7 domains<br/>all 8 plugins ported"]
         V3["✅ Design system<br/>38 blocks · 53 patterns"]
         V4["✅ CI + staging deploy<br/>GitHub Actions → ECR → ECS"]
-        V5["🟡 Content<br/>~37 of 233 pages · 0 of 119 posts"]
+        V5["🟡 Content<br/>15 of 233 pages · 119 posts + 23 case studies done"]
         V6["🔴 SEO parity<br/>Yoast not installed · no redirect map"]
         V7["🔴 Cutover ops<br/>no prod DB ingest · no perf baseline · no DNS plan"]
     end
@@ -218,24 +218,26 @@ flowchart LR
 | Test suite + CI | ✅ Done | No visual-regression suite (WR-103, deliberately not built) |
 | Staging deploy pipeline | ✅ Done | Production target does not exist yet |
 | Environment sync | ✅ Done | Production is gated off by design, in four independent places |
-| **Core marketing pages** | 🟡 ~14 of 233 | Role/industry set (~45), funnel pages (~19), experiments (~43), tools (~10) |
+| **Core marketing pages** | 🟡 15 of 233 | Role/industry set (~45), funnel pages (~19), experiments (~43), tools (~10) |
 | **Case studies** | ✅ 23 of 23 | Migrated to a real `case_study` CPT |
-| **Blog posts** | 🔴 0 of 119 | Blocked on the Elementor conversion pass |
-| **Taxonomies** | 🔴 0 of 7 categories, 0 of 8 tags | — |
+| **Blog posts** | ✅ 119 of 119 | Imported clean; category counts match production |
+| **Taxonomies** | ✅ 7 of 7 categories, 8 of 8 tags | `Live Sessions` is empty locally (2 on production) |
+| **Media** | 🟡 512 attachments | Not audited against production's library |
 | **Partners** | 🟡 1 of 2 | Lexgo is pure data entry |
 | **SEO parity** | 🔴 Not started | Install Yoast, carry `_yoast_wpseo_*` meta, build the redirect map |
-| **Elementor retirement gate** | 🔴 Blocked | ADR-0005 requires zero posts carrying `_elementor_data`; production DB never ingested |
+| **Elementor retirement gate** | 🟡 Partially met | Zero local posts carry `_elementor_data` — but nothing has `_rl_conversion_status` either, so the ADR-0005 human sign-off gate has no record |
 | **Performance baseline** | 🔴 Not started | Target: mobile 96+, LCP < 1.2s, CLS 0.00 |
 | **Production cutover** | 🔴 Not started | No production environment, no DNS runbook, no rollback plan |
 
-### The four decisions blocking ~250 of ~338 remaining items
+### The three decisions blocking ~107 of ~218 remaining pages
 
 Nobody can build these until someone signs off. This is the highest-leverage work available, and none of it is engineering.
 
 1. **Paid-traffic owner — 43 experiment landing pages (§5) + the funnel half of §4.** Which URLs still have ad spend pointed at them? Rebuilding a dead page wastes a week; killing a live one costs revenue.
 2. **Sales/ops owner — 19 operational pages.** `/payment/`, `/contractoragreement/`, `/onboardingform/`, `/vainterview/`, `/hmchecklists/` et al. read like live internal tooling. Which are still in the hiring flow, and who is the audience (that decides whether they need auth)?
 3. **~45 role/industry pages — one data-driven template, or 45 hand-built pages?** Recommendation: one template. The set already has a role/industry/region axis and already suffers duplicate `-2`/`-legacy` variants. Pair it with a canonical-URL pass.
-4. **119 blog posts — run `wp acorn content:audit-elementor` first.** The audit is cheap and read-only, and its output decides whether this is a scripted bulk import or a per-post slog.
+
+*(A fourth decision — how to migrate the 119 blog posts — is resolved: they are imported, carry no `_elementor_data`, and their category counts match production.)*
 
 Full plan, per-page inventory and sequencing: [`docs/production-cutover.md`](web/app/themes/remote-leverage/docs/production-cutover.md).
 

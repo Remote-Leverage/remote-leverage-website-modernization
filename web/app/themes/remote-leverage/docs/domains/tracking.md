@@ -51,6 +51,8 @@ Both destinations receive the same DTO. `RecordBehaviorEventAction` is the only 
 
 GTM, LinkedIn Insight and Meta Pixel are **not** injected by this domain. Google Site Kit is installed (`wp-plugin/google-site-kit`) and ships the GTM `<head>` snippet and `wp_body_open` noscript once a container is connected; LinkedIn and Meta are added as tags inside that container. This was a deliberate rescope of WR-99 from code to configuration — the remaining work is admin setup, not engineering.
 
+> **Site Kit is currently inactive locally** (verified 2026-09-14), so no GTM snippet is emitted and no tag inside the container fires. Activating it and connecting the container is a prerequisite for any GTM-delivered tracking at cutover.
+
 ## Verifying it
 
 Browser console on any front-end page:

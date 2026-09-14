@@ -1,3 +1,9 @@
+> **Partly superseded (2026-09-14).** Its §8 conclusion — 119 blog posts blocked on the
+> Elementor conversion pass — no longer holds: all 119 posts, 7 categories and 8 tags are
+> imported and zero posts carry `_elementor_data`. What was "four decisions" is now three.
+> Current figures and sequencing are in [production-cutover.md](production-cutover.md);
+> the analysis of the remaining page decisions below is still valid.
+
 # Content Migration — Continuation Plan
 
 Companion to [`content-migration-checklist.md`](./content-migration-checklist.md).
