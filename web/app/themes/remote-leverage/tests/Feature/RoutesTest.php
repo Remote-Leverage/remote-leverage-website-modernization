@@ -41,3 +41,131 @@ describe('Application Routes', function () {
             ->and($payload)->toHaveKey('timestamp');
     });
 });
+
+describe('config/redirects.php targets resolve to something real', function () {
+    beforeEach(function () {
+        $baseDir = dirname(__DIR__, 2);
+        if (! Route::has('api.health')) {
+            Route::prefix('api')->group($baseDir.'/routes/api.php');
+            Route::middleware([])->group($baseDir.'/routes/web.php');
+            Route::getRoutes()->refreshNameLookups();
+        }
+    });
+
+    /*
+     * A redirect target must be a registered Laravel route or a real WordPress page.
+     * Tests have no database, so page-slug targets are declared here and verified by
+     * hand against `wp post list --post_type=page`; the date below is that check.
+     */
+    $wordPressPageTargets = [
+        'vathankyou' => 'page ID 126, page-vathankyou.blade.php — verified 2026-09-14',
+        'hire-va-4' => 'page ID 1000000, renders patterns/hire-va-4-full.php — created and verified 2026-09-14',
+    ];
+
+    /*
+     * Targets known to point at nothing, quarantined so the suite stays green while the
+     * underlying content decision is open. Adding an entry should be deliberate — the
+     * default is to fix the target, not to list it here.
+     */
+    $pendingTargets = [
+        // Empty: every redirect target currently resolves. Add an entry only when a target is
+        // knowingly dead while the content decision is open, and give the reason.
+    ];
+
+    test('every target is a registered route, a known page, or explicitly quarantined', function () use ($wordPressPageTargets, $pendingTargets) {
+        $config = require dirname(__DIR__, 2).'/config/redirects.php';
+        $routeUris = collect(Route::getRoutes()->getRoutes())
+            ->map(fn ($route) => trim($route->uri(), '/'))
+            ->all();
+
+        foreach ($config as $from => $to) {
+            $resolves = in_array($to, $routeUris, true)
+                || isset($wordPressPageTargets[$to])
+                || isset($pendingTargets[$to]);
+
+            expect($resolves)->toBeTrue(
+                "'{$from}' => '{$to}': target is not a registered route, not a declared "
+                .'WordPress page, and not quarantined. Point it at something real, or add '
+                .'it to $pendingTargets with a reason.'
+            );
+        }
+    });
+
+    test('quarantined targets are still dead, so fixed ones get removed from the list', function () use ($wordPressPageTargets, $pendingTargets) {
+        $routeUris = collect(Route::getRoutes()->getRoutes())
+            ->map(fn ($route) => trim($route->uri(), '/'))
+            ->all();
+
+        // Asserted explicitly so the test is not silently vacuous when the list is empty,
+        // which is the desired steady state.
+        expect($pendingTargets)->toBeArray();
+
+        foreach (array_keys($pendingTargets) as $target) {
+            $nowResolves = in_array($target, $routeUris, true) || isset($wordPressPageTargets[$target]);
+
+            expect($nowResolves)->toBeFalse(
+                "'{$target}' now resolves — remove it from \$pendingTargets."
+            );
+        }
+    });
+
+    test('the partner-dashboard redirect points at the real portal route', function () {
+        $config = require dirname(__DIR__, 2).'/config/redirects.php';
+
+        expect($config['partner-dashboard'])->toBe('referrer-portal')
+            ->and(Route::has('referrer.portal'))->toBeTrue();
+    });
+});
+
+describe('every route() name referenced in code is registered (known-issues.md bug #1)', function () {
+    beforeEach(function () {
+        $baseDir = dirname(__DIR__, 2);
+        if (! Route::has('api.health')) {
+            Route::prefix('api')->group($baseDir.'/routes/api.php');
+            Route::middleware([])->group($baseDir.'/routes/web.php');
+            Route::getRoutes()->refreshNameLookups();
+        }
+    });
+
+    /*
+     * `redirect()->route('partner.portal')` shipped for months and threw on every click,
+     * because nothing checked that the name existed. This scans routes and Blade views for
+     * route() / redirect()->route() names and asserts each one is registered.
+     */
+    test('no code references an unregistered route name', function () {
+        $baseDir = dirname(__DIR__, 2);
+        $files = array_merge(
+            glob($baseDir.'/routes/*.php') ?: [],
+            glob($baseDir.'/resources/views/**/*.blade.php', GLOB_BRACE) ?: [],
+            glob($baseDir.'/resources/views/*.blade.php') ?: [],
+        );
+
+        $referenced = [];
+        foreach ($files as $file) {
+            preg_match_all("/(?:->)?route\(\s*'([a-zA-Z0-9_.-]+)'/", (string) file_get_contents($file), $m);
+            foreach ($m[1] as $name) {
+                $referenced[$name][] = basename($file);
+            }
+        }
+
+        expect($referenced)->not->toBeEmpty('scan found no route() calls — the pattern is wrong');
+
+        foreach ($referenced as $name => $files) {
+            expect(Route::has($name))->toBeTrue(
+                "route('{$name}') is referenced in ".implode(', ', array_unique($files))
+                .' but no route is registered under that name.'
+            );
+        }
+    });
+
+    test('the partner directory CTAs resolve to the referrer portal and registration', function () {
+        expect(Route::has('referrer.portal'))->toBeTrue()
+            ->and(Route::has('referrer.register'))->toBeTrue();
+
+        $blade = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/archive-rl_partner.blade.php');
+
+        expect($blade)->toContain("route('referrer.register')")
+            ->and($blade)->toContain("route('referrer.portal')")
+            ->and($blade)->not->toContain('partner-dashboard');
+    });
+});

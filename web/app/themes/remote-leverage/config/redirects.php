@@ -18,5 +18,12 @@ return [
     'hire-virtual-assistant' => 'hire-va-4',
     'book-a-call' => 'book-consultation',
     'join-live-call' => 'live-call/connect',
-    'partner-dashboard' => 'partner-portal',
+    // Was 'partner-portal', which is not a registered route or page (known-issues.md bug #1).
+    // The real portal path is 'referrer-portal' (route name `referrer.portal`).
+    'partner-dashboard' => 'referrer-portal',
+
+    // Duplicate thank-you slugs on production: /thank-you/ and /vathankyou/ serve the
+    // same confirmation page. /vathankyou/ is canonical in v2 (page ID 126,
+    // page-vathankyou.blade.php), so the duplicate 301s to it rather than being rebuilt.
+    'thank-you' => 'vathankyou',
 ];

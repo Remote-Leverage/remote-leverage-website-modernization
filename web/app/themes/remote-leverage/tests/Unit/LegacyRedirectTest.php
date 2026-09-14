@@ -32,3 +32,19 @@ describe('LegacyRedirectMiddleware (WR-103, ADR-0006 § SEO & Risk Mitigation)',
         expect($target)->toBe('/hire-va-4?utm_source=google&utm_campaign=spring');
     });
 });
+
+describe('config/redirects.php map', function () {
+    $config = require dirname(__DIR__, 2).'/config/redirects.php';
+
+    test('every target resolves to a real destination, not another redirect key', function () use ($config) {
+        foreach ($config as $from => $to) {
+            expect($config)->not->toHaveKey($to, "'{$from}' redirects to '{$to}', which is itself a redirect key (301 chain)");
+        }
+    });
+
+    test('duplicate thank-you slug 301s to the canonical vathankyou page', function () use ($config) {
+        $middleware = new LegacyRedirectMiddleware;
+
+        expect($middleware->resolve('/thank-you/', $config))->toBe('/vathankyou');
+    });
+});

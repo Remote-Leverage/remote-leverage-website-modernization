@@ -64,7 +64,7 @@ Local counts queried 2026-09-14; production counts from the 2026-09-10 audit.
 | Tags | 8 | 8 | 0 |
 | `attachment` | not audited | 512 | unknown |
 
-Migrated pages: `home`, `about-us`, `reviews`, `vapricing`, `privacy-policy`, `terms-of-use`, `comparison`, `compare-athena`, `wing-assistant-vs-remote-leverage`, `comparison-wing-assistant-ads`, `affiliate-program`, `referral`, `vathankyou`, `hire-va-4-preview`, `blog`.
+Migrated pages: `home`, `about-us`, `reviews`, `vapricing`, `privacy-policy`, `terms-of-use`, `comparison`, `compare-athena`, `wing-assistant-vs-remote-leverage`, `comparison-wing-assistant-ads`, `affiliate-program`, `referral`, `vathankyou`, `hire-va-4`, `blog`. *(Updated 2026-09-14: `hire-va-4-preview` was deleted; `hire-va-4` migrated in its place. `referral` holds incorrect content and is out of scope — see PAGE-MIGRATION-STATUS.md §4a.)*
 
 Per-category post counts match production exactly — Business Growth 91, Outsourcing 95, Case Studies 13, Salary Guides 12, Real Estate Posts 9, News 2. The one discrepancy is **Live Sessions: 2 on production, 0 locally**; worth confirming those two posts were not dropped.
 
@@ -157,3 +157,10 @@ These must all be green before DNS moves. One is green.
 - **`e-landing-page` CPT (2 entries)** has no equivalent post type in v2 and no recorded decision.
 - **`/remote-leverage-x-oyster/` and `/remote-leverage-x-lano/`** — unresolved whether they fold into the partner hub. "Lano" appears nowhere else in the audit; it may be a dead page or a missing partner record.
 - **`/comparison/` is a never-filled-in internal template on production** — literal `[X]` placeholders, "Text here Text here", a stray "NEW SECTION" label. It was reproduced verbatim under the strict-fidelity rule. Someone should decide whether it ships that way.
+
+## SEO gates added 2026-09-14
+
+- [x] **`robots.txt` exists** — `web/robots.txt`, static file in the Bedrock web root. Disallows `/wp/wp-admin/`, the authenticated portals and `/api/`; points at `https://remoteleverage.com/wp-sitemap.xml`. (Locally it reports 404 — a Herd/nginx artifact affecting `robots.txt` and `favicon.ico` only. Production serves it 200. See known-issues.md #3.)
+- [ ] **Unknown URLs must 404, not serve the homepage** — fixed in code by `MissingPathNotFoundMiddleware`; re-verify on staging after deploy, since the bug was invisible locally until then. Check any nonsense path returns 404 and every Laravel route (`/book-consultation`, `/referrer-portal`, `/referrer-register`, `/referral-dashboard`, `/partners`, `/tools/signature-generator`) still returns 200.
+- [ ] **Stop forcing indexability on non-production** — `app/setup.php` overrides Bedrock's `disallow-indexing` mu-plugin at `PHP_INT_MAX`, so staging currently advertises itself as indexable and emits no `noindex`. Gate on environment before staging is exposed. See known-issues.md #4. **Blocking.**
+- [ ] **Confirm the sitemap** — v2 uses core's `/wp-sitemap.xml` (200 locally). Production currently runs Yoast; confirm which sitemap the live robots.txt should point at after cutover.

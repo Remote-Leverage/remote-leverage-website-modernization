@@ -66,8 +66,10 @@ Route::get('referral-dashboard', function (Request $request) {
     return $isLoginTab ? view('pages.referrer-portal') : view('pages.referrer-register');
 })->name('referrer.dashboard.legacy');
 
+// The partner directory's CTAs point here. There is no separate partner portal — partners
+// and referrers share one portal, registered as `referrer.portal` / `referrer.register`.
 Route::get('partner-dashboard', function () {
-    return redirect()->route('partner.portal');
+    return redirect()->route('referrer.portal', [], 301);
 });
 
 Route::get('partners', function () {

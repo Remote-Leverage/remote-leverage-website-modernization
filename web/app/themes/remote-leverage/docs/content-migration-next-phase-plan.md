@@ -30,7 +30,7 @@ marketing" plus the case-study set. Sections §2–§8 are untouched.
 Local pages: `home`, `about-us`, `reviews`, `vapricing`, `privacy-policy`,
 `terms-of-use`, `comparison`, `compare-athena`,
 `wing-assistant-vs-remote-leverage`, `comparison-wing-assistant-ads`,
-`affiliate-program`, `referral`, `vathankyou`, `hire-va-4-preview`.
+`affiliate-program`, `referral`, `vathankyou`, `hire-va-4`. *(Updated 2026-09-14: `hire-va-4-preview` deleted, `hire-va-4` migrated in its place.)*
 
 ### Doc drift to fix first
 `PAGE-MIGRATION-STATUS.md` (repo root) is stale — it still lists the 4

@@ -2,35 +2,127 @@
 
 Live bugs, dead configuration, and documentation that contradicts the code. Found while writing this documentation set on 2026-09-14, by reading the code rather than the docs.
 
-Nothing here has been fixed — each entry names the problem and a proposed fix so it can be scheduled.
+Each entry names the problem and a proposed fix so it can be scheduled. Entries fixed since are
+marked inline.
+
+> **Scope closure (2026-09-14).** Migration scope is now the 44-URL transfer list and nothing
+> else — see [PAGE-MIGRATION-STATUS.md](../../../../../PAGE-MIGRATION-STATUS.md). Some issues
+> below concern code that may itself be out of scope and slated for deletion; fixing those would
+> be wasted work. Affected entries say so.
 
 ---
 
 ## Bugs
 
-### 1. `/partner-dashboard` throws — three inconsistent definitions of one URL
+### ~~1. `/partner-dashboard` throws — three inconsistent definitions of one URL~~ — ✅ **FIXED 2026-09-14**
 
-Three places disagree about where `/partner-dashboard` goes, and none of them point anywhere real:
+Three places disagreed about where `/partner-dashboard` goes, and none pointed anywhere real. No route was named `partner.portal` (the registered names are `referrer.portal` / `referrer.register`), and no path `partner-portal` existed (the real one is `referrer-portal`). The two CTA buttons on the partner directory raised `RouteNotFoundException` on every click.
 
-| Location | Says |
-| :--- | :--- |
-| `routes/web.php:69-71` | `redirect()->route('partner.portal')` |
-| `config/redirects.php` | `'partner-dashboard' => 'partner-portal'` |
-| `resources/views/archive-rl_partner.blade.php:77,84` | Links to `/partner-dashboard` and `/partner-dashboard#register` |
+**What was fixed:**
 
-No route is named `partner.portal` — the registered names are `referrer.portal` and `referrer.register`. No path `partner-portal` exists either; the real one is `referrer-portal`.
+| Location | Before | After |
+| :--- | :--- | :--- |
+| `routes/web.php` | `redirect()->route('partner.portal')` | `redirect()->route('referrer.portal', [], 301)` |
+| `config/redirects.php` | `'partner-dashboard' => 'partner-portal'` | `'partner-dashboard' => 'referrer-portal'` |
+| `archive-rl_partner.blade.php:77` | `home_url('/partner-dashboard#register')` | `route('referrer.register')` |
+| `archive-rl_partner.blade.php:84` | `home_url('/partner-dashboard')` | `route('referrer.portal')` |
 
-**Effect:** the two CTA buttons on the partner directory raise a `RouteNotFoundException`. The legacy redirect map entry is also dead.
+The redirect was also made **permanent (301)** rather than the framework-default 302, since `/partner-dashboard` is a legacy URL that should pass its signal on.
 
-**Proposed fix:** point the route at `referrer.portal`, change the redirect map entry to `referrer-portal`, and repoint the blade links at `route('referrer.portal')` and `route('referrer.register')` rather than a hardcoded path. Add a route-name assertion to `tests/Feature/RoutesTest.php` so a missing name fails CI instead of production.
+**Verified:** `/partner-dashboard/` now returns 301 and lands on `/referrer-portal` (200) on `remoteleverage-v2.test`.
 
-### 2. Calendly webhook signatures are unverified
+**Regression guards added** to `tests/Feature/RoutesTest.php`:
+
+- Every `route('...')` name referenced in `routes/` and `resources/views/` must be registered. Mutation-tested: reintroducing `partner.portal` fails the suite with the file name.
+- Every `config/redirects.php` target must be a registered route, a declared WordPress page, or explicitly quarantined with a reason. Mutation-tested with a bogus target.
+- The partner-directory CTAs specifically resolve to `referrer.portal` / `referrer.register` and no longer contain a hardcoded `partner-dashboard`.
+
+**Residual smell (not a bug):** `/partner-dashboard` is still defined twice — as a Laravel route and as a `config/redirects.php` entry. Both now agree and the route wins. Collapsing to one definition would be tidier but risks changing which layer handles the path, so it was left alone deliberately.
+
+### ~~2. Every unknown URL serves the homepage with HTTP 200~~ — ✅ **FIXED 2026-09-14**
+
+Any path that matched no page returned the **full homepage** with `200 OK` instead of a 404 — not a soft 404 but unlimited duplicate copies of the front page, which would have let crawlers index any typo or stale backlink and made every broken internal link look like it worked.
+
+**Root cause (confirmed in core, not guessed).** `WP_Rewrite::$use_verbose_page_rules` is `true` here, because core sets it from `/^[^%]*%(?:postname|category|tag|author)%/` against the permalink structure — and this site uses `/blog/%postname%/`, which matches. In verbose mode `WP::parse_request()` does not trust the catch-all page rule:
+
+```php
+// wp-includes/class-wp.php:242-250
+if ( $wp_rewrite->use_verbose_page_rules && preg_match( '/pagename=\$matches\[([0-9]+)\]/', $query, $varmatch ) ) {
+    // This is a verbose page match, let's check to be sure about it.
+    $page = get_page_by_path( $matches[ $varmatch[1] ] );
+    if ( ! $page ) {
+        continue;          // <-- rule skipped, and no later rule matches
+    }
+```
+
+With the rule skipped and nothing else matching, WordPress is left with **no query vars at all**. An empty query is the default home query, which returns posts — so `handle_404()` never fires and the front page renders with a 200.
+
+The decisive evidence was that `/?pagename=zzz-nope-123` correctly returned **404** while `/zzz-nope-123/` returned **200**: identical target, different path into `parse_request()`.
+
+**Fix.** `App\Application\Http\Middleware\MissingPathNotFoundMiddleware`, hooked on `parse_request` at priority 999 in `app/setup.php`. When a non-empty path produced no `matched_rule` and no query vars, it sets `$wp->query_vars = ['error' => '404']` — the same mechanism core itself uses. `WP::send_headers()` reads that and sends a real 404 (class-wp.php:455), and `WP_Query` calls `set_404()` (class-wp-query.php:1148), so the 404 template renders.
+
+**Why priority 999:** Acorn dispatches Laravel routes on `parse_request` at priority 10 and its `handleRequest()` ends in `exit()` (`Roots/Acorn/Application/Concerns/Bootable.php:300`), so a matched route never reaches this guard. As a second layer the middleware also skips any path registered as an Acorn route, excluding Acorn's catch-all `wordpress` route, which matches everything and would otherwise make the guard a no-op.
+
+**Verified end-to-end on `remoteleverage-v2.test`:**
+
+| Must 404 | | Must keep working | |
+| :--- | :--- | :--- | :--- |
+| `/zzz-definitely-not-a-page-abc123/` | 404 | `/`, `/about-us/`, `/hire-va-4/`, `/blog/`, `/reviews/`, `/vapricing/`, `/case-study/`, `/comparison/` | 200 |
+| `/zzz/deep/nope` | 404 | `/book-consultation/`, `/referrer-portal/`, `/referrer-register/`, `/referral-dashboard/`, `/partners/`, `/tools/signature-generator` | 200 |
+| `/hire-va-4-preview/` (deleted page) | 404 | `/case-study/{slug}/`, `/blog/{slug}/`, `/partners/oyster/` | 200 |
+| `/vacalendar/`, `/samples/`, `/contractor-management/` (unmigrated) | 404 | `/feed`, `/blog/feed`, `/wp-json/wp/v2/pages`, `/wp-sitemap.xml`, `/?s=virtual` | 200 |
+| | | `/hire-va-old/`, `/hire-virtual-assistant/`, `/thank-you/`, `/partner-dashboard/` | 301 |
+
+The 404 response is the real template (49 KB, title *"Page not found"*, heading *"Looks like this page went remote."*) rather than the 219 KB homepage.
+
+**Regression guards:** `tests/Unit/MissingPathNotFoundTest.php` (6 tests) covers the force case, the front page, rewrite-resolved requests, explicit query vars (`?p=`, `?pagename=`, `?s=`, feeds), and asserts every registered Laravel route is never forced to 404.
+
+**Consequence worth remembering:** before this fix, URL-existence checks against the local site were meaningless — everything answered 200. Audits done before 2026-09-14 that relied on curling the local site should be redone; ones that queried the database (`wp post list`) are sound. Production still has a narrower version of the same trap: it returns 200 for any path under `/tools/*`.
+
+### ~~3. `/robots.txt` returns 404~~ — ✅ **RESOLVED 2026-09-14** (file created; the 404 is a local Herd artifact)
+
+**A `robots.txt` now exists** at `web/robots.txt`, served as a static file from the Bedrock web root. It disallows `/wp/wp-admin/` (core lives under `/wp/` in this layout, not the web root), allows `admin-ajax.php`, disallows the authenticated portals and `/api/`, and points at `https://remoteleverage.com/wp-sitemap.xml`.
+
+**The 404 was never an application bug.** Traced with a request-lifecycle probe: PHP reported `http_response_code() === 200` at `send_headers`, `template_redirect`, `do_robots` and `shutdown` — the full request — while nginx still returned 404 to the client. After adding the static file, nginx serves **our exact file** (correct bytes, `content-type: text/plain`, its own `etag`) and *still* reports 404.
+
+Confirmed local-only:
+
+| URL (local) | Status | Bytes served |
+| :--- | :--- | :--- |
+| `/favicon.svg` | 200 | 3,972 |
+| `/favicon.ico` | **404** | 3,972 |
+| `/robots.txt` | **404** | 754 |
+
+`robots.txt` and `favicon.ico` are exactly the pair Valet/Herd singles out in its nginx config (`location = /favicon.ico` / `location = /robots.txt` with `log_not_found off`). `favicon.svg`, which is not in that snippet, serves 200 normally. **Production returns 200 for `/robots.txt`.** Nothing to fix in the application; do not chase this status code locally.
+
+**Worth knowing:** production's current robots.txt is bare (`User-Agent: *` / `Disallow:` — allow everything, no sitemap). The new file is a deliberate improvement, not a reproduction of it.
+
+### 4. Every environment is forced to be indexable — staging included
+
+`app/setup.php:192-205` forces indexability unconditionally, at `PHP_INT_MAX` priority:
+
+```php
+add_filter('pre_option_blog_public', fn () => '1', PHP_INT_MAX);
+add_filter('wp_robots', function (array $robots) {
+    unset($robots['noindex'], $robots['nofollow']);
+    $robots['index'] = true;
+    ...
+}, PHP_INT_MAX);
+```
+
+The comment says *"Ensure the site is indexable and robots allow indexing for Lighthouse audit"*, so it was deliberate — but it is not gated on environment, and at `PHP_INT_MAX` it **overrides Bedrock's `disallow-indexing` mu-plugin**, which sets `pre_option_blog_public` to zero at default priority for exactly this purpose. Staging and development therefore advertise themselves as fully indexable, and no `noindex` is ever emitted anywhere.
+
+The new static `web/robots.txt` does not mitigate this: it ships the same allow-everything policy to every environment, and being a static file it cannot vary by environment the way the virtual one could.
+
+**Proposed fix:** gate both filters on the environment, e.g. only apply when `wp_get_environment_type() === 'production'` (or `WP_ENV === 'production'`), and let `DISALLOW_INDEXING` do its job elsewhere. For staging also either deploy a different `robots.txt` or block crawlers at the server. **Treat this as a cutover gate** — a staging site indexed under the client's brand is expensive to undo.
+
+### 5. Calendly webhook signatures are unverified
 
 `config/services.php` reads `CALENDLY_WEBHOOK_SIGNING_KEY`, but the key is absent from `.env` and from `.env.example`. With no key configured, `/api/webhooks/calendly` accepts unsigned payloads — anyone who can reach the endpoint can flip a lead to `booked` or `canceled`.
 
 **Proposed fix:** set the key in every environment, and make `CalendlyWebhookController` reject requests when no signing key is configured rather than falling through to accept.
 
-### 3. Sentry is installed but silent
+### 6. Sentry is installed but silent
 
 `sentry/sentry-laravel` is a dependency, `config/sentry.php` is fully populated, and `@sentry/browser` is in `package.json` — but no `SENTRY_LARAVEL_DSN` or `SENTRY_DSN` is set in `.env`. Nothing is reported from any environment.
 
@@ -70,11 +162,11 @@ Phase 7 also still lists *"Verify Customer.io lead identification upon Gravity F
 
 **Proposed fix:** either update the percentages and drop the Gravity Forms line, or retire `plan.md` into `docs/archive/` and let the README's status section be the single source. Recommendation: archive it. A hand-maintained percentage tracker drifts by default; the README's gate table does not, because it is derived from verifiable facts.
 
-### `PAGE-MIGRATION-STATUS.md` (repo root)
+### ~~`PAGE-MIGRATION-STATUS.md` (repo root)~~ — **resolved 2026-09-14**
 
-Lists the four comparison pages and `/referral/` as "🔧 Needs migration". The checklist and the database both show them migrated. Two overlapping trackers is a liability — this was already flagged in [content-migration-next-phase-plan.md](content-migration-next-phase-plan.md) and has not been acted on.
+Was listing the four comparison pages and `/referral/` as "🔧 Needs migration" when both the checklist and the database showed them done.
 
-**Proposed fix:** fold its review notes into [content-migration-checklist.md](content-migration-checklist.md) and archive the file. *(A "superseded" banner has been added to it in the meantime.)*
+**Resolved by inverting the relationship rather than archiving the file.** `PAGE-MIGRATION-STATUS.md` was rewritten against the live database and is now the **source of truth for the 44-URL migration scope**; `content-migration-checklist.md` was demoted to a read-only production inventory. The "two overlapping trackers" liability is gone because they no longer track the same thing — one is scope, the other is what exists on production.
 
 ### `docs/adr-status.md`
 
@@ -86,7 +178,9 @@ WR-105 says *"No `.github/workflows` directory anywhere in the repo. Not being w
 
 Refers to `App\Support\LegalDocument` with 9 Pest tests. The class is `App\Support\DocumentOutline` (renamed, tests in `tests/Unit/DocumentOutlineTest.php`).
 
-**Proposed fix:** one-line correction.
+**Proposed fix:** one-line correction. Low value now — the document was demoted to a read-only production inventory on 2026-09-14 and no longer drives work.
+
+**Separately, scope closure changed what this file is.** It was written as a "migrate everything" audit of 235 production pages; 191 of those are now discarded. A banner marks every unticked box void and flags §§2, 3, 4, 5, 7 as out of scope. Anyone reading it for work items will otherwise be badly misled.
 
 ### The archived READMEs
 

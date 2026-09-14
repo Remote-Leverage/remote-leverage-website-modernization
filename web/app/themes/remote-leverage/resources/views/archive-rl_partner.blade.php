@@ -74,14 +74,14 @@
 
           <div class="pt-4 flex flex-wrap items-center gap-4">
             <a
-              href="{{ home_url('/partner-dashboard#register') }}"
+              href="{{ route('referrer.register') }}"
               class="px-6 py-3 rounded-pill bg-gradient-to-r from-brand-purple to-brand-magenta hover:opacity-95 text-white font-bold text-sm shadow-btn transition cursor-pointer"
             >
               Apply to Partner Network &rarr;
             </a>
 
             <a
-              href="{{ home_url('/partner-dashboard') }}"
+              href="{{ route('referrer.portal') }}"
               class="px-6 py-3 rounded-pill bg-white/10 hover:bg-white/15 text-white font-semibold text-sm border border-white/20 transition cursor-pointer"
             >
               Partner Portal Login

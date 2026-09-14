@@ -7,6 +7,7 @@
 namespace App;
 
 use App\Application\Http\Middleware\LegacyRedirectMiddleware;
+use App\Application\Http\Middleware\MissingPathNotFoundMiddleware;
 use App\Blocks\AccordionFaqBlock;
 use App\Blocks\BookingBlock;
 use App\Blocks\BookingFooterBlock;
@@ -247,6 +248,18 @@ if (defined('WP_ENV') && WP_ENV === 'development') {
 add_action('template_redirect', function () {
     (new LegacyRedirectMiddleware)->handle();
 }, 2);
+
+/**
+ * Force a real 404 for pretty-permalink paths WordPress could not resolve, instead of
+ * silently rendering the front page with a 200. See MissingPathNotFoundMiddleware for why
+ * this is needed (verbose page rules) and known-issues.md bug #2.
+ *
+ * Priority 999 keeps this after Acorn's own `parse_request` route dispatch (priority 10),
+ * which exits for any matched Laravel route before this ever runs.
+ */
+add_action('parse_request', function (\WP $wp) {
+    (new MissingPathNotFoundMiddleware)->handle($wp);
+}, 999);
 
 /**
  * Register custom Gutenberg block styles and pattern categories.
