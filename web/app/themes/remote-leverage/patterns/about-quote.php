@@ -1,9 +1,14 @@
 <?php
+
 /**
  * Title: About Testimonial Video Card (Stacy Do)
  * Slug: remote-leverage/about-quote
  * Categories: remote-leverage
  */
+
+use App\Support\BlockDefaults;
+
+$poster = BlockDefaults::homeImg('magnific_EqBRpqJuuO-1-1.png');
 ?>
 <!-- wp:group {"align":"full","backgroundColor":"bg-light","layout":{"type":"constrained","contentSize":"1380px"}} -->
 <div class="wp-block-group alignfull has-bg-light-background-color has-background pb-8 sm:pb-12">
@@ -14,7 +19,7 @@
                 <div x-data="{ playing: false }" class="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-md group">
                     <video x-ref="video"
                         src="/app/themes/remote-leverage/public/videos/5-minute-VSL_Horizontal_V01.mp4"
-                        poster="<?php echo esc_url(\App\Support\BlockDefaults::homeImg('magnific_EqBRpqJuuO-1-1.png')); ?>"
+                        poster="<?php echo esc_url($poster); ?>"
                         class="w-full h-full object-cover"
                         playsinline
                         controls

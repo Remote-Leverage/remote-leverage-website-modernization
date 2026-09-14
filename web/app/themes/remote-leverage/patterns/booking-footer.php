@@ -1,11 +1,15 @@
 <?php
+
 /**
  * Title: Booking Footer - Ready to Scale
  * Slug: remote-leverage/booking-footer
  * Categories: remote-leverage
  * Description: High-converting final call-to-action with embedded reactive booking wizard.
  */
-$map = \App\Support\BlockDefaults::homeImg('Map.webp');
+
+use App\Support\BlockDefaults;
+
+$map = BlockDefaults::homeImg('Map.webp');
 ?>
 <!-- wp:group {"align":"full","className":"relative overflow-hidden rl-booking-footer-group","style":{"spacing":{"padding":{"top":"6rem","bottom":"6rem"}}},"backgroundColor":"brand-dark-violet","textColor":"white","layout":{"type":"constrained","contentSize":"1380px"}} -->
 <div class="wp-block-group alignfull relative overflow-hidden rl-booking-footer-group has-white-color has-brand-dark-violet-background-color has-text-color has-background" id="booking-footer" style="padding-top:6rem;padding-bottom:6rem">
