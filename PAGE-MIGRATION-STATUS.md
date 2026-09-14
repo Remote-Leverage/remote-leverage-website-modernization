@@ -1,3 +1,11 @@
+> **Superseded.** This tracker contradicts the migration checklist — it still lists the four
+> comparison pages and `/referral/` as needing migration, when both the checklist and the
+> database show them done. Use
+> [docs/content-migration-checklist.md](web/app/themes/remote-leverage/docs/content-migration-checklist.md)
+> and [docs/production-cutover.md](web/app/themes/remote-leverage/docs/production-cutover.md)
+> as the source of truth. The review notes at the bottom are still worth reading and have not
+> been folded in yet.
+
 # Page Migration Status — v2 Redesign
 
 Tracking which pages have been rebuilt in the new (v2) design system vs. which

@@ -65,6 +65,22 @@ class EnvironmentSyncAdmin
         add_action('admin_init', [$this, 'handleActions']);
         add_action('wp_ajax_rl_sync_push_step', [$this, 'handlePushStep']);
         add_action('wp_ajax_rl_sync_pull_step', [$this, 'handlePullStep']);
+        add_action('admin_enqueue_scripts', [$this, 'enqueueStyles']);
+    }
+
+    /**
+     * Load the shared admin tokens on this screen only.
+     *
+     * They are scoped to .rl-admin-wrap, but enqueueing them everywhere would
+     * still add weight to every admin page for no reason.
+     */
+    public function enqueueStyles(string $hook): void
+    {
+        if (! str_contains($hook, self::SLUG)) {
+            return;
+        }
+
+        AdminDesignSystem::enqueue();
     }
 
     public function addMenuPage(): void

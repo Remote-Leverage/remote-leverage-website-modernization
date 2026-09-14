@@ -50,7 +50,7 @@ class EnvironmentSyncScreen
         $pull = $this->pullJobs->active();
         $running = $push !== null || $pull !== null;
 
-        echo '<div class="wrap rl-sync">';
+        echo '<div class="wrap rl-admin-wrap rl-sync">';
         $this->styles();
         $this->header();
 
@@ -92,8 +92,9 @@ class EnvironmentSyncScreen
     {
         $targets = $this->configuredEnvironments();
 
-        echo '<h1>Environment Sync</h1>';
-        echo '<p class="rl-sync-sub">';
+        echo '<div class="rl-admin-header">';
+        echo '<h1 class="rl-admin-title">Environment Sync</h1>';
+        echo '<p class="rl-admin-subtitle">';
         printf(
             'This environment is <code>%s</code>. ',
             esc_html(SyncEnvironment::current()),
@@ -105,6 +106,7 @@ class EnvironmentSyncScreen
             : 'Connected to '.esc_html(implode(', ', $targets)).'.';
 
         echo ' Never available in production.</p>';
+        echo '</div>';
     }
 
     /**
@@ -123,8 +125,8 @@ class EnvironmentSyncScreen
         $percent = $status['percent'];
         $elementId = 'rl-sync-'.$kind;
 
-        echo '<div class="rl-sync-panel">';
-        printf('<h2>%s</h2>', esc_html($title));
+        echo '<div class="rl-card rl-sync-live">';
+        printf('<p class="rl-card-title">%s</p>', esc_html($title));
 
         printf(
             '<div class="rl-sync-bar"><div id="%s-fill" class="rl-sync-bar-fill%s" style="width:%s"></div></div>',
@@ -134,13 +136,13 @@ class EnvironmentSyncScreen
         );
 
         printf(
-            '<p class="rl-sync-status"><span id="%s">%s</span></p>',
+            '<p class="rl-sync-status" id="%s">%s</p>',
             esc_attr($elementId),
             esc_html((string) $status['label']),
         );
 
         if (! $autostart) {
-            echo '<p class="rl-sync-hint">This transfer was left unfinished. '
+            echo '<p class="rl-hint">This transfer was left unfinished. '
                 .'Resume it, or cancel it to start something else.</p>';
         }
 
@@ -148,12 +150,12 @@ class EnvironmentSyncScreen
 
         if (! $autostart) {
             printf(
-                '<button type="button" class="button button-primary" onclick="rlSyncResume_%s()">Resume</button> ',
+                '<button type="button" class="rl-btn rl-btn-primary" onclick="rlSyncResume_%s()">Resume</button> ',
                 esc_attr($kind),
             );
         }
 
-        $this->form('cancel_job', 'Cancel transfer', 'button', [
+        $this->form('cancel_job', 'Cancel transfer', 'rl-btn rl-btn-outline', [
             'job_id' => (string) $status['id'],
         ], 'Cancel this transfer? Anything already written stays until you roll the session back.');
 
@@ -171,21 +173,21 @@ class EnvironmentSyncScreen
         $requested = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'push';
         $current = in_array($requested, ['push', 'pull', 'maintenance'], true) ? $requested : 'push';
 
-        echo '<h2 class="nav-tab-wrapper rl-sync-tabs">';
+        echo '<nav class="rl-tabs">';
 
         foreach (['push' => 'Push', 'pull' => 'Pull', 'maintenance' => 'Maintenance'] as $tab => $label) {
             printf(
-                '<a href="%s" class="nav-tab%s">%s</a>',
+                '<a href="%s" class="rl-tab%s">%s</a>',
                 esc_url(admin_url('options-general.php?page='.self::SLUG.'&tab='.$tab)),
-                $tab === $current ? ' nav-tab-active' : '',
+                $tab === $current ? ' rl-tab-active' : '',
                 esc_html($label),
             );
         }
 
-        echo '</h2>';
+        echo '</nav>';
 
         if ($running) {
-            echo '<div class="rl-sync-panel rl-sync-panel--muted"><p>A transfer is running. '
+            echo '<div class="rl-card"><p class="rl-card-sub" style="margin:0;">A transfer is running. '
                 .'Cancel it above before starting another.</p></div>';
 
             return;
@@ -200,49 +202,53 @@ class EnvironmentSyncScreen
 
     private function pushForm(): void
     {
-        echo '<form method="post" class="rl-sync-form" '
+        echo '<form method="post" class="rl-card" '
             .'onsubmit="return confirm(\'This overwrites data on the target. Continue?\');">';
         wp_nonce_field(self::SLUG);
         echo '<input type="hidden" name="rl_sync_action" value="push">';
 
-        echo '<p class="rl-sync-lede">Send this environment&rsquo;s data to a remote.</p>';
+        echo '<p class="rl-card-title">Push to a remote</p>';
+        echo '<p class="rl-card-sub">Send this environment&rsquo;s data to a remote, overwriting what is there.</p>';
 
         $this->environmentSelect('target');
         $this->datasetChoices('datasets', true);
         $this->exclusionFields('excluded');
 
-        echo '<p><button type="submit" class="button button-primary">Start push</button></p>';
+        echo '<p><button type="submit" class="rl-btn rl-btn-primary">Start push</button></p>';
         echo '</form>';
     }
 
     private function pullForm(): void
     {
-        echo '<form method="post" class="rl-sync-form" '
+        echo '<form method="post" class="rl-card" '
             .'onsubmit="return confirm(\'This overwrites data in THIS environment. Continue?\');">';
         wp_nonce_field(self::SLUG);
         echo '<input type="hidden" name="rl_sync_action" value="pull">';
 
-        echo '<p class="rl-sync-lede">Bring a remote&rsquo;s data into this environment, '
-            .'overwriting what is here. Undoable from Recent transfers.</p>';
+        echo '<p class="rl-card-title">Pull from a remote</p>';
+        echo '<p class="rl-card-sub">Bring a remote&rsquo;s data into this environment, overwriting what is '
+            .'here. Undoable from Recent transfers below.</p>';
 
         $this->environmentSelect('source');
         $this->datasetChoices('pull_datasets', false);
         $this->exclusionFields('pull_excluded');
 
-        echo '<p><button type="submit" class="button button-primary">Start pull</button></p>';
+        echo '<p><button type="submit" class="rl-btn rl-btn-primary">Start pull</button></p>';
         echo '</form>';
     }
 
     private function maintenanceForm(): void
     {
-        echo '<form method="post" class="rl-sync-form">';
+        echo '<form method="post" class="rl-card">';
         wp_nonce_field(self::SLUG);
         echo '<input type="hidden" name="rl_sync_action" value="purge">';
 
-        echo '<p class="rl-sync-lede">Empty a dataset that is never copied between environments. '
+        echo '<p class="rl-card-title">Purge a dataset</p>';
+        echo '<p class="rl-card-sub">Empty a dataset that is never copied between environments. '
             .'<strong>This cannot be undone</strong> — there is no rollback for a purge.</p>';
 
-        echo '<p><label class="rl-sync-label">Dataset</label><select name="purge_dataset">';
+        echo '<div class="rl-field"><label class="rl-label">Dataset</label>'
+            .'<select name="purge_dataset" class="rl-select">';
 
         foreach ($this->registry->purgeable() as $dataset) {
             $counts = $this->purger->preview($dataset->key);
@@ -255,30 +261,32 @@ class EnvironmentSyncScreen
             );
         }
 
-        echo '</select></p>';
+        echo '</select></div>';
 
-        echo '<p><label class="rl-sync-label">Where</label><select name="purge_where">';
+        echo '<div class="rl-field"><label class="rl-label">Where</label>'
+            .'<select name="purge_where" class="rl-select">';
         printf('<option value="local">this environment (%s)</option>', esc_html(SyncEnvironment::current()));
 
         foreach ($this->configuredEnvironments() as $env) {
             printf('<option value="%1$s">%1$s</option>', esc_attr((string) $env));
         }
 
-        echo '</select></p>';
+        echo '</select></div>';
 
-        echo '<p><label class="rl-sync-label">Confirm</label>'
-            .'<input type="text" name="purge_confirm" class="regular-text" autocomplete="off" '
+        echo '<div class="rl-field"><label class="rl-label">Confirm</label>'
+            .'<input type="text" name="purge_confirm" class="rl-input" autocomplete="off" '
             .'placeholder="type the environment name">'
-            .'<span class="rl-sync-hint">Naming the environment is what proves which one you meant. '
-            .'A mismatch deletes nothing.</span></p>';
+            .'<span class="rl-hint">Naming the environment is what proves which one you meant. '
+            .'A mismatch deletes nothing.</span></div>';
 
-        echo '<p><button type="submit" class="button button-link-delete">Purge</button></p>';
+        echo '<p><button type="submit" class="rl-btn rl-btn-destructive">Purge</button></p>';
         echo '</form>';
     }
 
     private function environmentSelect(string $name): void
     {
-        printf('<p><label class="rl-sync-label">%s</label><select name="%s">',
+        printf('<div class="rl-field"><label class="rl-label">%s</label>'
+            .'<select name="%s" class="rl-select">',
             esc_html($name === 'source' ? 'Source' : 'Target'),
             esc_attr($name),
         );
@@ -287,26 +295,26 @@ class EnvironmentSyncScreen
             printf('<option value="%1$s">%1$s</option>', esc_attr((string) $env));
         }
 
-        echo '</select></p>';
+        echo '</select></div>';
     }
 
     private function datasetChoices(string $field, bool $withClean): void
     {
-        echo '<p class="rl-sync-label">Datasets</p><ul class="rl-sync-datasets">';
+        echo '<div class="rl-field"><span class="rl-label">Datasets</span><ul class="rl-choices">';
 
         foreach ($this->registry->transferable() as $dataset) {
             $this->datasetChoice($dataset, $field, $withClean);
         }
 
         echo '</ul>';
-        echo '<p class="rl-sync-hint">Leads, referrals, scheduling and users are never transferred. '
-            .'Content without media leaves posts pointing at files the other side does not have.</p>';
+        echo '<span class="rl-hint">Leads, referrals, scheduling and users are never transferred. '
+            .'Content without media leaves posts pointing at files the other side does not have.</span></div>';
     }
 
     private function datasetChoice(Dataset $dataset, string $field, bool $withClean): void
     {
         printf(
-            '<li><label><input type="checkbox" name="%s[]" value="%s"%s> <strong>%s</strong></label>',
+            '<li class="rl-choice"><label><input type="checkbox" name="%s[]" value="%s"%s> %s</label>',
             esc_attr($field),
             esc_attr($dataset->key),
             $dataset->defaultSelected ? ' checked' : '',
@@ -315,28 +323,28 @@ class EnvironmentSyncScreen
 
         if ($withClean) {
             printf(
-                ' <label class="rl-sync-clean"><input type="checkbox" name="clean[]" value="%s"> '
+                '<label class="rl-choice-aside"><input type="checkbox" name="clean[]" value="%s"> '
                 .'empty on target first</label>',
                 esc_attr($dataset->key),
             );
         }
 
-        printf('<span class="rl-sync-hint">%s</span></li>', esc_html($dataset->description));
+        printf('<span class="rl-hint">%s</span></li>', esc_html($dataset->description));
     }
 
     private function exclusionFields(string $prefix): void
     {
         printf(
-            '<p><label class="rl-sync-label">Skip post types</label>'
-            .'<input type="text" name="%s_post_types" class="regular-text" placeholder="case_study, page">'
-            .'<span class="rl-sync-hint">Comma separated. Optional.</span></p>',
+            '<div class="rl-field"><label class="rl-label">Skip post types</label>'
+            .'<input type="text" name="%s_post_types" class="rl-input" placeholder="case_study, page">'
+            .'<span class="rl-hint">Comma separated. Optional.</span></div>',
             esc_attr($prefix),
         );
 
         printf(
-            '<p><label class="rl-sync-label">Skip post IDs</label>'
-            .'<input type="text" name="%s_post_ids" class="regular-text" placeholder="7, 12">'
-            .'<span class="rl-sync-hint">Comma separated. Optional.</span></p>',
+            '<div class="rl-field"><label class="rl-label">Skip post IDs</label>'
+            .'<input type="text" name="%s_post_ids" class="rl-input" placeholder="7, 12">'
+            .'<span class="rl-hint">Comma separated. Optional.</span></div>',
             esc_attr($prefix),
         );
     }
@@ -345,16 +353,17 @@ class EnvironmentSyncScreen
     {
         $sessions = $this->sessions->recent(8);
 
-        echo '<h2>Recent transfers</h2>';
+        echo '<p class="rl-card-title" style="margin-top:24px;">Recent transfers</p>';
+        echo '<p class="rl-card-sub">Transfers imported <em>into</em> this environment. '
+            .'A push you send from here is recorded on the target, not locally.</p>';
 
         if ($sessions === []) {
-            echo '<p class="rl-sync-hint">Nothing has been imported into this environment yet. '
-                .'A push you send from here is recorded on the target, not locally.</p>';
+            echo '<div class="rl-table-container"><p class="rl-empty">Nothing imported here yet.</p></div>';
 
             return;
         }
 
-        echo '<table class="widefat striped rl-sync-history"><thead><tr>'
+        echo '<div class="rl-table-container"><table class="rl-table"><thead><tr>'
             .'<th>When</th><th>Datasets</th><th>Rows</th><th>State</th><th></th>'
             .'</tr></thead><tbody>';
 
@@ -363,7 +372,7 @@ class EnvironmentSyncScreen
 
             echo '<tr><td>';
             printf(
-                '%s<br><code class="rl-sync-id">%s</code>',
+                '%s<br><span class="rl-mono">%s</span>',
                 esc_html($this->when((int) $status['updated_at'])),
                 esc_html((string) $status['id']),
             );
@@ -374,34 +383,34 @@ class EnvironmentSyncScreen
                 '<td>%d%s</td>',
                 (int) $status['total_rows'],
                 (int) $status['remapped_attachments'] > 0
-                    ? ' <span class="rl-sync-hint">'.(int) $status['remapped_attachments'].' remapped</span>'
+                    ? '<span class="rl-hint">'.(int) $status['remapped_attachments'].' remapped</span>'
                     : '',
             );
             printf('<td>%s</td>', $this->stateBadge((string) $status['state'], $status['error']));
 
             echo '<td>';
-            $this->form('rollback_local', 'Roll back', 'button button-small', [
+            $this->form('rollback_local', 'Roll back', 'rl-btn rl-btn-outline rl-btn-sm', [
                 'session_id' => (string) $status['id'],
             ], 'Revert everything this transfer wrote here?');
             echo '</td></tr>';
         }
 
-        echo '</tbody></table>';
+        echo '</tbody></table></div>';
     }
 
     private function stateBadge(string $state, ?string $error): string
     {
         $class = match ($state) {
-            'complete' => 'is-ok',
-            'failed' => 'is-bad',
-            default => 'is-busy',
+            'complete' => 'rl-badge-ok',
+            'failed' => 'rl-badge-bad',
+            default => 'rl-badge-busy',
         };
 
         $label = $state === 'importing' || $state === 'open' ? 'unfinished' : $state;
 
-        $html = sprintf('<span class="rl-sync-badge %s">%s</span>', esc_attr($class), esc_html($label));
+        $html = sprintf('<span class="rl-badge %s">%s</span>', esc_attr($class), esc_html($label));
 
-        return $error ? $html.'<br><span class="rl-sync-hint">'.esc_html($error).'</span>' : $html;
+        return $error ? $html.'<span class="rl-hint">'.esc_html($error).'</span>' : $html;
     }
 
     private function when(int $timestamp): string
@@ -425,14 +434,14 @@ class EnvironmentSyncScreen
         $status = $this->provisioner->status();
         $ready = $status['exists'] && $status['has_capability'] && $status['password_count'] > 0;
 
-        printf('<details class="rl-sync-details"%s><summary>%s</summary>',
+        printf('<details class="rl-card rl-sync-details"%s><summary>%s</summary>',
             $ready ? '' : ' open',
             $ready
                 ? 'Sync credentials &mdash; ready'
                 : 'Sync credentials &mdash; <strong>setup needed</strong>',
         );
 
-        echo '<p class="rl-sync-hint">The <code>sync-service</code> user this environment accepts '
+        echo '<p class="rl-hint">The <code>sync-service</code> user this environment accepts '
             .'sync calls as. Creating it here does what <code>wp user create</code> and '
             .'<code>wp acorn rl:sync:grant</code> do, so no shell access is needed.</p>';
 
@@ -445,7 +454,7 @@ class EnvironmentSyncScreen
 
         if (! $status['available']) {
             printf(
-                '<p class="rl-sync-bad">%s</p>',
+                '<p class="rl-badge rl-badge-bad">%s</p>',
                 esc_html((string) $status['unavailable_reason']),
             );
             echo '</details>';
@@ -457,7 +466,7 @@ class EnvironmentSyncScreen
         $this->form(
             'provision',
             $status['password_count'] > 0 ? 'Regenerate credentials' : 'Generate credentials',
-            'button',
+            'rl-btn rl-btn-primary',
             [],
             $status['password_count'] > 0
                 ? 'This revokes the current password. Any environment using it stops syncing until updated. Continue?'
@@ -466,7 +475,7 @@ class EnvironmentSyncScreen
 
         if ($status['exists'] && ($status['has_capability'] || $status['password_count'] > 0)) {
             echo ' ';
-            $this->form('revoke', 'Revoke', 'button', [], 'Revoke the password and capability?');
+            $this->form('revoke', 'Revoke', 'rl-btn rl-btn-outline', [], 'Revoke the password and capability?');
         }
 
         echo '</p></details>';
@@ -484,8 +493,8 @@ class EnvironmentSyncScreen
             $issued['password'],
         );
 
-        echo '<div class="rl-sync-panel">';
-        echo '<h2>Credentials created</h2>';
+        echo '<div class="rl-card">';
+        echo '<p class="rl-card-title">Credentials created</p>';
         echo '<p>Shown once, and never retrievable again. Add these to the <em>other</em> '
             .'environment&rsquo;s <code>.env</code>, prefixed for this one '
             .'(e.g. <code>STAGING_SYNC_URL</code>):</p>';
@@ -501,7 +510,7 @@ class EnvironmentSyncScreen
      */
     private function form(string $action, string $label, string $class, array $fields, ?string $confirm = null): void
     {
-        echo '<form method="post" class="rl-sync-inline"';
+        echo '<form method="post" class="rl-inline"';
 
         if ($confirm !== null) {
             printf(' onsubmit="return confirm(%s);"', esc_attr(wp_json_encode($confirm)));
@@ -613,43 +622,41 @@ class EnvironmentSyncScreen
         <?php
     }
 
+    /**
+     * Only what the shared tokens do not already cover: the progress bar, and
+     * the couple of places this screen needs to sit differently.
+     */
     private function styles(): void
     {
         ?>
         <style>
-        .rl-sync .rl-sync-sub { color:#50575e; max-width:60rem; }
-        .rl-sync-panel { background:#fff; border:1px solid #c3c4c7; border-left:4px solid #2271b1;
-            padding:.75rem 1rem 1rem; margin:1rem 0; max-width:60rem; }
-        .rl-sync-panel--muted { border-left-color:#dba617; }
-        .rl-sync-panel h2 { margin-top:.25rem; }
-        .rl-sync-bar { background:#f0f0f1; border-radius:3px; height:1.25rem; overflow:hidden; }
-        .rl-sync-bar-fill { background:#2271b1; height:100%; width:0; transition:width .3s ease; }
-        .rl-sync-bar-fill.is-ok { background:#008a20; }
-        .rl-sync-bar-fill.is-bad { background:#d63638; }
-        .rl-sync-bar-fill.is-indeterminate { background:linear-gradient(90deg,#c3c4c7 25%,#2271b1 50%,#c3c4c7 75%);
-            background-size:200% 100%; animation:rl-sync-slide 1.2s linear infinite; }
-        @keyframes rl-sync-slide { from { background-position:200% 0; } to { background-position:-200% 0; } }
-        .rl-sync-status { font-weight:600; margin:.6rem 0 .2rem; }
-        .rl-sync-actions { margin-bottom:0; }
-        .rl-sync-hint { color:#646970; font-size:12px; display:block; margin-top:.15rem; }
-        .rl-sync-lede { max-width:50rem; }
-        .rl-sync-form { background:#fff; border:1px solid #c3c4c7; border-top:0;
-            padding:1rem 1.25rem; max-width:60rem; }
-        .rl-sync-label { display:block; font-weight:600; margin-bottom:.25rem; }
-        .rl-sync-datasets { margin:0 0 .5rem; }
-        .rl-sync-datasets li { margin:0 0 .6rem; }
-        .rl-sync-clean { color:#646970; font-size:12px; margin-left:.5rem; }
-        .rl-sync-inline { display:inline; }
-        .rl-sync-history .rl-sync-id { font-size:11px; color:#646970; user-select:all; }
-        .rl-sync-badge { border-radius:9px; padding:.1rem .5rem; font-size:11px; font-weight:600; }
-        .rl-sync-badge.is-ok { background:#edfaef; color:#00622b; }
-        .rl-sync-badge.is-bad { background:#fcf0f1; color:#8a2424; }
-        .rl-sync-badge.is-busy { background:#fcf9e8; color:#8a6116; }
-        .rl-sync-details { margin:1.5rem 0; max-width:60rem; }
-        .rl-sync-details summary { cursor:pointer; font-weight:600; padding:.4rem 0; }
-        .rl-sync-code { width:100%; font-family:monospace; }
-        .rl-sync-bad { color:#d63638; }
-        .rl-sync-tabs { margin-bottom:0; }
+        .rl-sync-live { border-left: 3px solid #18181b; }
+        .rl-sync-bar {
+            background: #f4f4f5; border-radius: 9999px; height: 8px; overflow: hidden; margin: 12px 0 0;
+        }
+        .rl-sync-bar-fill {
+            background: #18181b; height: 100%; width: 0; border-radius: 9999px;
+            transition: width .3s ease;
+        }
+        .rl-sync-bar-fill.is-ok { background: #16a34a; }
+        .rl-sync-bar-fill.is-bad { background: #dc2626; }
+        .rl-sync-bar-fill.is-indeterminate {
+            background: linear-gradient(90deg, #e4e4e7 25%, #18181b 50%, #e4e4e7 75%);
+            background-size: 200% 100%; animation: rl-sync-slide 1.2s linear infinite;
+        }
+        @keyframes rl-sync-slide { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+        .rl-sync-status { font-size: 13px; font-weight: 500; margin: 10px 0 0; color: #09090b; }
+        .rl-sync-actions { margin: 14px 0 0; display: flex; gap: 8px; align-items: center; }
+        .rl-sync-details summary {
+            cursor: pointer; font-size: 14px; font-weight: 600; list-style: none;
+        }
+        .rl-sync-details summary::-webkit-details-marker { display: none; }
+        .rl-sync-details summary::before { content: "\25B8 "; color: #71717a; }
+        .rl-sync-details[open] summary::before { content: "\25BE "; }
+        .rl-sync-code {
+            width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+            border: 1px solid #e4e4e7; border-radius: 8px; padding: 10px; background: #fafafa;
+        }
         </style>
         <?php
     }

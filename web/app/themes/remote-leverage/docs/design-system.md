@@ -1,0 +1,151 @@
+# Design system
+
+Tokens, blocks, patterns and templates — everything that decides what a page looks like.
+
+For the *process* of migrating a production page into this system (extract → dissect → build → verify), see [page-migration-and-design-system-workflow.md](page-migration-and-design-system-workflow.md). This document is the reference: what exists and what the rules are.
+
+---
+
+## Non-negotiable rules
+
+1. **The canonical container is 1380px.** Blade/Tailwind: `w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8`. Gutenberg: every root `wp:group` declares `"layout":{"type":"constrained","contentSize":"1380px"}`. `theme.json` sets both `contentSize` and `wideSize` to `1380px`. Never `max-w-4xl`…`max-w-7xl`, `1140px` or `1200px` on a top-level section.
+2. **Bold (700) is the heaviest weight.** No `font-extrabold`, `font-black`, `800` or `900`.
+3. **Bespoke sections are ACF blocks.** Raw HTML inside `core/group` / `core/columns` triggers Gutenberg's "unexpected or invalid content" recovery modal, because core containers use `<InnerBlocks.Content />` and expect only block comments as children. An ACF block saves as a single server-rendered comment and can never fail client-side validation. If you must use core blocks, every visual element is a block comment and any custom markup is wrapped in `<!-- wp:html -->`.
+4. **Strict 1:1 fidelity when reproducing a production page.** Fetch the production page's compiled CSS (`post-<id>.css`) and match colours, gradients, borders and padding exactly. If no token matches a production value, *extend the tokens* — do not adjust the design.
+5. **Page content is authored as a `*-full.php` pattern in git**, then applied to the page. Not edited in the database.
+
+## Tokens
+
+Tailwind v4 — everything is declared with `@theme` in `resources/css/app.css`. There is no `tailwind.config.js`.
+
+### Brand colours
+
+| Token | Value |
+| :--- | :--- |
+| `--color-brand-purple` | `#8A2BE2` |
+| `--color-brand-purple-deep` | `#6200A4` |
+| `--color-brand-navy` | `#342567` |
+| `--color-brand-midnight` | `#18112C` |
+| `--color-brand-dark-violet` | `#25104A` |
+| `--color-brand-hero` | `#13132F` |
+| `--color-brand-magenta` / `--color-brand-magenta-hover` | `#F90066` / `#D90057` |
+| `--color-brand-orange` / `--color-brand-orange-warm` | `#FB7501` / `#F97316` |
+
+Surfaces (`--color-bg-light` `#F4F6FC`, `--color-bg-map` `#E4ECFC`, `--color-bg-benefits` `#FFF5FD`, `--color-roles-surface` `#250D4A`), semantic table colours (`--color-table-leverage` `#00D982`, `--color-table-competitor` `#D94900`), check/cross (`#94DB49` / `#DB4437`), and a set of glassmorphism alpha tokens round it out.
+
+`theme.json` (version 3) exposes a deliberately small editor palette — `brand-purple`, `brand-dark-violet`, `bg-light`, `bg-map`, `black`, `white` — so editors cannot drift off-brand. The full token set is available to Blade, not to the editor colour picker.
+
+### Type scale
+
+Named sizes taken from production's computed styles, so competitor and marketing pages share one scale instead of repeating magic numbers: `--text-hero` (64px), `--text-section` (48px), `--text-display` (46px), `--text-step` (36px), `--text-eyebrow` (27px), `--text-lead` (20px), `--text-cta` (17px), `--text-card` (15px), plus `--text-numeral` (201px) for the oversized step numerals. Each carries its own line-height and letter-spacing.
+
+Fonts: Inter Variable (`@fontsource-variable/inter`), bundled — not fetched from Google.
+
+### Stylesheets
+
+| File | Scope |
+| :--- | :--- |
+| `resources/css/app.css` | Tokens + front end |
+| `resources/css/editor.css` | Block editor parity |
+| `resources/css/blog.css` | Editorial/article typography |
+
+Scoped component classes (for example `.rl-legal-doc`) live in `app.css` rather than being expressed as utilities, because the global `h2.wp-block-heading` rules are `!important` and arbitrary Tailwind variants silently lose to them.
+
+## Blocks
+
+38 code-first ACF blocks in `app/Blocks/`, each with a Blade view in `resources/views/blocks/`. Registered through `Log1x\AcfComposer`; defaults come from `App\Support\BlockDefaults`, so a freshly inserted block is fully populated rather than empty.
+
+| Group | Blocks |
+| :--- | :--- |
+| Hero & entry | `hire-va-hero`, `about-hero`, `comparison-hero`, `affiliate-hero` |
+| Booking & funnel | `booking`, `booking-footer`, `live-call`, `cta-banner` |
+| Talent | `talent-marquee`, `talent-carousel`, `talent-grid`, `roles-grid`, `roles-carousel`, `roles-pricing-grid`, `department-cards` |
+| Social proof | `testimonials`, `trust-stats`, `client-logos-marquee`, `case-study`, `results-preview`, `about-stats` |
+| Comparison | `comparison-matrix`, `cost-comparison`, `data-table`, `split-compare-cards`, `solution-choice` |
+| Process & value | `process-steps`, `process-step-cards`, `why-hire`, `feature-cards`, `benefits-guarantee`, `guarantee-card`, `assurance-pair` |
+| Editorial | `accordion-faq`, `media-copy`, `image-card-grid`, `about-narrative`, `about-talent-banner` |
+
+Notes worth knowing:
+
+- `accordion-faq` emits Schema.org JSON-LD FAQ structured data from a semantic `<details>` accordion.
+- `testimonials` uses CSS scroll-snap with an Alpine video lightbox. **The modal is Vimeo-only** — a self-hosted MP4 renders as a static poster image instead.
+- `booking` / `booking-footer` embed `MultistepBookingWizard` with a configurable skin; `booking-footer` is the dark glassmorphic `skin="glass"` variant.
+- `case-study` carries the whole case-study page shape in one block: hero, info repeater, stat tiles, quote, a `sections` repeater with a Rich Text / Stat Tiles / Metric Table type select, and an optional Vimeo video.
+
+`App\Support\BlockDefaults` centralises demo content, attachment mapping and text sanitisation. When a page needs copy that differs from the sitewide default, the override goes in a small pattern — not into the block's defaults.
+
+## Patterns
+
+53 patterns in `patterns/`, registered under five categories (`app/setup.php`):
+
+| Category | Slug |
+| :--- | :--- |
+| Remote Leverage | `remote-leverage` |
+| Heroes | `remote-leverage-heroes` |
+| Sections & Trust | `remote-leverage-sections` |
+| Booking & Funnels | `remote-leverage-funnels` |
+| Editorial VA Guides | `remote-leverage-guides` |
+
+Every pattern is **pre-hydrated** — block attributes carry real content, so inserting one renders immediately instead of showing empty placeholders.
+
+The naming convention carries meaning:
+
+- **`*-full.php`** — a complete page. `about-full`, `reviews-full`, `vapricing-full`, `affiliate-full`, `comparison-full`, `comparison-wing-full`, `comparison-wing-ads-full`, `comparison-athena-full`, `hire-va-4-full`, `full-homepage`. These are the unit of page authoring: build the page as a `-full` pattern in git, then apply it.
+- **`<page>-<section>.php`** — a section carrying that page's copy override, used when production copy diverges from the sitewide default (for example `reviews-guarantee-6mo` is the 6-month guarantee, while `vapricing`'s own is 12-month).
+- **Bare section names** (`hero`, `client-logos`, `process-steps`, `trust-and-impact`, `booking-footer`, `testimonials-video-modal`, `replacement-guarantee`, `worlds-best-talent`, `why-companies-choose`, `beyond-virtual-assistant`) — sitewide-default sections, reusable anywhere.
+- **`guide-*.php`** — editorial furniture: table of contents, key takeaways, author bio, related articles.
+
+## Templates
+
+```
+resources/views/
+├── layouts/app.blade.php            Master shell
+├── front-page.blade.php             Homepage
+├── page.blade.php                   Default page (skips page-header when has_blocks())
+├── template-landing.blade.php       Landing page template
+├── template-legal.blade.php         "Legal Document" — TOC-driven legal pages
+├── template-custom.blade.php        Custom template
+├── page-vathankyou.blade.php        Thank-you page
+├── single.blade.php  index.blade.php  archive.blade.php  search.blade.php  404.blade.php
+├── archive-case_study.blade.php     Case study index
+├── partials/content-single-case_study.blade.php
+├── archive-rl_partner.blade.php     Partner directory
+├── single-rl_partner.blade.php      Co-branded partner hub (9 tabs)
+├── pages/                           Acorn-routed pages: book-consultation, referrer-portal,
+│                                    referrer-register, signature-generator
+├── blocks/                          One view per ACF block
+├── livewire/                        One view per Livewire component
+├── sections/                        header, footer, sidebar
+├── partials/                        content, entry-meta, page-header, comments, …
+├── components/                      alert
+└── signatures/                      sig-1|2|3 × light|dark (static HTML)
+```
+
+`template-legal.blade.php` is worth calling out as the pattern to copy when content should stay ordinary editable Gutenberg rich text rather than becoming a block: it derives its anchors and sticky table of contents at render time from the `h2`s in the content (`App\Support\DocumentOutline`), so adding a section to a legal document adds it to the navigation for free — nothing is duplicated into fields.
+
+## Support classes
+
+| Class | Does |
+| :--- | :--- |
+| `BlockDefaults` | Centralised demo content, attachment mapping, sanitisation |
+| `DocumentOutline` | Heading extraction → anchors + TOC (used by the legal template) |
+| `MediaLibrary` | Attachment lookup helpers for blocks |
+| `Pattern` | Pattern registration helpers |
+| `ReadingTime` | Article reading-time estimate |
+
+## Front-end behaviour
+
+- Core block CSS (`wp-block-library`, `classic-theme-styles`, `global-styles`) is dequeued on the front end; `should_load_separate_core_block_assets` is forced off.
+- Livewire's script is deferred and **lazily cloned** from a `<template id="rl-livewire-scripts">` when an island approaches the viewport (`resources/js/app.js`), so pages without Livewire components pay nothing for it.
+- Images are converted to WebP on the fly. Palette-mode PNGs break that conversion (`imagewebp(): Palette image not supported`) — re-encode to truecolor before sideloading.
+
+## Verification before you call a page done
+
+```bash
+# Every block parses; no orphan raw HTML inside container blocks
+wp eval 'foreach (parse_blocks(get_post(ID)->post_content) as $b) { if ($b["blockName"] === null && trim($b["innerHTML"]) !== "") { echo "INVALID: ".substr(trim($b["innerHTML"]),0,80)."\n"; } }'
+```
+
+Any block with `blockName === null` carrying non-whitespace `innerHTML` inside a container is an error and must be eliminated before delivery. Take a screenshot and compare against production — full-page screenshots of very tall pages (20000px+) render too small to catch visual bugs, so use viewport-scale or per-element captures.
+
+Pattern and block grammar is also covered in CI by `tests/Unit/GutenbergBlocksAndPatternsTest.php`.

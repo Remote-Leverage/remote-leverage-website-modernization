@@ -1,3 +1,10 @@
+> **Archived proposal — not a description of the codebase.**
+> This was written before/alongside the build and describes intended scope. Several
+> claims in it no longer match the code (stack versions, class names, counts,
+> component names). Kept for the rationale and the original scope.
+> For what actually exists, start at the [repository README](../../../../../../README.md)
+> and [docs/README.md](../README.md).
+
 # Remote Leverage Website Modernization
 ## Enterprise Architecture Proposal & Strategic Migration Plan (Roots Bedrock + Sage 11 + Acorn 5 + Livewire 4 + DDD)
 

@@ -1,3 +1,10 @@
+> **Archived proposal — not a description of the codebase.**
+> This was written before/alongside the build and describes intended scope. Several
+> claims in it no longer match the code (stack versions, class names, counts,
+> component names). Kept for the rationale and the original scope.
+> For what actually exists, start at the [repository README](../../../../../../README.md)
+> and [docs/README.md](../README.md).
+
 # Remote Leverage WordPress Theme (v2.1.0)
 
 A high-performance, enterprise-grade WordPress theme engineered for **Remote Leverage**. Built on **Roots Sage 10**, **Acorn 6**, **Tailwind CSS v4**, **Livewire 4**, and **Log1x ACF Composer**, following strict **Domain-Driven Design (DDD)** principles and headless marketing funnel architecture.
