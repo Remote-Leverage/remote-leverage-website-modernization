@@ -16,6 +16,8 @@ class BlockDefaults
         add_filter('wp_content_img_tag', [self::class, 'filterContentImgTag']);
         add_filter('the_content', [self::class, 'rewriteLocalAbsoluteUrls'], 1);
         add_filter('the_excerpt', [self::class, 'rewriteLocalAbsoluteUrls'], 1);
+        add_filter('the_content', [self::class, 'repairStarRatingAria'], 2);
+        add_filter('the_excerpt', [self::class, 'repairStarRatingAria'], 2);
         add_filter('wp_get_attachment_url', [self::class, 'rewriteLocalAbsoluteUrls']);
     }
 
@@ -55,6 +57,23 @@ class BlockDefaults
         }
 
         return $html;
+    }
+
+    /**
+     * aria-label is not allowed on a generic div. Saved Gutenberg HTML from
+     * the trust-and-impact pattern used that; add role="img" so the name is valid.
+     */
+    public static function repairStarRatingAria(mixed $html): string
+    {
+        if (! is_string($html) || $html === '') {
+            return is_string($html) ? $html : '';
+        }
+
+        return str_replace(
+            '<div style="display:flex;gap:4px;color:#9F53E7;margin-bottom:1rem;" aria-label="5 out of 5 stars">',
+            '<div style="display:flex;gap:4px;color:#9F53E7;margin-bottom:1rem;" role="img" aria-label="5 out of 5 stars">',
+            $html,
+        );
     }
 
     /**

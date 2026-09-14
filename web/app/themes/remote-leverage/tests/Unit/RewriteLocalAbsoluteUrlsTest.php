@@ -31,3 +31,16 @@ test('leaves local http home URLs unchanged when developing without TLS', functi
     expect(BlockDefaults::rewriteLocalAbsoluteUrls($html, 'http://remoteleverage-v2.test'))
         ->toBe($html);
 });
+
+test('adds role=img so aria-label is valid on the saved star-rating div', function () {
+    $html = '<div style="display:flex;gap:4px;color:#9F53E7;margin-bottom:1rem;" aria-label="5 out of 5 stars">stars</div>';
+
+    expect(BlockDefaults::repairStarRatingAria($html))
+        ->toBe('<div style="display:flex;gap:4px;color:#9F53E7;margin-bottom:1rem;" role="img" aria-label="5 out of 5 stars">stars</div>');
+});
+
+test('does not duplicate role=img when the star-rating markup is already valid', function () {
+    $html = '<div style="display:flex;gap:4px;color:#9F53E7;margin-bottom:1rem;" role="img" aria-label="5 out of 5 stars">stars</div>';
+
+    expect(BlockDefaults::repairStarRatingAria($html))->toBe($html);
+});
