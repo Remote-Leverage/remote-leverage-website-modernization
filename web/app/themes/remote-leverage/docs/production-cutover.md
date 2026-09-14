@@ -20,7 +20,7 @@ flowchart TB
         A1["Platform — Bedrock · Sage · Acorn"]
         A2["7 domains — all 8 legacy plugins ported"]
         A3["38 blocks · 53 patterns"]
-        A4["404 tests · CI on every PR"]
+        A4["422 tests · CI on every PR"]
         A5["Staging deploy — ECR → ECS"]
         A6["Environment sync"]
         A7["23 of 23 case studies"]

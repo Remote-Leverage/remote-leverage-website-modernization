@@ -67,7 +67,7 @@ Two local-only behaviours worth knowing:
 ## Testing
 
 ```bash
-./vendor/bin/pest                                   # 404 tests, 1320 assertions, ~8s
+./vendor/bin/pest                                   # 422 tests, 1368 assertions, ~8s
 ./vendor/bin/pest tests/Unit/LeadDomainTest.php     # one file
 ./vendor/bin/pest --filter="attribution"            # by name
 ```

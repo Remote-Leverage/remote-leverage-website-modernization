@@ -221,6 +221,6 @@ WP-Cron, registered in the providers. There is no queue worker and no system cro
 
 ## 8. Testing
 
-404 Pest tests, 1320 assertions, in `tests/Unit` and `tests/Feature`. `tests/stubs.php` and `tests/bootstrap.php` provide WordPress function stubs so the suite runs with **no WordPress and no database** — which is why it is fast (~8s) and why it can gate every PR in CI.
+422 Pest tests, 1368 assertions, in `tests/Unit` and `tests/Feature`. `tests/stubs.php` and `tests/bootstrap.php` provide WordPress function stubs so the suite runs with **no WordPress and no database** — which is why it is fast (~8s) and why it can gate every PR in CI.
 
 That also bounds what it can prove: it verifies domain logic, DTOs, attribution, block/pattern grammar and sync mechanics, not real WordPress integration. There is no browser or visual-regression layer (WR-103, deliberately not built — see [adr-status.md](adr-status.md)).

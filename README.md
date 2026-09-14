@@ -32,7 +32,7 @@ v2 folds all of it into a single Sage theme with an Acorn (Laravel) container in
 - **Content** is native Gutenberg — 38 code-first ACF blocks with Blade views, composed into 53 registered block patterns.
 - **Interactive funnels** (booking wizard, live-call button, referrer portal, partner directory) are Livewire 4 components, not iframes or shortcodes.
 - **Schema** is version-controlled Acorn migrations, applied automatically on deploy.
-- **Everything is tested** — 404 Pest tests, 1320 assertions, green as of this writing, gated in CI on every PR.
+- **Everything is tested** — 422 Pest tests, 1368 assertions, green as of this writing, gated in CI on every PR.
 
 ## Stack
 
@@ -47,7 +47,7 @@ v2 folds all of it into a single Sage theme with an Acorn (Laravel) container in
 | Fields | ACF Pro | * | Licensed; `ACF_PRO_KEY` required to `composer install` |
 | Styling | Tailwind CSS | ^4.0 | `@theme` tokens in `resources/css/app.css` |
 | Build | Vite | ^8.0 | `@roots/vite-plugin` |
-| Tests | Pest | ^5.1 | 404 tests |
+| Tests | Pest | ^5.1 | 422 tests |
 | Lint | Laravel Pint | ^1.20 | `pint.json` at repo root |
 | AI / MCP | `roots/acorn-ai`, `WordPress/mcp-adapter` | ^0.1.2 / ^0.6.1 | Abilities API–backed |
 | Monitoring | Sentry Laravel | ^4.27 | Config present; **DSN not set in `.env`** |
@@ -173,25 +173,31 @@ Each has its own document with the classes, the data it owns, the wiring and how
 
 ## Replacing production
 
-The engineering is largely done. **The cutover is blocked on content and on four business decisions, not on code.**
+The engineering is largely done. **The cutover is blocked on content, not on code.**
+
+> **Migration scope was closed on 2026-09-14.** A 44-URL transfer list, plus `/hire-va-4/` and
+> the 4 partner-hub URLs, is the **entire** migration — 48 URLs. The other 191 published pages on
+> production are **discarded**: not deferred, not "phase 2". They need a redirect-or-drop decision
+> at cutover, not a migration plan. Source of truth:
+> [`PAGE-MIGRATION-STATUS.md`](PAGE-MIGRATION-STATUS.md).
 
 ```mermaid
 flowchart LR
     subgraph PROD["Production today — remoteleverage.com"]
         P1["Elementor + hello-elementor"]
         P2["8 bespoke plugins"]
-        P3["233 pages · 119 posts · 2 partners"]
+        P3["235 pages · 119 posts · 2 partners"]
         P4["Yoast SEO Premium"]
     end
 
     subgraph V2["v2 — this repo"]
         direction TB
-        V1["✅ Platform<br/>Bedrock · Sage · Acorn · 404 tests green"]
+        V1["✅ Platform<br/>Bedrock · Sage · Acorn · 422 tests green"]
         V2b["✅ 7 domains<br/>all 8 plugins ported"]
         V3["✅ Design system<br/>38 blocks · 53 patterns"]
         V4["✅ CI + staging deploy<br/>GitHub Actions → ECR → ECS"]
-        V5["🟡 Content<br/>15 of 233 pages · 119 posts + 23 case studies done"]
-        V6["🔴 SEO parity<br/>Yoast not installed · no redirect map"]
+        V5["🟡 Content<br/>14 of 48 in-scope URLs<br/>119 posts + 23 case studies done"]
+        V6["🔴 SEO parity<br/>Yoast not installed<br/>191 discarded pages need redirects"]
         V7["🔴 Cutover ops<br/>no prod DB ingest · no perf baseline · no DNS plan"]
     end
 
@@ -218,26 +224,42 @@ flowchart LR
 | Test suite + CI | ✅ Done | No visual-regression suite (WR-103, deliberately not built) |
 | Staging deploy pipeline | ✅ Done | Production target does not exist yet |
 | Environment sync | ✅ Done | Production is gated off by design, in four independent places |
-| **Core marketing pages** | 🟡 15 of 233 | Role/industry set (~45), funnel pages (~19), experiments (~43), tools (~10) |
+| **In-scope URLs** | 🟡 14 of 48 | 5 nav-linked pages (P0), 5 partnership items, 6 funnel pages, 18 marketing/campaign pages |
 | **Case studies** | ✅ 23 of 23 | Migrated to a real `case_study` CPT |
 | **Blog posts** | ✅ 119 of 119 | Imported clean; category counts match production |
 | **Taxonomies** | ✅ 7 of 7 categories, 8 of 8 tags | `Live Sessions` is empty locally (2 on production) |
 | **Media** | 🟡 512 attachments | Not audited against production's library |
-| **Partners** | 🟡 1 of 2 | Lexgo is pure data entry |
-| **SEO parity** | 🔴 Not started | Install Yoast, carry `_yoast_wpseo_*` meta, build the redirect map |
+| **Partners** | 🟡 0 of 3 usable | Oyster exists but is a 66-char stub; Lano and Lexgo missing. Hub + 2 standalone landing pages both in scope |
+| **SEO parity** | 🟡 Partly | Done: `robots.txt`, real 404s for unresolved paths, non-production `noindex`. Remaining: install Yoast, carry `_yoast_wpseo_*` meta, build the redirect map for 191 discarded pages |
 | **Elementor retirement gate** | 🟡 Partially met | Zero local posts carry `_elementor_data` — but nothing has `_rl_conversion_status` either, so the ADR-0005 human sign-off gate has no record |
 | **Performance baseline** | 🔴 Not started | Target: mobile 96+, LCP < 1.2s, CLS 0.00 |
 | **Production cutover** | 🔴 Not started | No production environment, no DNS runbook, no rollback plan |
 
-### The three decisions blocking ~107 of ~218 remaining pages
+### What actually remains
 
-Nobody can build these until someone signs off. This is the highest-leverage work available, and none of it is engineering.
+The three business decisions that used to block ~107 pages (paid-traffic experiments, operational
+funnel pages, the role/industry template question) are **resolved by scope closure**: none of those
+sets is being migrated. What is left is concrete build work plus one small decision batch.
 
-1. **Paid-traffic owner — 43 experiment landing pages (§5) + the funnel half of §4.** Which URLs still have ad spend pointed at them? Rebuilding a dead page wastes a week; killing a live one costs revenue.
-2. **Sales/ops owner — 19 operational pages.** `/payment/`, `/contractoragreement/`, `/onboardingform/`, `/vainterview/`, `/hmchecklists/` et al. read like live internal tooling. Which are still in the hiring flow, and who is the audience (that decides whether they need auth)?
-3. **~45 role/industry pages — one data-driven template, or 45 hand-built pages?** Recommendation: one template. The set already has a role/industry/region axis and already suffers duplicate `-2`/`-legacy` variants. Pair it with a canonical-URL pass.
+**34 in-scope URLs to build**, in priority order:
 
-*(A fourth decision — how to migrate the 119 blog posts — is resolved: they are imported, carry no `_elementor_data`, and their category counts match production.)*
+1. **P0 — 5 pages the v2 nav already links to**, so the site currently points at its own 404s:
+   `/vacalendar/`, `/samples/`, `/contractor-management/`, `/contractor-payments/`, `/impact-report-2026/`.
+2. **P1 — 5 partnership items**: the `/remote-leverage-x-oyster/` and `/remote-leverage-x-lano/`
+   landing pages, plus `oyster` / `lano` / `lexgo` hub entries. Note the asymmetry — Lano has no
+   production hub entry and Lexgo no production landing page, so two of the five are new content,
+   not migrations.
+3. **P2 — 6 funnel/operational pages** (`/payment/`, `/signedup/`, `/vaonboardingform/`,
+   `/referral-program/`, and two deposit/thank-you pages).
+4. **P3–P4 — 18 marketing and campaign pages.**
+
+**Plus one decision batch:** v2 already contains 4 pages that are *not* on the list, built before
+scope closed — `/vapricing/`, `/affiliate-program/`, `/referral/`, `/comparison-wing-assistant-ads/`.
+Each needs a keep/redirect/delete call. `/referral/` is the urgent one: it was migrated from the
+wrong source and renders the `hire-va-4` landing page, when production's `/referral/` is actually a
+homepage variant (verified: 27 of 27 headings match the homepage, 4 of 27 match `/hire-va-4/`).
+
+Per-URL status, the out-of-scope inventory and the open decisions: [`PAGE-MIGRATION-STATUS.md`](PAGE-MIGRATION-STATUS.md).
 
 Full plan, per-page inventory and sequencing: [`docs/production-cutover.md`](web/app/themes/remote-leverage/docs/production-cutover.md).
 
@@ -255,6 +277,7 @@ Everything lives under [`web/app/themes/remote-leverage/docs/`](web/app/themes/r
 | Verified environment-variable reference | [configuration.md](web/app/themes/remote-leverage/docs/configuration.md) |
 | Tokens, blocks, patterns, templates | [design-system.md](web/app/themes/remote-leverage/docs/design-system.md) |
 | WP Admin surfaces this theme adds | [admin-screens.md](web/app/themes/remote-leverage/docs/admin-screens.md) |
+| **Migration scope & per-URL status** | [**PAGE-MIGRATION-STATUS.md**](PAGE-MIGRATION-STATUS.md) |
 | Cutover plan & content inventory | [production-cutover.md](web/app/themes/remote-leverage/docs/production-cutover.md) |
 | Domain guides (7) | [domains/](web/app/themes/remote-leverage/docs/domains/) |
 | Bugs, dead config, stale docs | [known-issues.md](web/app/themes/remote-leverage/docs/known-issues.md) |
@@ -264,12 +287,19 @@ Everything lives under [`web/app/themes/remote-leverage/docs/`](web/app/themes/r
 
 A short list of things that are wrong right now and are worth knowing before you touch the code. Detail and proposed fixes in [`docs/known-issues.md`](web/app/themes/remote-leverage/docs/known-issues.md).
 
-- **`/partner-dashboard` throws.** `routes/web.php` redirects to a route named `partner.portal` that does not exist; the partner directory links to that URL twice, and `config/redirects.php` maps it to a third, also non-existent, path.
 - **Eight `.env` keys are read by nothing** (`ZEROBOUNCE_API_KEY`, `REFERRAL_WEBHOOK_SECRET`, `BARBA_ENABLED`, `LOCOMOTIVE_ENABLED`, `PRISM_SERVER_ENABLED`, `STRIPE_TEST_KEY`/`_SECRET`, `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`) — all documented in the old README as if live.
 - **Calendly webhook signatures are unverified locally** — `CALENDLY_WEBHOOK_SIGNING_KEY` is in `config/services.php` but absent from `.env`.
 - **Sentry is configured but has no DSN**, so nothing is reported.
 - **`plan.md` claims Phases 3–8 are `0% Completed`.** Phases 3–6 are essentially done. Anyone reading it for status gets a badly wrong picture.
-- **`PAGE-MIGRATION-STATUS.md` contradicts the migration checklist** on five pages.
+- **`/referral/` holds the wrong content** — it renders the `hire-va-4` landing page. Production's `/referral/` is a homepage variant. Out of scope, so the call is redirect-or-delete rather than rework.
+- **`/robots.txt` and `/favicon.ico` report 404 locally** while serving correct content. A Herd/nginx artifact affecting only those two filenames; production returns 200. Do not chase it.
+
+**Fixed on 2026-09-14** (kept here briefly because they changed behaviour you may remember differently):
+
+- ~~`/partner-dashboard` throws~~ — the route, the redirect map and both partner-directory links now point at the real `referrer.portal` / `referrer.register`.
+- ~~Every unknown URL served the homepage with a 200~~ — caused by WordPress's verbose page rules silently emptying the query. Unresolved paths now return a real 404.
+- ~~Every environment forced itself to be indexable~~ — the theme override was removed entirely, so `DISALLOW_INDEXING` works again and non-production emits `noindex`.
+- ~~`PAGE-MIGRATION-STATUS.md` contradicts the migration checklist~~ — it was rewritten against the live database and is now the source of truth for migration scope; the checklist was demoted to a read-only production inventory.
 
 ---
 

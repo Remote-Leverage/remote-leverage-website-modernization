@@ -193,7 +193,7 @@ Both are now in `docs/archive/` with a banner. For the record, what they got wro
 | "Vite 6" | Vite 8 |
 | "~16 unified blocks" | 38 |
 | "21+ block patterns" | 54 |
-| "53 tests, 251 assertions" | 404 tests, 1320 assertions |
+| "53 tests, 251 assertions" | 422 tests, 1368 assertions |
 | "5 bounded contexts" | 7 (Sync and Lead are absent from the proposal entirely) |
 | `PartnerPortalDashboard`, `PartnerRegistrationForm` | `ReferrerPortalDashboard`, `ReferrerRegistrationForm` |
 | `RegisterPartnerAction` | `RegisterReferrerAction` |
