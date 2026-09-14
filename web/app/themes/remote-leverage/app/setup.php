@@ -187,24 +187,6 @@ add_action('widgets_init', function () {
 });
 
 /**
- * Ensure the site is indexable and robots allow indexing for Lighthouse audit.
- */
-add_filter('pre_option_blog_public', function () {
-    return '1';
-}, PHP_INT_MAX);
-
-add_filter('wp_robots', function (array $robots) {
-    unset($robots['noindex'], $robots['nofollow']);
-    $robots['index'] = true;
-    $robots['follow'] = true;
-    $robots['max-image-preview'] = 'large';
-    $robots['max-snippet'] = '-1';
-    $robots['max-video-preview'] = '-1';
-
-    return $robots;
-}, PHP_INT_MAX);
-
-/**
  * Dequeue Gutenberg block library and classic styles on frontend since we use Tailwind.
  */
 add_action('wp_enqueue_scripts', function () {

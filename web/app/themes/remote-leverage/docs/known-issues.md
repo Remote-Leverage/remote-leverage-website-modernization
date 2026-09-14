@@ -97,24 +97,25 @@ Confirmed local-only:
 
 **Worth knowing:** production's current robots.txt is bare (`User-Agent: *` / `Disallow:` — allow everything, no sitemap). The new file is a deliberate improvement, not a reproduction of it.
 
-### 4. Every environment is forced to be indexable — staging included
+### ~~4. Every environment is forced to be indexable — staging included~~ — ✅ **FIXED 2026-09-14** (override removed entirely)
 
-`app/setup.php:192-205` forces indexability unconditionally, at `PHP_INT_MAX` priority:
+`app/setup.php` forced indexability unconditionally at `PHP_INT_MAX`, which **overrode Bedrock's `disallow-indexing` mu-plugin** (`DISALLOW_INDEXING` is set in both `config/environments/staging.php` and `development.php`). Staging and local therefore advertised themselves as fully indexable and never emitted `noindex`. Introduced in `ee66680` (2026-09-07) alongside theme/performance work; the `for Lighthouse audit` comment suggests it was an audit tweak rather than a decision about other environments.
 
-```php
-add_filter('pre_option_blog_public', fn () => '1', PHP_INT_MAX);
-add_filter('wp_robots', function (array $robots) {
-    unset($robots['noindex'], $robots['nofollow']);
-    $robots['index'] = true;
-    ...
-}, PHP_INT_MAX);
-```
+**Fix: the whole block was deleted, restoring the WordPress/Bedrock default.** No environment gate, no policy class — nothing in the theme touches indexability any more. Both filters (`pre_option_blog_public` and `wp_robots`) are gone, along with the `use` import.
 
-The comment says *"Ensure the site is indexable and robots allow indexing for Lighthouse audit"*, so it was deliberate — but it is not gated on environment, and at `PHP_INT_MAX` it **overrides Bedrock's `disallow-indexing` mu-plugin**, which sets `pre_option_blog_public` to zero at default priority for exactly this purpose. Staging and development therefore advertise themselves as fully indexable, and no `noindex` is ever emitted anywhere.
+| Environment | `blog_public` | Robots meta |
+| :--- | :--- | :--- |
+| `development` / `staging` (`DISALLOW_INDEXING = true`) | `0` | `noindex, nofollow` |
+| `production` (no `DISALLOW_INDEXING`) | `1` (verified in the DB) | indexable, with core's `max-image-preview: large` |
 
-The new static `web/robots.txt` does not mitigate this: it ships the same allow-everything policy to every environment, and being a static file it cannot vary by environment the way the virtual one could.
+**Verified** on this machine (`WP_ENV=development`): `get_option('blog_public')` is now `0`, `apply_filters('wp_robots', [])` returns `{"noindex":true,"nofollow":true}`, and the rendered homepage contains `<meta name='robots' content='noindex, nofollow' />`. The raw DB value of `blog_public` is `'1'`, so production remains indexable once `DISALLOW_INDEXING` is absent.
 
-**Proposed fix:** gate both filters on the environment, e.g. only apply when `wp_get_environment_type() === 'production'` (or `WP_ENV === 'production'`), and let `DISALLOW_INDEXING` do its job elsewhere. For staging also either deploy a different `robots.txt` or block crawlers at the server. **Treat this as a cutover gate** — a staging site indexed under the client's brand is expensive to undo.
+**Two consequences of removing the block wholesale, both intended:**
+
+- `max-image-preview: large` is unaffected on production — WordPress core adds it itself via `wp_robots_max_image_preview_large()` (`wp-includes/robots-template.php:188`), gated on `blog_public`. The theme's copy was redundant.
+- `max-snippet: -1` and `max-video-preview: -1` are **gone**. These are snippet-length controls, not crawlability, and were part of the same removed block. If they are wanted back, they should be added on their own, gated on `blog_public`, not bundled with an indexability override.
+
+**Note on `robots.txt`:** the static `web/robots.txt` does not contradict any of this. Modern `do_robots()` never emits `Disallow: /` — it always outputs only the admin disallow/allow and passes `$public` to the `robots_txt` filter (`wp-includes/functions.php:1725-1739`). WordPress relies on the `noindex` meta tag, not robots.txt, to keep non-public sites out of the index, which is the mechanism now doing the work. Serving `noindex` while allowing the crawl is also the correct way round: a `Disallow` would stop crawlers ever seeing the `noindex`.
 
 ### 5. Calendly webhook signatures are unverified
 
