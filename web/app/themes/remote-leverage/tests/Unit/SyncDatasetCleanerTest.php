@@ -208,3 +208,46 @@ describe('the once-only guard', function () {
         expect($store->find($session->id)->hasCleaned('content'))->toBeTrue();
     });
 });
+
+describe('undo cost', function () {
+    it('records a whole batch in one write rather than one write per entry', function () {
+        foreach (range(1, 40) as $id) {
+            existingPost($id, 'page');
+        }
+
+        $writes = 0;
+        $undo = new class($this->undoPath, $writes) extends UndoLog
+        {
+            public function __construct(string $path, private int &$writes)
+            {
+                parent::__construct($path);
+            }
+
+            public function recordMany(array $entries): void
+            {
+                $this->writes++;
+                parent::recordMany($entries);
+            }
+
+            public function recordUpdate(string $table, array $primaryKey, array $before): void
+            {
+                $this->writes++;
+                parent::recordUpdate($table, $primaryKey, $before);
+            }
+
+            public function recordRowset(string $table, array $scope, array $before): void
+            {
+                $this->writes++;
+                parent::recordRowset($table, $scope, $before);
+            }
+        };
+
+        $this->cleaner->clean(cleanerSession(), DatasetRegistry::CONTENT, $undo);
+
+        // 40 posts is 80 undo entries. Written one at a time onto EFS that is
+        // what timed the first real media chunk out at 30s, so the batch has to
+        // stay a batch: one write here, not eighty.
+        expect($writes)->toBe(1)
+            ->and($undo->entryCount())->toBe(80);
+    });
+});

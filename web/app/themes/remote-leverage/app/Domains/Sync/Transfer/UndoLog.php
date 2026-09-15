@@ -61,12 +61,78 @@ class UndoLog
      */
     public function recordUpdate(string $table, array $primaryKey, array $before): void
     {
-        $this->append([
+        $this->append(self::updateEntry($table, $primaryKey, $before));
+    }
+
+    /**
+     * Build an update entry without writing it, for batching via recordMany().
+     *
+     * @param  array<string, mixed>  $primaryKey
+     * @param  array<string, mixed>  $before
+     * @return array<string, mixed>
+     */
+    public static function updateEntry(string $table, array $primaryKey, array $before): array
+    {
+        return [
             'op' => self::OP_UPDATE,
             'table' => $table,
             'pk' => $primaryKey,
             'before' => $before,
-        ]);
+        ];
+    }
+
+    /**
+     * Build a rowset entry without writing it, for batching via recordMany().
+     *
+     * @param  array<string, mixed>  $scope
+     * @param  array<int, array<string, mixed>>  $before
+     * @return array<string, mixed>
+     */
+    public static function rowsetEntry(string $table, array $scope, array $before): array
+    {
+        return [
+            'op' => self::OP_ROWSET,
+            'table' => $table,
+            'pk' => $scope,
+            'rows' => $before,
+        ];
+    }
+
+    /**
+     * Append many entries in a single write.
+     *
+     * One locked append per entry is fine when they are spread across requests,
+     * which is how the import produces them — 25 rows at a time. A clean is the
+     * opposite shape: it records an entire dataset inside one request, and on
+     * staging this log lives on EFS, where a thousand individually-locked
+     * appends cost far more than the work they are protecting. That is not a
+     * theoretical cost — it is what timed the first media chunk out at 30s.
+     *
+     * @param  array<int, array<string, mixed>>  $entries
+     */
+    public function recordMany(array $entries): void
+    {
+        if ($entries === []) {
+            return;
+        }
+
+        $this->ensureDirectory();
+
+        $lines = '';
+
+        foreach ($entries as $entry) {
+            $line = json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+            if ($line === false) {
+                throw new RuntimeException('Could not record an undo entry for '.($entry['table'] ?? 'unknown').'.');
+            }
+
+            $lines .= $line."\n";
+        }
+
+        if (file_put_contents($this->path, $lines, FILE_APPEND | LOCK_EX) === false) {
+            throw new RuntimeException('Could not write to the undo log at '.$this->path.'.');
+        }
     }
 
     /**
@@ -87,12 +153,7 @@ class UndoLog
      */
     public function recordRowset(string $table, array $scope, array $before): void
     {
-        $this->append([
-            'op' => self::OP_ROWSET,
-            'table' => $table,
-            'pk' => $scope,
-            'rows' => $before,
-        ]);
+        $this->append(self::rowsetEntry($table, $scope, $before));
     }
 
     public function recordFileAdd(string $absolutePath): void

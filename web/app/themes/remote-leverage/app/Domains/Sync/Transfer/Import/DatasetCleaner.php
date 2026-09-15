@@ -117,11 +117,19 @@ class DatasetCleaner
             $metaByPost[(int) $meta->post_id][] = (array) $meta;
         }
 
+        $entries = [];
+
         foreach ($rows as $row) {
             $id = (int) $row->ID;
 
-            $undo->recordUpdate('posts', ['ID' => $id], (array) $row);
-            $undo->recordRowset('postmeta', ['post_id' => $id], $metaByPost[$id] ?? []);
+            $entries[] = UndoLog::updateEntry('posts', ['ID' => $id], (array) $row);
+            $entries[] = UndoLog::rowsetEntry('postmeta', ['post_id' => $id], $metaByPost[$id] ?? []);
         }
+
+        // One write per batch, not one per entry. A clean records a whole
+        // dataset inside a single request, and on staging the log is on EFS —
+        // recording 512 attachments as 1,024 individually-locked appends is
+        // what timed the first media chunk out at 30s.
+        $undo->recordMany($entries);
     }
 }

@@ -50,6 +50,7 @@ class SyncClient
         // unchanged the moment the header starts arriving again.
         $response = Http::withBasicAuth($this->user(), $this->appPassword())
             ->acceptJson()
+            ->timeout($this->timeout())
             ->post($url, $payload);
 
         if ($response->failed()) {
@@ -59,6 +60,23 @@ class SyncClient
         }
 
         return $response->json();
+    }
+
+    /**
+     * How long to wait for the target to finish one call.
+     *
+     * Guzzle defaults to 30s, which suits a request that writes 25 rows and is
+     * wrong for the ones that do not: the first chunk of a dataset also carries
+     * that dataset's clean, and a rollback replays an entire session in one
+     * call. Neither is a hung request at 30s, but both were being abandoned as
+     * though they were, leaving a session open on the target.
+     *
+     * Raising this cannot exceed what the CDN in front of the target allows —
+     * if CloudFront gives up first the response is its 504, not this timeout.
+     */
+    private function timeout(): int
+    {
+        return max(1, (int) config('rl-sync.request_timeout', 60));
     }
 
     /**

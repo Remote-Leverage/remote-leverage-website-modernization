@@ -19,6 +19,22 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Per-request timeout
+    |--------------------------------------------------------------------------
+    |
+    | Seconds to wait for a remote environment to answer one sync call. Guzzle's
+    | 30s default fits a 25-row chunk but not the calls that do more in one
+    | request — the first chunk of a dataset also runs that dataset's clean, and
+    | a rollback replays a whole session. Capped in practice by the CDN's own
+    | origin-response timeout, which answers with a 504 of its own if it gives
+    | up first.
+    |
+    */
+
+    'request_timeout' => (int) env('SYNC_REQUEST_TIMEOUT', 60),
+
     'options' => [
         CalendlyTokenPool::OPTION_KEY,
         CalendlyEventTypeRoleResolver::OPTION_KEY,
