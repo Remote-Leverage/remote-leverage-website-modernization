@@ -77,7 +77,7 @@ flowchart TB
 - The legacy 301 map is applied by calling `LegacyRedirectMiddleware::handle()` from a `template_redirect` hook in `app/setup.php`, not by registering it in a middleware group.
 - `ReferralAttributionMiddleware` is registered in `ReferralServiceProvider`, but only affects Acorn-routed requests; the cookie is also set on ordinary page loads through the same hook pattern.
 
-Acorn routes (`routes/web.php`) are genuinely separate application pages: `/book-consultation`, `/live-call/connect`, `/referrer-portal`, `/referrer-register`, `/referral-dashboard`, `/tools/signature-generator`. Webhooks live at `/api/webhooks/stripe` and `/api/webhooks/calendly`, with `/api/health` for load-balancer checks.
+Acorn routes (`routes/web.php`) are genuinely separate application pages: `/book-consultation`, `/live-call/connect`, `/referrer-portal`, `/referrer-register`, `/referral-dashboard`, `/social-media-kit`. Webhooks live at `/api/webhooks/stripe` and `/api/webhooks/calendly`, with `/api/health` for load-balancer checks.
 
 ## 3. Layering
 

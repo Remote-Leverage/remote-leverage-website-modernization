@@ -17,8 +17,10 @@
 @endphp
 
 <section class="w-full bg-surface-white py-[30px]">
-    {{-- 1210 - 2×20 = production's 1170px inner column. --}}
-    <div class="mx-auto w-full max-w-[1210px] px-5">
+    {{-- 1210 - 2×20 = production's 1170px inner column. Rows are 78px apart there, which is
+         the row's own 38px bottom margin plus 2×10px row padding plus the column's 20px flex
+         gap — all four, or the grid drifts ~20px per row against production. --}}
+    <div class="mx-auto flex w-full max-w-[1210px] flex-col gap-5 px-5">
 
         @foreach ($rows as $row)
             {{-- 38px between rows; 100px between the two cards in a paired row. --}}
@@ -31,28 +33,34 @@
                         'w-full lg:w-[525px] lg:shrink-0' => $item['width'] === 'half',
                     ]) style="background: {{ $card }};">
 
-                        {{-- The player. `aspect-video` holds the 16:9 box before the iframe
-                             loads, so the card does not jump as six embeds settle. --}}
-                        <div class="aspect-video w-full overflow-hidden rounded-badge bg-black">
-                            <iframe src="{{ $item['videoUrl'] }}"
-                                    title="{{ $item['title'] ?: 'Video' }}"
-                                    class="h-full w-full"
-                                    frameborder="0"
-                                    loading="lazy"
-                                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write"
-                                    allowfullscreen></iframe>
-                        </div>
+                        {{-- Player and caption are one group 20px apart; the CTA sits 14px
+                             below that group. Production splits the two gaps exactly this way
+                             (measured on the live cards), so the caption does not drift toward
+                             its button. --}}
+                        <div class="flex flex-col gap-5">
+                            {{-- `aspect-video` holds the 16:9 box before the iframe loads, so
+                                 the card does not jump as six embeds settle. --}}
+                            <div class="aspect-video w-full overflow-hidden rounded-badge bg-black">
+                                <iframe src="{{ $item['videoUrl'] }}"
+                                        title="{{ $item['title'] ?: 'Video' }}"
+                                        class="h-full w-full"
+                                        frameborder="0"
+                                        loading="lazy"
+                                        allow="autoplay; fullscreen; picture-in-picture; clipboard-write"
+                                        allowfullscreen></iframe>
+                            </div>
 
-                        @if ($item['title'])
-                            <h4 class="{{ $caption }}">
-                                @if ($item['titleUrl'])
-                                    <a href="{{ $item['titleUrl'] }}" rel="noopener" target="_blank"
-                                       class="text-white no-underline hover:underline">{{ $item['title'] }}</a>
-                                @else
-                                    {{ $item['title'] }}
-                                @endif
-                            </h4>
-                        @endif
+                            @if ($item['title'])
+                                <h4 class="{{ $caption }}">
+                                    @if ($item['titleUrl'])
+                                        <a href="{{ $item['titleUrl'] }}" rel="noopener" target="_blank"
+                                           class="text-white no-underline hover:underline">{{ $item['title'] }}</a>
+                                    @else
+                                        {{ $item['title'] }}
+                                    @endif
+                                </h4>
+                            @endif
+                        </div>
 
                         @if ($item['ctaText'])
                             <div class="text-center">

@@ -92,7 +92,7 @@ $reportContents = [
     <div class="<?= $wrap ?>">
         <div class="rounded-2xl border border-black/10 p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-6 lg:gap-10 items-center mb-14">
             <div class="flex items-center gap-4">
-                <img src="<?= $img('bullseye-1.png') ?>" alt="" class="w-11 h-11 object-contain shrink-0" loading="lazy" />
+                <img src="<?= $img('bullseye-1.png') ?>" alt="" width="128" height="126" class="w-11 h-11 object-contain shrink-0" loading="lazy" />
                 <h3 class="font-display font-bold text-[20px] leading-[26px] tracking-[-0.6px] text-black">The reason is straightforward.</h3>
             </div>
             <p class="text-[15px] leading-[24px] text-black/75">
@@ -111,14 +111,14 @@ $reportContents = [
             </div>
 
             <div class="rounded-2xl overflow-hidden border border-black/10">
-                <img src="<?= $img('Oscar-Manuel-Herrera-Rosales_Mexico-1-1.png') ?>" alt="Oscar Manuel Herrera Rosales" class="w-full h-auto object-cover" loading="lazy" />
+                <img src="<?= $img('Oscar-Manuel-Herrera-Rosales_Mexico-1-1.png') ?>" alt="Oscar Manuel Herrera Rosales" width="347" height="347" class="w-full h-auto object-cover" loading="lazy" />
                 <div class="flex items-center justify-between gap-4 p-5">
                     <div>
                         <h6 class="font-display font-bold text-[16px] leading-[21px] text-black">Oscar Manuel Herrera Rosales</h6>
                         <p class="text-[13px] text-black/60">Sales Virtual Assistant</p>
                     </div>
                     <div class="text-center shrink-0">
-                        <img src="<?= $flag('mexico.png') ?>" alt="" class="w-8 h-8 rounded-full object-cover mx-auto mb-1" loading="lazy" />
+                        <img src="<?= $flag('mexico.png') ?>" alt="" width="36" height="36" class="w-8 h-8 rounded-full object-cover mx-auto mb-1" loading="lazy" />
                         <p class="text-[11px] text-black/60">Mexico</p>
                     </div>
                 </div>

@@ -935,7 +935,7 @@
               rel="noopener"
               class="px-4 py-2 rounded-card bg-slate-100 hover:bg-slate-200 text-text-body text-xs font-semibold inline-flex items-center gap-2 transition"
             >
-              <img src="{{ Vite::asset('resources/images/g-calendar.png') }}" alt="Google Calendar" class="w-4 h-4 object-contain" />
+              <img src="{{ Vite::asset('resources/images/g-calendar.png') }}" alt="Google Calendar" width="960" height="960" class="w-4 h-4 object-contain" />
               <span>Google</span>
             </a>
             <a 
@@ -944,7 +944,7 @@
               rel="noopener"
               class="px-4 py-2 rounded-card bg-slate-100 hover:bg-slate-200 text-text-body text-xs font-semibold inline-flex items-center gap-2 transition"
             >
-              <img src="{{ Vite::asset('resources/images/outlook.png') }}" alt="Outlook Calendar" class="w-4 h-4 object-contain" />
+              <img src="{{ Vite::asset('resources/images/outlook.png') }}" alt="Outlook Calendar" width="960" height="894" class="w-4 h-4 object-contain" />
               <span>Outlook</span>
             </a>
             <a 
@@ -952,7 +952,7 @@
               onclick="alert('Calendar invite has been emailed to you as an .ics attachment.'); return false;"
               class="px-4 py-2 rounded-card bg-slate-100 hover:bg-slate-200 text-text-body text-xs font-semibold inline-flex items-center gap-2 transition"
             >
-              <img src="{{ Vite::asset('resources/images/apple.png') }}" alt="Apple Calendar" class="w-4 h-4 object-contain" />
+              <img src="{{ Vite::asset('resources/images/apple.png') }}" alt="Apple Calendar" width="814" height="1000" class="w-4 h-4 object-contain" />
               <span>Apple (ICS)</span>
             </a>
           </div>

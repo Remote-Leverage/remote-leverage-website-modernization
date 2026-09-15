@@ -354,7 +354,7 @@ $heroCardCol = $heroSplitAt === '2xl'
     <div class="w-full max-w-[1420px] mx-auto">
         <div class="grid grid-cols-1 items-center gap-6 lg:grid-cols-2">
             <div class="p-2.5">
-                <img src="<?= esc_url($img('SPU-Image-1.png')) ?>" alt="" width="662" height="568"
+                <img src="<?= esc_url($img('SPU-Image-1.png')) ?>" alt="" width="560" height="480"
                      loading="lazy" decoding="async" class="h-auto w-full max-w-[662px] object-contain" />
             </div>
             <div class="flex flex-col p-2.5 px-5 lg:px-2.5">
@@ -513,7 +513,7 @@ $heroCardCol = $heroSplitAt === '2xl'
         <div class="mt-10 grid grid-cols-1 items-start gap-8 rounded-[10px] bg-white p-6 sm:p-10 lg:grid-cols-[1fr_1.6fr] lg:gap-12">
             <div class="flex flex-col items-center text-center lg:pt-6">
                 <img src="<?= esc_url(BlockDefaults::homeImg('rl-26-logo.svg')) ?>" alt="Remote Leverage"
-                     width="300" height="32" loading="lazy" decoding="async" class="mb-6 h-auto w-[240px] max-w-full" />
+                     width="154" height="18" loading="lazy" decoding="async" class="mb-6 h-auto w-[240px] max-w-full" />
                 <p class="font-display text-[16px] leading-6 font-bold text-[#1B1234]">Fill out this form to book a 15 Minute Virtual Assistant Hiring Consultation</p>
             </div>
             <div class="lg:border-l lg:border-black/10 lg:pl-12">

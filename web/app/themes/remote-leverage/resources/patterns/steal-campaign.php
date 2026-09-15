@@ -457,7 +457,7 @@ $orbit = [
         <h2 class="<?= $h2Mid ?> <?= $ink ?> text-center">It’s That Simple</h2>
 
         <div class="mt-6 flex items-center justify-center gap-4">
-            <img src="<?= $img('Group-207.png') ?>" alt="" width="76" height="30"
+            <img src="<?= $img('Group-207.png') ?>" alt="" width="100" height="51"
                  loading="lazy" decoding="async" class="h-[30px] w-auto">
             <span class="flex items-center gap-2">
                 <img src="<?= $img('Group-213.svg') ?>" alt="" width="22" height="22"
@@ -631,7 +631,7 @@ $reviewTone = $isDark
 <!-- wp:group {"align":"full","layout":{"type":"constrained","contentSize":"1320px"}} -->
 <div class="wp-block-group alignfull relative overflow-hidden pt-[70px] pb-[60px]" style="background-color:<?= $ground ?>;">
     <?php if ($isDark) { ?>
-        <img src="<?= $img('Map.png') ?>" alt="" aria-hidden="true" loading="lazy" decoding="async"
+        <img src="<?= $img('Map.png') ?>" alt="" aria-hidden="true" width="1884" height="744" loading="lazy" decoding="async"
              class="pointer-events-none absolute left-[3.5%] top-[470px] w-[90%] h-auto select-none">
     <?php } ?>
 

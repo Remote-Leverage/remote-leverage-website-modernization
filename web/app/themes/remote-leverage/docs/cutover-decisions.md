@@ -182,7 +182,7 @@ supported site-relative paths.
 
 ### 22. `/tools/` → `/`
 A deprecated old tools page, gated behind a login on production (302 to the public). Not
-investigated further, by decision. v2's own `/tools/signature-generator` is unaffected.
+investigated further, by decision. v2's own signature generator now lives at `/social-media-kit/`; `/tools/signature-generator` was removed 2026-09-15 and 301s there.
 
 ## Front-end
 

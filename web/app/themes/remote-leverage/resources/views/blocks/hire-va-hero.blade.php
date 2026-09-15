@@ -22,7 +22,7 @@
   {{-- Hero Background Graphic with Candidate Grid --}}
   <div class="absolute inset-0 z-0 pointer-events-none select-none">
     <img src="{{ BlockDefaults::themeImg('hire-va-4/hire-va-bg.webp') }}"
-         alt=""
+         alt="" width="1366" height="945"
          class="w-full h-full object-cover object-[70%_top] lg:object-top" />
     {{-- Dark gradient overlay for mobile/tablet text readability --}}
     <div class="absolute inset-0 bg-gradient-to-r from-[#1E0B38]/95 via-[#1E0B38]/75 to-transparent lg:hidden"></div>

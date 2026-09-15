@@ -60,7 +60,7 @@
             </div>
         </div>
 
-        <img src="{{ $mockup }}" alt="{{ strip_tags($headline) }}" width="1300" height="927" loading="eager"
+        <img src="{{ $mockup }}" alt="{{ strip_tags($headline) }}" width="1153" height="822" loading="eager"
             fetchpriority="high" decoding="async" class="w-full h-auto object-contain mt-6">
 
     </div>

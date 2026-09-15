@@ -68,7 +68,7 @@ The decisive evidence was that `/?pagename=zzz-nope-123` correctly returned **40
 | Must 404 | | Must keep working | |
 | :--- | :--- | :--- | :--- |
 | `/zzz-definitely-not-a-page-abc123/` | 404 | `/`, `/about-us/`, `/hire-va-4/`, `/blog/`, `/reviews/`, `/vapricing/`, `/case-study/`, `/comparison/` | 200 |
-| `/zzz/deep/nope` | 404 | `/book-consultation/`, `/referrer-portal/`, `/referrer-register/`, `/referral-dashboard/`, `/partners/`, `/tools/signature-generator` | 200 |
+| `/zzz/deep/nope` | 404 | `/book-consultation/`, `/referrer-portal/`, `/referrer-register/`, `/referral-dashboard/`, `/partners/`, `/social-media-kit/` | 200 |
 | `/hire-va-4-preview/` (deleted page) | 404 | `/case-study/{slug}/`, `/blog/{slug}/`, `/partners/oyster/` | 200 |
 | `/vacalendar/`, `/samples/`, `/contractor-management/` (unmigrated) | 404 | `/feed`, `/blog/feed`, `/wp-json/wp/v2/pages`, `/wp-sitemap.xml`, `/?s=virtual` | 200 |
 | | | `/hire-va-old/`, `/hire-virtual-assistant/`, `/thank-you/`, `/partner-dashboard/` | 301 |
@@ -276,6 +276,31 @@ Verified by running the **root** binary across all 562 theme files: it now passe
 configs genuinely agree rather than merely avoiding each other. The exclusion stays so one
 file has one owner.
 
+### 15. A block field not listed in `with()` is invisible, and nothing says so
+
+An ACF Composer block's `with()` maps sub-fields explicitly. Add a field to `fields()` but
+forget the mapping and the view simply never receives it — no error, no warning, the card just
+renders without it.
+
+`ImageCardGridBlock` hit this on 2026-09-15: per-card `cta_text`, `cta_url` and `emphasis` were
+added and registered correctly, ACF stored them correctly, and they still did not render,
+because `with()` was returning only `image`/`eyebrow`/`title`/`text`. The pricing cards on
+`/ecommerce-virtual-assistant/` lost their CTAs and their featured-card outline silently.
+
+**Whenever you add a repeater sub-field, check the block's `with()` in the same edit**, and
+diff the rendered section rather than trusting that what you passed arrived.
+
+### 16. `wptexturize` rewrites copy that has to survive verbatim
+
+Anything rendered through `the_content` goes through `wptexturize`, which curls quotes and
+apostrophes and converts ` - ` into an en dash. Harmless on marketing prose; not harmless on
+the ops checklists migrated on 2026-09-15, where `Send Work Offer - Direct Staff` is a string
+staff copy into CRM fields, and where it accounted for 35 of 35 copy diffs against production.
+
+Worked around in the affected patterns by entity-encoding the characters texturize looks for —
+it never decodes entities, and never touches text inside a tag. Reach for that on any page
+whose copy must match a system of record exactly.
+
 ## ~~Dead configuration~~ — ✅ **FIXED 2026-09-15**
 
 Eight keys were listed here as read by nothing. **Seven were; the eighth was not.**
@@ -455,7 +480,7 @@ The namespaced form is now canonical and the only one registered. **No migration
 
 **Regression guard:** `tests/Unit/LivewireComponentNamesTest.php` — every registered name must be namespaced and unique, and every `<livewire:…>` tag in the theme must resolve to a registered name (the failure message names the offending template).
 
-**Verified:** `/hire-va-4/`, `/partners/`, `/tools/signature-generator` and `/referrer-register/` all still return 200 with a hydrated `wire:snapshot` island.
+**Verified:** `/hire-va-4/`, `/partners/`, `/social-media-kit/` and `/referrer-register/` all still return 200 with a hydrated `wire:snapshot` island.
 
 ### The documentation tree is split across two directories
 

@@ -32,7 +32,7 @@
             </div>
 
             <div>
-                <img src="{{ $heroImage }}" alt="" width="700" height="480" loading="eager" fetchpriority="high"
+                <img src="{{ $heroImage }}" alt="" width="563" height="467" loading="eager" fetchpriority="high"
                     decoding="async" class="w-full h-auto object-contain">
             </div>
         </div>

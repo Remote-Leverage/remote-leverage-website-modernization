@@ -635,7 +635,7 @@ include get_theme_file_path('resources/patterns/sales-playbook-nav.php');
             </div>
             <div class="v5-pricecard__grid">
                 <div class="v5-pricecard__media">
-                    <img src="<?= esc_url($img) ?>" width="400" height="280" alt="" loading="lazy" decoding="async">
+                    <img src="<?= esc_url($img) ?>" width="1024" height="683" alt="" loading="lazy" decoding="async">
                 </div>
                 <div class="v5-pricecard__copy">
                     <h3 class="v5-pricecard__sub">40% of Annual Full Time Salary - One Time Payment</h3>

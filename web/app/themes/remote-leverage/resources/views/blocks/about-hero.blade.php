@@ -45,25 +45,25 @@
                     {{-- Avatar 1: North America (Top Right) --}}
                     <div class="absolute top-[28%] right-[22%] w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-white shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:scale-110">
                         <img src="{{ \App\Support\BlockDefaults::homeImg('Person_04.png') }}"
-                            alt="Talent" class="w-full h-full rounded-full object-cover">
+                            alt="Talent" width="88" height="88" class="w-full h-full rounded-full object-cover">
                     </div>
 
                     {{-- Avatar 2: Latin America (Top Left) --}}
                     <div class="absolute top-[42%] left-[12%] w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-white shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:scale-110">
                         <img src="{{ \App\Support\BlockDefaults::homeImg('person_01.png') }}"
-                            alt="Talent" class="w-full h-full rounded-full object-cover">
+                            alt="Talent" width="88" height="88" class="w-full h-full rounded-full object-cover">
                     </div>
 
                     {{-- Avatar 3: Latin America (Center Right) --}}
                     <div class="absolute top-[52%] left-[36%] w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-white shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:scale-110">
                         <img src="{{ \App\Support\BlockDefaults::homeImg('person_02.png') }}"
-                            alt="Talent" class="w-full h-full rounded-full object-cover">
+                            alt="Talent" width="88" height="88" class="w-full h-full rounded-full object-cover">
                     </div>
 
                     {{-- Avatar 4: South America (Bottom Center) --}}
                     <div class="absolute bottom-[24%] left-[24%] w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-white shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:scale-110">
                         <img src="{{ \App\Support\BlockDefaults::homeImg('Person_03.png') }}"
-                            alt="Talent" class="w-full h-full rounded-full object-cover">
+                            alt="Talent" width="88" height="88" class="w-full h-full rounded-full object-cover">
                     </div>
                 </div>
 
@@ -71,7 +71,7 @@
                 <div class="mt-4 flex items-center gap-3 self-center sm:self-end sm:mr-6">
                     <img class="h-8 w-auto object-contain"
                         src="{{ \App\Support\BlockDefaults::homeImg('Group-207.png') }}"
-                        alt="Talent Team">
+                        alt="Talent Team" width="100" height="51">
                     <div class="flex items-center gap-2">
                         {{-- Verified Blue Badge --}}
                         <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 27 27" fill="none" xmlns="http://www.w3.org/2000/svg">

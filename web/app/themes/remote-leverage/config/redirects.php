@@ -310,8 +310,13 @@ return [
     'how-to-increase-your-virtual-assistants-productivity-with-bonuses' => 'blog',
     'how-to-train-your-virtual-assistant' => 'blog',
     'vaguides' => 'blog',
-    'vaonboardingguide' => 'blog',
-    'vaonboardingguide2' => 'blog',
+    // 'vaonboardingguide' removed 2026-09-15: it is being built as a real v2 page (the
+    // 6-video VA-facing onboarding guide that /services/ links to). A key equal to a live
+    // page slug 301s that page away. Distinct from /onboardingguide/, which is the separate
+    // 28-video client-facing guide — different page, also built, also not a key.
+    // Dead variant slug. Retargeted 2026-09-15 from 'blog' to the real page, now that it
+    // exists — a visitor on the variant URL wants the guide, not the blog archive.
+    'vaonboardingguide2' => 'vaonboardingguide',
 
     // Retired voice-sample variants -> /samples/, the migrated sample recordings page.
     'samples-healthcare-industry' => 'samples',

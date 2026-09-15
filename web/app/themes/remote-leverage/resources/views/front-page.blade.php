@@ -415,8 +415,8 @@
                                     {{-- Wireframe Globe Background Graphic --}}
                                     <div
                                         class="absolute -right-12 -bottom-16 w-[300px] sm:w-[340px] pointer-events-none select-none">
-                                        <img src="{{ $img('globe.webp') }}" alt="Global Coverage" width="340"
-                                            height="340" class="w-full h-auto object-contain" loading="lazy"
+                                        <img src="{{ $img('globe.webp') }}" alt="Global Coverage" width="262"
+                                            height="317" class="w-full h-auto object-contain" loading="lazy"
                                             decoding="async">
                                     </div>
 

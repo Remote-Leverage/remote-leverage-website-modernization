@@ -24,7 +24,7 @@ flowchart LR
 ```
 
 It is a tool, not editorial content, so it sits with the other utility routes
-(`/tools/signature-generator`, `/book-consultation`, `/referrer-portal`) rather than being a
+(`/book-consultation`, `/referrer-portal`, `/live-call/connect`) rather than being a
 `page` row. That keeps it in git and means a database refresh cannot take it out — the same
 reasoning behind keeping page content in `patterns/` and partner records in
 `resources/partners/partners.php`.
@@ -117,9 +117,11 @@ download / setup — is identical signed in or out.
    public to drop files in `wp-content/plugins/rl-social-kit/assets/resources/instagram/`.
 4. **The Instagram pane has no sidebar entry** — same as the plugin, where it is unreachable
    dead markup. Kept for structural fidelity.
-5. **Its own copy of the six signature templates.** `resources/views/signatures/` already
-   exists for the Livewire generator and has diverged (`#25104A` vs the plugin's `#250D4A` in
-   3 of 6). Sharing them would silently change this page's output. A test pins this.
+5. **Its own copy of the six signature templates**, under `resources/social-kit/signatures/`.
+   The theme used to carry a second, drifted set at `resources/views/signatures/` for the
+   Livewire generator (`#25104A` against this page's `#250D4A`, in 3 of 6 files). That
+   divergence is what settled the consolidation below; the old set was deleted with the
+   generator on 2026-09-15, so these are now the only copies. A test pins them.
 
 ---
 

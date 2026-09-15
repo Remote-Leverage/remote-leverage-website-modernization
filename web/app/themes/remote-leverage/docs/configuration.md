@@ -74,7 +74,7 @@ GTM, LinkedIn Insight and Meta Pixel are configured inside the Google Site Kit /
 | `STRIPE_CONNECT_CLIENT_ID` | Connect onboarding |
 | `STRIPE_WEBHOOK_SECRET` | `StripeWebhookController` signature verification |
 | `STRIPE_WEBHOOK_FORWARD_URL` | Where `payment_intent.succeeded` payloads are forwarded |
-| `STRIPE_DEFAULT_THANKYOU_URL` | Fallback post-payment redirect |
+| `STRIPE_DEFAULT_THANKYOU_URL` | Fallback post-payment redirect, read by `PaymentGatewayBlock`. **Unset renders `success-url=""` on the deposit page and strands the payer** — a cutover gate, see [production-cutover.md](production-cutover.md#funnel-urls-configured-outside-wordpress) |
 | `REFERRAL_WEBHOOK_URL` | `DispatchReferralWebhook` |
 | `REFERRAL_DEFAULT_REWARD_AMOUNT` | Default commission |
 

@@ -60,7 +60,7 @@
           <!-- Brand Header -->
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full overflow-hidden shrink-0 border border-slate-200 ring-2 ring-brand-purple/10">
-              <img src="{{ Vite::asset('resources/images/avatar.png') }}" alt="Remote Leverage" class="w-full h-full object-cover" />
+              <img src="{{ Vite::asset('resources/images/avatar.png') }}" alt="Remote Leverage" width="1000" height="1000" class="w-full h-full object-cover" />
             </div>
             <div>
               <span class="font-bold text-sm text-brand-hero block font-display">Remote Leverage</span>

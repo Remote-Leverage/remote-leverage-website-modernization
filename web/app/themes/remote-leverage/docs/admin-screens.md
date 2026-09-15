@@ -58,6 +58,22 @@ Registered only when `SyncEnvironment::syncEnabled()` — it does not exist at a
 
 Full behaviour: [domains/sync.md](domains/sync.md).
 
+## Social Media Kit
+
+`SocialKitAdmin` — **Settings → RL Social Kit** (`options-general.php?page=rl-social-kit`).
+
+Ported from the retired `rl-social-kit` plugin on 2026-09-15. Writes the same option names the
+plugin used, so an existing `wp_options` row keeps working; `SocialKit::OPTION_DEFAULTS` is the
+single source of truth for the defaults and the screen never restates them.
+
+Two traps if this is ever edited. The Require Login checkbox needs an explicit
+`sanitize_callback` — an unchecked box is simply absent from the POST body, so without one the
+value can never save as `'0'`. And `rl_social_kit_company_logo` has to be registered separately
+because it is resolved at read time by `SocialKit::companyLogo()` rather than living in
+`OPTION_DEFAULTS`; miss it and the field renders but silently never saves.
+
+Full behaviour: [social-media-kit.md](social-media-kit.md).
+
 ## List-table enhancements
 
 | Class | Post types | Adds |
@@ -86,6 +102,6 @@ Not wp-admin, but admin-adjacent — Acorn routes serving application pages:
 | `/book-consultation` | `pages/book-consultation` |
 | `/referrer-portal`, `/referrer-register` | `pages/referrer-portal`, `pages/referrer-register` |
 | `/referral-dashboard` | Legacy tabbed URL — routes to portal or registration by query string |
-| `/tools/signature-generator` | `pages/signature-generator` |
+| `/social-media-kit` | `pages/social-media-kit` — replaced `/tools/signature-generator`, removed 2026-09-15 |
 | `/live-call/connect` | Redirects to a Meet room or to `/book-consultation?offline=1` |
 | `/api/health` | JSON health check |

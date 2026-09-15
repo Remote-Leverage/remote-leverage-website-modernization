@@ -27,7 +27,15 @@ use App\Support\BlockDefaults;
  *
  * 1. Nothing is omitted — every band, card, link and button on the live page is here. The
  *    page has no hidden-at-every-breakpoint containers (checked with getComputedStyle),
- *    unlike /services/, whose mobile stack is separate stale content.
+ *    unlike /services/, whose mobile stack is separate stale content. There is no page art
+ *    either: every element is an embed or type, so this page has no resources/images/pages/ dir.
+ *
+ * 1b. THE ONE DELIBERATE DEVIATION is the phone gutter. At 1440px this page is pixel-exact
+ *    against production — band heights, the 1170px column, every card's width, height and
+ *    origin. At 400px production runs its columns edge-to-edge (e-con-inner left=0, width=400)
+ *    so the intro paragraph's text touches both screen edges; the 20px gutter below keeps it
+ *    off them, which also matches patterns/onboardingguide.php. Same reason the 24px intro and
+ *    32px section heading step down one notch on small screens, where production holds both.
  *
  * PRODUCTION DEFECTS REPRODUCED DELIBERATELY — do not "fix" these in passing
  *
@@ -41,6 +49,11 @@ use App\Support\BlockDefaults;
  *    (with a leftover `gclid=test` query parameter) while its own accordion row and CTA
  *    button below it both point at the renamed get.quo.com. Production's inconsistency,
  *    transcribed as-is.
+ *
+ * 3b. Production puts the Payroll Sheet card's CTA 14px under its caption and the Phone System
+ *    card's CTA 20px under its own — the same card shape authored two ways in Elementor.
+ *    acf/video-card-grid uses 14px for both, so the last row is 6px shorter than production's
+ *    422px. Encoding an authoring slip as a block field would cost more than the 6px is worth.
  *
  * INDEXING
  *
@@ -67,8 +80,8 @@ use App\Support\BlockDefaults;
 $wrap = 'w-full max-w-[1210px] mx-auto px-5';
 
 // Elementor accordion rows: white, 14px/20px padding, 2px #EEE bottom rule, 16px/600 #1F2124.
-$accRow = 'group bg-white border-b-2 border-[#EEEEEE]';
-$accSummary = 'flex cursor-pointer list-none items-center justify-between gap-2.5 px-5 py-[14px] text-[16px] font-semibold leading-6 text-[#1F2124] [&::-webkit-details-marker]:hidden';
+$accRow = 'group bg-white';
+$accSummary = 'border-b-2 border-[#EEEEEE] flex cursor-pointer list-none items-center justify-between gap-2.5 px-5 py-[14px] text-[16px] font-semibold leading-6 text-[#1F2124] [&::-webkit-details-marker]:hidden';
 $accBody = 'bg-[#EEEEEE] p-5 text-[16px] leading-6 text-[#333] [&_p]:mb-4 [&_p:last-child]:mb-0 [&_a]:text-[#6200A4] [&_a]:no-underline [&_a:hover]:underline';
 
 // Font Awesome plus / minus, #6200A4 at 16px — production swaps one for the other on open.
@@ -141,7 +154,7 @@ $cards = [
 ?>
 
 <!-- ============ §1 INTRO BAND ============ -->
-<!-- wp:group {"align":"full","layout":{"type":"constrained","contentSize":"1170px"}} -->
+<!-- wp:group {"align":"full"} -->
 <div class="wp-block-group alignfull" style="background:linear-gradient(200deg, var(--color-brand-navy) 0%, var(--color-brand-purple-deep) 100%)">
     <div class="<?= $wrap ?> py-10 lg:py-[60px]">
         <h4 class="font-display text-[18px] leading-[26px] sm:text-[24px] sm:leading-[24px] font-medium text-white">The videos in this onboarding guide are designed to address the most common questions and challenges you may encounter as you integrate your new Virtual Assistant. We highly recommend reviewing and implementing the strategies shared in these videos to ensure a smooth and successful onboarding experience.</h4>
@@ -150,7 +163,7 @@ $cards = [
 <!-- /wp:group -->
 
 <!-- ============ §2 LINKS FOR FUTURE REFERENCE ============ -->
-<!-- wp:group {"align":"full","layout":{"type":"constrained","contentSize":"1170px"}} -->
+<!-- wp:group {"align":"full"} -->
 <div class="wp-block-group alignfull bg-[#FAFAFA]">
     <div class="<?= $wrap ?> py-10">
         <h4 class="font-display text-[26px] leading-[30px] sm:text-[32px] sm:leading-[32px] font-bold text-center text-brand-navy">Links for Future Reference</h4>

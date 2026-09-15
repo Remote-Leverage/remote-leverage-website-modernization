@@ -230,7 +230,7 @@ $footerNote = '<span class="mt-7 block max-w-[619px] space-y-2.5">'
 
             <div>
                 <div class="flex items-center gap-2.5">
-                    <img src="<?= esc_url($img('hero/google-logo.png')) ?>" alt="Google" width="63" height="21"
+                    <img src="<?= esc_url($img('hero/google-logo.png')) ?>" alt="Google" width="1024" height="346"
                          loading="eager" decoding="async" class="h-[21px] w-auto" />
                     <span class="text-[15px] font-semibold leading-[15px] text-black">4.8</span>
                     <span class="flex items-center gap-[3px]"><?= str_repeat($star, 5) ?></span>
@@ -403,7 +403,7 @@ $footerNote = '<span class="mt-7 block max-w-[619px] space-y-2.5">'
             </div>
 
             <div class="flex items-start justify-center lg:justify-end">
-                <img src="<?= esc_url($img('work/sales-talent.png')) ?>" alt="" width="627" height="713"
+                <img src="<?= esc_url($img('work/sales-talent.png')) ?>" alt="" width="536" height="610"
                      loading="lazy" decoding="async" class="h-auto w-full max-w-[627px] rounded-[20px]" />
             </div>
         </div>

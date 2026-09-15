@@ -76,6 +76,7 @@ describe('config/redirects.php targets resolve to something real', function () {
         // --post_status=publish` on 2026-09-15.
         '' => 'the site root — front page, page ID 7 (slug "home"), front-page.blade.php — verified 2026-09-15',
         'blog' => 'page ID 799 — verified 2026-09-15',
+        'vaonboardingguide' => 'page ID 1000078, renders patterns/vaonboardingguide.php — built and verified 2026-09-15. Distinct from /onboardingguide/ (page 1000077): production serves 3435px / 6 Vimeo embeds here against 10946px / 28 there.',
         'reviews' => 'page ID 292 — verified 2026-09-15',
         'vacalendar' => 'page ID 1000002 — verified 2026-09-15',
         'samples' => 'page ID 1000005 — verified 2026-09-15',
@@ -192,6 +193,10 @@ describe('config/redirects.php targets resolve to something real', function () {
             // the 28-video client onboarding guide.
             'hmchecklists', 'recruiterchecklists', 'saleschecklists',
             'sales-talents', 'onboardingguide',
+            // The 6-video VA-facing guide /services/ links to. Note it is NOT the same page as
+            // 'onboardingguide' above despite the near-identical slug and title: production
+            // serves 3435px / 6 Vimeo embeds here against 10946px / 28 there.
+            'vaonboardingguide',
         ] as $liveSlug) {
             expect(array_key_exists($liveSlug, $config))->toBeFalse(
                 "'{$liveSlug}' is a live v2 page slug; a redirect key of the same name would 301 the page away."

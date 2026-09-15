@@ -4,8 +4,8 @@
     @if (! $isDismissed)
       <div class="inline-flex items-center gap-4 py-2 px-3 sm:px-4 rounded-pill bg-surface-white/95 backdrop-blur-md border-2 border-lavender-tint shadow-card hover:shadow-lg transition-all duration-300">
         <div class="flex -space-x-3 items-center">
-          <img src="{{ Vite::asset('resources/images/avatar1.jpg') }}" alt="Sales Rep" class="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
-          <img src="{{ Vite::asset('resources/images/avatar2.jpg') }}" alt="Sales Manager" class="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
+          <img src="{{ Vite::asset('resources/images/avatar1.jpg') }}" alt="Sales Rep" width="200" height="200" class="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
+          <img src="{{ Vite::asset('resources/images/avatar2.jpg') }}" alt="Sales Manager" width="200" height="200" class="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
         </div>
         <div class="text-left">
           <div class="text-xs font-bold font-display text-brand-hero tracking-tight">Connect with Sales</div>

@@ -187,7 +187,7 @@ foreach ($currencyItems as [$icon, $title, $desc]) { ?>
                                 <p class="font-display font-bold text-[17px] text-black leading-tight">Rafael R.</p>
                                 <p class="text-[12px] text-black/55">Designer</p>
                             </div>
-                            <img src="<?= $img('Person_04.png') ?>" alt="" class="w-[45px] h-[45px] rounded-full object-cover" loading="lazy" />
+                            <img src="<?= $img('Person_04.png') ?>" alt="" width="45" height="45" class="w-[45px] h-[45px] rounded-full object-cover" loading="lazy" />
                         </div>
                         <div class="h-px w-full bg-black/10 mb-4"></div>
                         <p class="text-[12px] text-black/55 mb-1">Montly</p>
@@ -199,7 +199,7 @@ foreach ($currencyItems as [$icon, $title, $desc]) { ?>
                 </div>
 
                 <div class="bg-white rounded-2xl p-7 grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
-                    <img src="<?= $img('Frame-1131-1.png') ?>" alt="Automated invoicing" class="w-full max-w-[291px] h-auto object-contain" loading="lazy" />
+                    <img src="<?= $img('Frame-1131-1.png') ?>" alt="Automated invoicing" width="582" height="550" class="w-full max-w-[291px] h-auto object-contain" loading="lazy" />
                     <div>
                         <h2 class="<?= $h3 ?> text-black mb-3">Automated<br class="hidden sm:block" /> Invoicing</h2>
                         <p class="text-[14px] leading-[22px] text-black/70">Invoices generated on your schedule, with renewals and compliance documents tracked alongside them.</p>
@@ -208,7 +208,7 @@ foreach ($currencyItems as [$icon, $title, $desc]) { ?>
             </div>
 
             <div class="bg-white rounded-2xl p-7 h-full flex flex-col">
-                <img src="<?= $img('Frame-1132.webp') ?>" alt="Payment history" class="w-full h-auto rounded-xl object-cover mb-6" loading="lazy" />
+                <img src="<?= $img('Frame-1132.webp') ?>" alt="Payment history" width="625" height="409" class="w-full h-auto rounded-xl object-cover mb-6" loading="lazy" />
                 <h2 class="<?= $h3 ?> text-black mb-3">Payment History</h2>
                 <p class="text-[14px] leading-[22px] text-black/70">A complete record of every payout, ready for your accountant and your auditor.</p>
             </div>
@@ -271,7 +271,7 @@ foreach ($currencyItems as [$icon, $title, $desc]) { ?>
     <div class="<?= $wrap ?>">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center py-16 lg:py-24">
             <div class="hidden lg:flex justify-center">
-                <img src="<?= $img('Group-263-1.png') ?>" alt="" class="w-full max-w-[482px] h-auto object-contain" loading="lazy" />
+                <img src="<?= $img('Group-263-1.png') ?>" alt="" width="482" height="427" class="w-full max-w-[482px] h-auto object-contain" loading="lazy" />
             </div>
             <div>
                 <h2 class="<?= $h2 ?> text-white mb-5">Pricing built around your pay cycle</h2>

@@ -51,6 +51,25 @@
       @endif
     </script>
 
+    {{-- Font preload. `font-display: swap` means an un-preloaded face paints a fallback
+         first and reflows when the real font arrives; the faces below are only discovered
+         after app.css has downloaded and parsed, so that reflow is guaranteed on a cold visit.
+
+         Exactly these two, and no more. Measured on 2026-09-15 across `/`, `/hire-va-4/`,
+         `/case-study/`, `/blog/`, `/about-us/` and a blog article: every one of them requests
+         these two faces and only these two. The other three in app.css are deliberately left
+         alone —
+           - `inter-display-latin-ext.woff2` (125 KB) and `inter-latin-ext-wght-normal.woff2`
+             cover U+0100+ and were not requested by any page measured;
+           - `inter-latin-wght-italic.woff2` is requested on `/about-us/` only, and nothing
+             above the fold there is italic.
+         Preloading those would push ~125 KB of never-parsed bytes onto the critical path of
+         every visit, which is a bigger regression than the swap this fixes.
+
+         Resolved through the Vite manifest rather than hardcoded: these filenames are
+         content-hashed build output and change on every font rebuild. A hardcoded hash would
+         silently 404 and, worse, still look correct in the markup. --}}
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
   </head>
 

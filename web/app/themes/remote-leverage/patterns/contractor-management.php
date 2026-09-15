@@ -161,22 +161,22 @@ $faqBlock = BlockDefaults::patternBlock('accordion-faq', $faqData, ['align' => '
             </div>
 
             <div class="relative min-h-[320px] lg:min-h-[420px]">
-                <img src="<?= $img('person.png') ?>" alt="" class="absolute right-6 sm:right-16 bottom-0 h-[92%] w-auto object-contain" loading="lazy" />
+                <img src="<?= $img('person.png') ?>" alt="" width="536" height="512" class="absolute right-6 sm:right-16 bottom-0 h-[92%] w-auto object-contain" loading="lazy" />
                 <div class="absolute inset-x-4 sm:inset-x-8 bottom-6 grid grid-cols-2 gap-4">
                     <div class="rounded-xl p-4 backdrop-blur-sm" style="background-color:rgba(244,246,252,0.18);">
                         <div class="flex items-center justify-between gap-2 mb-6">
                             <p class="text-[13px] text-white">Contractors</p>
-                            <img src="<?= $img('paises.png') ?>" alt="" class="h-4 w-auto" loading="lazy" />
+                            <img src="<?= $img('paises.png') ?>" alt="" width="77" height="19" class="h-4 w-auto" loading="lazy" />
                         </div>
                         <div class="flex items-center justify-between gap-2">
-                            <img src="<?= $img('Frame-24.png') ?>" alt="" class="h-8 w-auto" loading="lazy" />
+                            <img src="<?= $img('Frame-24.png') ?>" alt="" width="137" height="41" class="h-8 w-auto" loading="lazy" />
                             <p class="text-[15px] font-bold text-white">+15</p>
                         </div>
                     </div>
                     <div class="rounded-xl p-4 backdrop-blur-sm" style="background-color:rgba(244,246,252,0.18);">
                         <div class="flex items-center justify-between gap-2 mb-4">
                             <p class="text-[13px] text-white">Payments</p>
-                            <img src="<?= $img('paises.png') ?>" alt="" class="h-4 w-auto" loading="lazy" />
+                            <img src="<?= $img('paises.png') ?>" alt="" width="77" height="19" class="h-4 w-auto" loading="lazy" />
                         </div>
                         <div class="h-px w-full bg-white/30 mb-4"></div>
                         <div class="flex items-end justify-between gap-2">

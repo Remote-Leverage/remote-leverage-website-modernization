@@ -10,8 +10,45 @@ test('homepage layout defers Livewire scripts and does not preload a missing Map
         ->toContain('@livewireScripts')
         ->not->toContain('Map.webp')
         ->not->toContain('Map.png')
-        ->not->toContain('rel="preload" as="font"')
         ->not->toContain('fonts.googleapis.com');
+});
+
+/*
+ * This assertion used to be `->not->toContain('rel="preload" as="font"')`, alongside the
+ * Map.webp and Google Fonts ones. Its intent was "do not preload a remote or unused asset"
+ * (it was added in 24d73ca, which removed a preload for a Map.webp that no longer existed),
+ * not "never preload a font" — self-hosted subsetted faces were deliberately preloaded on
+ * 2026-09-15 to remove the swap-reflow, and the blanket assertion then read as a prohibition
+ * on the fix. Replaced with the narrower guards below, which pin what actually matters.
+ */
+test('font preloads stay self-hosted, manifest-resolved, and limited to the two faces every page uses', function () {
+    $layout = file_get_contents(dirname(__DIR__, 2).'/resources/views/layouts/app.blade.php');
+
+    preg_match_all('/<link rel="preload" as="font".*?>/s', $layout, $matches);
+    $preloads = $matches[0];
+
+    // Preloading the whole face set would push ~125KB of never-parsed bytes onto the critical
+    // path of every visit — a worse regression than the swap-reflow the preload removes. The
+    // reasoning for exactly these two is in the comment above them in the layout.
+    expect($preloads)->toHaveCount(
+        2,
+        'Expected exactly two font preloads. Adding one means proving the face is requested '
+        .'above the fold on the pages measured in the layout comment; removing one reintroduces '
+        .'a fallback paint and reflow on every cold visit.'
+    );
+
+    foreach ($preloads as $tag) {
+        expect($tag)
+            // A font preload without crossorigin is fetched twice — once for the preload and
+            // once for the real request — which makes it a pure regression.
+            ->toContain('crossorigin')
+            ->toContain('type="font/woff2"')
+            // Content-hashed build output: a hardcoded hash would 404 while still looking
+            // correct in the markup, which is the failure mode worth guarding.
+            ->toContain('Vite::asset(')
+            ->not->toContain('http://')
+            ->not->toContain('https://');
+    }
 });
 
 test('app.css does not eagerly fetch intl-tel-input flag sprites', function () {

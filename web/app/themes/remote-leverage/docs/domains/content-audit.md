@@ -117,15 +117,18 @@ raw `acf/<slug>` matches alone reports well-used blocks as unused.
 
 This is WR-101, and it is what makes ADR-0005's human sign-off gate real rather than aspirational.
 
-## Email signatures
+## ~~Email signatures~~ — moved out of this domain 2026-09-15
 
-`GenerateSignatureHtmlAction` replaces `rl-social-kit`. Three layouts × two themes, as static templates in `resources/views/signatures/`: `sig-1-light`, `sig-1-dark`, `sig-2-light`, `sig-2-dark`, `sig-3-light`, `sig-3-dark`. Invalid layout or theme values fall back to `1` and `light`.
+`GenerateSignatureHtmlAction`, the `EmailSignatureGenerator` Livewire component and the six
+templates under `resources/views/signatures/` **were all deleted.** They were a second,
+partial implementation of something the ported `rl-social-kit` dashboard already did better,
+and the two template sets had already drifted (`#25104A` against the kit's `#250D4A`, in 3 of
+6 files).
 
-The `EmailSignatureGenerator` Livewire component drives it at `/tools/signature-generator`, letting staff preview and copy their signature.
-
-```bash
-wp acorn tinker --execute="echo app(\App\Domains\ContentAudit\Actions\GenerateSignatureHtmlAction::class)->execute(['name' => 'Jane Doe', 'title' => 'Director of Operations', 'email' => 'jane@remoteleverage.com', 'template' => 1, 'theme' => 'light']);"
-```
+Signature generation now lives entirely at **`/social-media-kit/`** — the same three layouts ×
+two themes, plus the asset library and the client setup instructions.
+`/tools/signature-generator` 301s there via `config/redirects.php`. See
+[social-media-kit.md](../social-media-kit.md).
 
 ## Tests
 

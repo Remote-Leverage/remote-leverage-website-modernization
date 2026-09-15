@@ -39,13 +39,18 @@ Local DB totals at verification: **22 pages, 119 posts, 23 case studies, 3 partn
 > The one exception is a genuine duplicate slug serving identical content, which is
 > handled by a codebase redirect rather than a rebuilt page (see §2).
 
-**Score: 48 of 48 built (100%). 1 page cannot go live yet.**
+**Score: 53 of 53 built (100%). 1 page cannot go live yet.**
 
-Every priority section below is closed: P0 cleared, P1 cleared, P2 built, P3 complete, P4
-cleared. The one outstanding item is not an unbuilt page —
+Every priority section below is closed — P0, P1, P2, P3 and P4 — plus five pages pulled in from
+the non-indexed sweep on 2026-09-15 (§3b), which took the scope from 48 URLs to 53.
+
+The one outstanding item is not an unbuilt page:
 `/virtual-assistant-hiring-manager-refundable-deposit/` is visually complete but **cannot take
-a payment until Stripe credentials are moved** (see P2). Nothing else is waiting on
-engineering.
+a payment until Stripe credentials are moved** (see P2). A second blocker on that same page was
+found on 2026-09-15 — `STRIPE_DEFAULT_THANKYOU_URL` was unset, so the deposit element rendered
+`success-url=""` and a paying customer landed nowhere. Now set locally; it has to be set in
+every environment. See the funnel gate in
+[production-cutover.md](web/app/themes/remote-leverage/docs/production-cutover.md).
 
 _Reconciled 2026-09-15 after P3 and P4 closed concurrently and the running total briefly
 disagreed with the sections. The per-priority sections are authoritative; §1's table counts
@@ -111,7 +116,7 @@ so it ships with the code and survives a database refresh.
 
 ---
 
-## 3. Remaining by priority — P0, P1, P2 and P4 cleared; P3 has 1 row left
+## 3. Remaining by priority — P0, P1, P2, P3 and P4 all cleared
 
 ### P0 — Broken destinations v2 already ships — ✅ CLEARED 2026-09-15
 
@@ -311,27 +316,34 @@ pricing card, medical software logos on all 8 talent dossiers, four telehealth F
 posts, the malformed `41,920,00` / "Economic Impact Create", the "Montly" misspelling, and the
 duplicated card descriptions in §2 and §3. **Do not "fix" these in passing.**
 
-One deliberate departure: §9a's pricing cards ship with **no images**. Production references
-`green.png` / `green-1.png` but both are broken on the live page (`naturalWidth 0`), so those
-card tops render blank. The block paints card images full-bleed at 168px, so wiring the intact
-files in would have stamped a large green coin on each card that production never shows.
-Matching what production *renders* meant leaving them out; the files are on disk and the
-reasoning is commented in the pattern.
+§9a's pricing icons **are** wired in (Adrián's call, 2026-09-15). Production references
+`green.png` / `green-1.png` but both are broken on the live page (`naturalWidth 0`), so the
+card tops render blank there. The files themselves are intact, so they render here through
+`acf/image-card-grid`'s new `icon` field, which draws them at their natural ~88px/146px —
+painting them through the existing full-bleed `image` slot at `h-[168px]` was what would have
+stamped an oversized green coin on each card.
 
-#### Block gaps this page worked around — worth revisiting
+#### Block gaps this page surfaced — ✅ all three closed 2026-09-15
 
-Logged rather than papered over, because each is a real limitation the next migration will hit:
+Logged rather than papered over, then fixed — each was a real limitation the next migration
+would have hit:
 
-- **`acf/roles-pricing-grid` cannot render without a headline.** `with()` does
-  `get_field('headline') ?: 'Virtual Assistant Roles'`, so an empty value is impossible and the
-  block injects a heading production lacks. The pattern suppresses it with an empty `sr-only`
-  span, which leaves an empty `<h2>` in the DOM. Wants a real "no headline" option.
-- **`acf/image-card-grid` has no alignment option**, no slot for the `<h3>` production puts
-  between the subheadline and the grid, and no trailing-copy field. The pattern renders all
-  three around the block instead.
-- **`acf/talent-carousel`'s `layout=full` hides the headline** along with the copy column,
+- **`acf/roles-pricing-grid` could not render without a headline.** `with()` did
+  `get_field('headline') ?: 'Virtual Assistant Roles'`, so an empty value was impossible and
+  the block injected a heading production lacks; the pattern had to suppress it with an empty
+  `sr-only` span. A blank headline now genuinely means no heading, and only an *unset* field
+  falls back to the default. The workaround is gone.
+- **`acf/image-card-grid` had no alignment option** and no way to show a small icon rather than
+  a full-bleed image. It gained `align` (`left` | `center`) and per-card `icon` / `icon_width`.
+- **`acf/talent-carousel`'s `layout=full` hid the headline** along with the copy column,
   contradicting the view's own comment that the intent was a full-width carousel *under its own
-  heading*. The pattern supplies the heading from a wrapper.
+  heading*. It now keeps the heading and drops only the copy column.
+
+**A silent bug came out of this.** `ImageCardGridBlock::with()` maps card sub-fields explicitly,
+so the per-card `cta_text` / `cta_url` / `emphasis` added earlier in the day **never reached the
+view** — §9a's CTAs and the black outline on the featured card simply did not render, with no
+error. Any field added to `fields()` but not to the `with()` mapping is invisible in exactly
+this way; the mapping now carries a comment saying so.
 
 #### `/hire-va-4/` corrected alongside (§1 row, was drifted)
 
@@ -515,6 +527,56 @@ Two deliberate divergences from production, **both approved 2026-09-15**:
   `text-align: start`. `.has-text-align-center/-left/-right` are now declared in `app.css`
   alongside the other core-block overrides — verified: `/comparison/` headings now compute
   `center` where they computed `start`.
+
+---
+
+## 3b. Added to scope 2026-09-15 — the non-indexed sweep
+
+43 live production pages are absent from `page-sitemap.xml`, so the audit that built the
+transfer list never saw them. 8 were already in scope; of the remaining 35, **31 already had
+explicit 301 keys** in `config/redirects.php` and 4 were being rebuilt — they were handled,
+just not recorded here. Two facts settled the rest:
+
+- **None of the 35 is linked from any migrated page.** All 17 were fetched and every href,
+  form action and raw URL extracted. Zero matches. The "migrated page works, its confirmation
+  step 404s" risk does not exist on-site; those entry points are external (email, Calendly, ads).
+- The remaining ~20 are confirmed template clones, empty shells or already-dead 301s.
+
+Five were pulled into scope and built:
+
+| Page | v2 | Why it was not left to a 301 |
+|---|---|---|
+| `/hmchecklists/` | ID 1000073 | 20 forms POST to a **live Zapier webhook**; a 301 to `/` silently kills a working internal tool |
+| `/recruiterchecklists/` | ID 1000074 | 7 forms → live n8n webhook |
+| `/saleschecklists/` | ID 1000075 | 10 forms → live n8n webhook |
+| `/sales-talents/` | ID 1000076 | The only SDR / appointment-setter landing page; genuinely distinct, not a template clone. 95% of production height |
+| `/onboardingguide/` | ID 1000077 | 28 Vimeo client-training videos. 99% of production height |
+
+`hire-va-2`, `hire-va-3` and `hire-va-t` were re-pointed from `/` to **`/hire-va/`**, the page
+they are price variants of, now that it is itself a live v2 page.
+
+#### Three webhooks nobody had catalogued
+
+`/hmchecklists/` fires three further endpoints **from JavaScript rather than a form `action`**,
+so they are invisible to any action-attribute scan — including the one that briefed this work:
+
+- a second Zapier hook (`26138149/u03014q`) the Upsell Inquiry block posts to *alongside* the
+  checklist, with its fields re-keyed
+- `n8n…/webhook/hm/jobs`, which populates the hiring-manager dropdown
+- `n8n…/webhook/send-todo-to-slack`
+
+All three are reproduced. Migrating on the form-action list alone would have taken them dark
+silently. `tests/Unit/OpsChecklistsTest.php` asserts every endpoint and every field name, and
+asserts no form posts anywhere else — mutation-tested with a one-character typo and a renamed
+field, both of which fail it.
+
+#### `wptexturize` was rewriting production copy
+
+Rendering these pages through `the_content` curled every apostrophe and turned
+`Send Work Offer - Direct Staff` into an en dash — strings staff paste into CRM fields. That is
+WordPress, not the pattern. Worked around inside the affected pattern files by entity-encoding
+the characters texturize looks for; it never decodes entities or touches text inside a tag.
+Worth knowing for any page whose copy has to survive verbatim.
 
 ---
 
