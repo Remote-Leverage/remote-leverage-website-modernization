@@ -92,7 +92,7 @@ Local only — read by the sync commands to call *out* to a remote. Never added 
 | :--- | :--- |
 | `STAGING_SYNC_URL`, `STAGING_SYNC_USER`, `STAGING_SYNC_APP_PASSWORD` | The `sync-service` user's application password on staging |
 | `PRODUCTION_SYNC_URL`, `PRODUCTION_SYNC_USER`, `PRODUCTION_SYNC_APP_PASSWORD` | Present so gate 3 has a URL to refuse. Setting these does not make production syncable — three other gates still refuse. |
-| `STAGING_SYNC_BODY_AUTH` | **Temporary.** Sends the sync credential in the request body as well as the `Authorization` header, because CloudFront strips the header before it reaches the origin. Read by `SyncClient`; the receiving half is `web/app/mu-plugins/rl-sync-body-auth.php`. A workaround for an infrastructure defect, not a design — **target for removal 2026-10-15.** `SyncClient` refuses to attach it when either side is production. See [domains/sync.md](domains/sync.md). |
+| `STAGING_SYNC_BODY_AUTH` | **Temporary, and now removable.** Sends the sync credential in the request body as well as the `Authorization` header, for a CDN that strips the header. Read by `SyncClient`; the receiving half is `web/app/mu-plugins/rl-sync-body-auth.php`. **Verified 2026-09-15: CloudFront now forwards `Authorization` on `/wp-json/wp-abilities/*`, so this flag is no longer doing anything** — a header-only call to `app/export-syncable-settings` on staging returns 200, and the same call with no credential returns 401. Set it to `false`, confirm a push still runs, then delete both halves. `SyncClient` refuses to attach it when either side is production. See [domains/sync.md](domains/sync.md). |
 
 ## Monitoring
 

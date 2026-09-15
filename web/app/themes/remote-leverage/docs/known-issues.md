@@ -373,6 +373,36 @@ works, and is invisible locally for the same reason #17 describes. Verify that o
 `wp eval '…PageRobots::currentPagePosture()'`, never by reading the local `<meta>` tag. See
 [architecture.md](architecture.md) § "Pages that describe their own chrome".
 
+### 19. Staging's `wp-json` reads are CloudFront-cached, so they will confirm a stale story
+
+`GET https://staging.remoteleverage.com/wp-json/wp/v2/pages?per_page=1` and friends are served
+through CloudFront, and the `/wp-json/*` behaviour is **not** the uncached one
+`docs/ai-mcp-and-sync.md` describes for the MCP path. A read taken right after a write can
+therefore return the state from before it, with nothing in the body to say so.
+
+This is not theoretical. On 2026-09-15 a `rl:sync:push --clean` timed out client-side at 30s; the
+`x-wp-total` counts read immediately afterwards said 22 pages and 512 attachments — exactly the
+pre-push numbers — and that was reported as "staging completely untouched, the clean never
+committed a single delete". Both halves were wrong. The clean had run to completion and the first
+25-attachment chunk had imported; only the *response* was lost. The rollback reverting **1,074**
+changes is what exposed it, and the number decomposes exactly: 512 attachments × 2 clean entries,
+plus 25 imported attachments × 2.
+
+So when checking a remote environment's state after a write:
+
+- **Send a cache-buster** (`&cb=$RANDOM`) and **read the `x-cache` header back**. Only
+  `Miss from cloudfront` is evidence about right now; `Hit from cloudfront` is evidence about
+  whenever the object was cached.
+- **Prefer a signal the CDN never touches.** The undo log's reverted count and the session's own
+  counters come back through the abilities path as a POST, so they describe the database rather
+  than a cache.
+- **Treat "the numbers are unchanged" as the ambiguous reading it is.** It is equally consistent
+  with "nothing happened" and "everything happened and you are looking at a cached copy" — and
+  those two call for opposite next actions.
+
+Not to be confused with #17: that is about markup which is *correctly* absent on staging. This is
+about reads that are silently, invisibly out of date.
+
 ## ~~Dead configuration~~ — ✅ **FIXED 2026-09-15**
 
 Eight keys were listed here as read by nothing. **Seven were; the eighth was not.**
@@ -418,6 +448,38 @@ no default are present and blank. Verified: `wp eval 'var_dump(env("LIVE_CALL_ME
 
 The Notion integration was deleted on 2026-09-15; `NOTION_API_KEY` /
 `NOTION_PARTNERS_DATABASE_ID` appear in neither file and should not return.
+
+### 20. `Mcp-Session-Id` is still stripped, so MCP dies after `initialize`
+
+**Measured against staging 2026-09-15.** The `Authorization` half of the CloudFront problem is
+fixed — a header-only call to `app/export-syncable-settings` returns **200**, and the same call
+with no credential returns **401**, so the credential is being read off the header on
+`/wp-json/wp-abilities/*`. MCP `initialize` authenticates for the same reason.
+
+The **session** header does not survive:
+
+| Step | Result |
+| :--- | :--- |
+| `initialize` with credentials | 200, `Mcp-Session-Id` issued in the response headers |
+| `tools/list` echoing that id back | **400 — `Invalid Request: Missing Mcp-Session-Id header`** |
+
+`docker/nginx.conf` cannot explain it: it touches only `HTTP_AUTHORIZATION` and `HTTP_X_LIVEWIRE`
+and does nothing per-path. The adapter reads the header straight off the request with no
+query-string or body fallback and has no stateless mode, so there is no application-side
+workaround — the `_rl_sync_auth` body bridge solves credentials, not sessions, and only matches
+the abilities path.
+
+**What this looks like from a Claude session:** the tool list is simply empty, with no error. That
+is the same symptom as a missing capability or a wrong password, which is why
+`scripts/verify-mcp.sh` exists — it fails at the session step by name instead.
+
+**Fix:** extend whatever origin request policy now forwards `Authorization` on the abilities and
+MCP paths so it also forwards `Mcp-Session-Id`. The two headers were evidently fixed separately
+and only one landed.
+
+**Adjacent cleanup this unblocks:** `STAGING_SYNC_BODY_AUTH` and
+`web/app/mu-plugins/rl-sync-body-auth.php` are now dead weight — see
+[domains/sync.md](domains/sync.md).
 
 ## Stale documentation
 

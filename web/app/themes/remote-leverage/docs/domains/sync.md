@@ -161,6 +161,29 @@ The bridge verifies nothing itself. `wp_authenticate_application_password()` sti
 
 **This is a workaround for an infrastructure defect, not a design.** The correct fix is a `/wp-json/wp-abilities/*` cache behavior with `CachingDisabled` and an origin request policy that forwards `Authorization`. Once that lands, set the flag to false and delete both halves. Target for removal: **2026-10-15**. It is the second workaround for this same misconfiguration; the first is the `X-Livewire` header hack in `docker/nginx.conf`, still marked temporary.
 
+> ### ✅ The bridge is no longer needed — verified against staging 2026-09-15
+>
+> **`Authorization` now reaches the origin on `/wp-json/wp-abilities/*`.** Proven by a paired
+> request to `app/export-syncable-settings` on `staging.remoteleverage.com`:
+>
+> | Request | Result |
+> | :--- | :--- |
+> | `Authorization` header only, **no** `_rl_sync_auth` in the body | **HTTP 200**, settings returned |
+> | No credential at all (control) | HTTP 401 |
+>
+> The ability's `permission()` gate is `rl_manage_ai_sync`, so a 200 means the credential was read
+> off the header. The body bridge cannot explain it — the mu-plugin only acts when `_rl_sync_auth`
+> is present, and it was not sent.
+>
+> **So `STAGING_SYNC_BODY_AUTH` can be set to `false` and both halves deleted**, ahead of the
+> 2026-10-15 target. `SyncClient` sends the header regardless, so flipping the flag is the whole
+> change on the sending side. Order: flip the flag, confirm a real push still runs, then delete
+> `web/app/mu-plugins/rl-sync-body-auth.php` and the `bodyAuthEnabled()` branch.
+>
+> **What is still broken:** `Mcp-Session-Id` is still stripped, so MCP remains unusable past
+> `initialize` — see [ai-mcp-and-sync.md](../ai-mcp-and-sync.md). The two headers were fixed
+> separately and only one of them landed.
+
 ## Tests
 
 Eighteen files, the largest test group in the suite: `SyncAttachmentRemapTest`, `SyncBodyAuthTest`, `SyncCleanBeforeImportTest`, `SyncClientBodyAuthTest`, `SyncContentExporterTest`, `SyncContentImporterTest`, `SyncDatasetCleanerTest`, `SyncDatasetsTest`, `SyncEnvironmentTest`, `SyncJobProgressTest`, `SyncMediaFileTest`, `SyncPurgeTest`, `SyncSessionTest`, `SyncTransferLogPurgeTest`, `SyncTransferPullerTest`, `SyncTransferPusherTest`, `SyncUndoLogTest`, `SyncUploadPathTest`.

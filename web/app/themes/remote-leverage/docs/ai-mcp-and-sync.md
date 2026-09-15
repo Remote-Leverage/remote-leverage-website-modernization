@@ -273,6 +273,32 @@ strips custom headers.** The `_rl_sync_auth` body bridge in
 credentials, not the session header, and it only matches the
 `/wp-json/wp-abilities/` path.
 
+### Measured against staging, 2026-09-15
+
+`Authorization` is fixed; `Mcp-Session-Id` is not. Probed directly against
+`staging.remoteleverage.com`:
+
+| Step | Result |
+| :--- | :--- |
+| `initialize` **with** credentials | **HTTP 200**, session id `…` returned in the `Mcp-Session-Id` response header |
+| `initialize` **without** credentials (control) | HTTP 401 `rest_forbidden` |
+| `tools/list` echoing that session id back | **HTTP 400 — `Invalid Request: Missing Mcp-Session-Id header`** |
+
+That is exactly the failure this section predicted: `initialize` succeeds because
+it needs no session, and every call after it fails because the header the server
+just issued does not survive the round trip. The 401 control proves the
+`Authorization` half now reaches the origin, so **only the custom header is still
+being stripped.**
+
+`docker/nginx.conf` is not the cause — it touches only `HTTP_AUTHORIZATION` and
+`HTTP_X_LIVEWIRE`, and does nothing per-path, so it cannot explain a difference
+between `/wp-json/wp/v2/*` and `/wp-json/mcp/*`.
+
+**Consequence: MCP against staging is still unusable past `initialize`**, which is
+what an empty tool list in a Claude session looks like from the outside. Run
+`scripts/verify-mcp.sh` after any distribution change — it fails at the session
+step with a named error rather than an empty list.
+
 What to configure: a cache behavior for `/wp-json/*` with
 
 - **Origin request policy:** `Managed-AllViewer` — forwards all viewer headers,
