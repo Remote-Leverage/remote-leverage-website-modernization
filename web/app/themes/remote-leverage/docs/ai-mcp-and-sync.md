@@ -239,8 +239,10 @@ content agent cannot run a sync and the sync user cannot edit a page.
 
 ### Prerequisites on the remote environment
 
-Two things have to be true before any of this authenticates, and both fail
-silently in ways that look like an ability problem rather than a transport one:
+Three things have to be true before any of this works, and all three fail
+silently in ways that look like an ability problem rather than a transport one.
+Run `scripts/verify-mcp.sh <site> <user> <app-password>` to tell them apart —
+each step reports a distinct cause.
 
 1. **`WP_MCP_AUTOLOAD` must be defined** (`config/application.php`). The plugin
    is installed from VCS and relocated by composer/installers, so it has no
@@ -249,8 +251,42 @@ silently in ways that look like an ability problem rather than a transport one:
    server at all. Check with `wp mcp-adapter list`.
 2. **Nginx must forward the `Authorization` header** (`docker/nginx.conf`).
    Stock `fastcgi_params` drops it, so PHP never sees the Basic credentials and
-   every request answers `rest_not_logged_in`. CloudFront must be configured to
-   forward `Authorization` to the origin as well.
+   every request answers `rest_not_logged_in`.
+3. **CloudFront must forward both `Authorization` and `Mcp-Session-Id`.**
+
+### The CloudFront requirement
+
+This one is worth stating precisely, because MCP needs **two** headers and a
+distribution that forwards only the obvious one still fails:
+
+| Header | Used for | Symptom when stripped |
+| --- | --- | --- |
+| `Authorization` | Application Password auth | `rest_not_logged_in` on every call |
+| `Mcp-Session-Id` | Transport session, issued by `initialize` | `initialize` succeeds, everything after it fails with `Missing Mcp-Session-Id header` |
+
+`Mcp-Session-Id` is read straight off the request
+(`HttpRequestContext::__construct`) with no query-string or body fallback, and
+the adapter has no stateless mode — the only session filters it exposes are
+limits and timeouts. So **MCP cannot be tunnelled past a distribution that
+strips custom headers.** The `_rl_sync_auth` body bridge in
+`web/app/mu-plugins/rl-sync-body-auth.php` does not help here either: it solves
+credentials, not the session header, and it only matches the
+`/wp-json/wp-abilities/` path.
+
+What to configure: a cache behavior for `/wp-json/*` with
+
+- **Origin request policy:** `Managed-AllViewer` — forwards all viewer headers,
+  which covers both of the above and the `X-Livewire` header that
+  `docker/nginx.conf` currently reconstructs by hand.
+- **Cache policy:** `Managed-CachingDisabled`.
+
+Disabling the cache on that behavior is not optional. Forwarding
+`Authorization` while still caching lets one user's authenticated response be
+served to another — a far worse bug than the one being fixed. These are
+authenticated, side-effecting API calls and none of them should ever be cached.
+
+Once this lands, two temporary workarounds can be removed: the `rl_livewire_header`
+map in `docker/nginx.conf` and the `rl-sync-body-auth.php` mu-plugin.
 
 For **local** development, STDIO works directly without the proxy:
 
