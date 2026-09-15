@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Sync;
 
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use InvalidArgumentException;
 use RuntimeException;
@@ -48,18 +50,82 @@ class SyncClient
         // The header is still sent regardless. The body copy is a fallback for
         // a CDN that strips it, not a replacement, so this keeps working
         // unchanged the moment the header starts arriving again.
-        $response = Http::withBasicAuth($this->user(), $this->appPassword())
+        $attempt = 0;
+
+        while (true) {
+            $attempt++;
+
+            try {
+                $response = $this->post($url, $payload);
+            } catch (ConnectionException $e) {
+                // A dropped or timed-out connection says nothing about whether
+                // the target applied the call, so this is only safe to retry
+                // because every ability it fronts is idempotent: row chunks are
+                // upserts, a clean is guarded by the session's own flag, and a
+                // file chunk is checksummed and written to a temporary name.
+                if ($this->shouldRetry($attempt)) {
+                    $this->backOff($attempt);
+
+                    continue;
+                }
+
+                throw new RuntimeException(
+                    "Sync call to {$this->env}/{$abilityName} failed after {$attempt} attempts: ".$e->getMessage(),
+                    previous: $e,
+                );
+            }
+
+            if ($response->failed()) {
+                // 502/503/504 is the container rolling over or PHP-FPM briefly
+                // saturated, not a rejection — and a media push is ~1,600 calls,
+                // so treating one as fatal means a deploy or a moment of load
+                // discards the whole transfer. A 4xx is a real refusal and is
+                // never retried.
+                if ($response->serverError() && $this->shouldRetry($attempt)) {
+                    $this->backOff($attempt);
+
+                    continue;
+                }
+
+                throw new RuntimeException(
+                    "Sync call to {$this->env}/{$abilityName} failed ({$response->status()}"
+                    .($attempt > 1 ? ", after {$attempt} attempts" : '').'): '.$response->body()
+                );
+            }
+
+            return $response->json();
+        }
+    }
+
+    /**
+     * Perform one request.
+     *
+     * Separated from the retry loop around it so tests can drive the loop
+     * through a subclass, the way the pusher and puller tests already fake this
+     * client — the Http facade is not available to that suite.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function post(string $url, array $payload): Response
+    {
+        return Http::withBasicAuth($this->user(), $this->appPassword())
             ->acceptJson()
             ->timeout($this->timeout())
             ->post($url, $payload);
+    }
 
-        if ($response->failed()) {
-            throw new RuntimeException(
-                "Sync call to {$this->env}/{$abilityName} failed ({$response->status()}): {$response->body()}"
-            );
-        }
+    private function shouldRetry(int $attempt): bool
+    {
+        return $attempt < max(1, (int) config('rl-sync.retries', 4));
+    }
 
-        return $response->json();
+    /**
+     * Wait before retrying, backing off so a target that is genuinely restarting
+     * is given longer each time rather than being hammered while it boots.
+     */
+    private function backOff(int $attempt): void
+    {
+        usleep(min(8_000_000, 500_000 * (2 ** ($attempt - 1))));
     }
 
     /**

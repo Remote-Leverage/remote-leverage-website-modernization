@@ -35,7 +35,40 @@ return [
 
     'request_timeout' => (int) env('SYNC_REQUEST_TIMEOUT', 60),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Transient-failure retries
+    |--------------------------------------------------------------------------
+    |
+    | Total attempts per sync call before giving up. A media push is ~1,600
+    | calls, so a single 503 from a container rolling over — or one dropped
+    | connection — would otherwise discard the whole transfer. Only connection
+    | failures and 5xx are retried; a 4xx is a real refusal and fails at once.
+    |
+    */
+
+    'retries' => (int) env('SYNC_RETRIES', 4),
+
     'options' => [
+        /*
+         * Site structure. Not environment-specific data like the rest of this
+         * list — these exist here because a target that does not share them is
+         * not a mirror in the way that matters: without permalink_structure
+         * every post answers on a different URL than local and production, and
+         * without page_for_posts the blog index renders empty however many
+         * posts were transferred. Both were true of staging until 2026-09-15.
+         *
+         * page_on_front and page_for_posts are post IDs, so they are only
+         * meaningful alongside a content transfer that put those posts on the
+         * target at the same IDs. Pushing settings alone, onto a target whose
+         * content came from somewhere else, points the front page at whatever
+         * now occupies that ID.
+         */
+        'permalink_structure',
+        'show_on_front',
+        'page_on_front',
+        'page_for_posts',
+
         CalendlyTokenPool::OPTION_KEY,
         CalendlyEventTypeRoleResolver::OPTION_KEY,
         CalendlyEventTypeDiscoveryService::BACKUP_OPTION_KEY,
