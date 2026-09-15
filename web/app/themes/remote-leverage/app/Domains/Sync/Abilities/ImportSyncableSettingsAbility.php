@@ -44,7 +44,53 @@ class ImportSyncableSettingsAbility extends Ability
             $updated[] = $key;
         }
 
-        return ['updated' => $updated, 'rejected' => $rejected];
+        $flushed = $this->flushRewriteRulesIfNeeded($updated);
+
+        return ['updated' => $updated, 'rejected' => $rejected, 'flushed_rewrite_rules' => $flushed];
+    }
+
+    /**
+     * Options that change how URLs are parsed, not merely how they are built.
+     *
+     * @var array<int, string>
+     */
+    private const REWRITE_AFFECTING = [
+        'permalink_structure',
+        'show_on_front',
+        'page_on_front',
+        'page_for_posts',
+        'category_base',
+        'tag_base',
+    ];
+
+    /**
+     * Regenerate the rewrite rules when a structural option has just changed.
+     *
+     * WordPress derives permalinks from the option on every request but matches
+     * incoming URLs against rules cached in wp_options, and only rebuilds those
+     * when something asks it to. Writing permalink_structure alone therefore
+     * leaves a site whose pages link to /blog/<slug>/ while every one of those
+     * URLs 404s, and whose old URLs still resolve — which is worse than not
+     * having synced it at all, and exactly what staging did on 2026-09-15.
+     *
+     * Soft flush: it rewrites the cached rules, and does not try to write a
+     * .htaccess this environment does not use.
+     *
+     * @param  array<int, string>  $updated
+     */
+    private function flushRewriteRulesIfNeeded(array $updated): bool
+    {
+        if (array_intersect($updated, self::REWRITE_AFFECTING) === []) {
+            return false;
+        }
+
+        if (! function_exists('flush_rewrite_rules')) {
+            return false;
+        }
+
+        flush_rewrite_rules(false);
+
+        return true;
     }
 
     public function permission(): bool|WP_Error
