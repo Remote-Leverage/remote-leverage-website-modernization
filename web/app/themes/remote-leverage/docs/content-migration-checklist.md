@@ -2,9 +2,19 @@
 
 > # ⛔ This is no longer a work list
 >
-> **Scope was closed on 2026-09-14.** The 46-row "Migrate for now" transfer list, plus
-> `/hire-va-4/`, is the **entire** migration — 44 URLs. Everything else on production is
-> **discarded**: not deferred, not "phase 2", not pending a decision. It will not be rebuilt.
+> **Scope was closed on 2026-09-14**, and **every in-scope URL has since been built
+> (54 of 54, 2026-09-15).** Everything else on production is **discarded**: not deferred, not
+> "phase 2", not pending a decision. It will not be rebuilt.
+>
+> This file remains useful for exactly one thing: it is a **read-only inventory of what exists
+> on production**, audited 2026-09-10. Use it to look up a production URL. Do not use it to
+> decide what to build — [`PAGE-MIGRATION-STATUS.md`](../../../../../PAGE-MIGRATION-STATUS.md)
+> is the only source of truth for scope and per-URL state.
+>
+> The scope grew twice after this banner was first written, so the "44 URLs" it used to quote
+> is wrong: the closed list of 48 gained 5 pages from the non-indexed sweep
+> (`/hmchecklists/`, `/recruiterchecklists/`, `/saleschecklists/`, `/sales-talents/`,
+> `/onboardingguide/`) and `/hire-va/` by direction — **48 + 5 + 1 = 54**.
 >
 > That means **every unticked `[ ]` box below is void.** They do not represent outstanding
 > work. Sections 2, 4, 5 and 7 are out of scope in their entirety (~191 production pages),

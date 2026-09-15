@@ -229,7 +229,11 @@ inside the pattern. Both work by walking the pattern registry from `post_content
 | Decision | Declared by | Resolved by |
 | :--- | :--- | :--- |
 | Drop the site nav for a conversion page | `acf/hire-va-hero` or `acf/consult-landing-hero` in the page, **or** the marker `rl:cta-only-header` | `App\Support\PageChrome::usesCtaOnlyHeader()` → `layouts/app.blade.php` picks `sections.header-cta` over `sections.header` |
-| Keep a page out of search results | the marker `rl:noindex` | `App\Support\PageRobots::filter()` on `wp_robots` (registered in `app/setup.php`) |
+| Keep a page out of search results | `rl:noindex` (→ `noindex, nofollow`) or `rl:noindex-follow` (→ `noindex, follow`, still passing link equity) | `App\Support\PageRobots::filter()` on `wp_robots` (registered in `app/setup.php`) |
+
+Two robots markers because production uses both postures and they are not interchangeable.
+`PageRobots::currentPagePosture()` tests the longer marker first, since `rl:noindex` is a prefix of
+`rl:noindex-follow` and a plain substring test would otherwise match it and wrongly add `nofollow`.
 
 The marker form exists for pages whose hero is hand-written rather than a block — the P4 campaign
 families in `resources/patterns/steal-campaign.php` and `va-roles-landing.php` emit
@@ -240,7 +244,9 @@ listing its block in `PageChrome::CTA_ONLY_HEADER_BLOCKS` is enough.
 already noindexes every non-production environment, so a local page looks correctly excluded
 whether or not the filter runs. It exists so the exclusion survives into production, where that
 mu-plugin stops applying. Verify it with
-`wp eval '…PageRobots::currentPageIsNoindex()'` rather than by reading the local `<meta>` tag.
+`wp eval '…PageRobots::currentPagePosture()'` rather than by reading the local `<meta>` tag —
+doubly so because the same mu-plugin also suppresses Yoast's canonical output locally and on
+staging ([known-issues.md](known-issues.md) #17), so the local `<head>` tells you nothing either way.
 It controls indexing only — a noindex page is still served to anyone holding the URL, so it is
 **not** access control. Two pages use it:
 

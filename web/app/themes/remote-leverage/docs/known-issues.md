@@ -301,6 +301,52 @@ Worked around in the affected patterns by entity-encoding the characters texturi
 it never decodes entities, and never touches text inside a tag. Reach for that on any page
 whose copy must match a system of record exactly.
 
+### 17. Canonical output cannot be observed in any environment we control — **verify right after the DNS flip**
+
+`<link rel="canonical">` is absent from every local page — `/`, `/about-us/`, `/comparison/`,
+`/blog/` and the whole P4 set. **This is correct behaviour, not a defect.** Traced 2026-09-15
+after it was first mis-filed here as "Yoast emits no canonicals":
+
+1. The values **are** stored and were rewritten onto the right origin — `about-us` (209) holds
+   `_yoast_wpseo_canonical = https://remoteleverage-v2.test/about-us/`.
+2. **Yoast withholds the canonical on any noindex URL.** That is why the import wrote 180
+   canonicals for 190 items.
+3. The noindex is forced by `web/app/mu-plugins/bedrock-disallow-indexing`, which does
+   `add_action('pre_option_blog_public', '__return_zero')` gated on `DISALLOW_INDEXING`. That
+   constant is `true` in `config/environments/development.php:17` **and `staging.php:17`**, and
+   **absent from production**.
+4. The raw database value of `blog_public` is `1`. Flipping the option and recomputing proves
+   nothing — the filter intercepts every read, so that test cannot work.
+
+On production the constant is undefined, the filter is never added, `blog_public` reads its real
+`1`, and Yoast emits canonicals. Same family as #3 and #4: locally unobservable, correct in
+production.
+
+**The real gap is verification, not behaviour.** Because staging sets `DISALLOW_INDEXING` too,
+the first place canonical output can be seen at all is production. Check it immediately after the
+DNS flip — there is no earlier opportunity.
+
+### 18. Two imported canonicals pointed at the homepage — fixed in v2, still wrong on production
+
+Production serves both `/hire-va-isolated-form/` and `/hire-va/` with
+`<link rel="canonical" href="https://remoteleverage.com">`, declaring both pages duplicates of the
+homepage. `content:import-seo` faithfully carried both onto v2 (pages 1000053 and 1000066).
+Deleted 2026-09-15 and the whole page set swept for others — none remain.
+
+This is the failure mode #17 makes dangerous: an imported canonical is **invisible on the front end
+in every environment we can inspect**, and starts applying the moment the site is production. The
+same blindness covers all 180 imported canonicals, so **re-sweep `_yoast_wpseo_canonical` after any
+further `content:import-seo` run**, and spot-check that each points where it should rather than
+assuming the rewrite was faithful — it was faithful here, which is exactly the problem.
+
+Related: `docs/seo-meta-migration.md`.
+
+Neither entry should be confused with the *deliberate* noindex mechanism —
+`App\Support\PageRobots`, driven by `rl:noindex` / `rl:noindex-follow` markers in a pattern — which
+works, and is invisible locally for the same reason #17 describes. Verify that one with
+`wp eval '…PageRobots::currentPagePosture()'`, never by reading the local `<meta>` tag. See
+[architecture.md](architecture.md) § "Pages that describe their own chrome".
+
 ## ~~Dead configuration~~ — ✅ **FIXED 2026-09-15**
 
 Eight keys were listed here as read by nothing. **Seven were; the eighth was not.**

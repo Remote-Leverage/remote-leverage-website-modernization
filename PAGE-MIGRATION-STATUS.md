@@ -21,11 +21,32 @@ actually exists in the v2 database and codebase. **48 URLs in scope.**
 > v2 already contains some content that is *not* on the list (built before scope was
 > closed). It is inventoried in §4 and needs a keep/redirect/delete decision.
 
-**Last verified: 2026-09-15** (P1 re-verified after the partner-directory rebuild) — against the live local DB (`wp post list`), the theme's
-Laravel routes, and `config/redirects.php`. Not hand-maintained: every row below was
-checked against the database on that date.
+**Last verified: 2026-09-15** — against the live local DB (`wp post list`), the theme's Laravel
+routes, and `config/redirects.php`. Not hand-maintained: every row below was checked against the
+database on that date.
 
-Local DB totals at verification: **22 pages, 119 posts, 23 case studies, 3 partners.**
+> **Checking a URL here needs more than one lookup.** A `wp post list` sweep reports several
+> in-scope URLs as missing, for three different and legitimate reasons:
+>
+> | Reason | Examples |
+> | :--- | :--- |
+> | Acorn route, never a `page` row | `/social-media-kit/`, `/referral-dashboard/`, `/book-consultation/`, `/referrer-portal/`, `/live-call/connect` |
+> | A redirect, deliberately | `/thank-you/` → `/vathankyou/` |
+> | A draft, not published | 1 page as of 2026-09-15 |
+>
+> Check `routes/web.php` and `config/redirects.php` too, or just curl the URL.
+>
+> And a redirect key equal to a live page slug **301s that page away**. Three keys
+> (`contractoragreement`, `services`, `store`) and later `vaonboardingguide` had to be removed
+> for exactly that reason on 2026-09-15; `tests/Feature/RoutesTest.php` now pins them so they
+> cannot come back.
+
+Local DB totals, re-queried **2026-09-15**: **54 published pages** (+1 draft), **119 posts**,
+**23 case studies**, **3 partners**, 513 attachments.
+
+> **Do not read "54 pages" as a check on "54 of 54 URLs".** They are different 54s and will drift
+> apart the moment anyone adds a draft or a route-backed URL. `/social-media-kit/` is in the URL
+> count and is not a page row at all.
 
 > **What "migrated" means here (tightened 2026-09-15).** A row only counts as migrated when
 > the page is **visually 1:1 with production**, verified by screenshot diff — not when the
@@ -39,7 +60,20 @@ Local DB totals at verification: **22 pages, 119 posts, 23 case studies, 3 partn
 > The one exception is a genuine duplicate slug serving identical content, which is
 > handled by a codebase redirect rather than a rebuilt page (see §2).
 
-**Score: 53 of 53 built (100%). 1 page cannot go live yet.**
+**Score: 54 of 54 built (100%). 1 page cannot go live yet.**
+
+The denominator moved twice and the arithmetic is **48 + 5 + 1**:
+
+| | Count | What |
+| :--- | ---: | :--- |
+| Original closed transfer list | 48 | The scope closed on 2026-09-14 |
+| Non-indexed sweep | +5 | `/hmchecklists/`, `/recruiterchecklists/`, `/saleschecklists/`, `/sales-talents/`, `/onboardingguide/` (IDs 1000073–1000077) |
+| Added by direction | +1 | `/hire-va/` (page 1000066), added to scope this session |
+| **Total** | **54** | |
+
+`/hire-va/` is the one the earlier "53" missed: §3b already treats it as in scope in prose —
+`hire-va-2`, `hire-va-3` and `hire-va-t` were re-pointed to it "now that it is itself a live v2
+page" — while leaving it out of the count. Fixed here.
 
 Every priority section below is closed — P0, P1, P2, P3 and P4 — plus five pages pulled in from
 the non-indexed sweep on 2026-09-15 (§3b), which took the scope from 48 URLs to 53.
@@ -512,14 +546,37 @@ Two deliberate divergences from production, **both approved 2026-09-15**:
 - `acf/hire-va-hero` floors at `min-h-dvh`, so the hire-va family's hero runs 512px/337px taller
   than production's 688px/863px. Same defect on the signed-off `/hire-va-4/`. Fix per CLAUDE.md
   is a `height_mode` option defaulted to current behaviour, not a second block.
-- `acf/testimonials` has no "SHOW MORE" control; production has one wherever it uses that wall.
-  Verified 2026-09-15: production emits it on both `/hire-va-6/` and `/stealing-jobs/`; locally
-  `/hire-va-6/`, `/1monthonus/` and the signed-off `/hire-va-4/` have none. The steal family is
-  the exception — it supplies its own from `steal-campaign.php`, which is the workaround the
-  block should make unnecessary.
-- `acf/accordion-faq` hard-renders two columns and unconditionally emits Schema.org `FAQPage`.
-  Two pages needed a single-column accordion and inlined it, losing the structured data.
-  A `columns` + `schema` option would let both fold back into the block.
+- ~~`acf/testimonials` has no "SHOW MORE" control~~ — ✅ **FIXED 2026-09-15.** The block gained
+  `show_more` / `visible_count` / `tone`, defaulted **off** — defaulting it on would have
+  collapsed `/reviews/` from 77 cards to 6. `/hire-va-6/`, `/hire-va-1st-month-free/` and
+  `/hire-va-4/` now feed the full 15 reviews collapsed to 6, as production does, and the steal
+  family's hand-rolled workaround was deleted.
+
+  **A caution for future audits:** the original evidence for this ("production emits it, 6
+  matches per page") was wrong — 5 of those 6 were theme boilerplate present on every production
+  page, including ones with no control at all. `/reviews/` has none. Count *visible* controls,
+  not string matches.
+- ~~`acf/accordion-faq` hard-renders two columns and unconditionally emits `FAQPage`~~ —
+  ✅ **FIXED 2026-09-15.** Gained `columns` (1|2, default 2) and `schema` (default on), both
+  defaulting to previous behaviour. `/vastore5/`'s inline accordion folded back in at
+  `columns: 1, schema: off`. The block's answer slot also had **no list styling**, and the theme
+  has no global `ul{list-style}` rule — so `/comparison/` and `/hire-va-6/` were rendering FAQ
+  bullets as unmarked, unindented lines. Both now `disc / 20px`.
+- ~~`acf/roles-grid` renders the Administrative card dark where production has lavender~~ —
+  **the premise was false.** Production measures `rgb(99,65,162)` with white text on all three
+  consuming pages, identical to what the theme shipped. An `admin_tint` option was added but
+  **has no consumer and must not be used** — see design-system.md. Two *real* defects were found
+  in that block instead and fixed: the view hard-coded the CTA label and `href="#booking"` and
+  never read the `$ctaText`/`$ctaUrl` it computed, and `$eyebrow` was dead the same way.
+  **`$cards` is still dead** — the repeater is computed, eight cards are hard-coded.
+- ~~The va-roles hero is hand-written markup because `acf/consult-landing-hero` is hard-wired to
+  the consultation skin~~ — ✅ **FIXED 2026-09-15.** The block gained a `variant` field; the hero
+  now renders through it with every per-page knob preserved (verified: rendered-HTML diff shows
+  only the wrapper element and a container value that was already being clamped to 1380px).
+- ~~Three templates override `.rl-logo-marquee-item img` at higher specificity~~ —
+  ✅ **FIXED 2026-09-15.** `.rl-logo-marquee-lg` and `-natural` modifiers added alongside the
+  existing `-dark`; `steal-campaign.php` and `va-roles-landing.php` now opt in instead of
+  overriding. Verified byte-identical computed styles on all affected pages.
 - ~~`has-text-align-center` has **no CSS anywhere in the theme**~~ — ✅ **FIXED 2026-09-15.**
   The class appeared 29 times across 7 pattern files and resolved to nothing in every built
   stylesheet, because the theme dequeues `wp-block-library`, which is what normally ships it.
@@ -652,7 +709,7 @@ it, which unblocks the `known-issues.md` bug #1 fix.
 | `/referrer-portal` | `rl-referral-program` | URL yes — **but the view is required** by `/referral-dashboard` (row 27, in scope) |
 | `/referrer-register` | `rl-referral-program` | URL yes — **same dependency**; also the target of `/affiliate-program/` CTAs |
 | `/live-call/connect` | `rl-join-live-call` | **No** — Calendly instant-call routing |
-| `/tools/signature-generator` | `rl-social-kit` | Possibly — but `/social-media-kit/` **is** on the list (P3) and may need it |
+| ~~`/tools/signature-generator`~~ | `rl-social-kit` | **Dropped 2026-09-15.** The route and `GenerateSignatureHtmlAction` are deleted; it 301s to `/social-media-kit/`, which is the in-scope deliverable and is built. They were the same thing. |
 
 ### 4c. Redirect entries pointing at out-of-scope targets (2 of 3 open)
 
@@ -728,8 +785,13 @@ one DOM node.
    it was out of scope, so the call was delete rather than rework. Page 213 is trashed (not
    force-deleted) and nothing linked to it. `/hire-va-4-preview/` (104), the other copy, was
    deleted 2026-09-14. **Follow-up:** add `'referral' => ''` to `config/redirects.php`.
-3. **`/social-media-kit/` vs `/tools/signature-generator`** — the in-scope page (P3) and
-   the out-of-scope route (§4b) may be the same deliverable. Confirm before building either.
+3. ~~**`/social-media-kit/` vs `/tools/signature-generator`**~~ — **resolved 2026-09-15.**
+   They were the same deliverable, and it was settled by building one and retiring the other.
+   `/social-media-kit/` is built and returns 200 as an **Acorn route** (`routes/web.php` →
+   `pages/social-media-kit.blade.php`) — it is not a `page` row and never will be, so a
+   `wp post list` check correctly fails to find it. `/tools/signature-generator` now returns
+   **301**: that route and `GenerateSignatureHtmlAction` were deleted, and 36 legacy social-kit
+   asset paths were added to `config/redirects.php`.
 4. **`legal_last_updated`** — still empty on both legal pages, so the hero falls back to
    the post modified date (2026-09-10). Someone who knows the real revision dates should set it.
 5. **Affiliate Program "How It Works"** — shows the same three cards duplicated from the

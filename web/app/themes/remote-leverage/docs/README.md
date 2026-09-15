@@ -33,10 +33,11 @@ All project documentation lives here. Start with the [repository README](../../.
 | :--- | :--- |
 | [production-cutover.md](production-cutover.md) | What stands between v2 and the DNS flip, and in what order |
 | [content-migration-checklist.md](content-migration-checklist.md) | Per-page inventory of everything live on production (audited 2026-09-10) |
-| [content-migration-next-phase-plan.md](content-migration-next-phase-plan.md) | The four blocking decisions, and the work that needs no sign-off |
+| ~~content-migration-next-phase-plan.md~~ | **Archived 2026-09-15** — all four blocking decisions resolved. Moved to [archive/](archive/content-migration-next-phase-plan.md) |
+| [cutover-decisions.md](cutover-decisions.md) | **Every decision that was blocking the cutover, and what was decided (2026-09-15).** Where it contradicts another doc, it wins and the other is stale |
 | [seo-meta-migration.md](seo-meta-migration.md) | Yoast install, and `content:import-seo` — carrying production's `_yoast_wpseo_*` meta onto v2 |
 | [page-migration-and-design-system-workflow.md](page-migration-and-design-system-workflow.md) | How to migrate a page: extract, dissect, build blocks, publish |
-| [performance-baseline.md](performance-baseline.md) | First measurement of the Phase 8 performance gate: mobile Lighthouse across 7 pages, and the `CaptureLeadAction` p95 queue-worker decision rule (measured 2026-09-15, local) |
+| [performance-baseline.md](performance-baseline.md) | The Phase 8 performance gate: mobile Lighthouse, the `CaptureLeadAction` p95 rule, and Parts 3–5 covering the font subsetting, preload, Calendly preflight and blog image work of 2026-09-15 |
 | [adr-status.md](adr-status.md) | ADR compliance and WR-98–106 backlog status (verified 2026-09-09) |
 | [jira-adr-compliance-backlog.md](jira-adr-compliance-backlog.md) | The original backlog write-up |
 

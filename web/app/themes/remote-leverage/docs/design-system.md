@@ -54,6 +54,38 @@ Two extensions in the original plan turned out to be unnecessary: a trusted-by e
 "Meet Our Talent" subheadline can both come from the pattern, because those blocks render no
 heading of their own. Check that before widening a block.
 
+### Blocks extended for the P4 campaign pages (2026-09-15)
+
+Same principle — every option defaults to the block's previous behaviour, so no already-signed-off
+page moved when these landed.
+
+| Block | Option added | Why |
+| :--- | :--- | :--- |
+| `acf/accordion-faq` | `columns` (`1` \| `2`, default `2`), `schema` (default on) | Production has single-column FAQs, and `FAQPage` structured data does not belong on internal noindex collateral. Two patterns had hand-rolled their own accordion for exactly these two reasons |
+| `acf/roles-grid` | `admin_tint` (`dark` default \| `lavender`) | Currently **no consumer** — see the warning below |
+| `acf/consult-landing-hero` | `variant` (`consultation` default \| `va-roles`), plus `headline_gradient`, `headline_size`, `background_image_class`, `split_at`, `cta_text`, `cta_url` | Lets the va-roles hero drop its hand-written markup, so one hero implementation serves both families |
+| `acf/testimonials` | `show_more` (default off), `visible_count` (default 6), `tone` (`light` default \| `dark`) | Production collapses the review wall behind a SHOW MORE pill. Default off on purpose: defaulting it on would have collapsed `/reviews/` from 77 cards to 6 |
+| `multistep-booking-wizard` | `revenueFirst` (default off) | The page-bottom booking blocks lead with the revenue question as a radio list. Hero forms keep their progressive email-first reveal |
+| `.rl-logo-marquee-*` (CSS) | `-lg` (50px mark on a 60px row) and `-natural` (width-sized, no filter) modifiers, alongside the existing `-dark` | Three templates were overriding the base `max-height: 28px` rule at higher specificity |
+
+> **Do not use `admin_tint: lavender` without re-measuring.** It was added on a report that
+> production renders the roles bento's Administrative card light lavender. That report was wrong:
+> production measures `rgb(99,65,162)` with white text on `/hire-va-4/`, `/hire-va-6/` and
+> `/hire-va-1st-month-free/` — identical to what the theme already shipped. The option exists but
+> has no consumer, and opting a page in would *break* parity.
+
+**Two dead-field traps found in `acf/roles-grid` while doing this**, worth checking for elsewhere:
+its Blade view hard-coded the CTA label and `href="#booking"` and never read the `$ctaText` /
+`$ctaUrl` the block computed in `with()`, and `$eyebrow` was dead the same way. Both are now wired.
+**`$cards` is still dead** — `RolesGridBlock::cards()` and its repeater are computed, but the view
+renders eight hard-coded cards. A field that exists in the editor and changes nothing on the page
+is worse than no field at all.
+
+Rule 2 (bold is the heaviest weight) was swept theme-wide the same day: 18 `font-extrabold` /
+`font-black` occurrences across 12 files — including the homepage hero CTA and its stat figures,
+`404.blade.php`, `trust-stats`, `cta-banner`, `talent-carousel`, the booking wizard, the referrer
+portal and the site header — are now `font-bold`.
+
 ### Two stat surfaces, deliberately
 
 `acf/trust-stats` and `acf/stats-band` carry the same three company figures. They are not

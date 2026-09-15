@@ -314,3 +314,51 @@ the postmeta snapshot before and after is identical.
 `tests/Unit/YoastMetaMapperTest.php` — 35 tests over the canonical rewriting, the meta
 extraction, the site-template detection and the force-indexed slugs. No network: the command's fetching is separated
 from the mapping precisely so the mapping can be tested against fixture head objects.
+
+## Canonicals cannot be verified before cutover
+
+Added 2026-09-15 after a false alarm that is worth recording, because anyone checking this will
+reach the same wrong conclusion.
+
+**Symptom:** no page renders a `rel="canonical"` tag. Not the homepage, not `/about-us/`, not
+`/blog/`, not any migrated page.
+
+**It is not a defect.** The canonicals are stored — 180 `_yoast_wpseo_canonical` rows, every one
+on the local host, none left pointing at `remoteleverage.com`. Yoast simply **withholds the
+canonical on any URL it considers `noindex`**, and every URL here is noindex because
+`web/app/mu-plugins/bedrock-disallow-indexing` runs
+`add_action('pre_option_blog_public', '__return_zero')` whenever `DISALLOW_INDEXING` is defined.
+
+**The raw database value of `blog_public` is `1`.** Flipping the option and recomputing proves
+nothing — the filter intercepts every read, so that test cannot work. The constant is set in
+`config/environments/development.php` and `staging.php`, and **absent from production**, so on
+production the filter is never registered, `blog_public` reads its real `1`, and canonicals are
+emitted.
+
+**Proven, not inferred (2026-09-15).** Temporarily setting `DISALLOW_INDEXING` to `false` in
+`config/environments/development.php` and reloading `/about-us/` emits both:
+
+```
+<meta name='robots' content='index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' />
+<link rel="canonical" href="https://remoteleverage-v2.test/about-us/" />
+```
+
+Restoring the constant removes both again. So canonicals **do** render as soon as indexing is
+allowed, and production — where the constant is absent — will emit them. This is expected
+behaviour on development and staging, not a defect.
+
+Two dead ends recorded so nobody repeats them: flipping the `blog_public` **option** cannot work,
+because `pre_option_blog_public` intercepts every read; and removing that filter at runtime in a
+`wp eval` also fails, because Yoast evaluates indexability at load time, before the filter can be
+lifted. Flipping the **constant** is the test that works.
+
+This is the same family as the `robots.txt` 404 and the site-wide `noindex` in
+[known-issues.md](known-issues.md) #3 and #4 — locally unobservable, correct in production.
+
+### What the blindness hid
+
+One real imported defect, since fixed: production canonicalises **both** `/hire-va/` and
+`/hire-va-isolated-form/` at the homepage, and `content:import-seo` faithfully carried those
+across. Nothing on the front end would ever have shown it. The same blindness applies to all 180
+imported canonicals, so a post-cutover sweep for canonicals pointing somewhere unexpected is
+worth the hour.

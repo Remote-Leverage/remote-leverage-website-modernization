@@ -4,7 +4,7 @@ A ground-up rebuild of [remoteleverage.com](https://remoteleverage.com) on **Roo
 
 This repository *is* the new platform. It is not live yet — it runs locally and on staging while content is migrated off production. See [Replacing production](#replacing-production) for exactly what stands between here and the DNS flip.
 
-> **Status of this document.** Verified against the code and the local database on **2026-09-14**. Production-side counts (233 pages, 119 posts, 2 partners) come from the audit in [`docs/content-migration-checklist.md`](web/app/themes/remote-leverage/docs/content-migration-checklist.md) (2026-09-10); everything describing *local* state was re-queried directly.
+> **Status of this document.** Verified against the code and the local database on **2026-09-15**. Production-side counts (233 pages, 119 posts, 2 partners) come from the audit in [`docs/content-migration-checklist.md`](web/app/themes/remote-leverage/docs/content-migration-checklist.md) (2026-09-10); everything describing *local* state was re-queried directly (54 published pages + 1 draft, 56 blocks, 102 patterns, 754 passing tests).
 
 ---
 
@@ -29,10 +29,10 @@ Production today is `hello-elementor` + Elementor Pro + eight in-house plugins (
 v2 folds all of it into a single Sage theme with an Acorn (Laravel) container inside it:
 
 - **Business logic** lives in seven bounded contexts under `app/Domains/`, each with its own actions, DTOs, events, models and gateways.
-- **Content** is native Gutenberg — 38 code-first ACF blocks with Blade views, composed into 53 registered block patterns.
+- **Content** is native Gutenberg — 56 code-first ACF blocks with Blade views, composed into 102 block patterns (plus 11 shared partials in `resources/patterns/`).
 - **Interactive funnels** (booking wizard, live-call button, referrer portal, partner directory) are Livewire 4 components, not iframes or shortcodes.
 - **Schema** is version-controlled Acorn migrations, applied automatically on deploy.
-- **Everything is tested** — 422 Pest tests, 1368 assertions, green as of this writing, gated in CI on every PR.
+- **Everything is tested** — 754 Pest tests, 3650 assertions, green as of this writing, gated in CI on every PR.
 
 ## Stack
 
@@ -42,15 +42,15 @@ v2 folds all of it into a single Sage theme with an Acorn (Laravel) container in
 | WordPress core | `roots/wordpress` | 7.1 | Abilities API (6.9+) is relied on by the sync/AI features |
 | Theme | Roots Sage | 10.x | `web/app/themes/remote-leverage` |
 | App container | Roots Acorn | ^6.0 | Laravel service container, Eloquent, events, Artisan inside WP |
-| Reactive UI | Livewire | ^4.4 | 7 components |
-| Blocks | Log1x ACF Composer | ^3.4 | 38 code-first blocks |
+| Reactive UI | Livewire | ^4.4 | 6 components |
+| Blocks | Log1x ACF Composer | ^3.4 | 56 code-first blocks |
 | Fields | ACF Pro | * | Licensed; `ACF_PRO_KEY` required to `composer install` |
 | Styling | Tailwind CSS | ^4.0 | `@theme` tokens in `resources/css/app.css` |
 | Build | Vite | ^8.0 | `@roots/vite-plugin` |
-| Tests | Pest | ^5.1 | 422 tests |
+| Tests | Pest | ^5.1 | 754 tests |
 | Lint | Laravel Pint | ^1.20 | `pint.json` at repo root |
 | AI / MCP | `roots/acorn-ai`, `WordPress/mcp-adapter` | ^0.1.2 / ^0.6.1 | Abilities API–backed |
-| Monitoring | Sentry Laravel | ^4.27 | Config present; **DSN not set in `.env`** |
+| Monitoring | Sentry Laravel | ^4.27 | Config present; **DSN not set in `.env`** — a cutover gate |
 | Phone parsing | libphonenumber-for-php | ^9.0 | E.164 normalisation |
 
 PHP **8.3+** (CI runs 8.4), Node **20.19+ / 22.12+**.
@@ -71,7 +71,7 @@ remoteleverage-v2/
     ├── app/                    240 PHP files — the application (see below)
     ├── config/                 services, redirects, post-types, rl-sync, ai, sentry
     ├── docs/                   ← all project documentation lives here
-    ├── patterns/               53 Gutenberg block patterns
+    ├── patterns/               102 Gutenberg block patterns
     ├── resources/              css, js, views (Blade), fonts, images
     ├── routes/                 web.php, api.php (Acorn routes, not WP rewrites)
     └── tests/                  Pest suite (Unit + Feature)
@@ -83,7 +83,7 @@ Inside the theme's `app/`:
 app/
 ├── Ai/                 MCP-callable landing-page abilities + LandingPageComposer
 ├── Application/        Livewire components, HTTP controllers, middleware
-├── Blocks/             38 ACF Composer block definitions
+├── Blocks/             56 ACF Composer block definitions
 ├── Domains/            ← business logic: 7 bounded contexts
 ├── Fields/             ACF field groups (PartnerHubFields)
 ├── Infrastructure/     Providers, migrations, console commands, WP admin & hooks
@@ -138,7 +138,7 @@ flowchart TB
     F --> G
     G --> H["Events<br/>LeadCreated, LeadBookingCompleted, …"]
     H --> I["Listeners<br/>Tracking · Scheduling · Referral · Slack · Webhook · Email"]
-    G --> J["Gateways<br/>Calendly · Google · HubSpot · Stripe · PostHog · Customer.io · Notion"]
+    G --> J["Gateways<br/>Calendly · Google · HubSpot · Stripe · PostHog · Customer.io"]
     G --> K["Eloquent models<br/>rl_leads, rl_referrers, …"]
 
     L["WP Admin screens<br/>Leads · Referrers · Calendly · Environment Sync"] --> G
@@ -162,7 +162,7 @@ Each has its own document with the classes, the data it owns, the wiring and how
 | **Scheduling** | Calendly embeds, `rl-join-live-call` | Calendly token pool + event-type routing, Google Meet creation, booking retry, `rl_live_call_sessions` | [scheduling.md](web/app/themes/remote-leverage/docs/domains/scheduling.md) |
 | **Tracking** | `rl-customer-io`, `rl-posthog-feature-flags` | Dual dispatch to PostHog + Customer.io, server-side flag evaluation, script injection | [tracking.md](web/app/themes/remote-leverage/docs/domains/tracking.md) |
 | **Referral** | `rl-referral-program` | `rl_referrers`, `rl_referrals`, `rl_referral_clicks`, `rl_referral_rewards`, `rl_payouts`; attribution cookie, Stripe Connect payouts | [referral.md](web/app/themes/remote-leverage/docs/domains/referral.md) |
-| **PartnerHub** | `rl-partners-hub` | `rl_partner` CPT, 9-tab co-branded hubs, Notion-synced directory | [partner-hub.md](web/app/themes/remote-leverage/docs/domains/partner-hub.md) |
+| **PartnerHub** | `rl-partners-hub` | `rl_partner` CPT, 9-tab co-branded hubs, CPT-backed directory | [partner-hub.md](web/app/themes/remote-leverage/docs/domains/partner-hub.md) |
 | **ContentAudit** | `rl-content-auditor`, `rl-social-kit` | Elementor AST audit/conversion, blog import, email-signature HTML | [content-audit.md](web/app/themes/remote-leverage/docs/domains/content-audit.md) |
 | **Sync** | *(new)* | Environment-to-environment dataset transfer over the Abilities REST API | [sync.md](web/app/themes/remote-leverage/docs/domains/sync.md) |
 
@@ -191,12 +191,12 @@ flowchart LR
 
     subgraph V2["v2 — this repo"]
         direction TB
-        V1["✅ Platform<br/>Bedrock · Sage · Acorn · 422 tests green"]
+        V1["✅ Platform<br/>Bedrock · Sage · Acorn · 754 tests green"]
         V2b["✅ 7 domains<br/>all 8 plugins ported"]
-        V3["✅ Design system<br/>38 blocks · 53 patterns"]
+        V3["✅ Design system<br/>56 blocks · 102 patterns"]
         V4["✅ CI + staging deploy<br/>GitHub Actions → ECR → ECS"]
-        V5["🟡 Content<br/>14 of 48 in-scope URLs<br/>119 posts + 23 case studies done"]
-        V6["🟡 SEO parity<br/>Yoast 28.5 installed (inactive)<br/>164 discarded URLs redirected<br/>meta import built, not yet run"]
+        V5["✅ Content<br/>54 of 54 in-scope URLs built<br/>119 posts + 23 case studies done"]
+        V6["🟡 SEO parity<br/>Yoast active but emitting no canonicals<br/>164 discarded URLs redirected<br/>meta import run"]
         V7["🔴 Cutover ops<br/>owned elsewhere<br/>perf measured locally, not on staging"]
     end
 
@@ -223,10 +223,10 @@ flowchart LR
 | Test suite + CI | ✅ Done | No visual-regression suite (WR-103, deliberately not built) |
 | Staging deploy pipeline | ✅ Done | Production target does not exist yet |
 | Environment sync | ✅ Done | Production is gated off by design, in four independent places |
-| **In-scope URLs** | 🟡 30 of 48 | P0 and P2 cleared; see [`PAGE-MIGRATION-STATUS.md`](PAGE-MIGRATION-STATUS.md) for the live count |
+| **In-scope URLs** | ✅ 54 of 54 built | Every priority cleared (P0–P4), plus 5 pages added by the non-indexed sweep and `/hire-va/` added by client direction. One page, `/virtual-assistant-hiring-manager-refundable-deposit/`, is visually complete but **cannot take a payment** until Stripe credentials and `STRIPE_DEFAULT_THANKYOU_URL` are set per environment. See [`PAGE-MIGRATION-STATUS.md`](PAGE-MIGRATION-STATUS.md) for the live count |
 | **Case studies** | ✅ 23 of 23 | Migrated to a real `case_study` CPT |
 | **Blog posts** | ✅ 119 of 119 | Imported clean; category counts match production |
-| **Taxonomies** | ✅ 7 of 7 categories, 8 of 8 tags | `Live Sessions` is empty locally (2 on production) |
+| **Taxonomies** | ✅ 7 of 7 categories, 8 of 8 tags | `Live Sessions` shows 2 on production and 0 locally, but **nothing was dropped**: both items are `post_type=page`, not posts — production registers `category` on pages and a term count is not post-type-scoped. Verified 2026-09-15 |
 | **Media** | ✅ Out of scope | **Production's media library is not being ported** (decided 2026-09-15). No reconciliation against production is planned; local art is sourced from `resources/images/pages/` and built by the `themeImages()` Vite plugin |
 | **Partners** | ✅ 3 of 3 | Rebuilt CPT-backed 2026-09-15; content seeded from `resources/partners/partners.php` (in git). Three gaps remain that only the partners can fill: intake forms for Lexgo and Lano, a referral destination for Oyster, logos for all three |
 | **SEO parity** | 🟡 Mechanism done, not yet run | Done: `robots.txt`, real 404s, non-production `noindex`; **Yoast 28.5 installed** (inactive — activating opens the config wizard); **`wp acorn content:import-seo`** built, dry-run matches 187 items by slug; **redirect map now 170 entries** covering the 164 discarded URLs. Remaining: activate Yoast, settle `/guides/` vs `/blog/` canonical, run the import for real |

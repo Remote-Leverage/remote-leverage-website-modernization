@@ -1,8 +1,21 @@
-> **Partly superseded (2026-09-14).** Its §8 conclusion — 119 blog posts blocked on the
-> Elementor conversion pass — no longer holds: all 119 posts, 7 categories and 8 tags are
-> imported and zero posts carry `_elementor_data`. What was "four decisions" is now three.
-> Current figures and sequencing are in [production-cutover.md](production-cutover.md);
-> the analysis of the remaining page decisions below is still valid.
+> # ⛔ Archived 2026-09-15 — historical only
+>
+> **All four of the blocking decisions this document was written to force are resolved.**
+> Nothing below is outstanding work; it is kept only as a record of how the migration was
+> sequenced.
+>
+> | Its decision | Outcome |
+> | :--- | :--- |
+> | B1 — paid-traffic owner on §5 experiment pages | Scope closed 2026-09-14; the surviving campaign pages were built as P4 |
+> | B2 — sales/ops owner on §4 operational pages | Built: `/payment/`, `/vaonboardingform/`, `/signedup/`, the referral-program pages |
+> | B3 — §2 role/industry template architecture | Moot; those ~45 pages are out of scope and discarded |
+> | B4 — §8 blog Elementor conversion pass | Done: 119 posts, 7 categories, 8 tags imported; zero posts carry `_elementor_data` |
+>
+> Its premise is also superseded: it estimated "~219 pages remaining" against an open scope.
+> The scope is closed at **54 in-scope URLs, all built**.
+>
+> Current state: [`PAGE-MIGRATION-STATUS.md`](../../../../../PAGE-MIGRATION-STATUS.md).
+> Remaining launch gates: [`production-cutover.md`](../production-cutover.md).
 
 # Content Migration — Continuation Plan
 
