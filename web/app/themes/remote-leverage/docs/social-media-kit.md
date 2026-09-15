@@ -125,16 +125,31 @@ download / setup — is identical signed in or out.
 
 ## Not ported
 
-- **The admin settings screen** (`Settings → RL Social Kit`). Option names and defaults are
-  preserved, so values can be set with `wp option update rl_social_kit_company_address '…'`,
-  but there is no UI.
 - **`rl_social_kit_login`.** The AJAX action is still registered so the carried-over JS works
-  when the login gate is switched on, but with the kit public it is unreachable in normal use.
+  if the login gate is switched on, but with the kit public it is unreachable in normal use.
 
-## Overlap with `/tools/signature-generator`
+## Settings → RL Social Kit
 
-The two are **not** the same deliverable, despite both generating signatures. This page is a
-superset: the generator plus the asset library plus the Gmail/Outlook/Apple Mail setup
-instructions. `/tools/signature-generator` is a Livewire component covering roughly the
-generator half; it is missing the first/last name split, Department, photo upload, the
-six-variants-at-once grid, and the setup modal. Consolidating them is an open decision.
+`App\Infrastructure\WordPress\Admin\SocialKitAdmin` renders the options screen, ported
+2026-09-15. It writes the same option names the plugin used, so an existing `wp_options` row
+keeps working and nothing needs migrating; `SocialKit::OPTION_DEFAULTS` stays the single
+source of truth for the defaults and the screen never restates them.
+
+Two details worth keeping if this is ever edited: the Require Login checkbox needs an explicit
+`sanitize_callback` (an unchecked box is simply absent from the POST body, so without it the
+value could never save as `'0'`), and `rl_social_kit_company_logo` has to be registered
+separately because it is resolved at read time by `SocialKit::companyLogo()` rather than
+living in `OPTION_DEFAULTS` — miss it and the field renders but silently never saves.
+
+## `/tools/signature-generator` was removed
+
+Resolved 2026-09-15: the old Livewire generator is **gone**, and `/tools/signature-generator`
+now 301s here via `config/redirects.php`. This page was a strict superset of it — the same six
+variants plus the asset library and the Gmail/Outlook/Apple Mail setup instructions — while the
+old route lacked the first/last name split, Department, photo upload, the six-variants-at-once
+grid and the setup modal.
+
+Deleted with it: `EmailSignatureGenerator` (component + view), `GenerateSignatureHtmlAction`,
+`resources/views/signatures/` and both service-provider registrations. Keeping two
+implementations had already let their templates drift (`#25104A` against this page's
+`#250D4A`, in 3 of 6 files), which is the argument that settled it.

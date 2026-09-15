@@ -857,15 +857,17 @@ function initMobileNav() {
   const iconOpen = button.querySelector('[data-rl-nav-open]');
   const iconClose = button.querySelector('[data-rl-nav-close]');
 
+  // `hidden` is an HTMLElement IDL property. These two icons are <svg>, i.e.
+  // SVGSVGElement, where assigning `.hidden` sets an inert JS property and never
+  // reflects to the attribute the UA stylesheet's [hidden] rule keys off — so the
+  // hamburger never became an X. Toggle the attribute itself.
+  const setHidden = (el, hide) => el && el.toggleAttribute('hidden', hide);
+
   const setOpen = (open) => {
     button.setAttribute('aria-expanded', open ? 'true' : 'false');
     panel.hidden = !open;
-    if (iconOpen) {
-      iconOpen.hidden = open;
-    }
-    if (iconClose) {
-      iconClose.hidden = !open;
-    }
+    setHidden(iconOpen, open);
+    setHidden(iconClose, !open);
   };
 
   setOpen(false);

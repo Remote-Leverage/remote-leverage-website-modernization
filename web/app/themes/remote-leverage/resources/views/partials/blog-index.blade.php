@@ -4,6 +4,15 @@
 
      Expects: $indexTitle, $indexDescription, $activeCategory (a WP_Term or null). --}}
 @php
+  use App\Support\ResponsiveImage;
+
+  // The card art is `width:100%; height:280px; object-fit:cover` inside a grid that is
+  // one column below 600px, two to 1024px and three above it, capped at 1320px with a
+  // 30px gap — so the widest a card image is ever painted is (1320 - 60) / 3 = 420px.
+  // Without this the browser assumed 100vw and took the 768px PNG every time.
+  $cardSizes = '(min-width: 1024px) 420px, (min-width: 600px) 50vw, calc(100vw - 40px)';
+  $cardIndex = 0;
+
   // Production's filter bar is a curated list, not every category: case-studies and
   // real-estate are deliberately absent from it.
   $filters = [
@@ -54,14 +63,19 @@
         @php
           the_post();
           $cardId = get_the_ID();
-          $cardThumb = get_the_post_thumbnail_url($cardId, 'medium_large');
+          $cardThumbId = get_post_thumbnail_id($cardId) ?: null;
+          $cardThumb = $cardThumbId ? ResponsiveImage::attributes($cardThumbId, 'medium_large', $cardSizes) : '';
           $cardCats = get_the_category();
+          $cardIndex++;
         @endphp
 
         <div class="rl-post-card">
           <a href="{{ get_permalink() }}" class="rl-post-image-link">
             @if ($cardThumb)
-              <img src="{{ $cardThumb }}" alt="{{ the_title_attribute(['echo' => false]) }}" class="rl-post-image" loading="lazy" />
+              {{-- The first card is the LCP element on `/blog/`; lazy-loading it deferred the
+                   only image that is above the fold at every breakpoint. --}}
+              <img {!! $cardThumb !!} alt="{{ the_title_attribute(['echo' => false]) }}" class="rl-post-image"
+                   @if ($cardIndex === 1) fetchpriority="high" decoding="async" @else loading="lazy" decoding="async" @endif />
             @else
               <span class="rl-post-image-placeholder"></span>
             @endif

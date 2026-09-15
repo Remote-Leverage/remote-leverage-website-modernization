@@ -82,18 +82,45 @@ class BlockDefaults
      */
     public static function filterContentImgTag(string $filteredImage): string
     {
-        if (! preg_match('/\ssrc=(["\'])(.*?)\1/i', $filteredImage, $m)) {
-            return $filteredImage;
+        $image = $filteredImage;
+
+        if (preg_match('/\ssrc=(["\'])(.*?)\1/i', $image, $m)) {
+            $originalSrc = html_entity_decode($m[2]);
+            $newSrc = self::preferWebp($originalSrc);
+
+            if ($newSrc !== $originalSrc) {
+                $image = str_replace($m[0], ' src='.$m[1].esc_attr($newSrc).$m[1], $image);
+            }
         }
 
-        $originalSrc = html_entity_decode($m[2]);
-        $newSrc = self::preferWebp($originalSrc);
+        // A matching srcset candidate always outranks src, so rewriting src alone did
+        // nothing for any content image WordPress had already given a srcset — the browser
+        // went on downloading the PNG and the WebP was never requested.
+        //
+        // Splitting on "," is safe here because sanitize_file_name() strips commas from
+        // every uploaded filename, so no candidate URL can contain one.
+        if (preg_match('/\ssrcset=(["\'])(.*?)\1/i', $image, $m)) {
+            $candidates = [];
 
-        if ($newSrc === $originalSrc) {
-            return $filteredImage;
+            foreach (explode(',', html_entity_decode($m[2])) as $candidate) {
+                $candidate = trim($candidate);
+
+                if ($candidate === '') {
+                    continue;
+                }
+
+                $parts = preg_split('/\s+/', $candidate, 2);
+                $url = self::preferWebp($parts[0]);
+
+                $candidates[] = isset($parts[1]) ? $url.' '.$parts[1] : $url;
+            }
+
+            if ($candidates !== []) {
+                $image = str_replace($m[0], ' srcset='.$m[1].esc_attr(implode(', ', $candidates)).$m[1], $image);
+            }
         }
 
-        return str_replace($m[0], ' src='.$m[1].esc_attr($newSrc).$m[1], $filteredImage);
+        return $image;
     }
 
     /**
@@ -3383,5 +3410,24 @@ Google Ads',
         self::encodeRepeater('cards', 'field_offer_stack_block_cards', $cards, $data);
 
         return self::patternBlock('offer-stack', array_merge($data, $overrides), ['align' => 'full']);
+    }
+
+    /**
+     * Rows of gradient video cards (`acf/video-card-grid`).
+     *
+     * Each card is `['video_url' => …, 'title' => …, 'width' => 'full'|'half', …]`. `video_url`
+     * must be the complete player URL: an unlisted Vimeo video is addressed by its ID *and*
+     * its `h=` privacy hash, and a player missing the hash renders a restriction notice rather
+     * than failing loudly. Transcribe production's `src`; do not rebuild it from the ID.
+     *
+     * @param  array<int, array<string, mixed>>  $cards
+     * @param  array<string, mixed>  $overrides
+     */
+    public static function renderVideoCardGrid(array $cards, array $overrides = []): string
+    {
+        $data = [];
+        self::encodeRepeater('cards', 'field_video_card_grid_block_cards', $cards, $data);
+
+        return self::patternBlock('video-card-grid', array_merge($data, $overrides), ['align' => 'full']);
     }
 }

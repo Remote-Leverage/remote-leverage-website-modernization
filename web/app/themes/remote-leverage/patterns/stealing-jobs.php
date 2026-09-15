@@ -27,12 +27,17 @@ $steal = [
     /* Production repeats "Customer Support" in the fifth slot rather than showing a fifth
        role — /steal-back-your-time/ has "And More" here. Reproduced as production has it;
        flagged in the migration report as a likely production content bug. */
+    // DELIBERATE DIVERGENCE (approved 2026-09-15): production repeats "Customer Support" here,
+    // title and chips identical to the card above it, so the roles grid shows the same role
+    // twice and never names the catch-all. /steal-back-your-time/ — same template, same section —
+    // carries the real fifth card, so this is production's content for the slot, not invented.
+    // Flagged for fixing on production; until then v2 and production differ on this card.
     'roles_fifth' => [
-        'title' => 'Customer Support',
+        'title' => 'And More',
         'span' => '',
         'image' => 'Earth-Illustration-2-1-1.png',
         'media_class' => 'pb-0 flex justify-end',
-        'chips' => ['Email and chat support', 'Customer follow-ups', 'Ticket management', 'Order assistance'],
+        'chips' => ['Data entry and research', 'Bookkeeping and invoicing', 'Project and task tracking', 'HR and recruiting support'],
     ],
 
     'steps_note' => 'No upfront gamble. No endless résumé hunting. No long-term agency markup.',

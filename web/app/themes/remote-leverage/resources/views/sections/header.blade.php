@@ -2,16 +2,21 @@
     class="sticky top-0 z-40 w-full bg-bg-light border-b border-slate-200/60 transition-all duration-200">
     <div class="w-full px-4 sm:px-6 lg:px-8">
         <div class="rl-container">
-        <div class="flex items-center justify-between gap-3 h-20">
+        <div class="relative flex items-center justify-end lg:justify-between gap-3 h-20">
 
-            <!-- Brand Logo -->
-            <div class="min-w-0">
+            {{-- Brand Logo.
+                 Below `lg` (the hamburger breakpoint) the logo is taken out of flow and centred on
+                 the row — production serves a viewport-centred 200px logo with no inline CTA beside
+                 it, and centring absolutely is what lets it stay 200px down to 320px instead of
+                 competing with the hamburger for flex space. At `lg` it returns to the flow as the
+                 left-hand item of the `justify-between` row, unchanged. --}}
+            <div class="absolute left-1/2 -translate-x-1/2 lg:static lg:left-auto lg:translate-x-0 min-w-0">
                 <a href="{{ home_url('/') }}"
                     class="flex min-w-0 items-center gap-3 group focus:outline-none focus:ring-2 focus:ring-brand-purple focus:ring-offset-2 rounded-lg"
                     aria-label="{{ $siteName ?? 'Remote Leverage' }}">
                     <img src="{{ Vite::asset('resources/images/logo.svg') }}" alt="{{ $siteName ?? 'Remote Leverage' }}"
                         width="154" height="18"
-                        class="h-6 sm:h-7 w-auto max-w-full object-contain object-left transition-transform group-hover:scale-[1.02]"
+                        class="w-[200px] h-auto max-w-none lg:h-7 lg:w-auto lg:max-w-full object-contain object-left transition-transform group-hover:scale-[1.02]"
                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
                     <span class="hidden text-2xl font-display font-bold text-brand-navy tracking-tight">
                         Remote Leverage
@@ -115,13 +120,12 @@
                 </a>
             </div>
 
-            <!-- Mobile Menu Button -->
-            <div class="flex shrink-0 lg:hidden items-center gap-3">
-                <a href="{{ home_url('/vacalendar') }}"
-                    class="inline-flex items-center gap-1.5 rounded-full border border-black px-4 py-1.5 text-xs font-display font-bold uppercase tracking-wider text-black bg-transparent">
-                    <span>{{ __('Consultation', 'remote-leverage') }}</span>
-                </a>
-
+            {{-- Mobile Menu Button.
+                 No inline Consultation pill here: production's mobile header is a centred logo and
+                 a hamburger, nothing else. The booking CTA lives inside the drawer below
+                 ("Book a Consultation"), which is the only mobile path to /vacalendar — do not
+                 remove it from the drawer without replacing it. --}}
+            <div class="flex shrink-0 lg:hidden items-center">
                 <button type="button" data-rl-nav-toggle aria-expanded="false" aria-controls="rl-mobile-nav"
                     class="p-2 rounded-xl text-slate-700 hover:text-brand-purple hover:bg-slate-100 transition-colors focus:outline-none"
                     aria-label="{{ __('Toggle navigation menu', 'remote-leverage') }}">

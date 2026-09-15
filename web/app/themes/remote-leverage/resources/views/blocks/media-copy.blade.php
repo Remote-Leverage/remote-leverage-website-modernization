@@ -54,7 +54,10 @@
                     @endif
 
                     @if ($body)
-                        <div class="text-card text-black [&_p]:mb-4 [&_p:last-child]:mb-0 [&_strong]:font-bold">
+                        {{-- Body follows $isDark like the heading does. It hard-coded text-black
+                             until 2026-09-15, so selecting tone: dark rendered black copy on a
+                             dark band — invisible, with nothing in the editor to warn you. --}}
+                        <div class="text-card {{ $isDark ? 'text-white' : 'text-black' }} [&_p]:mb-4 [&_p:last-child]:mb-0 [&_strong]:font-bold">
                             {!! $body !!}
                         </div>
                     @endif

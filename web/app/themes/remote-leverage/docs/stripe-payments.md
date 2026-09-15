@@ -242,12 +242,21 @@ Nothing here may slow a payment down.
 - With credentials unset — the normal local state — nothing throws and nothing is logged as an
   error. Verified, not assumed: `PostHogClient::capture()` and `CustomerIOClient::track()` both
   return `false` immediately when their config keys are null, and the browser SDKs are simply
-  never injected (`TrackingHooks` returns early), so `window.posthog` / `window.cioanalytics` /
-  `window._cio` are undefined and every client call site guards for that.
+  never injected (`TrackingHooks` returns early), so `window.posthog` and
+  `window.cioanalytics` are undefined and every client call site guards for that.
 
-`TrackingHooks` injects Customer.io's **classic** tracker (`window._cio`); production ran the
-CDP snippet (`window.cioanalytics`), which is what the legacy widget called. The client
-dispatcher prefers `cioanalytics` and falls back to `_cio`, so it works against either.
+`TrackingHooks` injects Customer.io's **CDP** snippet (`window.cioanalytics`) — the same
+`SNIPPET_VERSION 4.15.3` snippet production serves, verified against the live site on
+2026-09-15, and what the legacy payment widget called. The classic `window._cio` tracker was
+switched out on 2026-09-15; the client dispatcher still prefers `cioanalytics` and retains a
+`_cio` branch purely defensively (the GTM container could inject the classic tracker, and a
+staged cutover may serve some pages from the legacy stack). Nothing in v2 defines `_cio`.
+
+The snippet is gated on **`CUSTOMERIO_CDP_WRITE_KEY`**, not `CUSTOMERIO_SITE_ID`. Those are
+different Customer.io products: the write key is the CDP source credential the browser needs,
+the site id is the Track API v1 credential `CustomerIOClient` uses server-side. Pointing the
+snippet at a site id 404s on the CDP asset URL and silently queues every event forever, so
+each has its own variable and its own guard. Blank write key -> no snippet at all.
 
 ## Known gaps
 

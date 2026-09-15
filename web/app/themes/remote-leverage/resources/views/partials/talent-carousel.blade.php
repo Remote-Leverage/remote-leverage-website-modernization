@@ -7,6 +7,14 @@
      Brazil flag as Carlos rather than rendering a broken image. --}}
 @php
   use App\Support\MediaLibrary;
+  use App\Support\ResponsiveImage;
+
+  // Each card is a fixed 220px wide and the photo is painted at 220x265 with object-fit:
+  // cover, at every breakpoint. The originals are 771x1024 PNGs of 200-665KB each, and all
+  // five were being served untouched — 2.48MB of the single post's 3.06MB of images.
+  $photoSizes = '220px';
+  // The flag sits in a 24px circle. `thumbnail` (150px) is the smallest registered size.
+  $flagSizes = '24px';
 
   $talent = [
     ['name' => 'Carlos M.',   'role' => 'Social Media Assistant',     'photo' => 'Carlos-M-1.png',  'flag' => 'brazil-1.png'],
@@ -29,17 +37,17 @@
   <div class="rl-talent-carousel">
     <div class="rl-swiper-talent" data-rl-carousel-track>
       @foreach ($talent as $person)
-        @php($photo = MediaLibrary::url($person['photo']))
+        @php($photo = ResponsiveImage::attributes(MediaLibrary::id($person['photo']), 'medium', $photoSizes, '', ['medium', 'medium_large']))
         <div class="rl-article-talent-card" data-rl-carousel-card>
           @if ($photo)
-            <img src="{{ $photo }}" class="rl-talent-image" alt="{{ $person['name'] }}" loading="lazy" />
+            <img {!! $photo !!} class="rl-talent-image" alt="{{ $person['name'] }}" loading="lazy" decoding="async" />
           @endif
 
           <div class="rl-talent-info-banner">
-            @php($flag = MediaLibrary::url($person['flag']))
+            @php($flag = ResponsiveImage::attributes(MediaLibrary::id($person['flag']), 'thumbnail', $flagSizes, '', ['thumbnail']))
             @if ($flag)
               <div class="rl-talent-flag">
-                <img src="{{ $flag }}" class="rl-talent-country" alt="" loading="lazy" />
+                <img {!! $flag !!} class="rl-talent-country" alt="" loading="lazy" decoding="async" />
               </div>
             @endif
 

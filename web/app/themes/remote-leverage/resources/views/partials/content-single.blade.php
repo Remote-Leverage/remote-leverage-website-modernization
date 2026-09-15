@@ -9,6 +9,7 @@
 @php
   use App\Support\DocumentOutline;
   use App\Support\ReadingTime;
+  use App\Support\ResponsiveImage;
 
   $postId = get_the_ID();
 
@@ -27,10 +28,24 @@
 
   $categories = get_the_category();
   $faqs = get_post_meta($postId, 'rl_faqs', true) ?: [];
-  $thumbnail = get_the_post_thumbnail_url($postId, 'full');
+
+  // The hero image is `flex: 0 0 35%` of a 1340px inner from 900px up, and full width
+  // below it — so it is never painted wider than 469px. It used to be requested at `full`
+  // (1024px, a 516KB PNG) at every viewport, and it is the LCP element.
+  $thumbnailId = get_post_thumbnail_id($postId) ?: null;
+  $thumbnail = $thumbnailId
+    ? ResponsiveImage::attributes($thumbnailId, 'large', '(min-width: 900px) 469px, calc(100vw - 40px)')
+    : '';
 
   $authorId = (int) get_the_author_meta('ID');
   $authorAvatar = get_the_author_meta('rl_avatar', $authorId);
+  // Stored in user meta as a bare URL (and on some installs with an `http://` scheme,
+  // which is the single post's mixed-content warning). Painted at 44px in the header and
+  // 100px in the bio card, so `thumbnail` (150px) is already generous.
+  $authorAvatarId = ResponsiveImage::idFromUrl((string) $authorAvatar);
+  $authorAvatarAttrs = fn (int $box): string => ResponsiveImage::attributes(
+      $authorAvatarId, 'thumbnail', $box.'px', (string) $authorAvatar, ['thumbnail', 'medium'],
+  );
   $authorBio = get_the_author_meta('description', $authorId);
 @endphp
 
@@ -41,7 +56,7 @@
     <div class="rl-header-inner">
       @if ($thumbnail)
         <div class="rl-header-left">
-          <img class="rl-header-featured-image" src="{{ $thumbnail }}" alt="{{ the_title_attribute(['echo' => false]) }}" fetchpriority="high" />
+          <img class="rl-header-featured-image" {!! $thumbnail !!} alt="{{ the_title_attribute(['echo' => false]) }}" fetchpriority="high" decoding="async" />
         </div>
       @endif
 
@@ -57,7 +72,7 @@
         <div class="rl-header-meta">
           <div class="rl-header-meta-item rl-header-author">
             @if ($authorAvatar)
-              <img class="rl-author-avatar" src="{{ $authorAvatar }}" alt="{{ get_the_author() }}" />
+              <img class="rl-author-avatar" {!! $authorAvatarAttrs(44) !!} alt="{{ get_the_author() }}" decoding="async" />
             @endif
             <div class="rl-meta-details">
               <span class="rl-meta-label">{{ __('Written by:', 'remote-leverage') }}</span>
@@ -169,7 +184,7 @@
         <div class="rl-author-bio-card">
           @if ($authorAvatar)
             <div class="rl-author-avatar">
-              <img src="{{ $authorAvatar }}" alt="{{ get_the_author() }}" loading="lazy" />
+              <img {!! $authorAvatarAttrs(100) !!} alt="{{ get_the_author() }}" loading="lazy" decoding="async" />
             </div>
           @endif
 

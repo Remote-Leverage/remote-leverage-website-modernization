@@ -457,10 +457,43 @@ Two deliberate divergences from production, **both approved 2026-09-15**:
    production today, and in v2. If that is not intended, the fix is auth or unpublishing, not
    robots meta.
 2. **The roles section on `/stealing-jobs/` and `/stealing-jobs-lp/` repeats "Customer Support"
-   as its fifth card** (same title, same chips). `/steal-back-your-time/` has a real fifth role
-   there. Reproduced as-is; looks like a production content bug worth fixing on the live pages.
-3. **`/hire-va-isolated-form/` canonicals to the homepage** and `/vastore5/` has no canonical.
-   Mirrored rather than silently "fixed".
+   as its fifth card** (same title, same chips), so production's roles grid shows one role twice
+   and never names the catch-all. — **fixed in v2 2026-09-15, still broken on production.** Both
+   now carry the "And More" card (data entry, bookkeeping, project tracking, HR support) that
+   `/steal-back-your-time/` already has: same template, same section, so this is production's own
+   content for that slot rather than anything invented. **v2 and production deliberately differ
+   here until production is corrected.**
+3. **Canonicals pointing at the homepage** — **fixed in v2 2026-09-15, still wrong on production.**
+   Production serves both `/hire-va-isolated-form/` and `/hire-va/` with
+   `<link rel="canonical" href="https://remoteleverage.com">`, telling search engines both pages
+   are duplicates of the homepage. `content:import-seo` had already carried that onto v2 pages
+   1000053 and 1000066 as `_yoast_wpseo_canonical`, rewritten onto the v2 origin. Both deleted,
+   and the whole page set swept for others — none remain. `/vastore5/` has no canonical on either
+   side, which is correct for a noindex page.
+
+   **Related and still open:** v2 currently emits **no canonical on any page at all** — verified
+   on `/`, `/about-us/`, `/comparison/` and `/blog/` — even though `wordpress-seo` is active. So
+   the bad values were latent rather than live. Whatever is suppressing Yoast's front-end output
+   needs finding before launch, at which point any remaining imported canonical starts applying.
+
+#### Theme-wide fixes made alongside P4 (2026-09-15)
+
+- **Font weights brought inside the rule.** The page-migration skill caps weight at bold (700),
+  never `font-extrabold` or `font-black`. 18 violations were live across 12 files — including the
+  homepage hero CTA and its +2500 / +50 / economic-impact figures, `404.blade.php`,
+  `results-preview`, `trust-stats`, `cta-banner`, `talent-carousel`, the booking wizard, the
+  referrer portal and the site header. All now `font-bold`.
+- **`acf/media-copy`'s dark tone no longer renders invisible text.** The block computed a
+  tone-aware colour and then hard-coded `text-black` on the body wrapper, so choosing
+  `tone: dark` in wp-admin produced black copy on a dark band with no warning. No page had
+  selected it, so nothing visible changed — it stops the next person falling in.
+- **Booking form, every instance:** first/last name are always paired on one row (the glass skin
+  always did; the other skins only did when a `compactFields` flag was set), and the avatar card
+  and three-step progress rail are hidden by default site-wide.
+- **Booking form, page-bottom blocks only** (`acf/booking`, `acf/booking-footer`): the revenue
+  question leads, as a vertical radio list. Hero forms keep their progressive email-first reveal.
+  Submit label changed from "Next: Pick a Date" to "Book a Consultation"; the glass skin's
+  hard-coded "Book a Call" was deliberately left alone.
 
 #### Known gaps, all block-level and pre-existing (not introduced by P4)
 

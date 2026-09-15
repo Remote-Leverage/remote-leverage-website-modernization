@@ -40,14 +40,15 @@ Both destinations receive the same DTO. `RecordBehaviorEventAction` is the only 
 | `CustomerIOClient` | `identify()`, `track()` |
 | `HandleLeadCreatedForTracking` | Listener — identifies the person on both platforms the moment a lead is captured |
 | `AnalyticsEventData`, `UserProfileData` | The DTOs |
-| `TrackingHooks` (`app/Infrastructure/WordPress/Hooks`) | Injects the PostHog snippet in `<head>` and the Customer.io snippet in the footer |
+| `TrackingHooks` (`app/Infrastructure/WordPress/Hooks`) | Injects the PostHog snippet in `<head>` and the Customer.io **CDP** snippet (`window.cioanalytics`) in the footer |
 
 ## Configuration
 
 | Variable | Used by |
 | :--- | :--- |
 | `POSTHOG_API_KEY`, `POSTHOG_HOST` | `PostHogClient`, front-end snippet |
-| `CUSTOMERIO_SITE_ID`, `CUSTOMERIO_API_KEY`, `CUSTOMERIO_APP_API_KEY` | `CustomerIOClient` |
+| `CUSTOMERIO_SITE_ID`, `CUSTOMERIO_API_KEY`, `CUSTOMERIO_APP_API_KEY` | `CustomerIOClient` (Track API v1, server side) |
+| `CUSTOMERIO_CDP_WRITE_KEY` | The browser `cioanalytics` snippet only. A **different credential** from the site id above — CDP source write key vs Track API site id. Blank -> no snippet is emitted. |
 
 GTM, LinkedIn Insight and Meta Pixel are **not** injected by this domain. Google Site Kit is installed (`wp-plugin/google-site-kit`) and ships the GTM `<head>` snippet and `wp_body_open` noscript once a container is connected; LinkedIn and Meta are added as tags inside that container. This was a deliberate rescope of WR-99 from code to configuration — the remaining work is admin setup, not engineering.
 
@@ -58,11 +59,13 @@ GTM, LinkedIn Insight and Meta Pixel are **not** injected by this domain. Google
 Browser console on any front-end page:
 
 ```js
-window.posthog   // initialised PostHog client
-window._cio      // Customer.io tracking array
+window.posthog          // initialised PostHog client
+window.cioanalytics     // Customer.io CDP analytics array (`_writeKey` names the source)
 ```
 
-Network tab, filtered to `posthog` or `customer.io`: calls to `/e/` and `/api/v1/customers/` should fire with a distinct ID.
+`window.cioanalytics` is an array that gains a queued entry per call until `analytics.min.js` replaces it; `typeof window.cioanalytics.track === 'function'` is the check that matters. `window._cio` (the classic tracker) is **no longer injected** as of 2026-09-15 — if it is defined, something else on the page put it there, most likely a GTM tag.
+
+Network tab, filtered to `posthog` or `customer.io`: PostHog `/e/`, the CDP bundle at `cdp.customer.io/v1/analytics-js/snippet/<write key>/analytics.min.js`, and server-side `/api/v1/customers/` calls from `CustomerIOClient`.
 
 ## Tests
 
