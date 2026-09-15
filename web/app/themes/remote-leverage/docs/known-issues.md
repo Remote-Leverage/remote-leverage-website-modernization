@@ -301,30 +301,56 @@ Worked around in the affected patterns by entity-encoding the characters texturi
 it never decodes entities, and never touches text inside a tag. Reach for that on any page
 whose copy must match a system of record exactly.
 
-### 17. Canonical output cannot be observed in any environment we control — **verify right after the DNS flip**
+### 17. No canonical or robots output on dev/staging — expected behaviour, **proven, not a gate**
 
 `<link rel="canonical">` is absent from every local page — `/`, `/about-us/`, `/comparison/`,
-`/blog/` and the whole P4 set. **This is correct behaviour, not a defect.** Traced 2026-09-15
-after it was first mis-filed here as "Yoast emits no canonicals":
+`/blog/` and the whole P4 set. **This is correct behaviour, not a defect, and not a verification
+gap.** It was mis-filed here twice before being proven: first as "Yoast emits no canonicals" (a
+blocker), then as "unobservable in any environment we control" (a cutover risk). Both wrong.
+
+**The reproduction.** Set `Config::define('DISALLOW_INDEXING', false)` in
+`config/environments/development.php` and reload any page:
+
+```html
+<meta name='robots' content='index, follow, max-image-preview:large, …' />
+<link rel="canonical" href="https://remoteleverage-v2.test/about-us/" />
+```
+
+Restore the constant and both disappear again. Canonicals render the moment indexing is allowed,
+the stored data is correct, and production — where the constant is undefined — will emit them.
+
+**Two dead ends, recorded so nobody repeats them:**
+
+1. Flipping the `blog_public` **option** cannot work. `pre_option_blog_public` intercepts every
+   read, so `update_option` changes the raw row and `get_option` still returns `0`.
+2. `remove_action('pre_option_blog_public', '__return_zero')` at runtime in a `wp eval` also
+   fails — Yoast evaluates indexability at load time, before the filter can be lifted. Deleting
+   the indexable and forcing a rebuild does not help either.
+
+Only the **constant** reaches it, because the mu-plugin's guard short-circuits before the filter
+is ever registered:
+
+```php
+if (! defined('DISALLOW_INDEXING') || DISALLOW_INDEXING !== true) {
+    return;
+}
+add_action('pre_option_blog_public', '__return_zero');
+```
+
+Why the absence looks alarming and isn't:
 
 1. The values **are** stored and were rewritten onto the right origin — `about-us` (209) holds
    `_yoast_wpseo_canonical = https://remoteleverage-v2.test/about-us/`.
 2. **Yoast withholds the canonical on any noindex URL.** That is why the import wrote 180
    canonicals for 190 items.
-3. The noindex is forced by `web/app/mu-plugins/bedrock-disallow-indexing`, which does
-   `add_action('pre_option_blog_public', '__return_zero')` gated on `DISALLOW_INDEXING`. That
-   constant is `true` in `config/environments/development.php:17` **and `staging.php:17`**, and
-   **absent from production**.
-4. The raw database value of `blog_public` is `1`. Flipping the option and recomputing proves
-   nothing — the filter intercepts every read, so that test cannot work.
+3. The noindex is forced by the mu-plugin guard above. `DISALLOW_INDEXING` is `true` in
+   `config/environments/development.php:17` **and `staging.php:17`**, and **absent from
+   production** — so the raw `blog_public` value of `1` is never what `get_option` returns on
+   dev or staging, and always is on production.
 
-On production the constant is undefined, the filter is never added, `blog_public` reads its real
-`1`, and Yoast emits canonicals. Same family as #3 and #4: locally unobservable, correct in
-production.
-
-**The real gap is verification, not behaviour.** Because staging sets `DISALLOW_INDEXING` too,
-the first place canonical output can be seen at all is production. Check it immediately after the
-DNS flip — there is no earlier opportunity.
+Same family as #3 and #4: locally unobservable, correct in production. Nothing to do before the
+flip. A post-flip spot-check costs nothing, but this is not a gate — **#18 is the one that needs
+a real data check**, and it is about imported destinations rather than rendering.
 
 ### 18. Two imported canonicals pointed at the homepage — fixed in v2, still wrong on production
 

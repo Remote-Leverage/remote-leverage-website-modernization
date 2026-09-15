@@ -297,6 +297,52 @@ changes.
 If `CaptureLeadAction` throws, the error is logged and the PDF is served anyway. The visitor kept
 their side of the bargain, and the booking wizard treats a failed partial capture the same way.
 
+### 28. The canonical sweep happens **after** the DNS flip, not before
+All 180 imported canonicals were written while nothing rendered them, so a wrong destination was
+invisible — two (`/hire-va/` and `/hire-va-isolated-form/`, both canonicalised at the homepage on
+production) were caught by accident rather than by looking.
+
+**Decision: sweep after cutover, on real rendered output, rather than against stored postmeta
+now.** The trade is understood and deliberate: any remaining bad canonical is live and indexable
+for the length of the gap. Accepted because rendered output is the thing that actually matters
+and post-flip data is real rather than simulated. **This is a scheduled task, not a closed one —
+see the post-cutover checklist below.**
+
+### 29. The blog image size gap is left open
+No registered size sits between 226px and 768px, so a 220px card at 2x requests 577px and is
+served a 768px file (30–61KB WebP each). Closing it needs `add_image_size` plus
+`wp media regenerate` across 119 posts — a media migration, not a template change.
+
+**Decision: leave it.** The win is already banked (a single post went 3.27MB → 0.59MB, 79 → 99
+mobile). The remaining few tens of KB per card on retina screens does not justify rewriting the
+uploads directory.
+
+### 30. The `filterContentImgTag` srcset fix ships unmeasured
+It rewrote only `src`, but a matching `srcset` candidate always outranks `src` — so for any
+content image with a srcset the WebP was **never** requested. Fixed, but neither measured post
+has in-content images, so the fix was reasoned about rather than observed.
+
+**Decision: accept the reasoning.** The mechanism is not ambiguous. Recorded here because it is
+the one unverified claim in the image work, and a post with in-content images would settle it in
+minutes if anyone wants it later.
+
+---
+
+## Post-cutover checklist
+
+Things deliberately deferred to after the DNS flip, because they cannot be answered — or are not
+worth answering — beforehand. **These are scheduled, not closed.**
+
+| # | Do this right after the flip | Why it waited |
+| :--- | :--- | :--- |
+| 1 | **Confirm canonicals render** on a handful of pages | Suppressed on dev and staging by `DISALLOW_INDEXING`; proven correct locally by flipping the constant, but production is the first place it is true in normal operation (§17 of known-issues) |
+| 2 | **Sweep all 180 canonical destinations** for any pointing somewhere other than themselves | Decision 28. Two known-bad were fixed; the rest were never observable |
+| 3 | **Confirm both webhook endpoints return 200, not 503** | They fail closed; staging returns 503 today because the secrets are unset |
+| 4 | **Take the real performance baseline** | Local numbers are a floor — no CDN, no page cache, self-signed cert. The Phase 8 gate asks for staging/production |
+| 5 | **Verify transactional email actually sends** | Every `MAIL_*` value is currently empty |
+| 6 | **Confirm Sentry is receiving events** | DSN unset; "errors reported" is a cutover gate |
+| 7 | **Check production does *not* emit `noindex`** | The inverse of the dev/staging check — `DISALLOW_INDEXING` must be absent there |
+
 ---
 
 ## Still open — not decisions, but things only other people can supply
