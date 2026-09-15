@@ -145,33 +145,44 @@ $h2Style = 'letter-spacing:-0.03em;line-height:1.08';
            .rl-trust-headline 42px/48px 700, centred below 1500px and left-aligned at/above it
            section padding 86px top and bottom
 
-         The CTA is emitted twice for the same reason production does it: at/above 1500px it sits
-         inside the right-hand column under the headline, below it, it sits after the cards. One
+         DELIBERATE DIVERGENCE (approved 2026-09-15): we switch to the two-column row at
+         **1280px**, not production's 1500px. Production stacks this band on any window below
+         1500, which includes the common 1440px laptop — it was reported as "this should be two
+         columns on desktop", and matching production exactly would have re-shipped that. The
+         20% gap is production's and is only wide enough to work above 1500, so 1280–1499 uses a
+         flat 64px gap instead; at 1500+ the band is pixel-identical to production.
+
+         The CTA is emitted twice for the same reason production does it: in the two-column row it
+         sits inside the right-hand column under the headline, stacked it sits after the cards. One
          copy is hidden at each breakpoint rather than reordered, because the two positions are on
          opposite sides of the cards column. */ ?>
 <!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"5.375rem","bottom":"5.375rem"}}},"backgroundColor":"bg-map","layout":{"type":"constrained","contentSize":"1320px"}} -->
 <div class="wp-block-group alignfull has-bg-map-background-color has-background" style="padding-top:5.375rem;padding-bottom:5.375rem">
     <!-- wp:group {"className":"rl-trust-split"} -->
-    <div class="wp-block-group rl-trust-split mx-auto flex w-full max-w-[1320px] flex-col-reverse items-center gap-[60px] min-[1500px]:flex-row min-[1500px]:items-center min-[1500px]:gap-[20%]">
+    <?php /* px-5 below 1500 only: the row is max-w-1320, so at a 1280 viewport it would otherwise
+             sit flush against both screen edges with no gutter. At 1500+ the viewport is wide
+             enough that max-w-1320 creates the gutter on its own, and zero padding there keeps
+             the band pixel-identical to production. */ ?>
+    <div class="wp-block-group rl-trust-split mx-auto flex w-full max-w-[1320px] flex-col-reverse items-center gap-[60px] max-[1499px]:px-6 min-[1280px]:flex-row min-[1280px]:items-center min-[1280px]:gap-[64px] min-[1500px]:gap-[20%]">
 
         <!-- wp:group {"className":"rl-trust-split__cards"} -->
-        <div class="wp-block-group rl-trust-split__cards w-full max-w-[440px] min-[1500px]:max-w-[500px] min-[1500px]:shrink-0">
+        <div class="wp-block-group rl-trust-split__cards w-full max-w-[440px] min-[1280px]:max-w-[500px] min-[1280px]:shrink-0">
             <?= BlockDefaults::renderTrustStats() ?>
         </div>
         <!-- /wp:group -->
 
         <!-- wp:group {"className":"rl-trust-split__content"} -->
-        <div class="wp-block-group rl-trust-split__content w-full max-w-[440px] min-[1500px]:shrink-0">
+        <div class="wp-block-group rl-trust-split__content w-full max-w-[440px] min-[1280px]:shrink-0">
             <!-- wp:html -->
-            <div class="mb-4 flex justify-center gap-1 text-star-purple min-[1500px]:justify-start" role="img" aria-label="5 out of 5 stars">
+            <div class="mb-4 flex justify-center gap-1 text-star-purple min-[1280px]:justify-start" role="img" aria-label="5 out of 5 stars">
                 <?php for ($i = 0; $i < 5; $i++) { ?>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                 <?php } ?>
             </div>
             <!-- /wp:html -->
 
-            <!-- wp:heading {"level":2,"className":"text-center min-[1500px]:text-left","style":{"typography":{"fontSize":"42px","lineHeight":"1.14","letterSpacing":"-0.02em"}}} -->
-            <h2 class="wp-block-heading text-center min-[1500px]:text-left" style="font-size:42px;letter-spacing:-0.02em;line-height:1.14">
+            <!-- wp:heading {"level":2,"className":"text-center min-[1280px]:text-left","style":{"typography":{"fontSize":"42px","lineHeight":"1.14","letterSpacing":"-0.02em"}}} -->
+            <h2 class="wp-block-heading text-center min-[1280px]:text-left" style="font-size:42px;letter-spacing:-0.02em;line-height:1.14">
                 We've helped more than 2,000 businesses hire exceptional talent from Latin America, the Caribbean, and Europe.
             </h2>
             <!-- /wp:heading -->
@@ -179,7 +190,7 @@ $h2Style = 'letter-spacing:-0.03em;line-height:1.08';
             <?php /* The pill style is defined as `.wp-block-button.is-style-pill-purple > a`, so the
                      class has to sit on the wrapper, not the anchor. */ ?>
             <!-- wp:html -->
-            <div class="mt-[45px] hidden min-[1500px]:block">
+            <div class="mt-[45px] hidden min-[1280px]:block">
                 <div class="wp-block-buttons">
                     <div class="wp-block-button is-style-pill-purple"><a class="wp-block-button__link wp-element-button" href="#testimonials">Watch Client Testimonials</a></div>
                 </div>
@@ -191,8 +202,8 @@ $h2Style = 'letter-spacing:-0.03em;line-height:1.08';
     </div>
     <!-- /wp:group -->
 
-    <!-- wp:group {"className":"min-[1500px]:hidden"} -->
-    <div class="wp-block-group min-[1500px]:hidden">
+    <!-- wp:group {"className":"min-[1280px]:hidden"} -->
+    <div class="wp-block-group min-[1280px]:hidden">
         <!-- wp:buttons {"layout":{"type":"flex","justifyContent":"center"},"style":{"spacing":{"margin":{"top":"2.5rem"}}}} -->
         <div class="wp-block-buttons" style="margin-top:2.5rem">
             <!-- wp:button {"className":"is-style-pill-purple"} -->

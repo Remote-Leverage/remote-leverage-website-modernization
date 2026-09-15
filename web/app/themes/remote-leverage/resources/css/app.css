@@ -1251,6 +1251,24 @@
    Gutenberg Core Block Styles & Overrides (Using Design Tokens)
    ========================================================================== */
 
+/* Core's text-alignment classes.
+   The theme dequeues wp-block-library, which is what normally ships these, so until
+   2026-09-15 `has-text-align-center` was a no-op everywhere — 29 uses across 7 pattern
+   files, resolving to nothing in every built stylesheet. The homepage happened to look
+   right because a parent centres it; the four comparison pages did not, and their
+   multi-line headings rendered left-ragged inside a centred block. */
+.has-text-align-center {
+  text-align: center;
+}
+
+.has-text-align-left {
+  text-align: left;
+}
+
+.has-text-align-right {
+  text-align: right;
+}
+
 .wp-block-buttons {
   display: flex;
   flex-wrap: wrap;

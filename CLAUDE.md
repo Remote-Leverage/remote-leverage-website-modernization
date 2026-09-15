@@ -84,11 +84,16 @@ vendor/bin/pest        # theme test suite
 vendor/bin/pint --test # formatting gate; drop --test to fix
 ```
 
-**Do not format the theme with the repo-root Pint.** There are two Pint configurations and
-they disagree: the root `pint.json` uses the `per` preset, the theme's uses `laravel`. CI only
-runs the theme's. Running the root binary over the theme reformats it into a state CI rejects —
-that is how staging broke on 2026-09-15. The root config now excludes the theme so the two
-cannot fight, but always format the theme from the theme directory.
+**Both Pint configs use the `laravel` preset** — unified on 2026-09-15. They previously
+disagreed (root `per`, theme `laravel`), which meant running the root binary over the theme
+reformatted it into a state CI rejects; that is how staging broke on 2026-09-15. The root
+`pint.json` was switched to `laravel` rather than the theme to `per`, because the root governs
+10 PHP files and the theme 562.
+
+There is now one standard, and `vendor/bin/pint --test` from either directory agrees on every
+file. Still run the theme's from the theme directory as a habit — that is what CI runs
+(`.github/workflows/ci.yml`, `working-directory: web/app/themes/remote-leverage`) — and the
+root config still excludes the theme so the two never double-format the same file.
 
 Tailwind scans `patterns/`, `resources/patterns/`, `app/`, and `resources/**/*.blade.php`
 (see `@source` in `resources/css/app.css`). A class in a file outside those globs will not exist

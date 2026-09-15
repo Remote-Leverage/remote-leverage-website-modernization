@@ -258,6 +258,24 @@ Compare loosely, or coerce (`filter_var($v, FILTER_VALIDATE_BOOLEAN)`), and keep
 distinct from `false` when an unset field is supposed to mean "on". Fixed for that block; the
 pattern is worth checking wherever a block reads a boolean.
 
+### ~~14. Two Pint configurations enforced two different standards~~ — ✅ **FIXED 2026-09-15**
+
+The repo-root `pint.json` used the `per` preset while the theme's used `laravel`, so the same
+file could pass one and fail the other. Pointing the root binary at theme paths reformatted
+them into a state CI rejects (CI runs the theme's, from the theme directory) — that is how
+staging broke on 2026-09-15, and the root config's theme exclusion was the mitigation.
+
+The root is now `laravel` too. The direction mattered: the root governs **10** PHP files and
+the theme **562**, so unifying the other way would have rewritten the entire theme. Five
+non-theme files were reformatted once (`config/application.php`,
+`config/environments/staging.php`, `web/wp-config.php`, `web/app/mu-plugins/bedrock-autoloader.php`,
+`web/index.php`) and verified to still boot WordPress and serve pages. A pre-existing `per`-only
+failure in `rl-sync-body-auth.php` resolved itself in the process.
+
+Verified by running the **root** binary across all 562 theme files: it now passes, so the two
+configs genuinely agree rather than merely avoiding each other. The exclusion stays so one
+file has one owner.
+
 ## ~~Dead configuration~~ — ✅ **FIXED 2026-09-15**
 
 Eight keys were listed here as read by nothing. **Seven were; the eighth was not.**

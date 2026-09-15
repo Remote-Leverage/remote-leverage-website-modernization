@@ -65,7 +65,10 @@ return [
     'form-lp2' => '',
     'global-talent' => '',
     'guaranteed-fit' => '',
-    'hire-va' => '',
+    // 'hire-va' was listed here as a killed homepage clone. It is not one: production page 38574
+    // serves the "Virtual Assistant Roles" landing template (same as /hire-va-isolated-form/),
+    // not the homepage. The client reopened scope for it on 2026-09-15 and it is now built at
+    // patterns/hire-va.php, so the key is removed — leaving it would 301 the live page to /.
     'hire-va-2' => '',
     'hire-va-3' => '',
     'hire-va-t' => '',

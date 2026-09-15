@@ -412,10 +412,20 @@ Two mechanisms were added centrally rather than per page, both documented in
 - **Per-page `noindex`.** `App\Support\PageRobots` on the `wp_robots` filter, driven by an
   `rl:noindex` marker. See decision 1 below.
 
-One deliberate divergence from production, **open for a call**: the trust band keeps production's
-1500px breakpoint (exact parity, still stacks at 1440), but the `va-roles-landing` hero uses 1280px
-instead, because production at 1440 is genuinely broken — the booking card overflows off-screen to
-an unreadable sliver. Reproducing that faithfully would have re-shipped the complaint.
+Two deliberate divergences from production, **both approved 2026-09-15**:
+
+- **Trust band goes two-column at 1280px, not production's 1500px.** Production stacks this band
+  on any window below 1500, which includes the common 1440px laptop — that is what was reported as
+  "this should be two columns on desktop", so matching production exactly would have re-shipped the
+  complaint. Production's 20% gap only works above 1500, so 1280–1499 uses a flat 64px gap and a
+  24px side gutter (the row is `max-w-1320`, so at a 1280 viewport it would otherwise sit flush
+  against both screen edges). At 1500+ the band is pixel-identical to production — verified: cards
+  at x=96, copy column at x=860, unchanged from the parity build.
+- **The `va-roles-landing` hero booking card renders from 1280px up.** Production collapses it to
+  **zero width below ~1500px**, so on a 1440 laptop the page's entire conversion mechanism is
+  invisible. That reads as an Elementor layout bug rather than a design decision — it is also what
+  made an earlier audit mistake the card for an off-canvas popup. Our card is 472px against
+  production's 412px where production renders it at all; keeping 472px was an explicit call.
 
 #### Decisions this raised
 
@@ -455,10 +465,13 @@ an unreadable sliver. Reproducing that faithfully would have re-shipped the comp
 - `acf/accordion-faq` hard-renders two columns and unconditionally emits Schema.org `FAQPage`.
   Two pages needed a single-column accordion and inlined it, losing the structured data.
   A `columns` + `schema` option would let both fold back into the block.
-- `has-text-align-center` has **no CSS anywhere in the theme** (0 hits in every built
-  stylesheet) yet appears 29 times across 7 pattern files. The homepage is unaffected (a parent
-  centres it); the four comparison pages compute `text-align: start`, so multi-line headings go
-  left-ragged inside a centred block. One-line fix in `app.css`.
+- ~~`has-text-align-center` has **no CSS anywhere in the theme**~~ — ✅ **FIXED 2026-09-15.**
+  The class appeared 29 times across 7 pattern files and resolved to nothing in every built
+  stylesheet, because the theme dequeues `wp-block-library`, which is what normally ships it.
+  The homepage looked right anyway (a parent centres it); the four comparison pages computed
+  `text-align: start`. `.has-text-align-center/-left/-right` are now declared in `app.css`
+  alongside the other core-block overrides — verified: `/comparison/` headings now compute
+  `center` where they computed `start`.
 
 ---
 
