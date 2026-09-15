@@ -186,6 +186,23 @@ Config::define('DISALLOW_FILE_EDIT', true);
 // Disable plugin and theme updates and installation from the admin
 Config::define('DISALLOW_FILE_MODS', true);
 
+/**
+ * MCP Adapter autoloading.
+ *
+ * The plugin is installed from VCS and relocated here by composer/installers,
+ * so it has no nested vendor/ of its own — its Autoloader looks for
+ * WP_MCP_DIR/vendor/autoload_packages.php, never finds it, and bails before
+ * Plugin::instance() ever runs. That is silent except for an admin notice,
+ * and it takes the whole MCP server down with it.
+ *
+ * Bedrock's root autoloader already maps everything the plugin needs
+ * (WP\MCP\ -> web/app/plugins/mcp-adapter/includes and WP\McpSchema\ ->
+ * vendor/wordpress/php-mcp-schema/src), so this constant — the plugin's own
+ * documented escape hatch — tells it to trust the ambient autoloader instead
+ * of hunting for its own.
+ */
+Config::define('WP_MCP_AUTOLOAD', false);
+
 // Limit the number of post revisions
 Config::define('WP_POST_REVISIONS', env('WP_POST_REVISIONS') ?? true);
 
