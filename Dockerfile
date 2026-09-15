@@ -11,12 +11,21 @@ RUN npm run build
 
 FROM php:8.4-fpm-bookworm AS php-base
 
+# imagick is version-pinned deliberately. The long-standing stable, 3.7.0,
+# predates PHP 8.4 by three years and is widely reported not to build against
+# it; modern PHP support arrived in the 3.8 line, whose latest release notes
+# cover compiling against 8.5. Pinning also keeps a future bad release from
+# failing the whole deploy, since this stage is shared by build and runtime.
+# libmagickwand-dev is its build dependency and stays for the shared libraries.
+# The piped newline answers imagick's "prefix of ImageMagick installation"
+# prompt with its own default; without it the build can stall waiting on stdin.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       curl \
       git \
       libfreetype6-dev \
       libicu-dev \
       libjpeg62-turbo-dev \
+      libmagickwand-dev \
       libonig-dev \
       libpng-dev \
       libwebp-dev \
@@ -36,7 +45,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       soap \
       zip \
     && pecl install redis \
-    && docker-php-ext-enable redis \
+    && printf "\n" | pecl install imagick-3.8.1 \
+    && docker-php-ext-enable redis imagick \
     && rm -rf /tmp/pear /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
