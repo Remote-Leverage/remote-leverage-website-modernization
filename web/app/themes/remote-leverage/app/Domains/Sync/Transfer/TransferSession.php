@@ -27,6 +27,7 @@ final class TransferSession
     /**
      * @param  array<string, array<string, int>>  $counters
      * @param  array<int, int>  $attachmentMap
+     * @param  array<int, string>  $cleaned
      */
     public function __construct(
         public readonly string $id,
@@ -37,7 +38,28 @@ final class TransferSession
         public ?string $error = null,
         public readonly int $createdAt = 0,
         public int $updatedAt = 0,
+        public array $cleaned = [],
     ) {}
+
+    /**
+     * Whether this dataset has already been emptied on the target.
+     *
+     * A chunk is redelivered verbatim after a dropped connection, so the clean
+     * that precedes the first one has to be guarded by state that outlives the
+     * request. Without this, a retry part-way through a transfer would delete
+     * everything the earlier chunks had just imported.
+     */
+    public function hasCleaned(string $dataset): bool
+    {
+        return in_array($dataset, $this->cleaned, true);
+    }
+
+    public function markCleaned(string $dataset): void
+    {
+        if (! $this->hasCleaned($dataset)) {
+            $this->cleaned[] = $dataset;
+        }
+    }
 
     public function recordRows(string $dataset, string $kind, int $count): void
     {
@@ -93,6 +115,7 @@ final class TransferSession
             'counters' => $this->counters,
             'total_rows' => $this->totalRows(),
             'remapped_attachments' => count($this->attachmentMap),
+            'cleaned' => $this->cleaned,
             'error' => $this->error,
             'created_at' => $this->createdAt,
             'updated_at' => $this->updatedAt,
@@ -110,6 +133,7 @@ final class TransferSession
             'state' => $this->state,
             'counters' => $this->counters,
             'attachment_map' => $this->attachmentMap,
+            'cleaned' => $this->cleaned,
             'error' => $this->error,
             'created_at' => $this->createdAt,
             'updated_at' => $this->updatedAt,
@@ -130,6 +154,7 @@ final class TransferSession
             error: isset($data['error']) ? (string) $data['error'] : null,
             createdAt: (int) ($data['created_at'] ?? 0),
             updatedAt: (int) ($data['updated_at'] ?? 0),
+            cleaned: array_values(array_filter((array) ($data['cleaned'] ?? []), 'is_string')),
         );
     }
 }

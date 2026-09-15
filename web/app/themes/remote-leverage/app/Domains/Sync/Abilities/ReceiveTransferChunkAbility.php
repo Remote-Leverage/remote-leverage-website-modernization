@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Sync\Abilities;
 
 use App\Domains\Sync\Transfer\Import\ContentImporter;
+use App\Domains\Sync\Transfer\Import\DatasetCleaner;
 use App\Domains\Sync\Transfer\SessionStore;
 use App\Domains\Sync\Transfer\TransferSession;
 use App\Domains\Sync\Transfer\UndoLogFactory;
@@ -26,6 +27,7 @@ class ReceiveTransferChunkAbility extends TransferAbility
     public function __construct(
         private readonly SessionStore $sessions,
         private readonly ContentImporter $importer,
+        private readonly DatasetCleaner $cleaner,
         private readonly UndoLogFactory $undoLogs,
     ) {}
 
@@ -58,6 +60,31 @@ class ReceiveTransferChunkAbility extends TransferAbility
         }
 
         $session->state = TransferSession::STATE_IMPORTING;
+        $undo = $this->undoLogs->for($session->id);
+
+        // Clean lazily, on the first chunk of each dataset, rather than when the
+        // session opens. Deleting only once rows are actually arriving means a
+        // transfer that fails before it sends anything leaves the target intact,
+        // and it keeps each request bounded — emptying every selected dataset up
+        // front is the single long request this design exists to avoid.
+        if ($session->manifest->shouldClean($dataset) && ! $session->hasCleaned($dataset)) {
+            try {
+                $removed = $this->cleaner->clean($session, $dataset, $undo);
+            } catch (Throwable $e) {
+                $session->fail($e->getMessage());
+                $this->sessions->save($session);
+
+                return ['ok' => false, 'error' => $e->getMessage(), 'session' => $session->toStatusArray()];
+            }
+
+            $session->markCleaned($dataset);
+            $session->recordRows($dataset, 'removed', $removed);
+
+            // Persisted before a single row is imported. If the import below
+            // dies and the chunk is redelivered, the retry must not clean a
+            // second time — by then the target holds rows this transfer wrote.
+            $this->sessions->save($session);
+        }
 
         try {
             $written = $this->importer->importBatch(
@@ -65,7 +92,7 @@ class ReceiveTransferChunkAbility extends TransferAbility
                 $dataset,
                 $this->rows($input, 'posts'),
                 $this->rows($input, 'meta'),
-                $this->undoLogs->for($session->id),
+                $undo,
             );
         } catch (Throwable $e) {
             $session->fail($e->getMessage());

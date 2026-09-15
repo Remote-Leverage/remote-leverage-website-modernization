@@ -82,6 +82,16 @@ class PushTransferCommand extends Command
 
         $sent = (array) ($result['sent'] ?? []);
 
+        $removed = (int) ($sent['removed'] ?? 0);
+
+        // Reported on its own line rather than folded into the summary: a clean
+        // is the only part of a push that destroys anything, and how much it
+        // destroyed is the number an operator needs before deciding whether the
+        // run did what they meant.
+        if ($removed > 0) {
+            $this->warn("Cleaned {$removed} existing rows off {$target} before importing.");
+        }
+
         $this->info(sprintf(
             'Done. Session %s — %d posts, %d meta, %d files, %d settings, %d undo entries.',
             $result['session_id'],
@@ -110,7 +120,18 @@ class PushTransferCommand extends Command
                 ? [count($exporter->settingsValues()), 'settings']
                 : [$exporter->count($manifest, $dataset), 'posts'];
 
-            $this->line(sprintf('  %-10s %d %s', $dataset, $count, $unit));
+            $this->line(sprintf('  %-10s %d %s%s', $dataset, $count, $unit,
+                $manifest->shouldClean($dataset) ? '  (target emptied first)' : ''));
+        }
+
+        // The row count on the far side is not knowable without calling it, so
+        // the dry run names what will be destroyed rather than quantifying it.
+        // Saying nothing would let --clean pass a dry run looking identical to a
+        // merge, which is the one difference the dry run exists to show.
+        if ($manifest->cleanBeforeImport !== []) {
+            $this->warn('Clean is on for '.implode(', ', $manifest->cleanBeforeImport)
+                .": every existing row in those datasets is deleted on {$target} before the import, "
+                .'including anything that exists only there.');
         }
 
         return self::SUCCESS;

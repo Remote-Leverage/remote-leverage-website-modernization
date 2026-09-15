@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Sync\Transfer\Export;
 
 use App\Domains\Sync\Datasets\DatasetRegistry;
+use App\Domains\Sync\Transfer\PostSelection;
 use App\Domains\Sync\Transfer\TransferManifest;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -21,17 +22,6 @@ use Illuminate\Support\Facades\DB;
  */
 class ContentExporter
 {
-    /**
-     * Post types never exported, whatever the manifest says.
-     *
-     * Revisions and auto-drafts are per-environment editing residue, and on this
-     * install they are the bulk of wp_posts — carrying them would multiply the
-     * transfer size for data the target has no use for.
-     *
-     * @var array<int, string>
-     */
-    private const ALWAYS_EXCLUDED_TYPES = ['revision', 'auto-draft'];
-
     public function __construct(private readonly DatasetRegistry $registry) {}
 
     /**
@@ -129,30 +119,6 @@ class ContentExporter
      */
     private function postQuery(TransferManifest $manifest, string $dataset): Builder
     {
-        $query = DB::table('posts')->whereNotIn('post_type', self::ALWAYS_EXCLUDED_TYPES);
-
-        // Settings are wp_options rows and own no posts at all. Without this the
-        // "everything that is not an attachment" branch below claims them, and a
-        // settings-only push silently ships the entire content set instead of
-        // seven option keys — the opposite of what the dataset promises.
-        if ($dataset === DatasetRegistry::SETTINGS) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        if ($dataset === DatasetRegistry::MEDIA) {
-            $query->where('post_type', '=', 'attachment');
-        } else {
-            $query->where('post_type', '!=', 'attachment');
-
-            if ($manifest->excludedPostTypes !== []) {
-                $query->whereNotIn('post_type', $manifest->excludedPostTypes);
-            }
-        }
-
-        if ($manifest->excludedPostIds !== []) {
-            $query->whereNotIn('ID', $manifest->excludedPostIds);
-        }
-
-        return $query;
+        return PostSelection::query($manifest, $dataset);
     }
 }

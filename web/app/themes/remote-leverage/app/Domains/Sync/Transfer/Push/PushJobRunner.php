@@ -135,7 +135,29 @@ class PushJobRunner
 
         $job->count('posts', count($posts));
         $job->count('meta', count($meta));
+        $job->counters['removed'] = $this->removedOnTarget($response);
         $job->cursor = (int) end($ids);
+    }
+
+    /**
+     * How many rows the target has deleted so far for this transfer.
+     *
+     * Assigned rather than accumulated: the target reports its own running
+     * total on every chunk, so adding them up would multiply one clean by the
+     * number of batches that followed it.
+     *
+     * @param  array<string, mixed>  $response
+     */
+    private function removedOnTarget(array $response): int
+    {
+        $counters = (array) (($response['session'] ?? [])['counters'] ?? []);
+        $removed = 0;
+
+        foreach ($counters as $kinds) {
+            $removed += (int) (((array) $kinds)['removed'] ?? 0);
+        }
+
+        return $removed;
     }
 
     private function afterRows(PushJob $job): string

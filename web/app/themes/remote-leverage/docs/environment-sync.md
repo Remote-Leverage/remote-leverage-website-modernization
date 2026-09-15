@@ -97,9 +97,56 @@ Per-run exclusions, so a sync can skip things you're mid-edit on:
 
 ### Clean before import
 
-Per-group toggle. When on, the target's rows for that group are deleted before the
-incoming rows are written, so the target ends up an exact mirror rather than a merge.
-When off, rows are upserted by primary key and anything extra on the target survives.
+Per-group toggle (`--clean=content,media` on the CLI). When on, the target's rows for
+that group are deleted before the incoming rows are written, so the target ends up an
+exact mirror rather than a merge. When off, rows are upserted by primary key and
+anything extra on the target survives.
+
+Off is a merge, and on two environments that grew independently a merge is rarely what
+you want: import keeps the *source's* post IDs, so an ID holding unrelated posts on each
+side resolves by overwriting the target's, while a page the source has under a different
+ID survives beside its replacement under the slug the source has since reused. Staging
+and local hit exactly this — local `vathankyou` is ID 126, staging's ID 126 was
+`sales-virtual-assistants`. Clean is what makes "push everything" mean what it says.
+
+**Implemented 2026-09-15.** The flag was plumbed end to end from the beginning — CLI,
+admin screen, manifest validation, serialization to the remote — but nothing read
+`shouldClean()`, so passing it was a silent no-op and every push was a merge. Anything
+that "already ran with `--clean`" before that date did not clean.
+
+What a clean deletes is bounded three ways, and each bound is load-bearing:
+
+- **Only what the export replaces.** `Transfer\PostSelection` is the single definition
+  of a dataset's rows, used by the exporting side to decide what to send and by
+  `Import\DatasetCleaner` to decide what to delete. Per-run exclusions bind the clean
+  too: a post type or ID the transfer was told to skip has nothing arriving to replace
+  it, so deleting it would be a one-way loss rather than a mirror.
+- **Only `wp_posts` and `wp_postmeta`.** The `content` group advertises the term tables,
+  but nothing in the transfer actually carries terms — `ContentExporter` sends posts and
+  postmeta and nothing else. Cleaning the term tables would therefore drop every category
+  and tag with nothing to restore them. Taxonomy is left exactly as the target had it,
+  which also means **category and tag assignments do not travel with a push.**
+- **Rows, not files.** Uploaded files stay. The media transfer already asks the target
+  which files it is missing and sends only those, so deleting them would force a
+  re-upload of everything for no gain — and the attachment rows pointing at them are
+  rebuilt from the source regardless.
+
+Every deleted row goes into the session's undo log before it is deleted, so a clean is
+reversed by the same `rl:sync:rollback` that reverses the import it precedes. This is the
+opposite of `DatasetPurger`, which refuses to pretend a whole-table truncation is
+undoable; the difference is that a clean is bounded by one dataset that is about to be
+replaced, rather than by an open-ended table.
+
+The clean runs lazily, on the first chunk of each dataset, rather than when the session
+opens. That keeps each request bounded — emptying every selected dataset up front is the
+one long request this design exists to avoid — and it means a transfer that fails before
+sending anything leaves the target untouched. A session flag (`cleaned`) is persisted
+*before* the first row is imported, because chunks are redelivered verbatim after a
+dropped connection and a second clean would delete everything the earlier chunks wrote.
+
+One consequence of running lazily: **a dataset the source has no rows for is never
+cleaned**, because no chunk is ever sent for it. Cleaning `content` from a source with no
+content leaves the target's content alone rather than emptying it.
 
 ## 3. Bi-directional
 
