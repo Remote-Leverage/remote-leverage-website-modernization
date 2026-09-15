@@ -7,7 +7,7 @@ namespace App\Domains\PartnerHub\Actions;
 class QueryPartnersAction
 {
     public function __construct(
-        protected SyncNotionPartnersAction $syncPartnersAction
+        protected FetchPartnersAction $fetchPartnersAction
     ) {}
 
     /**
@@ -15,7 +15,7 @@ class QueryPartnersAction
      */
     public function execute(?string $search = null, ?string $category = null, bool $featuredOnly = false): array
     {
-        $allPartners = $this->syncPartnersAction->execute();
+        $allPartners = $this->fetchPartnersAction->execute();
 
         return array_values(array_filter($allPartners, function (array $partner) use ($search, $category, $featuredOnly) {
             if ($featuredOnly && empty($partner['featured'])) {

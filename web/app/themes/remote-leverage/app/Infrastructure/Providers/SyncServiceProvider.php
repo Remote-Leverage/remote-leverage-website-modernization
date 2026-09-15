@@ -7,6 +7,7 @@ namespace App\Infrastructure\Providers;
 use App\Domains\Sync\Commands\GrantSyncCapabilityCommand;
 use App\Domains\Sync\Commands\PullTransferCommand;
 use App\Domains\Sync\Commands\PurgeDatasetCommand;
+use App\Domains\Sync\Commands\PurgeTransferLogsCommand;
 use App\Domains\Sync\Commands\PushTransferCommand;
 use App\Domains\Sync\Commands\RollbackLocalCommand;
 use App\Domains\Sync\Commands\RollbackTransferCommand;
@@ -35,6 +36,7 @@ class SyncServiceProvider extends ServiceProvider
                 PushTransferCommand::class,
                 PullTransferCommand::class,
                 PurgeDatasetCommand::class,
+                PurgeTransferLogsCommand::class,
                 RollbackLocalCommand::class,
                 RollbackTransferCommand::class,
             ]);

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domains\Sync\Abilities\RollbackTransferAbility;
 use App\Domains\Sync\Datasets\DatasetRegistry;
 use App\Domains\Sync\Transfer\Import\AttachmentReferenceRewriter;
 use App\Domains\Sync\Transfer\Import\ContentImporter;
@@ -161,5 +162,53 @@ describe('rolling back an import', function () {
 
         expect($this->undo->exists())->toBeFalse()
             ->and(DB::table('posts')->where('ID', 5)->exists())->toBeTrue();
+    });
+});
+
+/**
+ * Recovery from a session that opened and then died before writing anything.
+ *
+ * Found while verifying a real push against staging. Rollback refused an empty
+ * undo log outright, and refusing meant it never closed the session either — so
+ * the session stayed open, every later transfer was refused by it, and the
+ * refusal message ("Finish, roll back, or cancel it first") named rollback as a
+ * remedy that could not work. Staging accumulated four of these before anyone
+ * noticed, and the only way out was calling finish-transfer by hand.
+ */
+describe('rolling back a session that wrote nothing', function () {
+    beforeEach(function () {
+        $this->sessions = new SessionStore($this->registry);
+        $this->ability = new RollbackTransferAbility($this->sessions, $this->factory);
+    });
+
+    it('succeeds rather than refusing', function () {
+        $result = $this->ability->execute(['session_id' => $this->session->id]);
+
+        expect($result['ok'])->toBeTrue()
+            ->and($result['reverted'])->toBe(0);
+    });
+
+    it('closes the session, so the next transfer is not blocked by it', function () {
+        $this->ability->execute(['session_id' => $this->session->id]);
+
+        expect($this->sessions->find($this->session->id)->isFinished())->toBeTrue();
+    });
+
+    it('still reverts and closes when there is something to undo', function () {
+        DB::table('posts')->insert(row(1));
+        $this->undo->recordInsert('posts', ['ID' => 1]);
+
+        $result = $this->ability->execute(['session_id' => $this->session->id]);
+
+        expect($result['ok'])->toBeTrue()
+            ->and($result['reverted'])->toBeGreaterThan(0)
+            ->and(DB::table('posts')->where('ID', 1)->exists())->toBeFalse()
+            ->and($this->sessions->find($this->session->id)->isFinished())->toBeTrue();
+    });
+
+    it('still refuses a session it has never heard of', function () {
+        $result = $this->ability->execute(['session_id' => 'nope']);
+
+        expect($result['ok'])->toBeFalse();
     });
 });

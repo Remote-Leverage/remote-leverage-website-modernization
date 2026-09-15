@@ -340,3 +340,39 @@ describe('the settings dataset', function () {
         expect($this->client->chunks())->toHaveCount(1);
     });
 });
+
+/**
+ * A push refused at begin never received a session id.
+ *
+ * Telling the operator to "roll back session " — with nothing after it — sent
+ * them looking for a session that does not exist, while the id actually
+ * blocking them sat in the line above. Seen for real against staging.
+ */
+describe('reporting a push that never opened a session', function () {
+    it('does not tell the operator to roll back an empty session id', function () {
+        $this->client->beginResponse = [
+            'ok' => false,
+            'error' => 'A transfer is already in progress on this environment (session other-1, open).',
+        ];
+
+        try {
+            $this->pusher->push(pushManifest(), 'staging');
+            $this->fail('Expected the push to throw.');
+        } catch (RuntimeException $e) {
+            expect($e->getMessage())->not->toContain('still holds session')
+                ->and($e->getMessage())->toContain('other-1');
+        }
+    });
+
+    it('still names the session when one was opened', function () {
+        seedPost(1);
+        $this->client->chunkResponse = ['ok' => false, 'error' => 'nope'];
+
+        try {
+            $this->pusher->push(pushManifest(), 'staging');
+            $this->fail('Expected the push to throw.');
+        } catch (RuntimeException $e) {
+            expect($e->getMessage())->toContain('still holds session sess-1');
+        }
+    });
+});

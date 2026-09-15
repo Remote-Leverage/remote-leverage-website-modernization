@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Fields;
 
+use App\Domains\PartnerHub\Services\PartnerHubGlobalData;
 use App\Domains\PartnerHub\Services\PartnerHubTabResolver;
 use Log1x\AcfComposer\Builder;
 use Log1x\AcfComposer\Field;
@@ -50,6 +51,36 @@ class PartnerHubFields extends Field
         ]);
         $fields->addUrl('_rl_partner_website', [
             'label' => 'Partner Official Website',
+        ]);
+
+        $fields->addTab('Directory');
+        $fields->addMessage(
+            'directory_note',
+            'How this partner appears on the <code>/partners/</code> directory grid. The card links through to this partner\'s co-branded hub.'
+        );
+        $fields->addSelect('_rl_directory_category', [
+            'label' => 'Directory Category',
+            'instructions' => 'Determines which filter pill shows this partner.',
+            'choices' => array_combine(
+                PartnerHubGlobalData::getDirectoryCategories(),
+                PartnerHubGlobalData::getDirectoryCategories(),
+            ),
+            'default_value' => 'Staffing & HR',
+        ]);
+        $fields->addTextarea('_rl_directory_description', [
+            'label' => 'Directory Card Description',
+            'instructions' => 'Shown on the card and matched by the directory search. Around 160 characters reads best — the card clamps to three lines.',
+            'rows' => 3,
+        ]);
+        $fields->addText('_rl_directory_perk', [
+            'label' => 'Exclusive Perk / Benefit',
+            'instructions' => 'Optional. Rendered as the highlighted strip on the card; clamped to one line.',
+        ]);
+        $fields->addTrueFalse('_rl_directory_featured', [
+            'label' => 'Featured Partner',
+            'instructions' => 'Adds the Featured badge and includes this partner in the "Featured Only" filter.',
+            'ui' => 1,
+            'default_value' => 0,
         ]);
 
         $fields->addTab('Terms');
@@ -112,6 +143,57 @@ class PartnerHubFields extends Field
             'label' => 'RL Referral Fee Structure (RL &rarr; Partner)',
             'rows' => 3,
         ]);
+
+        $fields->addTab('Services');
+        $fields->addMessage(
+            'services_note',
+            'Leave both blank to show the standard Remote Leverage service catalogue on the Services Overview tab.'
+        );
+        $fields->addTextarea('_rl_services_desc', [
+            'label' => 'Section Subtitle / Lead Description',
+            'placeholder' => PartnerHubGlobalData::getServicesDesc(),
+            'rows' => 2,
+        ]);
+        $fields->addRepeater('_rl_services', [
+            'label' => 'Custom Service Catalogue',
+            'instructions' => 'Adding any row replaces the full global catalogue for this partner — it does not append to it.',
+            'layout' => 'block',
+            'button_label' => 'Add Service',
+        ])
+            ->addText('name', [
+                'label' => 'Service Name',
+                'required' => 1,
+            ])
+            ->addText('best_for', [
+                'label' => 'Best For',
+                'instructions' => 'Target client or use case, shown under the service name.',
+            ])
+            ->addTextarea('desc', [
+                'label' => 'Description',
+                'rows' => 3,
+            ])
+            ->endRepeater();
+
+        $fields->addTab('Lifecycle');
+        $fields->addMessage(
+            'lifecycle_note',
+            'Leave empty to show the standard six-stage referral pipeline on the Referral Program tab.'
+        );
+        $fields->addRepeater('_rl_lifecycle_stages', [
+            'label' => 'Custom Referral Lifecycle Stages',
+            'instructions' => 'Adding any row replaces the full default pipeline for this partner — it does not append to it.',
+            'layout' => 'block',
+            'button_label' => 'Add Stage',
+        ])
+            ->addText('status', [
+                'label' => 'Stage Title',
+                'required' => 1,
+            ])
+            ->addTextarea('desc', [
+                'label' => 'Description',
+                'rows' => 2,
+            ])
+            ->endRepeater();
 
         $fields->addTab('Resources');
         $fields->addText('_rl_rl_resource_title', [
@@ -206,6 +288,21 @@ class PartnerHubFields extends Field
         $fields->addTextarea('_rl_override_commission_terms', [
             'label' => 'Additional Commission Terms & Notes',
             'rows' => 3,
+        ]);
+        $fields->addTextarea('_rl_override_value_prop', [
+            'label' => 'Custom Direct-Hire Value Proposition (Overview Callout)',
+            'placeholder' => PartnerHubGlobalData::getValueProposition()['desc'],
+            'rows' => 3,
+        ]);
+        $fields->addTextarea('_rl_override_target_fit', [
+            'label' => 'Custom Target Profile Fit (ICP Callout)',
+            'placeholder' => PartnerHubGlobalData::getTargetFit()['desc'],
+            'rows' => 3,
+        ]);
+        $fields->addTextarea('_rl_target_industries', [
+            'label' => 'Custom Target Industries (ICP)',
+            'instructions' => 'One industry per line. If empty, the 16 default industries are used.',
+            'rows' => 5,
         ]);
 
         return $fields->build();

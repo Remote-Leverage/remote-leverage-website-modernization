@@ -52,11 +52,6 @@ return [
         'host' => env('POSTHOG_HOST', 'https://us.i.posthog.com'),
     ],
 
-    'notion' => [
-        'api_key' => env('NOTION_API_KEY'),
-        'database_id' => env('NOTION_PARTNERS_DATABASE_ID'),
-    ],
-
     'slack' => [
         'webhook_url' => env('SLACK_WEBHOOK_URL'),
     ],

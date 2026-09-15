@@ -19,6 +19,7 @@ use App\Domains\Sync\Abilities\FinishTransferAbility;
 use App\Domains\Sync\Abilities\ImportLandingPageAbility;
 use App\Domains\Sync\Abilities\ImportSyncableSettingsAbility;
 use App\Domains\Sync\Abilities\PurgeDatasetAbility;
+use App\Domains\Sync\Abilities\PurgeTransferLogsAbility;
 use App\Domains\Sync\Abilities\ReadMediaFileAbility;
 use App\Domains\Sync\Abilities\ReceiveMediaFileAbility;
 use App\Domains\Sync\Abilities\ReceiveTransferChunkAbility;
@@ -115,6 +116,7 @@ return [
 
         // Maintenance. Never transfers anything; only empties purgeable datasets.
         PurgeDatasetAbility::class,
+        PurgeTransferLogsAbility::class,
         ExportLandingPageAbility::class,
         ImportLandingPageAbility::class,
     ],

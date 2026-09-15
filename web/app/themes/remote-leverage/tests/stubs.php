@@ -766,3 +766,36 @@ if (! function_exists('serialize_blocks')) {
         return implode('', array_map('serialize_block', $blocks));
     }
 }
+
+if (! class_exists('WP_Post')) {
+    class WP_Post
+    {
+        public $ID = 0;
+
+        public $post_title = '';
+
+        public $post_name = '';
+
+        public $post_status = 'publish';
+
+        public $post_type = 'post';
+
+        public function __construct(array $attributes = [])
+        {
+            foreach ($attributes as $key => $value) {
+                $this->{$key} = $value;
+            }
+        }
+    }
+}
+
+if (! function_exists('get_field')) {
+    /**
+     * ACF reader. Backed by the same post-meta store as get_post_meta() so a
+     * test can seed an ACF-authored value with update_post_meta().
+     */
+    function get_field($key, $postId = false, $formatValue = true)
+    {
+        return $GLOBALS['_wp_mock_post_meta'][$postId][$key] ?? null;
+    }
+}

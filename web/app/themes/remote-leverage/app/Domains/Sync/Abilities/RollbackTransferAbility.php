@@ -47,8 +47,17 @@ class RollbackTransferAbility extends TransferAbility
 
         $log = $this->undoLogs->for($session->id);
 
+        // An empty log is not an error, and refusing here used to wedge the
+        // whole tool: a session that died between begin and its first write has
+        // nothing to undo, so rollback bailed without closing it, and every
+        // later transfer was refused by a session no one could clear. Closing
+        // it is the only thing left to do, and it is safe precisely because
+        // nothing was written.
         if (! $log->exists()) {
-            return ['ok' => false, 'error' => 'This session has nothing recorded to roll back.'];
+            $session->fail('Rolled back: nothing had been written.');
+            $this->sessions->save($session);
+
+            return ['ok' => true, 'reverted' => 0, 'session' => $session->toStatusArray()];
         }
 
         try {

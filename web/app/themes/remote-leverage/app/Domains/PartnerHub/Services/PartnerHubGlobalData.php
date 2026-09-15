@@ -42,6 +42,61 @@ class PartnerHubGlobalData
     }
 
     /**
+     * Categories a partner can be filed under in the `/partners/` directory.
+     *
+     * Single source of truth for the ACF select on the CPT and the filter pills
+     * on the Livewire grid — if the two drift, a partner becomes unreachable by
+     * filtering. "All" is the grid's own pseudo-category and is not stored.
+     *
+     * @return array<int, string>
+     */
+    public static function getDirectoryCategories(): array
+    {
+        return [
+            'Staffing & HR',
+            'Marketing & Media',
+            'Software & Tech',
+            'Finance & Legal',
+            'Real Estate',
+        ];
+    }
+
+    /**
+     * Direct-Hire Value Proposition callout, shown on the Overview tab beneath
+     * the company description. A partner may override the body text via
+     * `_rl_override_value_prop`; the title stays global.
+     */
+    public static function getValueProposition(): array
+    {
+        return [
+            'title' => 'Direct-Hire Value Proposition',
+            'desc' => 'No retainers or upfront fees. Clients only pay a one-time placement fee upon successfully hiring a candidate. Zero ongoing staffing markups.',
+        ];
+    }
+
+    /**
+     * Target Profile Fit callout, shown at the top of the Ideal Client Profile
+     * tab. As with the value proposition, only the body text is overridable
+     * per partner, via `_rl_override_target_fit`.
+     */
+    public static function getTargetFit(): array
+    {
+        return [
+            'title' => 'Target Profile Fit',
+            'desc' => 'The ideal Remote Leverage client is a business (SMB to Enterprise) seeking to hire qualified staff faster (2–4 weeks), with zero upfront placement fees and significant cost savings over traditional domestic recruiting.',
+        ];
+    }
+
+    /**
+     * Lead paragraph for the Services Overview tab, overridable per partner
+     * via `_rl_services_desc`.
+     */
+    public static function getServicesDesc(): string
+    {
+        return 'Remote Leverage provides specialized direct-hire recruitment across key business functions.';
+    }
+
+    /**
      * Key Differentiators / Why Choose RL.
      */
     public static function getWhyChooseRl(): array

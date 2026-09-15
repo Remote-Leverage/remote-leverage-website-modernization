@@ -21,7 +21,7 @@ actually exists in the v2 database and codebase. **48 URLs in scope.**
 > v2 already contains some content that is *not* on the list (built before scope was
 > closed). It is inventoried in §4 and needs a keep/redirect/delete decision.
 
-**Last verified: 2026-09-15** — against the live local DB (`wp post list`), the theme's
+**Last verified: 2026-09-15** (P1 re-verified after the partner-directory rebuild) — against the live local DB (`wp post list`), the theme's
 Laravel routes, and `config/redirects.php`. Not hand-maintained: every row below was
 checked against the database on that date.
 
@@ -39,11 +39,11 @@ Local DB totals at verification: **22 pages, 119 posts, 23 case studies, 3 partn
 > The one exception is a genuine duplicate slug serving identical content, which is
 > handled by a codebase redirect rather than a rebuilt page (see §2).
 
-**Score: 21 of 48 migrated (44%). 27 remaining.**
+**Score: 24 of 48 migrated (50%). 24 remaining.**
 
 ---
 
-## 1. ✅ Migrated (21)
+## 1. ✅ Migrated (24)
 
 | # | Production URL | v2 implementation |
 |---|---|---|
@@ -59,7 +59,10 @@ Local DB totals at verification: **22 pages, 119 posts, 23 case studies, 3 partn
 | 33 | `/terms-of-use/` | page ID 130 — Legal Document template |
 | 27 | `/referral-dashboard/` | Laravel route, `routes/web.php:64` (legacy tab behaviour preserved) |
 | 42 | `/thank-you/` | 301 → `/vathankyou/` (page ID 126) — see §2 |
-| — | `/partners/` | `archive-rl_partner.blade.php` + `PartnerPostType` — template built; **content is the gap**, see P1 |
+| — | `/partners/` | `archive-rl_partner.blade.php` + `PartnerPostType` — directory rebuilt CPT-backed 2026-09-15, renders all 3 partners |
+| — | `/partners/oyster/` | page ID 122 → `resources/partners/partners.php` |
+| — | `/partners/lexgo/` | page ID 1000011 → `resources/partners/partners.php` |
+| — | `/partners/lano/` | page ID 1000012 → `resources/partners/partners.php` |
 | — | `/hire-va-4/` | page ID 1000000 → `patterns/hire-va-4-full.php` (migrated 2026-09-14) |
 | — | `/vacalendar/` | page ID 1000002 → `patterns/vacalendar-full.php` |
 | — | `/samples/` | page ID 1000005 → `patterns/samples-content.php` |
@@ -86,7 +89,7 @@ so it ships with the code and survives a database refresh.
 
 ---
 
-## 3. ❌ Remaining (27), by priority
+## 3. ❌ Remaining (24), by priority
 
 ### P0 — Broken destinations v2 already ships — ✅ CLEARED 2026-09-15
 
@@ -99,7 +102,7 @@ Three of those five (`contractor-management`, `contractor-payments`, `impact-rep
 were first built with the right copy but invented layout, and were rebuilt against
 production's actual design on 2026-09-15. See §6.
 
-### P1 — Partnerships (3 remaining)
+### P1 — Partnerships — ✅ CLEARED 2026-09-15
 
 **Resolved 2026-09-14: the standalone landing pages and the partner hub are both kept.**
 They serve different jobs — the `/remote-leverage-x-*/` pages are marketing pages *about*
@@ -115,19 +118,48 @@ They deliberately **do not** use production's partner-blue palette: per directio
 Lano `brand-navy → brand-midnight`), the shared world map rather than production's globe
 graphic, and a transparent white header over the hero.
 
-**Partner hub entries (3)** — templates (`archive-rl_partner.blade.php`,
-`single-rl_partner.blade.php`, `PartnerPostType`) are built, so this is content work only.
-All three entries now exist but are one-line placeholders (~70 chars each):
+**Partner hub entries (3) — ✅ done 2026-09-15.**
+
+The earlier reading of this row ("content work only — three ~70-char stubs") was wrong on
+both halves, and the real blocker was structural:
+
+- The three entries were **not** stubs. Only `post_content` held a placeholder sentence, and
+  `single-rl_partner.blade.php` never renders `post_content`. Each entry already carried ~22
+  populated meta fields (codes, terms, both fee structures, resource links, manager contact).
+- `/partners/` itself was **empty**, and no amount of CPT content would have fixed it. The
+  directory grid read *only* from a Notion database via `NotionSyncService`, and both
+  `NOTION_API_KEY` and `NOTION_PARTNERS_DATABASE_ID` were unset — so `fetchPartners()`
+  returned `[]` and the page rendered "No matching partners found" while the three populated
+  CPT entries sat unused.
+
+Resolved by making the CPT the single source of truth for both surfaces and **deleting the
+Notion integration** (`NotionSyncService`, `SyncNotionPartnersAction`, the `services.notion`
+config block and both env keys). Two dead reads in the directory card were fixed alongside:
+it read `$partner['website']` where the DTO emitted `website_url` (so "Visit Website" never
+rendered), and `$partner['slug']`, which the DTO never emitted at all (so the hub link was
+guessed by slugifying the name).
 
 | Entry | Local state | Production |
 |---|---|---|
-| `/partners/oyster/` | exists (ID 122) — **stub, 66 chars** | live, 200 |
-| `/partners/lano/` | exists (ID 1000012) — **stub, 69 chars** | *(no `rl_partner` entry on production)* |
-| `/partners/lexgo/` | exists (ID 1000011) — **stub, 71 chars** | live, 200 |
+| `/partners/oyster/` | ID 122 — seeded, renders, in directory | live, 200 |
+| `/partners/lano/` | ID 1000012 — seeded, renders, in directory | *(no `rl_partner` entry on production)* |
+| `/partners/lexgo/` | ID 1000011 — seeded, renders, in directory | live, 200 |
+
+Partner content now lives in **`resources/partners/partners.php`** (in git), applied by
+`wp acorn partners:seed` — idempotent, matched on `post_name`, never changes an existing post
+ID. Previously these entries existed only in the database and would have been lost on a
+refresh, which is what made the directory empty in the first place.
 
 Note the asymmetry: production carries Oyster + Lexgo as `rl_partner` entries and
 Oyster + Lano as landing pages. **Lano has no production hub entry and Lexgo has no
-production landing page**, so each needs one side authored fresh rather than migrated.
+production landing page**, so each needed one side authored fresh rather than migrated.
+
+Three data gaps remain, recorded in [docs/domains/partner-hub.md](web/app/themes/remote-leverage/docs/domains/partner-hub.md#known-gaps)
+— they need information from the partners, not code: Lexgo and Lano have no referral intake
+form or tracking sheet of their own (the hand-authored entries had **Oyster's**, which would
+have routed their referrals into Oyster's sheet — now unset), Oyster still has no referral
+destination (`pending to define`), and none of the three has a logo, so cards fall back to a
+monogram.
 
 ### P2 — Funnel / operational pages (6)
 
@@ -325,5 +357,10 @@ one DOM node.
    gated name/email capture, but `form_action` is empty — production posts to a gated
    download this project has no endpoint for yet. Needs a Lead domain endpoint and the
    actual PDF.
-8. **Partner hub entries are stubs.** All three `rl_partner` entries exist but hold a single
-   placeholder sentence. Content work, not template work — see §3 P1.
+8. ~~**Partner hub entries are stubs.**~~ — **resolved 2026-09-15.** They were never stubs:
+   only `post_content` was a placeholder, and the hub template never renders it. The actual
+   blocker was that `/partners/` read from an unconfigured Notion database rather than the
+   CPT. Notion is deleted, the directory is CPT-backed, and partner content is seeded from
+   `resources/partners/partners.php`. See §3 P1. What remains is information only the
+   partners can supply — intake forms for Lexgo and Lano, a referral destination for Oyster,
+   and logos for all three.

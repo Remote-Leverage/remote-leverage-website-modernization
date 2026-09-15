@@ -22,7 +22,7 @@ All project documentation lives here. Start with the [repository README](../../.
 | [domains/scheduling.md](domains/scheduling.md) | Calendly, Google Meet, revenue-tier routing, instant live calls |
 | [domains/tracking.md](domains/tracking.md) | PostHog + Customer.io dual dispatch, feature flags |
 | [domains/referral.md](domains/referral.md) | Referrer portal, click attribution, Stripe Connect payouts |
-| [domains/partner-hub.md](domains/partner-hub.md) | `rl_partner` CPT, co-branded hubs, Notion-synced directory |
+| [domains/partner-hub.md](domains/partner-hub.md) | `rl_partner` CPT, co-branded hubs, CPT-backed partner directory |
 | [domains/content-audit.md](domains/content-audit.md) | Elementor audit/conversion, blog import, email signatures |
 | [domains/sync.md](domains/sync.md) | Environment-to-environment dataset transfer |
 

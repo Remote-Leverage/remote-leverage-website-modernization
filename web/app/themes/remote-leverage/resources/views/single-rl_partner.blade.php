@@ -70,13 +70,42 @@
   // Global Default Content Library (WR-120)
   $whyChooseRl = \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getWhyChooseRl();
   $comparisonMatrix = \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getComparisonMatrix();
-  $targetIndustries = \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getTargetIndustries();
   $geographicMarkets = \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getGeographicMarkets();
-  $services = \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getServices();
-  $lifecycleStages = \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getDefaultLifecycleStages();
   $defaultRules = \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getDefaultReferralRules();
   $caseStudies = \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getCaseStudies();
   $faqs = \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getFaqs();
+
+  // Per-partner overrides in front of those defaults — a non-empty override
+  // replaces its default wholesale, it never merges into it.
+  $resolver = \App\Domains\PartnerHub\Services\PartnerHubContentResolver::class;
+
+  $services = $resolver::resolveRows(
+      get_field('_rl_services', $postId),
+      \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getServices(),
+  );
+  $servicesDesc = $resolver::resolveText(
+      get_post_meta($postId, '_rl_services_desc', true),
+      \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getServicesDesc(),
+  );
+  $lifecycleStages = $resolver::resolveRows(
+      get_field('_rl_lifecycle_stages', $postId),
+      \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getDefaultLifecycleStages(),
+  );
+  $targetIndustries = $resolver::resolveList(
+      get_post_meta($postId, '_rl_target_industries', true),
+      \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getTargetIndustries(),
+  );
+
+  $valuePropTitle = \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getValueProposition()['title'];
+  $valuePropDesc = $resolver::resolveText(
+      get_post_meta($postId, '_rl_override_value_prop', true),
+      \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getValueProposition()['desc'],
+  );
+  $targetFitTitle = \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getTargetFit()['title'];
+  $targetFitDesc = $resolver::resolveText(
+      get_post_meta($postId, '_rl_override_target_fit', true),
+      \App\Domains\PartnerHub\Services\PartnerHubGlobalData::getTargetFit()['desc'],
+  );
 
   function getTabUrl($permalink, $tab) {
       if ($tab === 'overview') {
@@ -106,6 +135,7 @@
           'pdf' => '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>',
           'check-circle' => '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
           'alert' => '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+          'info' => '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
           'megaphone' => '<path d="M3 11l18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
           'briefcase' => '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
           'globe' => '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
@@ -275,6 +305,17 @@
               <p class="text-text-muted text-sm sm:text-base mt-2 leading-relaxed">
                 {{ $overrideCompanyDesc ?: 'Remote Leverage is a global recruitment and talent acquisition firm that connects growth-oriented companies with thoroughly vetted, top-tier international professionals. Under our direct-hire model, Remote Leverage sources and screens candidates, presents a curated shortlist, the client interviews and selects the candidate, and the client hires directly. Remote Leverage receives a one-time placement fee when a client hires.' }}
               </p>
+
+              {{-- Direct-Hire Value Proposition callout (parity with the legacy plugin's overview tab) --}}
+              <div class="mt-5 p-5 rounded-card-md bg-brand-purple/5 border border-brand-purple/15 flex items-start gap-3">
+                <div class="w-8 h-8 rounded-lg bg-brand-purple/10 flex items-center justify-center shrink-0 text-brand-purple mt-0.5">
+                  {!! $rlIcon('info', 'w-4 h-4') !!}
+                </div>
+                <div>
+                  <div class="font-bold text-xs uppercase tracking-wider text-brand-purple">{{ $valuePropTitle }}</div>
+                  <p class="text-sm text-text-body font-medium leading-relaxed mt-1">{{ $valuePropDesc }}</p>
+                </div>
+              </div>
             </div>
 
             {{-- Partnership Terms Summary — unified spec strip so short values never mismatch height with the long renewal sentence --}}
@@ -400,9 +441,10 @@
               <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 text-emerald-700 mt-0.5">
                 {!! $rlIcon('target', 'w-4 h-4') !!}
               </div>
-              <p class="text-sm text-emerald-900 font-medium leading-relaxed">
-                The ideal Remote Leverage client is a business (SMB to Enterprise) seeking to hire qualified staff faster (2&ndash;4 weeks), with zero upfront placement fees and significant cost savings over traditional domestic recruiting.
-              </p>
+              <div>
+                <div class="font-bold text-xs uppercase tracking-wider text-emerald-700">{{ $targetFitTitle }}</div>
+                <p class="text-sm text-emerald-900 font-medium leading-relaxed mt-1">{{ $targetFitDesc }}</p>
+              </div>
             </div>
 
             <div>
@@ -439,7 +481,7 @@
             <div>
               <span class="px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">Capabilities</span>
               <h1 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight mt-3">Services Overview</h1>
-              <p class="text-text-muted text-sm mt-2">Remote Leverage provides specialized direct-hire recruitment across key business functions.</p>
+              <p class="text-text-muted text-sm mt-2">{{ $servicesDesc }}</p>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

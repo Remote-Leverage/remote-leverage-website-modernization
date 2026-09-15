@@ -39,6 +39,30 @@ class UndoLogFactory
         @rmdir($dir);
     }
 
+    /**
+     * Session ids that still have a log directory on disk.
+     *
+     * Not the same list as the session index: a log outlives the session record
+     * whenever pruning drops the record first, and those orphans are exactly
+     * what a "clear the logs" operation has to find, since nothing else now
+     * references them.
+     *
+     * @return array<int, string>
+     */
+    public function sessionIds(): array
+    {
+        $base = $this->basePath();
+
+        if (! is_dir($base)) {
+            return [];
+        }
+
+        return array_values(array_map(
+            'basename',
+            array_filter(glob($base.'/*') ?: [], 'is_dir'),
+        ));
+    }
+
     private function basePath(): string
     {
         if (function_exists('wp_upload_dir')) {

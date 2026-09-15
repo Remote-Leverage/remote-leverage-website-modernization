@@ -57,7 +57,10 @@ None of this was ported to a corresponding class. The new template instead hardc
 
 - CPT registration, rewrite rules (`/partners/{slug}/{tab}/`), and query var — ported faithfully (`PartnerPostType.php` mirrors `RL_Partner_CPT` almost line-for-line).
 - Tab routing logic and the 9 tab keys/labels — preserved.
-- The Notion-synced directory grid (archive page) is new, additive, and functional — not present in the legacy plugin at all.
+- The directory grid (archive page) is new, additive — not present in the legacy plugin at all.
+  **Superseded 2026-09-15:** it was Notion-synced and described here as "functional", but both Notion
+  credentials were unset, so it rendered an empty directory. It now reads the `rl_partner` CPT and Notion
+  is deleted — see [domains/partner-hub.md](domains/partner-hub.md).
 - `HandleLeadBookingCompletedForPartner` (ADR-0008's `PartnerHub` subscriber to `LeadBookingCompleted`, matching by `sourceType`/`sourceID`) is real, new architecture the legacy plugin never had — this is genuine forward progress on attribution, separate from the co-branded hub content itself.
 
 ## Bottom line

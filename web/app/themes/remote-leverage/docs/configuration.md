@@ -78,7 +78,6 @@ GTM, LinkedIn Insight and Meta Pixel are configured inside the Google Site Kit /
 
 | Variable | Read by |
 | :--- | :--- |
-| `NOTION_API_KEY`, `NOTION_PARTNERS_DATABASE_ID` | `NotionSyncService` |
 
 ## Sync
 
@@ -126,6 +125,6 @@ Proposed cleanup in [known-issues.md](known-issues.md).
 
 ## `.env.example` is incomplete
 
-It covers only the Bedrock core set — database, environment, salts, `APP_KEY`, `ACF_PRO_KEY`, Redis. None of the ~30 integration keys the application actually reads are in it, so a fresh clone boots WordPress but has no working Calendly, HubSpot, Stripe, PostHog, Customer.io, Notion or sync.
+It covers only the Bedrock core set — database, environment, salts, `APP_KEY`, `ACF_PRO_KEY`, Redis. None of the ~30 integration keys the application actually reads are in it, so a fresh clone boots WordPress but has no working Calendly, HubSpot, Stripe, PostHog, Customer.io or sync.
 
 Proposed fix: regenerate `.env.example` from the tables above, with every key present and empty, grouped by domain, and a one-line comment saying which feature degrades when it is blank.

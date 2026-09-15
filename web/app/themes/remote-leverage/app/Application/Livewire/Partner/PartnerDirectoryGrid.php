@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Livewire\Partner;
 
 use App\Domains\PartnerHub\Actions\QueryPartnersAction;
+use App\Domains\PartnerHub\Services\PartnerHubGlobalData;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -16,14 +17,19 @@ class PartnerDirectoryGrid extends Component
 
     public bool $featuredOnly = false;
 
-    public array $categories = [
-        'All',
-        'Staffing & HR',
-        'Marketing & Media',
-        'Software & Tech',
-        'Finance & Legal',
-        'Real Estate',
-    ];
+    /**
+     * Filter pills. Kept in step with the CPT's category select via
+     * PartnerHubGlobalData so a partner can't be filed under a category the
+     * grid has no pill for. "All" is the grid's own pseudo-category.
+     *
+     * @var array<int, string>
+     */
+    public array $categories = [];
+
+    public function mount(): void
+    {
+        $this->categories = ['All', ...PartnerHubGlobalData::getDirectoryCategories()];
+    }
 
     public function selectCategory(string $category): void
     {

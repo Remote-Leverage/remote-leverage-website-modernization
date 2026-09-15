@@ -61,9 +61,13 @@ class TransferPusher
         }
 
         if ($job->phase === PushJob::PHASE_FAILED) {
-            throw new RuntimeException(
-                $job->error."\nThe target still holds session {$job->sessionId}; roll it back to undo what landed."
-            );
+            // Only point at a session that exists. A push refused at begin never
+            // got one, and telling the operator to roll back an empty id sends
+            // them after the wrong thing while the id that is actually blocking
+            // them sits in the line above.
+            throw new RuntimeException($job->sessionId === ''
+                ? (string) $job->error
+                : $job->error."\nThe target still holds session {$job->sessionId}; roll it back to undo what landed.");
         }
 
         return [
