@@ -76,7 +76,7 @@ class CountryPlacementsBlock extends Block
         $custom = function_exists('get_field') ? get_field('rows') : null;
         $rows = is_array($custom) && $custom !== [] ? $custom : BlockDefaults::countryPlacements();
 
-        return array_values(array_map(static fn(array $row): array => [
+        return array_values(array_map(static fn (array $row): array => [
             'flag' => BlockDefaults::resolveImageUrl($row['flag'] ?? ''),
             'country' => BlockDefaults::cleanText($row['country'] ?? ''),
             'count' => BlockDefaults::cleanText((string) ($row['count'] ?? '')),

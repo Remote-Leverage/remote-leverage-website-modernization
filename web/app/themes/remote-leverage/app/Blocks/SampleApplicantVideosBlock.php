@@ -104,13 +104,14 @@ class SampleApplicantVideosBlock extends Block
         return array_map(function ($card) use ($nameMap) {
             if (empty($card['poster_file']) && ! empty($card['poster_url'])) {
                 $base = basename($card['poster_url']);
-                if (file_exists(get_theme_file_path('public/images/samples/posters/' . $base))) {
-                    $card['poster_file'] = 'public/images/samples/posters/' . $base;
+                if (file_exists(get_theme_file_path('public/images/samples/posters/'.$base))) {
+                    $card['poster_file'] = 'public/images/samples/posters/'.$base;
                 }
             }
             if (empty($card['poster_file']) && ! empty($card['name']) && isset($nameMap[$card['name']])) {
-                $card['poster_file'] = 'public/images/samples/posters/' . $nameMap[$card['name']];
+                $card['poster_file'] = 'public/images/samples/posters/'.$nameMap[$card['name']];
             }
+
             return $card;
         }, $cards);
     }

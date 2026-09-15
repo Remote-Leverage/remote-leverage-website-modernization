@@ -90,7 +90,7 @@ class TalentGridBlock extends Block
                 if ($srcset) {
                     $card['bg_srcset'] = preg_replace_callback(
                         '/(\S+)(?=\s+\d+w)/',
-                        fn($m) => BlockDefaults::preferWebp($m[1]),
+                        fn ($m) => BlockDefaults::preferWebp($m[1]),
                         $srcset,
                     );
                     $card['bg_sizes'] = '(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw';

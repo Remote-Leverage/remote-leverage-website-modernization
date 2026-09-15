@@ -24,6 +24,7 @@ use App\Blocks\TalentMarqueeBlock;
 use App\Blocks\TestimonialsBlock;
 use App\Blocks\TrustStatsBlock;
 use App\Blocks\WhyHireBlock;
+use App\Support\HeaderMode;
 use Illuminate\Support\Facades\Vite;
 
 /**
@@ -429,7 +430,7 @@ add_action('init', function () {
  * in white instead of sitting on its own pale band. Derived from the pattern, not a DB setting.
  */
 add_filter('body_class', function (array $classes): array {
-    if (\App\Support\HeaderMode::isOverDarkHero()) {
+    if (HeaderMode::isOverDarkHero()) {
         $classes[] = 'rl-header-over-hero';
     }
 

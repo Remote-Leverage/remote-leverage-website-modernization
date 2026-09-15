@@ -40,17 +40,17 @@ class RolesCarouselBlock extends Block
     public function with(): array
     {
         $hasGetField = function_exists('get_field');
-        $field = fn(string $key) => $hasGetField ? get_field($key) : null;
+        $field = fn (string $key) => $hasGetField ? get_field($key) : null;
 
         $cards = array_values(array_filter(
             (array) ($field('cards') ?: []),
-            fn($c) => ! empty($c['title']),
+            fn ($c) => ! empty($c['title']),
         ));
 
         return [
             'headline' => BlockDefaults::cleanText($field('headline') ?: ''),
             'subheadline' => BlockDefaults::cleanText($field('subheadline') ?: ''),
-            'cards' => array_map(fn($c) => [
+            'cards' => array_map(fn ($c) => [
                 'icon' => BlockDefaults::resolveImageUrl($c['icon'] ?? ''),
                 'title' => BlockDefaults::cleanText($c['title'] ?? ''),
                 'text' => $c['text'] ?? '',

@@ -31,7 +31,7 @@ class BlockInventoryCommand extends Command
         }
 
         $markdown = $this->render($blocks, $this->collectPatterns($themePath));
-        $target = $themePath . '/docs/block-inventory.md';
+        $target = $themePath.'/docs/block-inventory.md';
 
         if ($this->option('check')) {
             $current = is_file($target) ? file_get_contents($target) : '';
@@ -60,10 +60,10 @@ class BlockInventoryCommand extends Command
     {
         $blocks = [];
 
-        foreach (glob($themePath . '/app/Blocks/*Block.php') ?: [] as $file) {
+        foreach (glob($themePath.'/app/Blocks/*Block.php') ?: [] as $file) {
             $source = (string) file_get_contents($file);
             $slug = $this->slugFor(basename($file, 'Block.php'));
-            $viewPath = $themePath . '/resources/views/blocks/' . $slug . '.blade.php';
+            $viewPath = $themePath.'/resources/views/blocks/'.$slug.'.blade.php';
 
             $blocks[] = [
                 'slug' => $slug,
@@ -74,7 +74,7 @@ class BlockInventoryCommand extends Command
             ];
         }
 
-        usort($blocks, fn(array $a, array $b): int => strcmp($a['slug'], $b['slug']));
+        usort($blocks, fn (array $a, array $b): int => strcmp($a['slug'], $b['slug']));
 
         return $blocks;
     }
@@ -94,9 +94,9 @@ class BlockInventoryCommand extends Command
         $helperSlugs = $this->helperSlugMap($themePath);
         $usages = [];
         $files = array_merge(
-            glob($themePath . '/patterns/*.php') ?: [],
-            glob($themePath . '/resources/patterns/*.php') ?: [],
-            glob($themePath . '/resources/views/*.blade.php') ?: [],
+            glob($themePath.'/patterns/*.php') ?: [],
+            glob($themePath.'/resources/patterns/*.php') ?: [],
+            glob($themePath.'/resources/views/*.blade.php') ?: [],
         );
 
         foreach ($files as $file) {
@@ -130,7 +130,7 @@ class BlockInventoryCommand extends Command
      */
     protected function helperSlugMap(string $themePath): array
     {
-        $source = (string) file_get_contents($themePath . '/app/Support/BlockDefaults.php');
+        $source = (string) file_get_contents($themePath.'/app/Support/BlockDefaults.php');
         preg_match_all('/function (render[A-Za-z0-9]+)\(.*?\n    \}/s', $source, $m, PREG_SET_ORDER);
 
         $direct = [];
@@ -186,7 +186,7 @@ class BlockInventoryCommand extends Command
         $keywords = $this->matchOne('/public \$keywords\s*=\s*\[(.+?)\]/s', $classSource);
 
         return $keywords !== null
-            ? 'Keywords: ' . trim(preg_replace('/[\'"\s]+/', ' ', $keywords) ?? '')
+            ? 'Keywords: '.trim(preg_replace('/[\'"\s]+/', ' ', $keywords) ?? '')
             : '—';
     }
 
@@ -248,9 +248,9 @@ class BlockInventoryCommand extends Command
                 $block['slug'],
                 $block['view'] ? '' : ' ⚠️ no view',
                 $this->cell($block['summary']),
-                $block['fields'] === [] ? '—' : '`' . implode('`, `', $block['fields']) . '`',
-                $used === [] ? '_unused_' : implode(', ', array_map(static fn(string $f): string => '`' . $f . '`', array_slice($used, 0, 4)))
-                    . (count($used) > 4 ? sprintf(' _+%d_', count($used) - 4) : ''),
+                $block['fields'] === [] ? '—' : '`'.implode('`, `', $block['fields']).'`',
+                $used === [] ? '_unused_' : implode(', ', array_map(static fn (string $f): string => '`'.$f.'`', array_slice($used, 0, 4)))
+                    .(count($used) > 4 ? sprintf(' _+%d_', count($used) - 4) : ''),
             );
         }
 
@@ -266,13 +266,13 @@ class BlockInventoryCommand extends Command
         $lines[] = '```';
         $lines[] = '';
 
-        return implode("\n", $lines) . "\n";
+        return implode("\n", $lines)."\n";
     }
 
     protected function cell(string $text): string
     {
         $text = str_replace(['|', "\n"], ['\\|', ' '], $text);
 
-        return mb_strlen($text) > 180 ? mb_substr($text, 0, 177) . '…' : $text;
+        return mb_strlen($text) > 180 ? mb_substr($text, 0, 177).'…' : $text;
     }
 }

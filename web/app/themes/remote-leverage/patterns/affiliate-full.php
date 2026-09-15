@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\BlockDefaults;
+
 /**
  * Title: Full Page - Affiliate Program
  * Slug: remote-leverage/affiliate-full
@@ -70,7 +72,7 @@ $uploads = home_url('/app/uploads/2026/09');
 
 <!-- wp:group {"align":"full","className":"min-h-[90vh] flex flex-col justify-center items-stretch","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}},"color":{"background":"#F9EAFF"}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
 <div class="wp-block-group alignfull has-background min-h-[90vh] flex flex-col justify-center items-stretch" style="padding-top:4rem;padding-bottom:4rem;background-color:#F9EAFF">
-    <?= \App\Support\BlockDefaults::renderProgressSteps(
+    <?= BlockDefaults::renderProgressSteps(
         [
             'headline' => 'How It Works',
             'subheadline' => 'Joining the program is simple. You can go from signing up to earning your first commission in three steps:',

@@ -103,7 +103,7 @@ Never approximate a bespoke page with generic components. Every section must be 
 When given a production URL, execute these 8 phases systematically:
 
 ```
-0. Visual Ingestion ──> 1. Spec Table ──> 2. Media Sideload ──> 3. Block Architecture ──> 4. Defaults & Patterns ──> 5. Testing Page ──> 6. Code Validation ──> 7. Side-by-Side Visual Diff
+0. Visual Ingestion ──> 1. Spec Table ──> 2. Media ──> 3. Block Architecture ──> 4. Defaults & Patterns ──> 5. Testing Page ──> 6. Code Validation ──> 7. Side-by-Side Visual Diff
 ```
 
 ---
@@ -189,12 +189,21 @@ reconsidering it for later pages. Re-check the inventory per section, not per pr
 
 ---
 
-### Phase 3: Media Sideloading & Attachment Mapping
+### Phase 3: Media
 
-All demo images in ACF blocks MUST exist in the WordPress Media Library as real attachments.
+1. **Save the downloaded art to `resources/images/pages/<page-slug>/`** — never to
+   `public/images/`, which is gitignored and regenerated. Then:
+   ```bash
+   npm run build
+   ```
+   The `themeImages()` plugin (`vite/theme-images.js`) optimizes each file into
+   `public/images/<page-slug>/` under the same name and writes a `.webp` sibling. Reference it
+   from a pattern with `BlockDefaults::pageImg('<page-slug>', '<file>.png')`.
 
-1. **Import Images**:
-   Run a WP-CLI snippet to import and attach the images:
+2. **Only sideload into the Media Library when the content is editor-managed** — art the client
+   will swap from wp-admin, or a block field that stores an attachment ID. Theme art that a
+   pattern hard-codes does not need to be in the library, and putting it there invites the
+   basename collision in `docs/known-issues.md` §6.
    ```bash
    wp eval '
    require_once(ABSPATH . "wp-admin/includes/image.php");
@@ -208,8 +217,7 @@ All demo images in ACF blocks MUST exist in the WordPress Media Library as real 
    }
    '
    ```
-2. **Attachment Lookup**:
-   `BlockDefaults::getAttachmentId($value)` will automatically map the filename to its attachment ID in the database.
+   `BlockDefaults::getAttachmentId($value)` then maps the filename to its attachment ID.
 
 ---
 

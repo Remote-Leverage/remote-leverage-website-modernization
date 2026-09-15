@@ -8,8 +8,8 @@ use App\Support\BlockDefaults;
  * Categories: remote-leverage
  * Description: 2026 Global Workforce Impact Report landing page, rebuilt to match production layout, typography and imagery (2026-09-14).
  */
-$img = fn(string $file): string => get_theme_file_uri('public/images/impact-report-2026/' . $file);
-$flag = fn(string $file): string => get_theme_file_uri('public/images/impact-report-2026/flags/' . $file);
+$img = fn (string $file): string => get_theme_file_uri('public/images/impact-report-2026/'.$file);
+$flag = fn (string $file): string => get_theme_file_uri('public/images/impact-report-2026/flags/'.$file);
 
 // Production design tokens, read off the live page with getComputedStyle.
 $lav = 'var(--color-lavender-tint)';   // page background
@@ -21,7 +21,7 @@ $wrap = 'w-full max-w-[1380px] mx-auto px-5 sm:px-6 lg:px-8';
 $arrow = '<svg class="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5"/><path d="M10 8l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 // Keys match the acf/feature-cards repeater (img, title, desc).
-$findings = array_map(fn(array $c): array => ['img' => $img($c[0]), 'title' => $c[1], 'desc' => $c[2]], [
+$findings = array_map(fn (array $c): array => ['img' => $img($c[0]), 'title' => $c[1], 'desc' => $c[2]], [
     ['magnific_LUCl1DBswO-1.jpg', 'The heart of our global impact.', 'Almost 80% of professionals we place call LATAM and the Caribbean home, reflecting the depth of talent in both regions.'],
     ['Frame-76-8.jpg', 'Life-changing income.', 'Professionals placed through Remote Leverage earn an average of 4.2x their local minimum wage.'],
     ['five-markets.jpg', 'Five markets anchor the regions', 'Mexico, Colombia, Honduras, Jamaica, and Brazil together account for more than half of all hires across the region.'],
@@ -29,7 +29,6 @@ $findings = array_map(fn(array $c): array => ['img' => $img($c[0]), 'title' => $
     ['opportunity.jpg', 'Opportunity is everywhere.', 'Even in higher-income markets like Barbados and Costa Rica, Remote Leverage rates still outpace national averages.'],
     ['impact-reaches.jpg', 'Impact reaches families and communities.', 'Higher household income changes lives and communities. In Jamaica, women make up nearly 80% of our placements.'],
 ]);
-
 
 $reportContents = [
     ['Country-by-country placement data', '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.5 3.6 5.7 3.6 9s-1.2 6.5-3.6 9c-2.4-2.5-3.6-5.7-3.6-9s1.2-6.5 3.6-9z"/>'],

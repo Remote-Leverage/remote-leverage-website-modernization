@@ -17,7 +17,7 @@ if (! isset($partner) || ! is_array($partner)) {
     return;
 }
 
-$pimg = fn(string $file): string => get_theme_file_uri('public/images/partners/' . $file);
+$pimg = fn (string $file): string => get_theme_file_uri('public/images/partners/'.$file);
 
 $heroBg = $partner['hero_bg'];      // brand blue behind the globe
 $deepBg = $partner['deep_bg'];      // darker band used for logo strip / roles / closing CTA
@@ -32,7 +32,7 @@ $btnDark = 'inline-flex items-center gap-3 rounded-full bg-black px-8 py-4 font-
 
 // Shared across both partner pages — identical on production.
 // Keys match the acf/talent-grid repeater (name, title, desc, bg, logo).
-$talent = array_map(fn(array $t): array => [
+$talent = array_map(fn (array $t): array => [
     'name' => $t[1],
     'title' => $t[2],
     'desc' => $t[3],
@@ -48,7 +48,7 @@ $talent = array_map(fn(array $t): array => [
 ]);
 
 // Keys match the acf/department-cards repeater (title, desc, img).
-$roles = array_map(fn(array $r): array => ['title' => $r[0], 'desc' => $r[1], 'img' => $pimg($r[2])], [
+$roles = array_map(fn (array $r): array => ['title' => $r[0], 'desc' => $r[1], 'img' => $pimg($r[2])], [
     ['Sales<br>& Growth', 'SDRs, BDRs, and Account Managers to fill your pipeline.', 'freepik__talk__67298-1.png'],
     ['Operations<br>& Fintech', 'KYC Analysts, Billing Specialists, and HubSpot/Salesforce Admins.', 'freepik__photo-a-35yearold-indian-man-with-a-beard-wearing-__5017-1.png'],
     ['Marketing<br>& Demand Gen', 'Content Ops, Social Media Managers, and Campaign Specialists.', 'freepik__talk__81238-1.png'],
@@ -56,7 +56,7 @@ $roles = array_map(fn(array $r): array => ['title' => $r[0], 'desc' => $r[1], 'i
 ]);
 
 // Keys match the acf/feature-cards repeater (img, title, desc).
-$pricing = array_map(fn(array $c): array => ['img' => $pimg($c[0]), 'title' => $c[1], 'desc' => $c[2]], [
+$pricing = array_map(fn (array $c): array => ['img' => $pimg($c[0]), 'title' => $c[1], 'desc' => $c[2]], [
     ['Frame-77-2.png', '$6 – $12/hr', 'Premium global talent that fits your budget.'],
     ['Frame-121.svg', '70% Lower Costs', 'Reinvest your savings back into your product and growth.'],
     ['Frame-127.png', '4-Day Average', 'From vacancy to a fully vetted professional ready for onboarding.'],
@@ -64,15 +64,15 @@ $pricing = array_map(fn(array $c): array => ['img' => $pimg($c[0]), 'title' => $
 ]);
 
 // Value cards arrive from the partner config as [img => filename, title, desc]; resolve the URL.
-$valueCards = array_map(fn(array $c): array => ['img' => $pimg($c['img']), 'title' => $c['title'], 'desc' => $c['desc']], $partner['value_cards']);
+$valueCards = array_map(fn (array $c): array => ['img' => $pimg($c['img']), 'title' => $c['title'], 'desc' => $c['desc']], $partner['value_cards']);
 
 // Table rows arrive positional; acf/data-table wants feature/diy/rl.
-$tableRows = array_map(fn(array $r): array => ['feature' => $r[0], 'diy' => $r[1], 'rl' => $r[2]], $partner['table_rows']);
+$tableRows = array_map(fn (array $r): array => ['feature' => $r[0], 'diy' => $r[1], 'rl' => $r[2]], $partner['table_rows']);
 
 // acf/process-steps wants one encoded repeater; production shows the paragraphs joined.
 $stepsData = [];
 BlockDefaults::encodeRepeater('steps', 'field_process_steps_block_steps', array_map(
-    fn(array $step, int $i): array => [
+    fn (array $step, int $i): array => [
         'num' => sprintf('%02d', $i + 1),
         'title' => $step['title'],
         'desc' => implode(' ', $step['paragraphs']),

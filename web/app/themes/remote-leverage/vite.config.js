@@ -3,6 +3,8 @@ import tailwindcss from '@tailwindcss/vite';
 import laravel from 'laravel-vite-plugin'
 import { wordpressPlugin, wordpressThemeJson } from '@roots/vite-plugin';
 
+import { themeImages } from './vite/theme-images.js'
+
 // Set APP_URL if it doesn't exist for Laravel Vite plugin
 if (! process.env.APP_URL) {
   process.env.APP_URL = 'http://example.test';
@@ -20,8 +22,12 @@ export default defineConfig({
         'resources/js/editor.js',
       ],
       refresh: true,
-      assets: ['resources/images/**', 'resources/fonts/**'],
+      // Only the flat files here go through Vite's hashed pipeline. `resources/images/pages/**`
+      // is handled by themeImages() below, which has to preserve filenames.
+      assets: ['resources/images/*.{png,jpg,jpeg,svg,gif,webp}', 'resources/fonts/**'],
     }),
+
+    themeImages(),
 
     wordpressPlugin(),
 

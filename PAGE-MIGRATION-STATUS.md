@@ -313,10 +313,14 @@ one DOM node.
 5. **Affiliate Program "How It Works"** — shows the same three cards duplicated from the
    section above instead of real steps. Exists on production too, so left alone pending a
    copy decision. Moot if `/affiliate-program/` is dropped under §4a.
-6. **`public/images/` is gitignored** — 46MB of hand-maintained page imagery that nothing
-   tracks. The Sync domain only transfers the WP uploads directory, so a fresh clone loses
-   every image on `contractor-management`, `samples`, `hire-va-4`, the homepage and the pages
-   rebuilt on 2026-09-15. Needs an un-ignore decision or a different home.
+6. ~~**`public/images/` is gitignored**~~ — **resolved 2026-09-15**: the 383 source images
+   moved to `resources/images/pages/<page>/` (tracked, 27MB) and `public/images/` is now
+   generated from them at build time by the `themeImages()` Vite plugin
+   (`vite/theme-images.js`), which preserves every filename and adds a `.webp` sibling. A
+   fresh clone plus `npm run build` reproduces the directory exactly. Two leftovers:
+   `public/videos/` (64MB, unreferenced by any block or pattern) is still hand-maintained and
+   untracked, and 22 Elementor/Framer scrape artefacts (CSS, woff2, mp4) that had been sitting
+   in `public/images/home/` were parked in the gitignored `.scrape-cache/` rather than deleted.
 7. **The Impact Report download form is not wired.** `acf/impact-report-hero` renders the
    gated name/email capture, but `form_action` is empty — production posts to a gated
    download this project has no endpoint for yet. Needs a Lead domain endpoint and the

@@ -1,4 +1,7 @@
 <?php
+
+use App\Support\BlockDefaults;
+
 /**
  * Title: Full Page - Sample Applicant Recordings
  * Slug: remote-leverage/samples-content
@@ -40,8 +43,8 @@
 </section>
 <!-- /wp:html -->
 
-<?= \App\Support\BlockDefaults::renderSampleApplicantVideos() ?>
+<?= BlockDefaults::renderSampleApplicantVideos() ?>
 
-<?= \App\Support\BlockDefaults::renderSampleApplicantAudio() ?>
+<?= BlockDefaults::renderSampleApplicantAudio() ?>
 
 <!-- wp:pattern {"slug":"remote-leverage/hire-va-4-booking-footer"} /-->

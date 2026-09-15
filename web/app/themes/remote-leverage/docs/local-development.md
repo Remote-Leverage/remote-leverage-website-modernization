@@ -46,7 +46,7 @@ The env var reference — which keys are actually read, and by what — is in [c
 ```bash
 # From web/app/themes/remote-leverage
 npm run dev      # Vite dev server + HMR
-npm run build    # production assets into public/build
+npm run build    # production assets into public/build, page art into public/images
 ```
 
 Serve the site however you normally serve a Bedrock install (Herd, Valet, nginx) with the document root at `web/`. The local host used throughout the docs is `https://remoteleverage-v2.test`.
@@ -57,7 +57,13 @@ Serve the site however you normally serve a Bedrock install (Herd, Valet, nginx)
 docker compose --env-file env up --build      # http://127.0.0.1:8080
 ```
 
-This is the same `Dockerfile` staging runs, plus MySQL 8 and Redis 7. `app/` and `resources/` are bind-mounted, so PHP and Blade changes are live; asset changes still need `npm run build`. Compare against <https://staging.remoteleverage.com>.
+This is the same `Dockerfile` staging runs, plus MySQL 8 and Redis 7. `app/` and `resources/` are bind-mounted, so PHP and Blade changes are live; asset changes still need `npm run build`.
+
+`public/` is gitignored and produced entirely by that build, page art included — the sources live
+in `resources/images/pages/`. A fresh clone shows no images until the first `npm run build`; a cold
+run takes ~18s for 383 images, and subsequent runs ~2s from the content-hash cache in
+`node_modules/.cache/`. Never add an image by writing into `public/images/`: it survives locally
+and disappears on deploy. Compare against <https://staging.remoteleverage.com>.
 
 Two local-only behaviours worth knowing:
 

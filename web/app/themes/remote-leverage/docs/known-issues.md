@@ -131,6 +131,13 @@ retries. A related data problem was found at the same time: two files in `upload
 page showed a different graphic than the one on disk. Both were deleted and regenerated. A
 perceptual scan of all 319 webp/source pairs found no others.
 
+**Follow-up 2026-09-15:** theme-file webp is no longer generated at runtime at all. The
+`themeImages()` Vite plugin writes every `.webp` at build time from
+`resources/images/pages/**`, so `preferWebp()` finds one already on disk and never has to
+convert. The on-demand path still exists for images that live in `uploads/` (EFS), which is
+where the remaining risk sits. Build-time conversion is lossless for PNG sources and q82 for
+JPEG — a worked comparison is in the plugin's comments.
+
 ### 6. Image URLs are silently swapped for same-named media-library attachments
 
 `BlockDefaults::encodeRepeater()` runs every subfield value through `getAttachmentId()`, which

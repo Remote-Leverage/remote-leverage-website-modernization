@@ -37,8 +37,8 @@ class ContractorPaymentsHeroBlock extends Block
 
     public function with(): array
     {
-        $field = fn(string $key) => function_exists('get_field') ? get_field($key) : null;
-        $img = fn(string $file): string => BlockDefaults::pageImg('contractor-payments', $file);
+        $field = fn (string $key) => function_exists('get_field') ? get_field($key) : null;
+        $img = fn (string $file): string => BlockDefaults::pageImg('contractor-payments', $file);
 
         return [
             'headline' => $field('headline') ?: "Contractor Payments for\nYour Global Team, Simplified",
@@ -91,7 +91,7 @@ class ContractorPaymentsHeroBlock extends Block
         $custom = function_exists('get_field') ? get_field('stats') : null;
 
         if (is_array($custom) && $custom !== []) {
-            return array_values(array_map(static fn(array $s): array => [
+            return array_values(array_map(static fn (array $s): array => [
                 'value' => BlockDefaults::cleanText($s['value'] ?? ''),
                 'label' => BlockDefaults::cleanText($s['label'] ?? ''),
                 'icon' => (string) ($s['icon'] ?? 'dollar'),

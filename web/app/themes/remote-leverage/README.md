@@ -33,7 +33,7 @@ Run from this directory.
 
 ```bash
 npm run dev            # Vite dev server + HMR
-npm run build          # production assets
+npm run build          # production assets + optimizes resources/images/pages/ -> public/images/
 ./vendor/bin/pest      # 422 tests, 1368 assertions
 ./vendor/bin/pint      # format   (--test to check only)
 ```

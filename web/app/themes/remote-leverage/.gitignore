@@ -5,3 +5,4 @@
 .env
 npm-debug.log
 *.sql
+/.scrape-cache

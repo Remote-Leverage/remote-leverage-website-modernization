@@ -20,8 +20,8 @@ class ContentAuditServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(PrismAiAuditor::class, fn() => new PrismAiAuditor());
-        $this->app->singleton(ElementorAuditService::class, fn() => new ElementorAuditService());
+        $this->app->singleton(PrismAiAuditor::class, fn () => new PrismAiAuditor);
+        $this->app->singleton(ElementorAuditService::class, fn () => new ElementorAuditService);
         $this->app->singleton(ConvertElementorPostAction::class);
         $this->app->singleton(ApplyElementorConversionAction::class);
         $this->app->singleton(AuditMarkdownContentAction::class);

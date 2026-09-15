@@ -25,8 +25,8 @@ $patternFiles = static function (): array {
     $theme = dirname(__DIR__, 2);
 
     return array_merge(
-        glob($theme . '/patterns/*.php') ?: [],
-        glob($theme . '/resources/patterns/*.php') ?: [],
+        glob($theme.'/patterns/*.php') ?: [],
+        glob($theme.'/resources/patterns/*.php') ?: [],
     );
 };
 
@@ -92,8 +92,8 @@ describe('pattern authors reuse existing blocks', function () use ($patternFiles
             preg_match_all('#acf/([a-z0-9-]+)#', (string) file_get_contents($file), $m);
 
             foreach (array_unique($m[1]) as $slug) {
-                if (! is_file($theme . '/resources/views/blocks/' . $slug . '.blade.php')) {
-                    $missing[] = basename($file) . ' → acf/' . $slug;
+                if (! is_file($theme.'/resources/views/blocks/'.$slug.'.blade.php')) {
+                    $missing[] = basename($file).' → acf/'.$slug;
                 }
             }
         }
@@ -105,13 +105,13 @@ describe('pattern authors reuse existing blocks', function () use ($patternFiles
 
     test('the committed block inventory lists every block', function () {
         $theme = dirname(__DIR__, 2);
-        $inventory = (string) file_get_contents($theme . '/docs/block-inventory.md');
+        $inventory = (string) file_get_contents($theme.'/docs/block-inventory.md');
         $missing = [];
 
-        foreach (glob($theme . '/app/Blocks/*Block.php') ?: [] as $blockFile) {
+        foreach (glob($theme.'/app/Blocks/*Block.php') ?: [] as $blockFile) {
             $slug = strtolower((string) preg_replace('/(?<!^)[A-Z]/', '-$0', basename($blockFile, 'Block.php')));
 
-            if (! str_contains($inventory, '`acf/' . $slug . '`')) {
+            if (! str_contains($inventory, '`acf/'.$slug.'`')) {
                 $missing[] = $slug;
             }
         }

@@ -37,7 +37,7 @@ class ProgressStepsBlock extends Block
 
     public function with(): array
     {
-        $field = fn(string $key) => function_exists('get_field') ? get_field($key) : null;
+        $field = fn (string $key) => function_exists('get_field') ? get_field($key) : null;
 
         return [
             'headline' => $field('headline') ?: '',
@@ -72,7 +72,7 @@ class ProgressStepsBlock extends Block
             return [];
         }
 
-        return array_values(array_map(static fn(array $s): array => [
+        return array_values(array_map(static fn (array $s): array => [
             'title' => BlockDefaults::cleanText($s['title'] ?? ''),
             'text' => BlockDefaults::cleanText($s['text'] ?? ''),
         ], array_filter($custom, 'is_array')));

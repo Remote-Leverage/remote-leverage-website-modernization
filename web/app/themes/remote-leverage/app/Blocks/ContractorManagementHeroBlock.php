@@ -37,8 +37,8 @@ class ContractorManagementHeroBlock extends Block
 
     public function with(): array
     {
-        $field = fn(string $key) => function_exists('get_field') ? get_field($key) : null;
-        $img = fn(string $file): string => BlockDefaults::pageImg('contractor-management', $file);
+        $field = fn (string $key) => function_exists('get_field') ? get_field($key) : null;
+        $img = fn (string $file): string => BlockDefaults::pageImg('contractor-management', $file);
 
         return [
             'headline' => $field('headline') ?: 'Contractor Management for Remote Teams',
@@ -83,7 +83,7 @@ class ContractorManagementHeroBlock extends Block
         $custom = function_exists('get_field') ? get_field('stats') : null;
 
         if (is_array($custom) && $custom !== []) {
-            return array_values(array_map(static fn(array $s): array => [
+            return array_values(array_map(static fn (array $s): array => [
                 'value' => BlockDefaults::cleanText($s['value'] ?? ''),
                 'label' => BlockDefaults::cleanText($s['label'] ?? ''),
                 'icon' => (string) ($s['icon'] ?? 'people'),

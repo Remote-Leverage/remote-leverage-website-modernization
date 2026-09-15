@@ -37,7 +37,7 @@ class PartnerHeroBlock extends Block
 
     public function with(): array
     {
-        $field = fn(string $key) => function_exists('get_field') ? get_field($key) : null;
+        $field = fn (string $key) => function_exists('get_field') ? get_field($key) : null;
 
         return [
             'headline' => $field('headline') ?: 'Remote Leverage × Partner',
@@ -127,7 +127,7 @@ class PartnerHeroBlock extends Block
         }
 
         return array_values(array_filter(array_map(
-            static fn(array $p): string => BlockDefaults::cleanText($p['text'] ?? ''),
+            static fn (array $p): string => BlockDefaults::cleanText($p['text'] ?? ''),
             array_filter($custom, 'is_array'),
         )));
     }
@@ -143,7 +143,7 @@ class PartnerHeroBlock extends Block
             return [];
         }
 
-        return array_values(array_map(static fn(array $s): array => [
+        return array_values(array_map(static fn (array $s): array => [
             'value' => BlockDefaults::cleanText($s['value'] ?? ''),
             'label' => BlockDefaults::cleanText($s['label'] ?? ''),
             'icon' => (string) ($s['icon'] ?? 'bars'),

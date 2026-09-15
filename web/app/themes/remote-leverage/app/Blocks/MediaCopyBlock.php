@@ -40,7 +40,7 @@ class MediaCopyBlock extends Block
     public function with(): array
     {
         $hasGetField = function_exists('get_field');
-        $field = fn(string $key) => $hasGetField ? get_field($key) : null;
+        $field = fn (string $key) => $hasGetField ? get_field($key) : null;
 
         return [
             'headline' => BlockDefaults::cleanText($field('headline') ?: ''),

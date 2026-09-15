@@ -93,9 +93,10 @@ When given a URL from a production site (e.g. `https://remoteleverage.com/sample
 └──────────────────────────┬─────────────────────────────┘
                            ▼
 ┌────────────────────────────────────────────────────────┐
-│ 3. MEDIA SIDELOADING & ATTACHMENT MAPPING              │
-│    Download images to public/images/<slug>/            │
-│    Import to WP Media Library (get real Attachment IDs)│
+│ 3. MEDIA                                               │
+│    Save art to resources/images/pages/<slug>/ (tracked)│
+│    npm run build -> optimized public/images/<slug>/    │
+│    Sideload to the Media Library only if editor-managed│
 └──────────────────────────┬─────────────────────────────┘
                            ▼
 ┌────────────────────────────────────────────────────────┐
@@ -302,9 +303,16 @@ When creating a pattern file in `patterns/<slug>.php`:
 
 ---
 
-## 7. Media Sideloading Procedure
+## 7. Media
 
-Always ensure demo images exist in the WordPress Media Library with real attachment IDs:
+Page art is **source in `resources/images/pages/<slug>/`** and **generated into
+`public/images/<slug>/`** by the `themeImages()` Vite plugin (`vite/theme-images.js`). Drop the
+file in `resources/`, run `npm run build`, and reference it with
+`BlockDefaults::pageImg('<slug>', '<file>')`. Writing directly into `public/` loses the file on
+the next deploy — that directory is gitignored and rebuilt from scratch in the Docker assets stage.
+
+Sideload into the Media Library only when the image is editor-managed or a block field stores an
+attachment ID; hard-coded theme art does not belong there (see `docs/known-issues.md` §6):
 
 ```php
 // In a WP-CLI script or migration helper:

@@ -82,3 +82,17 @@ jobs:
 
       - name: Build assets
         run: npm run build
+
+      # public/images is gitignored and rebuilt from resources/images/pages by the themeImages()
+      # plugin. If that ever stops emitting, the theme deploys with no page art and nothing else
+      # in CI notices — the Pest job runs without a Vite build, so its guards skip.
+      - name: Verify page images were generated
+        run: |
+          sources=$(find resources/images/pages -type f ! -name '.gitkeep' | wc -l)
+          built=$(find public/images -type f 2>/dev/null | wc -l)
+          echo "sources: $sources, built: $built"
+          if [ "$sources" -eq 0 ]; then echo "::error::resources/images/pages is empty"; exit 1; fi
+          if [ "$built" -lt "$sources" ]; then
+            echo "::error::public/images has $built files for $sources sources"
+            exit 1
+          fi

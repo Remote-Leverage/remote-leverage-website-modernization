@@ -8,7 +8,7 @@ use App\Support\BlockDefaults;
  * Categories: remote-leverage
  * Description: Contractor Payments product landing page, rebuilt to match production layout, typography and imagery (2026-09-14).
  */
-$img = fn(string $file): string => get_theme_file_uri('public/images/contractor-payments/' . $file);
+$img = fn (string $file): string => get_theme_file_uri('public/images/contractor-payments/'.$file);
 
 // Production design tokens, read off the live page with getComputedStyle.
 $h2 = 'font-display font-bold text-[32px] leading-[38px] sm:text-[42px] sm:leading-[48px] tracking-[-1.26px]';
@@ -25,7 +25,7 @@ $steps = [
 ];
 
 // Keys match the acf/feature-cards repeater (img, title, desc).
-$card = fn(array $c): array => ['img' => $img($c[0]), 'title' => $c[1], 'desc' => $c[2]];
+$card = fn (array $c): array => ['img' => $img($c[0]), 'title' => $c[1], 'desc' => $c[2]];
 
 $platformCards = array_map($card, [
     ['Frame-1146.png', 'Every contractor, one invoice', 'Consolidated into a single approval each cycle, no matter how many countries you pay into.'],
@@ -48,7 +48,7 @@ $industries = array_map($card, [
     ['Frame-1132-1.webp', 'Legal', 'Compliantly pay contractors handling intake, document prep, and case admin.'],
 ]);
 
-$recruiting = array_map(fn(array $c): array => ['img' => $img($c[0]), 'title' => $c[1], 'desc' => $c[2]], [
+$recruiting = array_map(fn (array $c): array => ['img' => $img($c[0]), 'title' => $c[1], 'desc' => $c[2]], [
     ['Frame-1133.webp', 'Elite recruiters', 'Specialized recruiters who know where to find the talent you need.'],
     ['Frame-1134-1.webp', 'Pre-vetted pipeline', 'Pre-screened, English-fluent candidates ready to onboard immediately.'],
     ['Frame-1135.webp', 'Fast fulfillment', 'Most placements completed in under a week.'],

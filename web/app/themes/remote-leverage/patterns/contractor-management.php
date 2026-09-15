@@ -13,7 +13,7 @@ use App\Support\BlockDefaults;
  * need"). They are intentionally not reproduced here — rendering them would put content
  * on the page that production never shows.
  */
-$img = fn(string $file): string => get_theme_file_uri('public/images/contractor-management/' . $file);
+$img = fn (string $file): string => get_theme_file_uri('public/images/contractor-management/'.$file);
 
 // Production design tokens, read off the live page with getComputedStyle.
 $deep = 'var(--color-brand-dark-violet)';
@@ -25,7 +25,7 @@ $wrap = 'w-full max-w-[1380px] mx-auto px-5 sm:px-6 lg:px-8';
 $arrow = '<svg class="w-[22px] h-[22px] shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5"/><path d="M10 8l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 // Keys match the acf/feature-cards repeater (img, title, desc).
-$card = fn(array $c): array => ['img' => $img($c[0]), 'title' => $c[1], 'desc' => $c[2]];
+$card = fn (array $c): array => ['img' => $img($c[0]), 'title' => $c[1], 'desc' => $c[2]];
 
 $everything = array_map($card, [
     ['Frame-76-9.jpg', 'Top-Tier Latin American Talent Onboard in Minutes', 'Local-ready contracts, ID verification, digital signing.'],
@@ -41,7 +41,7 @@ $service = array_map($card, [
 ]);
 
 // Keys match the acf/process-step-cards repeater (number, title, text, image).
-$steps = array_map(fn(array $s): array => [
+$steps = array_map(fn (array $s): array => [
     'number' => $s[0], 'title' => $s[1], 'text' => $s[2], 'image' => $img($s[3]),
 ], [
     ['01', 'Tell us about your team', 'Tell us where your contractors are and how you pay them today.', 'Frame-115.jpg'],
@@ -50,7 +50,7 @@ $steps = array_map(fn(array $s): array => [
 ]);
 
 // Keys match the acf/roles-carousel repeater (icon, title, text).
-$industries = array_map(fn(array $c): array => ['icon' => $img($c[0]), 'title' => $c[1], 'text' => $c[2]], [
+$industries = array_map(fn (array $c): array => ['icon' => $img($c[0]), 'title' => $c[1], 'text' => $c[2]], [
     ['ICONS-16.png', 'Construction<br>& Trades', 'Manage VAs who handle scheduling, estimates, and back-office admin.'],
     ['ICONS-17.png', 'Medical &<br>Healthcare', 'Onboard healthcare assistants and providers, compliant and credential-ready.'],
     ['ICONS-18.png', 'Finance &<br>Accounting', 'Compliantly hire support for bookkeeping, data entry, and client admin.'],

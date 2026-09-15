@@ -37,7 +37,7 @@ class ImpactReportHeroBlock extends Block
 
     public function with(): array
     {
-        $field = fn(string $key) => function_exists('get_field') ? get_field($key) : null;
+        $field = fn (string $key) => function_exists('get_field') ? get_field($key) : null;
 
         return [
             'headline' => $field('headline') ?: 'The Remote Leverage 2026 Impact Report',
