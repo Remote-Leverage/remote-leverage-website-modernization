@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\WordPress\Admin;
 
+use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
 use App\Domains\Scheduling\Services\CalendlyEventTypeDiscoveryService;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
@@ -96,6 +97,11 @@ class CalendlyAdminDashboard
             $rows = app(CalendlyTokenPool::class)->allRows();
             if (isset($rows[$index]['token'])) {
                 app(CalendlyTokenPool::class)->clearFailures($rows[$index]['token']);
+                // Also drop the cached users/me identity for this token: "reset
+                // health" is the affordance an admin reaches for after moving a
+                // token between Calendly accounts, and the cached org/user URI
+                // is exactly what would still be stale afterwards.
+                app(CalendlyClient::class)->forgetUserIdentity($rows[$index]['token']);
             }
             wp_safe_redirect(admin_url('admin.php?page=rl-calendly&health_reset=1'));
             exit;

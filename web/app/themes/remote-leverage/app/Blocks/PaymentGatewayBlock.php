@@ -22,6 +22,13 @@ use Log1x\AcfComposer\Builder;
  *
  * The `rl-` class names are load-bearing: resources/js/payment-gateway.js selects the card,
  * the form, the columns, the success state and the submit button by them.
+ *
+ * TELEMETRY: this block fires nothing itself. The `Payment Gateway Viewed` funnel event is
+ * raised client-side by resources/js/payment-gateway.js behind an IntersectionObserver, so it
+ * counts a human scrolling the checkout into view rather than every render — which would
+ * include bots, editor previews and cached page builds, and would make every later step read
+ * as a collapse. The `data-*` attributes emitted by the view (block id, post id, layout) are
+ * the properties that event carries. See app/Domains/Payment/Services/CheckoutTelemetry.php.
  */
 class PaymentGatewayBlock extends Block
 {

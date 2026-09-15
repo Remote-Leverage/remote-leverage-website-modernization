@@ -3366,4 +3366,26 @@ Google Ads',
             ['align' => 'full'],
         );
     }
+
+    /**
+     * /services/ — the whole page is one `acf/offer-stack`, because production paints a single
+     * gradient behind every card and a block per card would seam at each join.
+     *
+     * Each row takes the block's card sub-fields; `pills` is a nested repeater of `['text' => …]`
+     * rows and is encoded as one by encodeRepeater().
+     *
+     * @param  array<int, array<string, mixed>>  $cards
+     * @param  array<string, mixed>  $overrides
+     */
+    public static function renderOfferStack(array $cards, array $overrides = []): string
+    {
+        return self::renderBlockWithRepeater(
+            'offer-stack',
+            'cards',
+            'field_offer_stack_block_cards',
+            $cards,
+            $overrides,
+            ['align' => 'full'],
+        );
+    }
 }

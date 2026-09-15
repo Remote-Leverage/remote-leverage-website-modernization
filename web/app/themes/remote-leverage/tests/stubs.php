@@ -102,6 +102,11 @@ $app->singleton('cache', function () {
             return true;
         }
 
+        public function has($key)
+        {
+            return array_key_exists($key, $this->storage) && $this->storage[$key] !== null;
+        }
+
         public function remember($key, $ttl, $callback)
         {
             if (! isset($this->storage[$key])) {

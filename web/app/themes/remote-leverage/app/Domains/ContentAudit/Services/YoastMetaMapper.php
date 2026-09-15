@@ -21,6 +21,13 @@ namespace App\Domains\ContentAudit\Services;
  * Canonicals are rewritten from the production origin to the target origin.
  * Carrying them verbatim would point every page on a staging install at
  * production and de-index the copy under test.
+ *
+ * Robots directives are carried as production renders them, with one named
+ * exception: slugs passed as `$forceIndex` keep their own indexability because
+ * the page behind the slug was rebuilt in v2 and production's suppression of
+ * the old one is stale. Such a page is left with no stored canonical either —
+ * Yoast omits the canonical on a noindex URL, and its own self-canonical is the
+ * right value once the page is indexable again.
  */
 final class YoastMetaMapper
 {
@@ -71,23 +78,76 @@ final class YoastMetaMapper
     ];
 
     /**
+     * The robots keys that express production's "keep this page out of search"
+     * gesture. A slug in {@see self::$forceIndex} drops all three together:
+     * production suppressed those pages as one decision, and that decision is
+     * what went stale, not just its `noindex` half.
+     *
+     * @var list<string>
+     */
+    private const SUPPRESSION_KEYS = [
+        '_yoast_wpseo_meta-robots-noindex',
+        '_yoast_wpseo_meta-robots-nofollow',
+        '_yoast_wpseo_meta-robots-adv',
+    ];
+
+    /**
+     * Normalised slugs that keep their own indexability. Not promoted: the
+     * constructor normalises what it is given.
+     *
+     * @var list<string>
+     */
+    private readonly array $forceIndex;
+
+    /**
      * @param  string  $sourceOrigin  Production origin, e.g. `https://remoteleverage.com`.
      * @param  string  $targetOrigin  Where the migrated content lives, e.g. `https://remoteleverage-v2.test`.
      * @param  array<string,list<string>>  $siteDefaults  Social values to treat as templates, keyed by head field.
+     * @param  list<string>  $forceIndex  Slugs whose production crawl suppression is stale and must not be carried.
      */
     public function __construct(
         private readonly string $sourceOrigin,
         private readonly string $targetOrigin,
         private readonly array $siteDefaults = [],
-    ) {}
+        array $forceIndex = [],
+    ) {
+        $this->forceIndex = array_values(array_unique(array_filter(
+            array_map([self::class, 'normaliseSlug'], $forceIndex)
+        )));
+    }
+
+    /**
+     * Whether this slug keeps its own indexability regardless of what
+     * production's head object says.
+     *
+     * A page rebuilt in v2 can share a slug with a production page that was
+     * deliberately hidden; carrying that `noindex` across would silently keep
+     * the rebuilt page out of the index, and nothing in the rendered head
+     * distinguishes "hidden on purpose" from "hidden because the old page was
+     * bad". The caller names those slugs.
+     */
+    public function indexForced(string $slug): bool
+    {
+        return in_array(self::normaliseSlug($slug), $this->forceIndex, true);
+    }
+
+    /**
+     * Slugs are compared case-insensitively and without surrounding slashes, so
+     * `/Referral-Program/` and `referral-program` are one slug.
+     */
+    public static function normaliseSlug(string $slug): string
+    {
+        return trim(strtolower(trim($slug)), '/');
+    }
 
     /**
      * @param  array<string,mixed>  $head  A `yoast_head_json` object.
      * @param  string  $postTitle  The production post title, used to tell a real
      *                             OpenGraph override from Yoast echoing the title.
+     * @param  string  $slug  The local slug, checked against the force-index list.
      * @return array<string,string> Meta key => value, keys with no value omitted.
      */
-    public function map(array $head, string $postTitle = ''): array
+    public function map(array $head, string $postTitle = '', string $slug = ''): array
     {
         $meta = [];
 
@@ -123,6 +183,17 @@ final class YoastMetaMapper
         $advanced = array_values(array_intersect(self::ADVANCED_ROBOTS, array_keys($robots)));
         if ($advanced !== []) {
             $meta['_yoast_wpseo_meta-robots-adv'] = implode(',', $advanced);
+        }
+
+        // A force-indexed slug drops the suppression wholesale rather than
+        // never reading it: the keys still have to be *absent* from the result
+        // so the importer deletes any that a previous run wrote. Everything
+        // else production says about the page — title, description, social — is
+        // still carried.
+        if ($this->indexForced($slug)) {
+            foreach (self::SUPPRESSION_KEYS as $key) {
+                unset($meta[$key]);
+            }
         }
 
         $ogTitle = $this->social($head, 'og_title');

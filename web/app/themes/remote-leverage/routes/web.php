@@ -77,11 +77,6 @@ Route::get('partners', function () {
     return view('archive-rl_partner');
 });
 
-// Email Signature Generator (replaces rl-social-kit)
-Route::get('tools/signature-generator', function () {
-    return view('pages.signature-generator');
-})->name('tools.signature-generator');
-
 // Social Media Kit — the ported rl-social-kit dashboard (signatures + brand asset library).
 // A route rather than a WordPress page: it is a tool, not editorial content, so it belongs in
 // git like the other utility routes above and survives a database refresh.

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Application\Http\Controllers;
 
 use App\Application\Http\Support\WebhookSignature;
+use App\Domains\Payment\Data\CheckoutFunnelStep;
+use App\Domains\Payment\Services\CheckoutTelemetry;
 use App\Domains\Referral\Models\Payout;
 use App\Domains\Referral\Models\Referrer;
 use Illuminate\Http\JsonResponse;
@@ -77,6 +79,13 @@ class StripeWebhookController
             case 'payment_intent.succeeded':
                 $this->handlePaymentIntentSucceeded($payload['data']['object'] ?? []);
                 break;
+
+            case 'payment_intent.payment_failed':
+                // Telemetry only — nothing is forwarded and no state changes. The legacy
+                // handler ignored this event entirely, so the funnel lost every decline that
+                // Stripe resolved after the browser had already been redirected away.
+                $this->handlePaymentIntentFailed($payload['data']['object'] ?? []);
+                break;
         }
 
         return response()->json(['status' => 'success']);
@@ -143,6 +152,29 @@ class StripeWebhookController
             'widget_id' => $enriched['widget_id'],
         ]);
 
+        // The authoritative "payment succeeded" for the funnel: the client-side event only
+        // fires if the browser makes it back to the page, which a closed tab or a redirect-
+        // based method finishing out-of-band defeats. `confirmation_source` is what lets
+        // downstream dedupe this against the two client-fired variants by payment_intent_id.
+        CheckoutTelemetry::deferStep(CheckoutFunnelStep::PaymentSucceeded, [
+            'widget_id' => $enriched['widget_id'],
+            'post_id' => $enriched['post_id'],
+            'page_url' => $enriched['page_url'],
+            'payment_intent_id' => $enriched['payment_intent_id'],
+            'amount' => $enriched['amount'],
+            'currency' => $enriched['currency'],
+            'status' => $enriched['status'],
+            'customer_name' => $enriched['customer_name'],
+            'customer_phone' => $enriched['customer_phone'],
+            'description' => $enriched['description'],
+            'payment_method_type' => $enriched['payment_method_type'],
+            'card_brand' => $enriched['card_brand'],
+            'card_last4' => $enriched['card_last4'],
+            'stripe_receipt_url' => $enriched['stripe_receipt_url'],
+            'confirmation_source' => 'stripe_webhook',
+            'source' => 'server',
+        ], $enriched['customer_email']);
+
         $forwardUrl = (string) (config('services.stripe.webhook_forward_url') ?? '');
 
         if ($forwardUrl === '') {
@@ -152,6 +184,44 @@ class StripeWebhookController
         }
 
         $this->forwardToExternal($forwardUrl, $enriched);
+    }
+
+    /**
+     * Record a declined or errored PaymentIntent. Telemetry only.
+     *
+     * @param  array<string, mixed>  $paymentIntent
+     */
+    protected function handlePaymentIntentFailed(array $paymentIntent): void
+    {
+        if (empty($paymentIntent['id'])) {
+            return;
+        }
+
+        $metadata = is_array($paymentIntent['metadata'] ?? null) ? $paymentIntent['metadata'] : [];
+        $lastError = is_array($paymentIntent['last_payment_error'] ?? null) ? $paymentIntent['last_payment_error'] : [];
+
+        Log::warning('Stripe Webhook: payment failed', [
+            'payment_intent_id' => $paymentIntent['id'],
+            'error' => $lastError['message'] ?? '',
+            'widget_id' => $metadata['widget_id'] ?? '',
+        ]);
+
+        CheckoutTelemetry::deferStep(CheckoutFunnelStep::PaymentFailed, [
+            'widget_id' => (string) ($metadata['widget_id'] ?? ''),
+            'post_id' => (string) ($metadata['post_id'] ?? ''),
+            'page_url' => (string) ($metadata['page_url'] ?? ''),
+            'payment_intent_id' => (string) $paymentIntent['id'],
+            'amount' => isset($paymentIntent['amount']) ? ((float) $paymentIntent['amount'] / 100) : 0,
+            'currency' => (string) ($paymentIntent['currency'] ?? ''),
+            'customer_name' => (string) ($metadata['customer_name'] ?? ''),
+            'failure_stage' => 'confirmation',
+            'error' => (string) ($lastError['message'] ?? ''),
+            'decline_code' => (string) ($lastError['decline_code'] ?? ''),
+            'error_code' => (string) ($lastError['code'] ?? ''),
+            'severity' => 'error',
+            'confirmation_source' => 'stripe_webhook',
+            'source' => 'server',
+        ], (string) ($metadata['customer_email'] ?? ($paymentIntent['receipt_email'] ?? '')));
     }
 
     /**

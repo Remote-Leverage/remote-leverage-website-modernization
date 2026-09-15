@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application\Http\Controllers;
 
+use App\Domains\Payment\Data\CheckoutFunnelStep;
+use App\Domains\Payment\Services\CheckoutTelemetry;
 use App\Domains\Payment\Services\PaymentGatewayBlockResolver;
 use App\Domains\Payment\Services\StripePaymentIntentGateway;
 use Illuminate\Http\JsonResponse;
@@ -68,6 +70,16 @@ class PaymentIntentController
                 'block_id' => $blockId,
             ]);
 
+            CheckoutTelemetry::deferStep(CheckoutFunnelStep::PaymentFailed, [
+                'widget_id' => $blockId,
+                'post_id' => $postId,
+                'block_index' => $blockIndex,
+                'failure_stage' => 'intent',
+                'error' => 'block_not_resolved',
+                'severity' => 'error',
+                'source' => 'server',
+            ], $email);
+
             return response()->json(['error' => 'This payment form is not configured correctly. Please contact support.'], 422);
         }
 
@@ -101,6 +113,17 @@ class PaymentIntentController
                 'error' => $intent['error'] ?? 'unknown',
             ]);
 
+            CheckoutTelemetry::deferStep(CheckoutFunnelStep::PaymentFailed, [
+                'widget_id' => $blockId,
+                'post_id' => $postId,
+                'amount' => $charge['amount'] / 100,
+                'currency' => $charge['currency'],
+                'failure_stage' => 'intent',
+                'error' => (string) ($intent['error'] ?? 'unknown'),
+                'severity' => 'error',
+                'source' => 'server',
+            ], $email);
+
             return response()->json(['error' => $intent['error'] ?? 'Failed to initialize payment.'], 502);
         }
 
@@ -111,6 +134,17 @@ class PaymentIntentController
             'post_id' => $postId,
             'email' => $email,
         ]);
+
+        CheckoutTelemetry::deferStep(CheckoutFunnelStep::IntentCreated, [
+            'widget_id' => $blockId,
+            'post_id' => $postId,
+            'payment_intent_id' => (string) ($intent['id'] ?? ''),
+            'amount' => $charge['amount'] / 100,
+            'currency' => $charge['currency'],
+            'customer_name' => $customerName,
+            'customer_phone' => $phone,
+            'source' => 'server',
+        ], $email);
 
         return response()->json(['client_secret' => $intent['client_secret'] ?? '']);
     }

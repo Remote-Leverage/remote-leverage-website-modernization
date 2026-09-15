@@ -23,7 +23,10 @@ use WP_Post;
  *
  * Idempotent: the mapper owns a fixed key set, and any key it does not produce
  * for a post is deleted, so a re-run converges instead of leaving stale
- * overrides behind.
+ * overrides behind. That is also why the force-index exclusion lives here as an
+ * option with a default rather than as a manual `wp post meta delete` after the
+ * fact: a hand-edit would be undone by the next run, and this command is meant
+ * to be re-runnable.
  */
 class ImportYoastMetaCommand extends Command
 {
@@ -38,6 +41,7 @@ class ImportYoastMetaCommand extends Command
         {--cache= : Write the fetched REST payloads into this directory}
         {--strict-types : Only match a local post against the same production post type}
         {--all-social : Carry OpenGraph/Twitter values even when they look like a post-type template}
+        {--force-index=referral-program,ecommerce-virtual-assistant : Slugs that stay indexable whatever production says; blank to carry every directive}
         {--threshold=0.05 : Share of the corpus at which a repeated social value counts as a template}
         {--dry-run : Report what would change without writing}';
 
@@ -94,9 +98,14 @@ class ImportYoastMetaCommand extends Command
 
         $this->reportSiteDefaults($defaults);
 
-        $mapper = new YoastMetaMapper($source, $target, $defaults);
+        $forceIndex = $this->forceIndexSlugs();
+        $mapper = new YoastMetaMapper($source, $target, $defaults, $forceIndex);
         $dryRun = (bool) $this->option('dry-run');
         $strict = (bool) $this->option('strict-types');
+
+        $this->reportForceIndex($forceIndex);
+
+        $forcedSeen = [];
 
         // Production types keyed by slug, so a local case study can find the
         // production *page* that carries its SEO meta.
@@ -118,6 +127,10 @@ class ImportYoastMetaCommand extends Command
                     continue;
                 }
 
+                if ($mapper->indexForced($slug)) {
+                    $forcedSeen[YoastMetaMapper::normaliseSlug($slug)] = true;
+                }
+
                 $remoteType = isset($remote[$type.'|'.$slug])
                     ? $type
                     : ($strict ? null : ($bySlug[$slug] ?? null));
@@ -136,7 +149,7 @@ class ImportYoastMetaCommand extends Command
                     $crossType++;
                 }
 
-                $desired = $mapper->map($item['head'], $item['title']);
+                $desired = $mapper->map($item['head'], $item['title'], $slug);
                 $diff = $this->diff((int) $post->ID, $desired);
 
                 if ($diff === []) {
@@ -162,6 +175,7 @@ class ImportYoastMetaCommand extends Command
         $remoteUnmatched = array_values(array_diff(array_keys($remote), array_keys($seen)));
 
         $this->summarise($remote, $matched, $crossType, $changed, $unchanged, $localUnmatched, $remoteUnmatched, $dryRun);
+        $this->warnUnusedForceIndex($forceIndex, $forcedSeen);
 
         return self::SUCCESS;
     }
@@ -353,6 +367,48 @@ class ImportYoastMetaCommand extends Command
             }
 
             delete_post_meta($postId, $key);
+        }
+    }
+
+    /**
+     * Slugs whose production `noindex` is stale and must not be carried.
+     *
+     * @return list<string>
+     */
+    private function forceIndexSlugs(): array
+    {
+        return array_values(array_filter(array_map(
+            [YoastMetaMapper::class, 'normaliseSlug'],
+            explode(',', (string) $this->option('force-index')),
+        )));
+    }
+
+    /**
+     * @param  list<string>  $slugs
+     */
+    private function reportForceIndex(array $slugs): void
+    {
+        if ($slugs === []) {
+            return;
+        }
+
+        $this->line('Kept indexable regardless of production\'s robots directives: '.implode(', ', $slugs));
+        $this->newLine();
+    }
+
+    /**
+     * A force-index slug that matched nothing is almost always a typo, and it
+     * fails silently — the page it was meant to protect keeps its noindex.
+     *
+     * @param  list<string>  $slugs
+     * @param  array<string,true>  $seen
+     */
+    private function warnUnusedForceIndex(array $slugs, array $seen): void
+    {
+        $unused = array_values(array_diff($slugs, array_keys($seen)));
+
+        if ($unused !== []) {
+            $this->warn('--force-index matched no local post: '.implode(', ', $unused));
         }
     }
 

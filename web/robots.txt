@@ -19,4 +19,7 @@ Disallow: /partner-dashboard
 Disallow: /live-call/connect
 Disallow: /api/
 
-Sitemap: https://remoteleverage.com/wp-sitemap.xml
+# Yoast SEO serves the sitemap index, and 301s core's /wp-sitemap.xml onto it —
+# the same arrangement production has had for years, so the URL Search Console
+# already knows does not change at cutover. See docs/seo-meta-migration.md.
+Sitemap: https://remoteleverage.com/sitemap_index.xml

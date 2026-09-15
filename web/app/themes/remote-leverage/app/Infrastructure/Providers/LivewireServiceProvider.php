@@ -10,7 +10,6 @@ use App\Application\Livewire\Partner\PartnerDirectoryGrid;
 use App\Application\Livewire\Referrer\ReferrerPortalDashboard;
 use App\Application\Livewire\Referrer\ReferrerRegistrationForm;
 use App\Application\Livewire\Scheduling\InstantLiveCallButton;
-use App\Application\Livewire\Utilities\EmailSignatureGenerator;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
@@ -48,7 +47,6 @@ class LivewireServiceProvider extends ServiceProvider
             Livewire::component('referrer.referrer-portal-dashboard', ReferrerPortalDashboard::class);
             Livewire::component('referrer.referrer-registration-form', ReferrerRegistrationForm::class);
             Livewire::component('partner.partner-directory-grid', PartnerDirectoryGrid::class);
-            Livewire::component('utilities.email-signature-generator', EmailSignatureGenerator::class);
             Livewire::component('blog.guide-index-filter', GuideIndexFilter::class);
         }
     }

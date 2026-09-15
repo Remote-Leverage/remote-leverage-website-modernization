@@ -44,6 +44,18 @@ class TestimonialsBlock extends Block
             // 'plain' drops the quote/company/duration chrome for a bare video wall
             // (production's /signedup/). 'cards' is the default everywhere else.
             'layout' => get_field('layout') ?: 'cards',
+            // Production collapses the wall behind a "show more" control on the campaign
+            // and steal landing pages, but NOT on /reviews/ (77 cards, all shown) or the
+            // bare video walls of /1monthonus/, /hire-va-isolated-form/ and /signedup/.
+            // So the collapse is opt-in: unset keeps every existing usage unchanged.
+            'show_more' => (bool) get_field('show_more'),
+            // Production shows six (two rows of three) on the hire-va family and three
+            // (one row) on the steal family — an even split, so the default is the one
+            // that is also two full rows at the block's default three columns.
+            'visible_count' => max(1, (int) (get_field('visible_count') ?: 6)),
+            // The control is an outline pill that reads black on the light pages and
+            // white on the near-black steal pages.
+            'tone' => get_field('tone') ?: 'light',
         ];
     }
 
@@ -61,6 +73,25 @@ class TestimonialsBlock extends Block
                 'label' => 'Columns',
                 'choices' => ['3' => 'Three across (default)', '2' => 'Two across'],
                 'default_value' => '3',
+            ])
+            ->addTrueFalse('show_more', [
+                'label' => 'Collapse behind a "show more" control',
+                'instructions' => 'Off by default — the full wall renders, which is how /reviews/ and the bare video walls behave.',
+                'default_value' => 0,
+                'ui' => 1,
+            ])
+            ->addNumber('visible_count', [
+                'label' => 'Cards visible before collapse',
+                'instructions' => 'Only used when "show more" is on. Production uses 6 on the hire-va pages and 3 on the steal pages.',
+                'default_value' => 6,
+                'min' => 1,
+                'step' => 1,
+            ])
+            ->addSelect('tone', [
+                'label' => 'Control tone',
+                'instructions' => 'Outline colour of the "show more" pill.',
+                'choices' => ['light' => 'Black on a light ground (default)', 'dark' => 'White on a dark ground'],
+                'default_value' => 'light',
             ])
             ->addRepeater('testimonials', [
                 'label' => 'Testimonials List',

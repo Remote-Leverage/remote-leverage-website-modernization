@@ -238,3 +238,83 @@ describe('site default detection', function () {
             ->toHaveKey('_yoast_wpseo_canonical');
     });
 });
+
+/**
+ * Decision of 2026-09-15: `referral-program` and `ecommerce-virtual-assistant`
+ * were rebuilt in v2, so production's `noindex,nofollow` on the pages that used
+ * to hold those slugs is stale and must not be carried across. The other five
+ * noindex pages on production — `signedup`, `vaonboardingform`, `payment`,
+ * `vastore5`, `referral-program-thank-you-page-deposit` — still inherit it.
+ */
+describe('force-indexed slugs', function () {
+    $suppressed = yoastHead(['robots' => [
+        'index' => 'noindex',
+        'follow' => 'nofollow',
+        'noarchive' => 'noarchive',
+    ]]);
+
+    $forced = fn () => new YoastMetaMapper(YOAST_PROD, YOAST_LOCAL, [], ['referral-program', 'ecommerce-virtual-assistant']);
+
+    it('drops the whole suppression for a named slug', function () use ($suppressed, $forced) {
+        expect($forced()->map($suppressed, '', 'referral-program'))
+            ->not->toHaveKey('_yoast_wpseo_meta-robots-noindex')
+            ->not->toHaveKey('_yoast_wpseo_meta-robots-nofollow')
+            ->not->toHaveKey('_yoast_wpseo_meta-robots-adv');
+    });
+
+    it('leaves the keys absent, so the importer deletes what an earlier run wrote', function () use ($suppressed, $forced) {
+        // Absence is the whole mechanism: the importer deletes every key the
+        // mapping does not produce, so a re-run clears an inherited noindex
+        // rather than needing a manual `wp post meta delete`.
+        expect(array_keys($forced()->map($suppressed, '', 'referral-program')))
+            ->not->toContain('_yoast_wpseo_meta-robots-noindex');
+    });
+
+    it('still carries the title, description and social meta of a forced slug', function () use ($suppressed, $forced) {
+        $meta = $forced()->map($suppressed, 'Referral Program', 'referral-program');
+
+        expect($meta['_yoast_wpseo_title'])->toBe('Hire talent for 70% less - Remote Leverage')
+            ->and($meta)->toHaveKey('_yoast_wpseo_metadesc')
+            ->and($meta)->toHaveKey('_yoast_wpseo_opengraph-image');
+    });
+
+    it('leaves every other noindex page suppressed', function () use ($suppressed, $forced) {
+        foreach (['signedup', 'vaonboardingform', 'payment', 'vastore5', 'referral-program-thank-you-page-deposit'] as $slug) {
+            expect($forced()->map($suppressed, '', $slug))
+                ->toHaveKey('_yoast_wpseo_meta-robots-noindex', '1')
+                ->toHaveKey('_yoast_wpseo_meta-robots-nofollow', '1');
+        }
+    });
+
+    it('does not touch a slug that was already indexable', function () use ($forced) {
+        expect($forced()->map(yoastHead(), '', 'referral-program'))
+            ->toHaveKey('_yoast_wpseo_canonical', YOAST_LOCAL.'/hire-us-uk-now/')
+            ->not->toHaveKey('_yoast_wpseo_meta-robots-noindex');
+    });
+
+    it('carries the noindex when no slug is passed at all', function () use ($suppressed, $forced) {
+        // The slug argument is optional; omitting it must not silently make
+        // everything indexable.
+        expect($forced()->map($suppressed))
+            ->toHaveKey('_yoast_wpseo_meta-robots-noindex', '1');
+    });
+
+    it('compares slugs case-insensitively and without surrounding slashes', function () use ($suppressed) {
+        $mapper = new YoastMetaMapper(YOAST_PROD, YOAST_LOCAL, [], ['/Referral-Program/']);
+
+        expect($mapper->indexForced('referral-program'))->toBeTrue()
+            ->and($mapper->map($suppressed, '', 'referral-program'))
+            ->not->toHaveKey('_yoast_wpseo_meta-robots-noindex');
+    });
+
+    it('reports whether a slug is forced, so the importer can flag a typo', function () use ($forced) {
+        expect($forced()->indexForced('ecommerce-virtual-assistant'))->toBeTrue()
+            ->and($forced()->indexForced('ecommerce-virtual-assistants'))->toBeFalse()
+            ->and($forced()->indexForced(''))->toBeFalse();
+    });
+
+    it('carries every directive when the list is empty', function () use ($suppressed) {
+        expect(yoastMapper()->map($suppressed, '', 'referral-program'))
+            ->toHaveKey('_yoast_wpseo_meta-robots-noindex', '1');
+    });
+});

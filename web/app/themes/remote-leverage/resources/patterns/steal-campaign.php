@@ -609,28 +609,19 @@ $orbit = [
         </p>
 
         <?php
-/* acf/testimonials renders the wall; production collapses it to the first row behind a
-   "show more" toggle, which is page chrome rather than block behaviour, so the collapse
-   lives here. On the dark pages the block's light card type is re-toned in place —
-   see the agent report, the block wants a `tone` field. */
+/* acf/testimonials renders the wall and now owns the "show more" collapse too — production
+   shows one row of three here, against six on the hire-va pages, so the count is a field.
+   On the dark pages the block's light card type is re-toned in place. */
 $reviewTone = $isDark
     ? '[&_h3]:text-white! [&_span]:text-white/70! [&_.group:hover]:bg-white/5! [&_.group:hover]:border-white/10!'
     : '';
 ?>
-        <div x-data="{ open: false }" class="mt-[50px]">
-            <?php /* The clamp is a real inline style, not an Alpine :class. The server HTML has
-                     to render collapsed — an Alpine-only binding leaves all fifteen reviews
-                     expanded until hydration, which is what a screenshot catches. */ ?>
-            <div class="<?= $reviewTone ?> [&_.mb-20]:mb-0" style="max-height:520px;overflow:hidden"
-                 :style="open ? 'max-height:none' : 'max-height:520px;overflow:hidden'">
-                <?= BlockDefaults::renderTestimonials() ?>
-            </div>
-            <div class="mt-10 flex justify-center">
-                <button type="button" @click="open = !open"
-                        class="inline-flex items-center rounded-full border <?= $isDark ? 'border-white/40 text-white hover:bg-white/10' : 'border-black/40 text-black hover:bg-black/5' ?> px-7 py-3 font-display text-[13px] font-bold uppercase tracking-[-0.2px] transition-colors">
-                    <span x-text="open ? 'Show less' : 'Show more'">Show more</span>
-                </button>
-            </div>
+        <div class="<?= $reviewTone ?> mt-[50px]">
+            <?= BlockDefaults::renderTestimonials(BlockDefaults::withFieldKeys('testimonials_block', [
+                'show_more' => 1,
+                'visible_count' => 3,
+                'tone' => $isDark ? 'dark' : 'light',
+            ])) ?>
         </div>
     </div>
 </div>

@@ -242,7 +242,15 @@ whether or not the filter runs. It exists so the exclusion survives into product
 mu-plugin stops applying. Verify it with
 `wp eval '…PageRobots::currentPageIsNoindex()'` rather than by reading the local `<meta>` tag.
 It controls indexing only — a noindex page is still served to anyone holding the URL, so it is
-**not** access control. `/vastore5/` is the current user (internal sales collateral).
+**not** access control. Two pages use it:
+
+- `/vastore5/` — internal sales collateral. Marker lives in `patterns/vastore5.php`, so it is in git.
+- `/comparison/` (page 323) — production's own `/comparison/` was never filled in (literal `[X]`
+  placeholders, "Text here Text here", a stray "NEW SECTION" label) and v2 reproduces it verbatim
+  under the strict-fidelity rule. Shipped so the URL resolves, noindexed until real copy is written.
+  **Caveat:** page 323 is one of the pages whose `post_content` holds expanded block markup rather
+  than a pattern reference, so its marker lives in the database and will not survive a database
+  refresh. Re-add it, or promote the page into a pattern, if 323 is ever rebuilt.
 
 ## 8. Testing
 

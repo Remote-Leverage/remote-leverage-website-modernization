@@ -11,7 +11,7 @@ use App\Application\Http\Middleware\MissingPathNotFoundMiddleware;
  * of a 404.
  */
 describe('MissingPathNotFoundMiddleware', function () {
-    $routes = ['book-consultation', 'referrer-portal', 'live-call/connect', 'tools/signature-generator'];
+    $routes = ['book-consultation', 'referrer-portal', 'live-call/connect'];
 
     test('forces a 404 when a non-empty path resolved to nothing', function () use ($routes) {
         $middleware = new MissingPathNotFoundMiddleware;

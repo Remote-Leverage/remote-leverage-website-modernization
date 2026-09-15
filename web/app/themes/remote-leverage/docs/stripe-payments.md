@@ -126,20 +126,123 @@ means expanding `latest_charge`, which should be a separate, tested change.
 | `app/Application/Http/Controllers/PaymentIntentController.php` | `POST /api/payments/intent` |
 | `app/Domains/Payment/Services/PaymentGatewayBlockResolver.php` | Server-side amount resolution |
 | `app/Domains/Payment/Services/StripePaymentIntentGateway.php` | Stripe PaymentIntent API |
-| `app/Application/Http/Controllers/StripeWebhookController.php` | Signature verification, enrichment, forwarding |
+| `app/Application/Http/Controllers/StripeWebhookController.php` | Signature verification, enrichment, forwarding, success/failure telemetry |
+| `app/Domains/Payment/Data/CheckoutFunnelStep.php` | The funnel steps and their event names, with legacy provenance |
+| `app/Domains/Payment/Services/CheckoutTelemetry.php` | Builds the `AnalyticsEventData` and defers dispatch past the response |
 
-## Telemetry dropped in the port
+## Checkout funnel telemetry
 
-The legacy client script fired PostHog `capture`/`identify`, Customer.io `cioanalytics.track`,
-and POSTed every step of the funnel to `/wp-json/rl/v1/log` (the plugin's `LoggingProvider`
-table). v2 has no `LoggingProvider` and no equivalent endpoint, and inventing an
-unauthenticated write endpoint on the money path to replace it would be a poor trade. All of it
-was removed rather than stubbed.
+> **Rebuilt 2026-09-15.** The port originally removed the legacy widget's telemetry rather than
+> stubbing it; this section previously said so. It is now instrumented again, through the
+> Tracking domain. The legacy source it was reconstructed from is
+> `rl-elementor-blocks/assets/js/payment-gateway.js` and
+> `rl-elementor-blocks/src/Integrations/StripeWebhookHandler.php` — **not** present in this
+> repository, but readable in the `rl-testing` install at
+> `web/app/plugins/rl-elementor-blocks/`.
 
-What replaces it: `PaymentIntentController` logs every intent creation and every failure, and
-`StripeWebhookController` logs and forwards every successful payment. That is the
-authoritative record. If client-side funnel attribution is wanted back, attach it to the
-`window.posthog` instance `app.js` already loads — do not add a logging endpoint.
+Every step becomes an `AnalyticsEventData` handed to
+`App\Domains\Tracking\Actions\RecordBehaviorEventAction`, which dual-dispatches to PostHog and
+Customer.io — the same path `CalendlyWebhookController` and `HandleLeadCreatedForTracking` use.
+There is no second telemetry mechanism.
+
+| Funnel step | Event name | Fired from | Provenance |
+| :--- | :--- | :--- | :--- |
+| Gateway viewed | `Payment Gateway Viewed` | `resources/js/payment-gateway.js`, IntersectionObserver at 25% | **Proposed.** The legacy widget had no viewed event. |
+| Checkout started | `form_started` | same, first `input` on the form | Legacy, verbatim (PostHog only in the legacy widget). |
+| Partial email captured | `Payment Partial Email Captured` | same, on email blur/change, with `posthog.identify(email)` | Legacy `payment_partial_email_captured` / `Payment Partial_email_captured`, tidied. |
+| Intent created | `Payment Intent Loaded` | `PaymentIntentController::store()` | Legacy `payment_intent_loaded` / `Payment Intent_loaded`, tidied. |
+| Payment submitted | `Payment Attempted` | `resources/js/payment-gateway.js`, before `confirmPayment()` | Legacy, **verbatim**. |
+| Payment succeeded | `Payment Succeeded` | `StripeWebhookController` (`payment_intent.succeeded`) **and** the client, on redirect return and on inline confirm | Legacy, **verbatim**. |
+| Payment failed | `Payment Failed` | `PaymentIntentController` (422/502), `StripeWebhookController` (`payment_intent.payment_failed`), and the client on Stripe.js load failure, intent failure and confirm error | Legacy, **verbatim**. |
+
+Plus one legacy PostHog-only event kept verbatim because production insights are keyed to the
+literal string: `payment_stripe_load_failed`, with `correlation_id`, `widget_id`, `post_id`,
+`form_type`.
+
+The canonical mapping lives in `App\Domains\Payment\Data\CheckoutFunnelStep`, which also
+records each step's `legacyLogEvent()` / `legacyCustomerIoEvent()` / `legacyPostHogEvent()` so a
+downstream insight or campaign built on an old name can be remapped deliberately.
+`tests/Unit/PaymentCheckoutTelemetryTest.php` covers the mapping and asserts the JS `FUNNEL`
+map has not drifted from the PHP enum.
+
+### Two naming decisions worth knowing
+
+- **`form_started` keeps its lowercase legacy spelling.** It was never payment-specific — the
+  legacy booking widgets fired it too, and production's funnel report aggregates on the literal
+  string (`rl-elementor-blocks/src/Settings.php`, the `SUM(CASE WHEN event_name =
+  'form_started' ...)` column). Title-casing it would silently detach the checkout from that
+  report.
+- **`Payment Attempted` / `Succeeded` / `Failed` are verbatim.** They were already clean Title
+  Case in the legacy Customer.io calls and n8n / Customer.io mappings key off those exact
+  strings. The two that were artefacts of PHP's `ucfirst()` on a snake_case key
+  (`Payment Intent_loaded`, `Payment Partial_email_captured`) were tidied, since nothing
+  sensible can be keyed to the underscore.
+
+### Deduplicating success
+
+`Payment Succeeded` fires from three places, discriminated by a `confirmation_source` property:
+`stripe_webhook`, `client_redirect`, `client_inline`. All three carry `payment_intent_id`, so
+downstream dedupes on that. The webhook one is authoritative — the client events do not fire if
+the customer closes the tab, and the client cannot be trusted about money anyway. `source`
+(`server` / `client`) separates the halves the same way for `Payment Failed`.
+
+### Event properties
+
+Server-side events carry what the server knows: `widget_id` (the block id, legacy key),
+`post_id`, `page_url`, `payment_intent_id`, `amount` (major units), `currency`, `customer_name`,
+`customer_phone`, and on failures `failure_stage`, `error`, `error_code`, `decline_code`,
+`severity`.
+
+Client-side events additionally carry what only the browser knows, which is what the legacy
+`/wp-json/rl/v1/log` table existed to hold: `posthog_session_id`, `posthog_replay_url`,
+`utm_source`, `utm_campaign`, `gclid`, `fbclid`, and `duration` (seconds on the form, from a
+`sessionStorage` start marker keyed by block id — the legacy `rl_session_start_<id>` key).
+
+Both PostHog and Customer.io are keyed on the **lowercased email** as the distinct id, matching
+`HandleLeadCreatedForTracking` and `CalendlyWebhookController`, so a checkout stitches onto the
+same person as their lead and booking. With no usable email the distinct id is `anonymous` and
+no `email` property is sent.
+
+### `/wp-json/rl/v1/log` was deliberately NOT reinstated
+
+It was registered with `permission_callback => '__return_true'` — an unauthenticated write
+endpoint sitting on the money path. Its three jobs are all covered elsewhere:
+
+1. **Funnel breadcrumbs** → PostHog, via the events above.
+2. **Attribution and session context** (UTM, gclid, fbclid, PostHog session + replay URL,
+   duration) → carried as properties on the events, rather than needing their own indexed
+   columns.
+3. **Operational record** → `Log::` in `PaymentIntentController` and `StripeWebhookController`,
+   which the port already added, and the forwarded webhook payload.
+
+The Tracking-adjacent audit log, `rl_lead_activity_logs` via `LeadActivityLogger`, was checked
+and **cannot** host these steps: its `lead_id` is a non-nullable foreign key onto `rl_leads`, and
+an anonymous visitor half-way through a checkout has no `Lead` row. Writing one purely to hold a
+funnel breadcrumb would also pollute the table that `findRecentBookingForSlot()` reads as the
+booking duplicate guard.
+
+### Latency and missing credentials
+
+Nothing here may slow a payment down.
+
+- Client-side events go straight to the PostHog and Customer.io browser SDKs that
+  `TrackingHooks` injects. No request to our own server, so no added latency at all. Every call
+  is wrapped — an analytics SDK throwing must not take a checkout down.
+- Server-side events are dispatched with `->afterResponse()`, the same deferral
+  `LeadServiceProvider` / `TrackingServiceProvider` use and for the same reason: no queue worker
+  is deployed (`queue.default` is `sync`), so an un-deferred PostHog + Customer.io call pair
+  would run inside the customer's request. The closure is `static` and resolves through the
+  global `app()` helper so it never captures `$this` — a non-static closure there captures the
+  container graph and fatally OOMs inside serializable-closure, silently dropping the work.
+- With credentials unset — the normal local state — nothing throws and nothing is logged as an
+  error. Verified, not assumed: `PostHogClient::capture()` and `CustomerIOClient::track()` both
+  return `false` immediately when their config keys are null, and the browser SDKs are simply
+  never injected (`TrackingHooks` returns early), so `window.posthog` / `window.cioanalytics` /
+  `window._cio` are undefined and every client call site guards for that.
+
+`TrackingHooks` injects Customer.io's **classic** tracker (`window._cio`); production ran the
+CDP snippet (`window.cioanalytics`), which is what the legacy widget called. The client
+dispatcher prefers `cioanalytics` and falls back to `_cio`, so it works against either.
 
 ## Known gaps
 
@@ -152,3 +255,15 @@ authoritative record. If client-side funnel attribution is wanted back, attach i
 - **No automated test** covers `PaymentGatewayBlockResolver` or the webhook's
   `payment_intent.succeeded` path. Both are worth a Pest test; the resolver especially, since
   it is the thing standing between a page and a client-chosen price.
+  (`tests/Unit/PaymentCheckoutTelemetryTest.php` covers the funnel event mapping, but it
+  deliberately makes no network calls and so proves nothing about delivery.)
+- **Telemetry delivery is unverified.** `POSTHOG_API_KEY` and the Customer.io credentials are
+  unset in this environment, so no event has been seen to arrive. What is verified is the
+  mapping, the no-credentials no-op, and that the browser makes no request to our own server.
+  Before trusting the funnel: set the keys, load the deposit page, and confirm
+  `Payment Gateway Viewed` → `form_started` → `Payment Attempted` → `Payment Succeeded` land in
+  PostHog with a shared `distinct_id`, and that the Customer.io person timeline shows the same.
+- **The legacy dashboards are not migrated.** Production's funnel report read the
+  `wp_rl_calendly_logs` table that `/wp-json/rl/v1/log` wrote to. That table is not reproduced
+  (see above for why), so any saved report or automation reading it directly needs rebuilding
+  as a PostHog insight against the event names in the table above.

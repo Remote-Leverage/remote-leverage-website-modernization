@@ -5,11 +5,33 @@ declare(strict_types=1);
 namespace App\Domains\Scheduling\Gateways;
 
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class CalendlyClient
 {
+    /**
+     * Cache key prefix for the per-token `users/me` identity (org URI + user URI).
+     * That response is effectively static for the life of a token, so re-fetching
+     * it on every booking submit was pure latency — see findExistingInvitee().
+     */
+    protected const USER_IDENTITY_PREFIX = 'rl_calendly_user_identity_';
+
+    protected const USER_IDENTITY_TTL_SECONDS = 43200; // 12h
+
+    /** Per-request budget for the duplicate-booking preflight. */
+    protected const PREFLIGHT_TIMEOUT_SECONDS = 5;
+
+    protected const PREFLIGHT_CONNECT_TIMEOUT_SECONDS = 2;
+
+    /**
+     * Whole-preflight budget. Bounds the worst case (every pooled token rotating
+     * on 429/403) so a degraded Calendly cannot hold the booking submit open for
+     * tokens x timeout seconds.
+     */
+    protected const PREFLIGHT_BUDGET_SECONDS = 8.0;
+
     protected CalendlyTokenPool $tokenPool;
 
     protected ?string $userUri;
@@ -101,8 +123,13 @@ class CalendlyClient
      * flows that must address every pooled token explicitly (e.g. event-type
      * discovery across accounts) rather than trying one and failing over.
      */
-    public function getForToken(string $token, string $url, array $query = []): ?Response
-    {
+    public function getForToken(
+        string $token,
+        string $url,
+        array $query = [],
+        ?int $timeoutSeconds = null,
+        ?int $connectTimeoutSeconds = null
+    ): ?Response {
         try {
             // Guzzle/Laravel's HTTP client treats an explicit `query` option — even
             // an empty array — as a full replacement of the URL's existing query
@@ -110,9 +137,15 @@ class CalendlyClient
             // own query string (organization/user/page_token), so passing []
             // here would silently strip it and break every page after the first.
             // Only pass $query through when there's something to add.
+            $request = Http::withToken($token)->timeout($timeoutSeconds ?? 15);
+
+            if ($connectTimeoutSeconds !== null) {
+                $request = $request->connectTimeout($connectTimeoutSeconds);
+            }
+
             return empty($query)
-                ? Http::withToken($token)->timeout(15)->get($url)
-                : Http::withToken($token)->timeout(15)->get($url, $query);
+                ? $request->get($url)
+                : $request->get($url, $query);
         } catch (\Throwable $e) {
             Log::error("CalendlyClient::getForToken exception: {$e->getMessage()}");
 
@@ -279,46 +312,111 @@ class CalendlyClient
 
     /**
      * Duplicate-booking preflight: does the given email already have an active
-     * scheduled event for this exact event type + start time, on ANY pooled
-     * account? Ported from legacy's is_already_booked(). Checked explicitly per
-     * token (not via sendWithFailover) since the org/user URI used to scope the
-     * /scheduled_events query is account-specific — the same token that resolved
-     * it must be the one used to query with it.
+     * scheduled event for this exact event type + start time? Ported from
+     * legacy's is_already_booked(), then rewritten for latency — it was measured
+     * at 4 057 ms p50 / 6 144 ms p95 *inside the user's request*
+     * (docs/performance-baseline.md, Part 2, Pass C).
+     *
+     * What it used to do, and why it was slow:
+     *   for each of the 4 pooled tokens: GET users/me, then GET scheduled_events
+     *   = 8 sequential round-trips, walked to completion even when the first
+     *   account already answered "this lead has no prior booking" — which is the
+     *   overwhelmingly common case.
+     *
+     * What it does now:
+     *   - `users/me` is resolved through a 12h cache (userIdentity()), because a
+     *     token's org/user URI does not change. Warm, that is 0 round-trips.
+     *   - The pool is used as a *failover*, not a fan-out: the first token that
+     *     returns a usable answer ends the loop. Rotation happens only when a
+     *     token cannot answer — 429 (rate-limited, the reason the pool exists),
+     *     401/403 (bad/scoped-out token) or 404.
+     *   - The `scheduled_events` query is narrowed to a +/-60s window around the
+     *     requested slot, so the account's whole booking history is neither
+     *     transferred nor scanned.
+     *   - A connection error or a 5xx stops immediately and reports "no prior
+     *     booking" rather than retrying three more accounts behind a 15s timeout;
+     *     PREFLIGHT_BUDGET_SECONDS bounds the whole thing even when every token
+     *     rotates.
+     *
+     * Warm-cache cost is therefore **one** round-trip instead of eight.
+     *
+     * Deliberate behaviour change: this no longer queries every pooled account.
+     * The pooled tokens are separate Calendly accounts, but createInvitee() books
+     * through sendWithFailover(), which also takes the first eligible token — so
+     * the account checked here is the account the booking lands on. The residual
+     * gap (a prior booking made while the primary token was rate-limited, so it
+     * landed on a different account) is still covered for the common double-submit
+     * case by BookMeetingAction's activity-log guard, which is account-agnostic.
+     *
+     * Fail-open by design: null means "no duplicate found, go ahead and book".
+     * A Calendly outage must not block a booking submit.
      */
     public function findExistingInvitee(string $email, string $eventTypeUri, string $startTimeIso): ?array
     {
+        $deadline = microtime(true) + self::PREFLIGHT_BUDGET_SECONDS;
+
         foreach ($this->tokenPool->getEligibleTokens(null) as $item) {
+            if (microtime(true) >= $deadline) {
+                Log::warning('CalendlyClient: duplicate-booking preflight exceeded its time budget, treating as no prior booking');
+
+                return null;
+            }
+
             $token = $item['token'];
 
-            $user = $this->getForToken($token, 'https://api.calendly.com/users/me');
-            if (! $user || ! $user->successful()) {
+            $identity = $this->userIdentity($token);
+            if ($identity === null) {
+                Log::warning("CalendlyClient: preflight could not resolve identity for token [{$item['label']}], failing over");
+
                 continue;
             }
 
-            $orgUri = $user->json('resource.current_organization');
-            $userUri = $user->json('resource.uri');
-            if (! $orgUri && ! $userUri) {
+            $response = $this->queryScheduledEvents($token, $identity, $email, $startTimeIso);
+
+            if ($response === null) {
+                // Connection error or timeout. Calendly is unreachable, not this
+                // token's fault — rotating would just pay the timeout again.
+                Log::error('CalendlyClient: preflight could not reach Calendly, treating as no prior booking');
+
+                return null;
+            }
+
+            $status = $response->status();
+
+            if ($status === 429) {
+                Log::warning("CalendlyClient: preflight token [{$item['label']}] rate-limited, failing over to next token in pool");
+                $this->tokenPool->markRateLimited($token);
+
                 continue;
             }
 
-            $response = $this->getForToken($token, 'https://api.calendly.com/scheduled_events', [
-                'organization' => $orgUri,
-                'invitee_email' => $email,
-                'status' => 'active',
-            ]);
+            if ($status === 401 || $status === 403) {
+                Log::warning("CalendlyClient: preflight token [{$item['label']}] returned {$status}, recording failure and failing over");
+                $this->forgetUserIdentity($token);
+                $this->tokenPool->recordFailure($token, 'booking');
 
-            if (! $response || $response->status() === 403) {
-                $response = $this->getForToken($token, 'https://api.calendly.com/scheduled_events', [
-                    'user' => $userUri,
-                    'invitee_email' => $email,
-                    'status' => 'active',
-                ]);
-            }
-
-            if (! $response || ! $response->successful()) {
                 continue;
             }
 
+            if ($status === 404) {
+                continue;
+            }
+
+            if ($status >= 500) {
+                Log::error("CalendlyClient: preflight token [{$item['label']}] returned server error {$status}, treating as no prior booking");
+
+                return null;
+            }
+
+            if (! $response->successful()) {
+                Log::warning("CalendlyClient: preflight token [{$item['label']}] returned {$status}", ['body' => $response->body()]);
+
+                continue;
+            }
+
+            // A working account answered. Short-circuit either way: a match is the
+            // duplicate we were looking for, and an empty collection is a definitive
+            // "no prior booking" — the case that used to cost all eight round-trips.
             foreach ($response->json('collection', []) as $scheduledEvent) {
                 $sameEventType = ($scheduledEvent['event_type'] ?? null) === $eventTypeUri;
                 $sameStartTime = isset($scheduledEvent['start_time'])
@@ -328,9 +426,160 @@ class CalendlyClient
                     return $scheduledEvent;
                 }
             }
+
+            return null;
         }
 
         return null;
+    }
+
+    /**
+     * The org URI + user URI a token authenticates as, cached for 12h.
+     *
+     * This lives on the client rather than in CalendlyMetadataCache because that
+     * class is constructed *with* a CalendlyClient — caching token identity there
+     * would make the two mutually dependent. CalendlyMetadataCache caches
+     * per-event-type metadata; this is per-token identity, and the only caller
+     * that needs it is the client itself.
+     *
+     * @return array{organization: ?string, user: ?string}|null
+     */
+    public function userIdentity(string $token, bool $forceRefresh = false): ?array
+    {
+        $key = self::userIdentityKey($token);
+
+        if (! $forceRefresh) {
+            $cached = Cache::get($key);
+
+            if (is_array($cached) && (! empty($cached['organization']) || ! empty($cached['user']))) {
+                return $cached;
+            }
+        }
+
+        $response = $this->getForToken(
+            $token,
+            'https://api.calendly.com/users/me',
+            [],
+            self::PREFLIGHT_TIMEOUT_SECONDS,
+            self::PREFLIGHT_CONNECT_TIMEOUT_SECONDS
+        );
+
+        if (! $response || ! $response->successful()) {
+            return null;
+        }
+
+        $identity = [
+            'organization' => $response->json('resource.current_organization'),
+            'user' => $response->json('resource.uri'),
+        ];
+
+        if (empty($identity['organization']) && empty($identity['user'])) {
+            return null;
+        }
+
+        Cache::put($key, $identity, now()->addSeconds(self::USER_IDENTITY_TTL_SECONDS));
+
+        return $identity;
+    }
+
+    /**
+     * Drop a token's cached identity — on 401/403 (token revoked or re-scoped),
+     * and from the admin screen when the pool is edited.
+     */
+    public function forgetUserIdentity(string $token): void
+    {
+        Cache::forget(self::userIdentityKey($token));
+    }
+
+    /**
+     * One `scheduled_events` lookup for a token, scoped to the account's
+     * organization when it has one and falling back to user scope only on 403
+     * (a token without organization-read permission). The legacy code also
+     * re-queried on a null response; that is a connection failure, so retrying
+     * the same unreachable host under a second timeout is paid latency for
+     * nothing — it is reported as unreachable instead.
+     *
+     * @param  array{organization: ?string, user: ?string}  $identity
+     */
+    protected function queryScheduledEvents(string $token, array $identity, string $email, string $startTimeIso): ?Response
+    {
+        $slot = strtotime($startTimeIso);
+
+        $base = [
+            'invitee_email' => $email,
+            'status' => 'active',
+            'count' => 100,
+        ];
+
+        if ($slot !== false) {
+            // The match below is exact equality on start_time, so a +/-60s window
+            // is a strict superset of what can match, and keeps the response to the
+            // handful of events around the requested slot instead of the account's
+            // entire active history.
+            $base['min_start_time'] = gmdate('Y-m-d\TH:i:s\Z', $slot - 60);
+            $base['max_start_time'] = gmdate('Y-m-d\TH:i:s\Z', $slot + 60);
+        }
+
+        $orgUri = $identity['organization'] ?? null;
+        $userUri = $identity['user'] ?? null;
+
+        $response = null;
+
+        if ($orgUri) {
+            $response = $this->scheduledEventsRequest($token, ['organization' => $orgUri] + $base);
+
+            if ($response === null || $response->status() !== 403 || ! $userUri) {
+                return $response;
+            }
+        }
+
+        if ($userUri) {
+            return $this->scheduledEventsRequest($token, ['user' => $userUri] + $base);
+        }
+
+        return $response;
+    }
+
+    /**
+     * A time-windowed scheduled_events GET, retried once unwindowed if Calendly
+     * rejects the window params with a 400. The window is verified to work today;
+     * the retry means a future API change narrows the result set rather than
+     * silently turning the duplicate guard off.
+     *
+     * @param  array<string, mixed>  $query
+     */
+    protected function scheduledEventsRequest(string $token, array $query): ?Response
+    {
+        $response = $this->getForToken(
+            $token,
+            'https://api.calendly.com/scheduled_events',
+            $query,
+            self::PREFLIGHT_TIMEOUT_SECONDS,
+            self::PREFLIGHT_CONNECT_TIMEOUT_SECONDS
+        );
+
+        if ($response && $response->status() === 400 && isset($query['min_start_time'])) {
+            Log::warning('CalendlyClient: scheduled_events rejected the time window, retrying unwindowed', [
+                'body' => $response->body(),
+            ]);
+
+            unset($query['min_start_time'], $query['max_start_time']);
+
+            return $this->getForToken(
+                $token,
+                'https://api.calendly.com/scheduled_events',
+                $query,
+                self::PREFLIGHT_TIMEOUT_SECONDS,
+                self::PREFLIGHT_CONNECT_TIMEOUT_SECONDS
+            );
+        }
+
+        return $response;
+    }
+
+    protected static function userIdentityKey(string $token): string
+    {
+        return self::USER_IDENTITY_PREFIX.substr(hash('sha256', $token), 0, 16);
     }
 
     /**

@@ -247,18 +247,28 @@ and `payment_intent.succeeded` handling with HMAC signature verification added t
 **It is inert until someone moves the credentials.** They live in `rl-testing`'s WP options and
 were not readable from this session. The env vars and their legacy option names are documented
 in [`docs/stripe-payments.md`](web/app/themes/remote-leverage/docs/stripe-payments.md). Three
-things need a human decision before this page goes live:
+things needed a human decision before this page goes live. **All three are now resolved
+(2026-09-15)** — what remains is moving the credentials, not deciding anything:
 
-1. **Which Stripe account.** `STRIPE_KEY`/`STRIPE_SECRET` currently serve Connect payouts to
-   referrers. If the deposit is collected on a different account, that pair must change.
-2. **The webhook fails open.** With `STRIPE_WEBHOOK_SECRET` unset the controller logs a warning
-   and processes anyway — ported verbatim from the legacy plugin. Once the secret is set in
-   every environment this should be made fail-closed, or a forged `payment_intent.succeeded`
-   can drive onboarding.
-3. **Telemetry was dropped.** The legacy widget fired PostHog, Customer.io and an internal
-   `/wp-json/rl/v1/log` endpoint on every step of the checkout. v2 has no equivalent, so those
-   calls were removed rather than stubbed. If that attribution matters to sales/ops, it needs
-   rebuilding.
+1. **Which Stripe account — decided.** The deposit is collected on the **existing**
+   `STRIPE_KEY`/`STRIPE_SECRET` pair, the same one serving Connect payouts to referrers. No
+   second credential set. See [cutover-decisions.md](web/app/themes/remote-leverage/docs/cutover-decisions.md) §5.
+2. **~~The webhook fails open.~~ Fixed 2026-09-15 — it now fails closed.** With
+   `STRIPE_WEBHOOK_SECRET` unset the controller returns **503** and processes nothing; a bad
+   signature returns **403**. The same shared verifier was applied to the Calendly webhook,
+   which had no signature verification at all. **This turns the missing secret into a hard
+   deployment gate:** until `STRIPE_WEBHOOK_SECRET` and `CALENDLY_WEBHOOK_SIGNING_KEY` are set,
+   those endpoints are dark — Stripe Connect payout events included, not just the deposit. See
+   [known-issues.md](web/app/themes/remote-leverage/docs/known-issues.md) #7.
+3. **Telemetry — rebuilt 2026-09-15.** The legacy widget fired PostHog, Customer.io and an
+   internal `/wp-json/rl/v1/log` endpoint on every step of the checkout, and the port removed
+   all of it. It is instrumented again through the Tracking domain
+   (`RecordBehaviorEventAction`), covering gateway viewed → checkout started → payment
+   submitted → succeeded / failed. The `/wp-json/rl/v1/log` endpoint was deliberately not
+   reinstated — it was unauthenticated and everything it held is now event properties. Event
+   names, provenance and what still needs live keys to verify are in
+   [`docs/stripe-payments.md`](web/app/themes/remote-leverage/docs/stripe-payments.md)
+   § Checkout funnel telemetry.
 
 Nothing was verified against Stripe end to end, because no key was available.
 
@@ -490,7 +500,7 @@ call from you.
 |---|---|---|---|---|---|
 | 1 | `/vapricing/` | 288 | yes | Fully built — roles pricing grid, 8 role cards, 64 sideloaded images | Substantial build. Linked from nav? **check before deleting** |
 | 2 | `/affiliate-program/` | 212 | yes | Fully built — `AffiliateHeroBlock` + process steps + booking footer | CTAs point at `/referrer-register` |
-| 3 | `/referral/` | 213 | yes | **Built from the wrong source** — renders `hire-va-4-full`, but production `/referral/` is a *homepage* variant | See correction below |
+| 3 | ~~`/referral/`~~ | 213 | **trashed 2026-09-15** | **Built from the wrong source** — rendered `hire-va-4-full`, but production `/referral/` is a *homepage* variant | **Decided: delete.** See correction below |
 | 4 | `/comparison-wing-assistant-ads/` | 408 | yes | Fully built — shorter variant of the in-scope Wing page | Confirmed a distinct page, not a duplicate |
 
 #### Correction: `/referral/` was migrated from the wrong source (2026-09-14)
@@ -516,6 +526,16 @@ none of which appear on `/hire-va-4/`.
 This matters for the decision in the table above — the page is not a legitimate duplicate to
 redirect away, it is 20,952 characters of *incorrect* content sitting at a URL that is live on
 production. Deleting or redirecting it is cleaner than leaving it.
+
+**Resolved 2026-09-15 — deleted.** Page 213 was trashed (`wp post delete 213`, recoverable, not
+`--force`). Nothing referenced it: no `href` in the theme, patterns or config, no `nav_menu_item`
+targeting object id 213, no `/referral/` string in any `wp_posts.post_content`, `wp_postmeta` or
+`wp_options` row. The only mention anywhere was the explanatory comment in
+`config/redirects.php`. `/referral/` now returns a real 404 locally. **Still needed:** a 301 in
+`config/redirects.php`, since the URL is live on production — `'referral' => ''`, in the
+"Old homepage variants and homepage clones -> /" bucket, because production's `/referral/` *is*
+a homepage variant (27 of 27 headings). Until that key is added, a legacy `/referral/` visitor
+404s at cutover.
 
 `/hire-va-4-preview/` (ID 104), the other copy of this content, was **deleted (trashed)
 2026-09-14** at your instruction. No code referenced it — only documentation.
@@ -608,10 +628,11 @@ one DOM node.
 1. ~~**The partner hub and Lexgo**~~ — **resolved 2026-09-14**: both the
    `/remote-leverage-x-*/` landing pages and `/partners/` are kept. Lexgo rides the hub
    (production has no `/remote-leverage-x-lexgo/`). See §3 P1.
-2. **`/referral/` (213) holds the wrong content** — it renders `hire-va-4-full`, but
-   production `/referral/` is a homepage variant (§4a). It is out of scope, so the call is
-   redirect-or-delete, not rework. `/hire-va-4-preview/` (104), the other copy, was deleted
-   2026-09-14.
+2. ~~**`/referral/` (213) holds the wrong content**~~ — **resolved 2026-09-15: deleted.**
+   It rendered `hire-va-4-full`, but production `/referral/` is a homepage variant (§4a), and
+   it was out of scope, so the call was delete rather than rework. Page 213 is trashed (not
+   force-deleted) and nothing linked to it. `/hire-va-4-preview/` (104), the other copy, was
+   deleted 2026-09-14. **Follow-up:** add `'referral' => ''` to `config/redirects.php`.
 3. **`/social-media-kit/` vs `/tools/signature-generator`** — the in-scope page (P3) and
    the out-of-scope route (§4b) may be the same deliverable. Confirm before building either.
 4. **`legal_last_updated`** — still empty on both legal pages, so the hero falls back to

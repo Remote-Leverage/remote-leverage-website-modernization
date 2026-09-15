@@ -18,16 +18,18 @@ namespace App\Support;
  *   idle     #FFFFFF, weight 300, no underline
  *   active   #3DC53D, weight 500, underlined
  *
- * WHERE PRODUCTION ACTUALLY SHOWS IT (verified 2026-09-15, not what production-cutover.md
- * claims): only on **single** case_study posts. The string "TALENT PROFILES" does not
- * appear in the served HTML of `/case-study/` (the archive) or `/reviews/`, and a
- * Playwright probe finds no bar on either. `docs/production-cutover.md` describes the bar
- * as "shared site-wide with /reviews/"; that is wrong.
+ * WHERE PRODUCTION SHOWS IT (verified 2026-09-15, not what production-cutover.md
+ * originally claimed): only on **single** case_study posts. The string "TALENT PROFILES"
+ * does not appear in the served HTML of `/case-study/` (the archive) or `/reviews/`, and
+ * a Playwright probe finds no bar on either. `docs/production-cutover.md` described the
+ * bar as "shared site-wide with /reviews/"; that was wrong.
  *
- * The archive and `/reviews/` entries in SURFACES are therefore a deliberate extension
- * beyond production, added because a tab group whose tabs lead to pages that do not
- * themselves carry the bar is broken wayfinding. To fall back to strict production
- * parity, delete those two entries — nothing else needs to change.
+ * v2 briefly extended the bar onto the `case_study` archive and `/reviews/`, on the
+ * reasoning that a tab group whose tabs lead to pages that drop the bar is broken
+ * wayfinding. That extension was **reverted on 2026-09-15** in favour of strict
+ * production parity: `surfaces()` now matches single case_study posts and nothing else.
+ * The consequence is accepted and deliberate — every tab except CASE STUDIES leads to a
+ * page that does not carry the bar, exactly as on production.
  */
 class CaseStudySubnav
 {
@@ -69,22 +71,17 @@ class CaseStudySubnav
      * Each entry is a conditional-tag check run against the current main query. The first
      * one that matches wins, so order is significant only if two could ever match at once.
      *
-     * `/samples/` is deliberately absent: production does not show the bar there either,
-     * and it was not part of this build's scope.
+     * Strict production parity: single case_study posts are the ONLY surface. The
+     * `case_study` archive, `/reviews/` and `/samples/` are all deliberately absent —
+     * production does not show the bar on any of them.
      *
      * @return array<string, callable(): bool>
      */
     private static function surfaces(): array
     {
         return [
-            // Production parity — the bar exists here on remoteleverage.com.
-            self::TAB_CASE_STUDIES => static fn (): bool => is_singular('case_study')
-                // Beyond production: the CASE STUDIES tab links to the archive, so the
-                // archive needs the bar or the tab leads somewhere that loses it.
-                || is_post_type_archive('case_study'),
-
-            // Beyond production: same reasoning as the archive.
-            self::TAB_REVIEWS => static fn (): bool => is_page('reviews'),
+            // Production parity — the bar exists here on remoteleverage.com, and only here.
+            self::TAB_CASE_STUDIES => static fn (): bool => is_singular('case_study'),
         ];
     }
 
@@ -93,14 +90,15 @@ class CaseStudySubnav
      * content of the page beneath it — which is what production does (its bar and its
      * case-study hero both sit in the same 1240px container, both starting at x=100).
      *
-     * The surfaces do not share one container, so neither can the bar. Measured at
-     * 1440px on 2026-09-15:
+     * Measured at 1440px on 2026-09-15:
      *
      *   case_study archive + single  1260px + px-8  → content starts at x=122
      *   /reviews/                    1380px, no side padding at this width → x=30
      *
-     * A surface with no entry falls back to the case-study container, since that is the
-     * one production actually ships the bar against.
+     * Since the 2026-09-15 parity revert only the case-study row is reachable — the
+     * `/reviews/` row is kept as the recorded measurement in case that surface is ever
+     * restored. A surface with no entry falls back to the case-study container, which is
+     * the one production actually ships the bar against.
      */
     private const CONTAINERS = [
         self::TAB_CASE_STUDIES => 'max-w-[1260px] mx-auto px-4 sm:px-6 lg:px-8',

@@ -11,18 +11,188 @@
  *  - Elementor coupling (elementorFrontend.hooks.addAction) — these are Gutenberg blocks now,
  *    so each .rl-payment-card initialises itself on DOMContentLoaded.
  *  - jQuery — the theme does not ship it on the front end.
- *  - TELEMETRY. The legacy script fired PostHog capture/identify, Customer.io `cioanalytics`
- *    track calls, and POSTed every step to `/wp-json/rl/v1/log` (the plugin's LoggingProvider
- *    table). v2 has no LoggingProvider and no such endpoint, and inventing one here would
- *    create an unauthenticated write endpoint on the money path. Payment events are instead
- *    recorded server-side: PaymentIntentController logs intent creation and
- *    StripeWebhookController logs and forwards payment_intent.succeeded, which is the
- *    authoritative record anyway. If client-side attribution is wanted back, wire it to the
- *    already-loaded window.posthog in app.js rather than to a new endpoint.
+ *  - The `POST /wp-json/rl/v1/log` leg of the legacy telemetry. That endpoint was registered
+ *    with `permission_callback => '__return_true'` — an unauthenticated write endpoint on the
+ *    money path — and everything it held is now carried as properties on the analytics events
+ *    below (PostHog session id + replay URL, utm_source, utm_campaign, gclid, fbclid, the
+ *    time-on-form duration and the severity), or logged server-side by PaymentIntentController
+ *    and StripeWebhookController. See app/Domains/Payment/Services/CheckoutTelemetry.php.
+ *
+ * TELEMETRY (rebuilt 2026-09-15; the port had removed all of it rather than stubbing it).
+ * Event names live in FUNNEL below and MUST stay in step with the PHP enum
+ * App\Domains\Payment\Data\CheckoutFunnelStep — tests/Unit/PaymentCheckoutTelemetryTest.php
+ * reads this file and fails if the two drift. Dispatch is direct to the PostHog and
+ * Customer.io browser SDKs that TrackingHooks already injects; there is no request to our own
+ * server, so none of this can add latency to a payment. Both SDKs are absent whenever their
+ * credentials are unset (which is the normal local state), and every call site guards for that.
  *
  * The amount is NOT sent from here. The server re-derives it from the block on the page
  * (post_id + block_index); this script only posts who the customer is.
  */
+
+/**
+ * Funnel step -> event name. Mirrors CheckoutFunnelStep::eventName() in PHP.
+ *
+ * `form_started` keeps its lowercase legacy spelling on purpose: it was never
+ * payment-specific, the legacy booking widgets fired it too, and production's funnel report
+ * aggregates across it. The rest are the legacy Customer.io names, tidied where they were
+ * artefacts of PHP's ucfirst() on a snake_case key.
+ */
+const FUNNEL = {
+  gatewayViewed: 'Payment Gateway Viewed',
+  checkoutStarted: 'form_started',
+  emailCaptured: 'Payment Partial Email Captured',
+  paymentSubmitted: 'Payment Attempted',
+  paymentSucceeded: 'Payment Succeeded',
+  paymentFailed: 'Payment Failed',
+};
+
+/** Legacy PostHog-only event, kept verbatim — production insights are keyed to this string. */
+const STRIPE_LOAD_FAILED_EVENT = 'payment_stripe_load_failed';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function queryParam(name) {
+  try {
+    return new URLSearchParams(window.location.search).get(name) || undefined;
+  } catch (e) {
+    return undefined;
+  }
+}
+
+/**
+ * Build the per-card telemetry dispatcher.
+ *
+ * Every send is wrapped: an analytics SDK throwing must never take a checkout down, which is
+ * the whole reason the legacy version swallowed its own fetch rejection.
+ */
+function createTelemetry({ blockId, postId }) {
+  const storageKey = `rl_session_start_${blockId}`;
+  let startedAt = Date.now();
+
+  try {
+    const stored = window.sessionStorage.getItem(storageKey);
+    if (stored) {
+      startedAt = parseInt(stored, 10) || Date.now();
+    } else {
+      window.sessionStorage.setItem(storageKey, String(startedAt));
+    }
+  } catch (e) {
+    // Private mode / blocked storage. Duration is then per-pageview rather than per-session.
+  }
+
+  // Captured once and refreshed on every send, as the legacy script did: PostHog assigns the
+  // session id asynchronously, so the first few events would otherwise carry nothing.
+  function posthogContext() {
+    const posthog = window.posthog;
+    const context = {};
+
+    if (!posthog) {
+      return context;
+    }
+
+    try {
+      if (typeof posthog.get_session_id === 'function') {
+        context.posthog_session_id = posthog.get_session_id() || undefined;
+      }
+      if (typeof posthog.get_session_replay_url === 'function') {
+        context.posthog_replay_url = posthog.get_session_replay_url() || undefined;
+      }
+    } catch (e) {
+      // Stub not yet replaced by the real library.
+    }
+
+    return context;
+  }
+
+  function baseProperties() {
+    return {
+      // `widget_id` is the legacy key for this and the Stripe metadata still uses it.
+      widget_id: blockId,
+      post_id: postId,
+      form_type: 'payment_gateway',
+      source: 'client',
+      page_url: window.location.href,
+      duration: Math.round((Date.now() - startedAt) / 1000),
+      utm_source: queryParam('utm_source'),
+      utm_campaign: queryParam('utm_campaign'),
+      gclid: queryParam('gclid'),
+      fbclid: queryParam('fbclid'),
+      ...posthogContext(),
+    };
+  }
+
+  function clean(properties) {
+    return Object.fromEntries(
+      Object.entries(properties).filter(([, v]) => v !== undefined && v !== null && v !== ''),
+    );
+  }
+
+  function capture(eventName, properties) {
+    const payload = clean(properties);
+
+    try {
+      if (window.posthog && typeof window.posthog.capture === 'function') {
+        window.posthog.capture(eventName, payload);
+      }
+    } catch (e) {
+      // Analytics is never allowed to break the form.
+    }
+
+    try {
+      // Production runs the CDP snippet (`cioanalytics`), which is what the legacy widget
+      // called. TrackingHooks injects the classic tracker (`_cio`). Support whichever is there.
+      if (window.cioanalytics && typeof window.cioanalytics.track === 'function') {
+        window.cioanalytics.track(eventName, payload);
+      } else if (window._cio && typeof window._cio.track === 'function') {
+        window._cio.track(eventName, payload);
+      }
+    } catch (e) {
+      // As above.
+    }
+  }
+
+  return {
+    track(eventName, properties = {}) {
+      capture(eventName, { ...baseProperties(), ...properties });
+    },
+
+    /**
+     * Legacy parity: the widget identified the visitor in PostHog by email the moment a valid
+     * one was typed, well before any payment, so an abandoned checkout is still attributable.
+     */
+    identify(email) {
+      try {
+        if (window.posthog && typeof window.posthog.identify === 'function') {
+          window.posthog.identify(email, { email });
+        }
+      } catch (e) {
+        // As above.
+      }
+
+      try {
+        if (window.cioanalytics && typeof window.cioanalytics.identify === 'function') {
+          window.cioanalytics.identify(email, { email });
+        } else if (window._cio && typeof window._cio.identify === 'function') {
+          window._cio.identify({ id: email, email });
+        }
+      } catch (e) {
+        // As above.
+      }
+    },
+  };
+}
+
+/** `pi_123_secret_abc` -> `pi_123`, so a client-side success carries the same id as the webhook. */
+function intentIdFromClientSecret(clientSecret) {
+  if (typeof clientSecret !== 'string') {
+    return undefined;
+  }
+
+  const [id] = clientSecret.split('_secret_');
+
+  return id || undefined;
+}
 
 const STRIPE_JS_SRC = 'https://js.stripe.com/v3/';
 
@@ -130,6 +300,74 @@ function initCard(card) {
   let iti = null;
   let isStripeValid = false;
   let messageTimer = null;
+  let clientSecret = null;
+
+  const telemetry = createTelemetry({ blockId, postId });
+
+  // --- Funnel step 1: gateway viewed -------------------------------------------------------
+  // Tied to visibility rather than to render. The block sits well below the fold on the
+  // deposit page, so counting every page load as a view would make every later step look like
+  // a catastrophic drop-off. No legacy equivalent existed — this name is new.
+  let viewedFired = false;
+
+  function fireGatewayViewed() {
+    if (viewedFired) {
+      return;
+    }
+    viewedFired = true;
+    telemetry.track(FUNNEL.gatewayViewed, { layout: card.dataset.layout || undefined });
+  }
+
+  if (typeof IntersectionObserver === 'function') {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          fireGatewayViewed();
+          observer.disconnect();
+        }
+      });
+    }, { threshold: 0.25 });
+    observer.observe(card);
+  } else {
+    fireGatewayViewed();
+  }
+
+  // --- Funnel step 2: checkout started -----------------------------------------------------
+  let checkoutStartedFired = false;
+
+  form.addEventListener('input', () => {
+    if (checkoutStartedFired) {
+      return;
+    }
+    checkoutStartedFired = true;
+    fireGatewayViewed();
+    // `form_id` is the legacy property name on this event and is shared with the booking
+    // widgets' version of it; keep it.
+    telemetry.track(FUNNEL.checkoutStarted, { form_id: blockId });
+  }, true);
+
+  // --- Funnel step 2b: partial email capture -----------------------------------------------
+  let lastIdentifiedEmail = '';
+
+  function handleEmailCapture(raw) {
+    const email = String(raw || '').trim().toLowerCase();
+
+    if (!EMAIL_PATTERN.test(email) || email === lastIdentifiedEmail) {
+      return;
+    }
+
+    lastIdentifiedEmail = email;
+    telemetry.identify(email);
+    telemetry.track(FUNNEL.emailCaptured, { email });
+  }
+
+  const emailField = field('email');
+
+  if (emailField) {
+    emailField.addEventListener('blur', () => handleEmailCapture(emailField.value));
+    emailField.addEventListener('change', () => handleEmailCapture(emailField.value));
+    handleEmailCapture(emailField.value);
+  }
 
   function showMessage(text, type = 'info') {
     if (!messageContainer) {
@@ -276,6 +514,16 @@ function initCard(card) {
       const Stripe = await loadStripeJs();
       stripe = Stripe(publishableKey);
     } catch (e) {
+      // Legacy parity: this exact event name, with these exact properties, is what the widget
+      // captured when the <script src="https://js.stripe.com/v3/"> tag never arrived.
+      telemetry.track(STRIPE_LOAD_FAILED_EVENT, {
+        correlation_id: `stripe_load_failed_${blockId}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+      });
+      telemetry.track(FUNNEL.paymentFailed, {
+        failure_stage: 'stripe_js',
+        error: e && e.message ? e.message : 'Stripe.js failed to load',
+        severity: 'critical',
+      });
       showMessage('Unable to load the payment form. Please refresh the page or try again later.', 'error');
       setLoading(false);
       return;
@@ -291,6 +539,14 @@ function initCard(card) {
 
       switch (paymentIntent && paymentIntent.status) {
         case 'succeeded':
+          // The browser came back from a redirect-based method (Link, 3D Secure). The webhook
+          // records the same success independently; `confirmation_source` is what lets these
+          // be deduplicated by payment_intent_id downstream.
+          telemetry.track(FUNNEL.paymentSucceeded, {
+            payment_intent_id: paymentIntent.id,
+            confirmation_source: 'client_redirect',
+            email: value('email') || undefined,
+          });
           showSuccessState();
           window.history.replaceState({}, document.title, window.location.pathname);
           setLoading(false);
@@ -299,6 +555,14 @@ function initCard(card) {
           showMessage('Your payment is processing.');
           break;
         case 'requires_payment_method':
+          telemetry.track(FUNNEL.paymentFailed, {
+            payment_intent_id: paymentIntent.id,
+            failure_stage: 'confirmation',
+            confirmation_source: 'client_redirect',
+            error: 'requires_payment_method',
+            severity: 'error',
+            email: value('email') || undefined,
+          });
           showMessage('Your payment was not successful, please try again.', 'error');
           break;
         default:
@@ -307,11 +571,17 @@ function initCard(card) {
       }
     }
 
-    let clientSecret;
-
     try {
       clientSecret = await createIntent();
     } catch (e) {
+      // PaymentIntentController records its own side of this (source: 'server'). This one is
+      // the only record when the request never reached the server at all.
+      telemetry.track(FUNNEL.paymentFailed, {
+        failure_stage: 'intent',
+        error: e && e.message ? e.message : 'Failed to initialize payment.',
+        severity: 'error',
+        email: value('email') || undefined,
+      });
       showMessage(e.message || 'Failed to initialize payment.', 'error');
       setLoading(false);
       return;
@@ -387,6 +657,14 @@ function initCard(card) {
 
     setLoading(true);
 
+    const paymentIntentId = intentIdFromClientSecret(clientSecret);
+
+    telemetry.track(FUNNEL.paymentSubmitted, {
+      payment_intent_id: paymentIntentId,
+      email: value('email') || undefined,
+      phone: phoneNumber() || undefined,
+    });
+
     const { error } = await stripe.confirmPayment({
       elements,
       confirmParams: {
@@ -402,12 +680,30 @@ function initCard(card) {
     });
 
     if (error) {
+      telemetry.track(FUNNEL.paymentFailed, {
+        payment_intent_id: paymentIntentId,
+        failure_stage: 'confirmation',
+        confirmation_source: 'client_inline',
+        error: error.message,
+        error_type: error.type,
+        error_code: error.code,
+        decline_code: error.decline_code,
+        severity: 'error',
+        email: value('email') || undefined,
+      });
+
       if (error.type === 'card_error' || error.type === 'validation_error') {
         showMessage(error.message, 'error');
       } else {
         showMessage('An unexpected error occurred.', 'error');
       }
     } else {
+      telemetry.track(FUNNEL.paymentSucceeded, {
+        payment_intent_id: paymentIntentId,
+        confirmation_source: 'client_inline',
+        email: value('email') || undefined,
+      });
+
       // Card payments normally redirect and never reach here; some methods resolve inline.
       if (successUrl) {
         window.location.href = successUrl;

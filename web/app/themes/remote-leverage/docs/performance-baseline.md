@@ -3,7 +3,8 @@
 First measurement of the cutover gate that [`production-cutover.md`](production-cutover.md) lists
 as 🔴 **"Never measured"** — *Performance baseline met (mobile 96+, LCP < 1.2s, CLS 0.00)* — and of
 the `CaptureLeadAction` p95 decision rule proposed in
-[`known-issues.md`](known-issues.md#synchronous-listeners-are-a-latency-risk-at-production-volume).
+[`known-issues.md`](known-issues.md) (“Synchronous listeners are a latency risk at production volume”,
+since **reclassified** on the strength of what is measured below).
 
 Measured 2026-09-15 against **local Herd** (`https://remoteleverage-v2.test`), after
 `npm run build`. Nothing was changed to produce these numbers — this is a measurement pass only.
@@ -371,6 +372,43 @@ completion. 8 × ~500 ms ≈ 4 s, exactly what was measured. `getEventQuestions`
 `getScheduledEvent`'s measured 1.5 s is the **404 failover worst case** — a miss retries through the
 whole pool. On the happy path it is one round-trip.
 
+### Pass D — `findExistingInvitee()` after the fix (2026-09-15) — **measured**
+
+The preflight was rewritten (`CalendlyClient::findExistingInvitee`): `users/me` is resolved through
+a 12 h per-token identity cache, the pool is used as a failover rather than a fan-out so the first
+account that answers ends the loop, the `scheduled_events` query is narrowed to a ±60 s window
+around the requested slot, and a 5 s request / 8 s whole-preflight budget replaces the inherited
+15 s-per-call default. **One HTTP round-trip on a warm cache instead of eight.**
+
+Measured as an **interleaved A/B in a single WP-CLI process** — a verbatim replica of the old loop
+and the new implementation alternating on the same fresh email each iteration, so both arms see
+identical network conditions. **n = 20 per arm**, nearest-rank percentiles, `hrtime()`. Read-only;
+`createInvitee` was still never called.
+
+| Arm | min | p50 | **p95** | p99 | max | mean |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| **Before** (old loop, replica) | 4 171.51 ms | **4 434.93 ms** | **5 495.00 ms** | 5 553.28 ms | 5 553.28 ms | 4 635.11 ms |
+| **After** (current code) | 400.58 ms | **521.20 ms** | **1 159.35 ms** | 1 561.99 ms | 1 561.99 ms | 679.80 ms |
+| *Speed-up* | | **8.51×** | **4.74×** | | | 6.82× |
+
+The "after" arm is now indistinguishable from the calibration row above — **one plain Calendly GET
+from this machine** (378 ms min / 528 ms p50) — which is the floor for a single round-trip. What is
+left is network, not code.
+
+Two further checks, both live and read-only:
+
+- **Cold identity cache** (first submission after a deploy or a 12 h TTL expiry): p50 432.16 ms,
+  p95 1 122.30 ms over n = 12, i.e. the extra `users/me` costs one round-trip *once per token per
+  12 h*, not once per booking.
+- **Correctness against a real booking.** A genuine active scheduled event on the primary pooled
+  account was rediscovered by `findExistingInvitee()` in 436 ms, and the negative control (same
+  invitee and event type, slot +7 days) correctly returned no match in 889 ms. The narrowed time
+  window and the short-circuit do not weaken the duplicate guard.
+
+Regression coverage: `tests/Unit/CalendlyPreflightTest.php` — 429 failover, cached `users/me` not
+re-fetched, no-prior-booking short-circuit, 401/403 rotation, 5xx and connection-failure
+degradation, and the time-windowed query.
+
 ## (b) Every outbound call with all integrations configured
 
 Counted from the code, for one `LeadCreated`:
@@ -379,14 +417,15 @@ Counted from the code, for one `LeadCreated`:
 
 | # | Call | Where | Timeout |
 | ---: | :--- | :--- | ---: |
-| 1–8 | **`users/me` + `scheduled_events` × 4 pooled tokens** | `CalendlyClient::findExistingInvitee` | 15 s each |
+| ~~1–8~~ → **1** | ~~`users/me` + `scheduled_events` × 4 pooled tokens~~ → **one `scheduled_events`** (warm identity cache; +1 `users/me` per token per 12 h) | `CalendlyClient::findExistingInvitee` | ~~15 s each~~ → 5 s/request, 8 s total budget |
 | 9 | `event_types/{uuid}` (cached per TTL) | `CalendlyMetadataCache::getEventQuestions` | 15 s |
 | 10 | **`POST /scheduled_events/…/invitees`** — creates the booking | `CalendlyClient::createInvitee` | 20 s |
 | 11 | `GET /scheduled_events/{uuid}` — resolve the Meet link | `CalendlyClient::getScheduledEvent` | 15 s (×4 on failover) |
 | — | *`POST …/cancellation`, only on a genuine reschedule* | `cancelScheduledEvent` | 15 s |
 | — | *Google Calendar OAuth + insert, only if the Calendly path returns nothing* | `GoogleCalendarClient` | none set |
 
-**Up to 11 sequential third-party round-trips before the user sees a confirmation.**
+~~**Up to 11 sequential third-party round-trips before the user sees a confirmation.**~~
+**Now up to 4** (warm) — rows 1–8 collapsed to one after the 2026-09-15 preflight fix; see Pass D.
 
 ### After the response is flushed (`dispatch()->afterResponse()`)
 
@@ -406,7 +445,7 @@ Counted from the code, for one `LeadCreated`:
 | Path | In-request calls | After-response calls | Total |
 | :--- | ---: | ---: | ---: |
 | Step-1 partial capture | **0** | **7** | 7 |
-| Final booking submit | **up to 11** | **9** | **up to 20** |
+| Final booking submit | ~~up to 11~~ → **up to 4** | **9** | ~~up to 20~~ → **up to 13** |
 
 Note the four `afterResponse` calls with **no timeout set** (Customer.io ×2, PostHog, `wp_mail`).
 They inherit Guzzle / WordPress defaults, so a hung endpoint holds a PHP-FPM worker far longer than

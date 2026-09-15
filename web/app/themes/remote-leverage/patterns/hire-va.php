@@ -25,7 +25,9 @@
  *     Role copy, benefit rows, process steps, guarantee, reviews and all 11 FAQ answers are
  *     byte-identical.
  *
- * No new key was needed on the shared template, so the sibling pages it drives are untouched.
+ * One new key was added to the shared template for this page — 'hero_split_at' — and it defaults
+ * to the existing behaviour, so /1monthonus/ and /hire-va-isolated-form/ render byte-identical
+ * HTML to before (verified by diffing their rendered pages across the change).
  *
  * Production leads with an <h2>, not an <h1> — there is no <h1> anywhere on the page, as on the
  * two siblings. Reproduced as-is rather than "fixed".
@@ -44,6 +46,14 @@ $page = [
 
     // Headline is three lines and production runs it at 80/88 (getComputedStyle on the hero h2).
     'hero_headline_size' => '80',
+
+    // Production's hero is a centred single column at 1440px and only switches to the
+    // left-aligned row above its own ~1500px Elementor breakpoint (h2 text-align measured on
+    // production 2026-09-15: center at 1440, start at 1600 and 1920). The template defaults the
+    // switch to xl (1280px) because /hire-va-isolated-form/ needs it to keep its booking card
+    // on-screen; this page has no booking card, so it takes the 2xl (1536px) break and matches
+    // production at the 1440px verification width.
+    'hero_split_at' => '2xl',
 
     // No hero booking card and no hero background image on this page: the band is the bare
     // 135deg #6200A4 -> #6E1686 gradient, backgroundImage reads as that gradient alone.

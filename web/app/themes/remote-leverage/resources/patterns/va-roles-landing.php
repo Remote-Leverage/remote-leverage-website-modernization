@@ -6,10 +6,10 @@
  * Not a block pattern. It lives outside the theme's patterns/ directory because WordPress core
  * scans that tree recursively and would reject a headerless file.
  *
- * Included by patterns/1monthonus.php and patterns/hire-va-isolated-form.php, each of which
- * defines $page before including this file. The two production pages are the same Elementor
- * template and differ only in the hero headline, the hero checklist and one benefit row, so the
- * markup lives here once.
+ * Included by patterns/1monthonus.php, patterns/hire-va-isolated-form.php and patterns/hire-va.php,
+ * each of which defines $page before including this file. The three production pages are the same
+ * Elementor template and differ only in the hero headline, the hero checklist, the hero CTA/booking
+ * card and one benefit row, so the markup lives here once.
  *
  * This is the oldest design in the P4 set and does NOT follow the current design system: it is a
  * light page (#FAFAFA / #FFFFFF) with a #6200A4 → #6E1686 hero, #342567 headings and a #FB7501
@@ -151,6 +151,34 @@ $heroHeadline = ($page['hero_headline_size'] ?? '64') === '80'
     ? 'text-[40px] leading-[1.1] sm:text-[64px] sm:leading-[70.4px] xl:text-[80px] xl:leading-[88px]'
     : 'text-[40px] leading-[1.1] sm:text-[64px] sm:leading-[70.4px]';
 
+// Width at which the hero stops being a centred single column and becomes the left-aligned
+// copy/card row. Production's own Elementor breakpoint for this is ~1500px: measured on
+// /hire-va/ 2026-09-15, the hero h2 computes text-align:center at 1440 and start at 1600/1920.
+//
+// 'xl' (1280px) is the default because that is what the two pages already on this template
+// ship, and for /hire-va-isolated-form/ it is deliberate: production's own 1500px break leaves
+// its booking card overflowing off-screen at 1440, which is a production bug, not a design.
+//
+// A page with no booking card has nothing to rescue, so it can opt into '2xl' (1536px) and
+// reproduce production's centred 1440px hero exactly. Both class sets are spelled out in full
+// below so Tailwind's scanner sees every literal.
+//
+// The wide set is written as min-[1536px]: rather than 2xl: on purpose. This theme's Tailwind
+// build emits no 2xl: variant at all — verified by compiling a probe file carrying both spellings:
+// min-[1536px]:flex-row landed in public/build/assets/app-*.css, 2xl:flex-row did not. The
+// arbitrary variant resolves to the same 96rem media query.
+$heroSplitAt = ($page['hero_split_at'] ?? 'xl') === '2xl' ? '2xl' : 'xl';
+$heroRow = $heroSplitAt === '2xl'
+    ? 'min-[1536px]:flex-row min-[1536px]:items-center'
+    : 'xl:flex-row xl:items-center';
+$heroCol = $heroSplitAt === '2xl'
+    ? 'min-[1536px]:flex-1 min-[1536px]:text-left'
+    : 'xl:flex-1 xl:text-left';
+$heroFlush = $heroSplitAt === '2xl' ? 'min-[1536px]:mx-0' : 'xl:mx-0';
+$heroCardCol = $heroSplitAt === '2xl'
+    ? 'min-[1536px]:w-[492px] min-[1536px]:shrink-0'
+    : 'xl:w-[492px] xl:shrink-0';
+
 ?>
 <!-- ============ HERO ============ -->
 <!-- rl:cta-only-header — production serves this family with no site nav, only a logo and a
@@ -195,10 +223,10 @@ $heroHeadline = ($page['hero_headline_size'] ?? '64') === '80'
     <?php } ?>
 
     <div class="<?= $wrap ?> relative z-10">
-        <div class="mx-auto flex w-full max-w-[1280px] flex-col items-center gap-5 xl:flex-row xl:items-center">
+        <div class="mx-auto flex w-full max-w-[1280px] flex-col items-center gap-5 <?= $heroRow ?>">
 
             <!-- Left: headline, intro, tick list, optional CTA -->
-            <div class="w-full text-center xl:flex-1 xl:text-left">
+            <div class="w-full text-center <?= $heroCol ?>">
                 <h2 class="font-display font-bold <?= $heroHeadline ?> text-white">
                     <?= $page['hero_title_lead'] ?? '' ?><br />
                     <span class="bg-[linear-gradient(120deg,#FFA51E_20%,#FFDC10_70%)] bg-clip-text text-transparent">
@@ -206,11 +234,11 @@ $heroHeadline = ($page['hero_headline_size'] ?? '64') === '80'
                     </span>
                 </h2>
 
-                <p class="mx-auto mt-6 max-w-[670px] font-display text-[18px] leading-[27px] text-white sm:text-[22px] sm:leading-[33px] xl:mx-0">
+                <p class="mx-auto mt-6 max-w-[670px] font-display text-[18px] leading-[27px] text-white sm:text-[22px] sm:leading-[33px] <?= $heroFlush ?>">
                     Recruiting agency helping businesses hire English speaking Virtual Assistants from <strong class="font-bold">Latin America</strong> for 70% less than U.S. Employees.
                 </p>
 
-                <div class="mx-auto mt-8 flex w-fit flex-col gap-x-14 gap-y-1 sm:grid sm:grid-flow-col sm:grid-rows-3 xl:mx-0">
+                <div class="mx-auto mt-8 flex w-fit flex-col gap-x-14 gap-y-1 sm:grid sm:grid-flow-col sm:grid-rows-3 <?= $heroFlush ?>">
                     <?php foreach (array_merge($page['hero_checks_left'] ?? [], $page['hero_checks_right'] ?? []) as $item) { ?>
                         <span class="flex items-center gap-2 text-left font-display text-[18px] font-semibold leading-10 text-white sm:text-[24px]">
                             <?= $check ?><?= $item ?>
@@ -227,7 +255,7 @@ $heroHeadline = ($page['hero_headline_size'] ?? '64') === '80'
 
             <!-- Right: booking card -->
             <?php if (! empty($page['hero_card_title'])) { ?>
-                <div class="w-full xl:w-[492px] xl:shrink-0">
+                <div class="w-full <?= $heroCardCol ?>">
                     <div class="mx-auto w-full max-w-[472px] rounded-[10px] bg-white p-[30px] shadow-[0_4px_150px_0_rgba(138,43,226,0.7)]">
                         <h3 class="text-center font-display text-[27px] font-bold leading-[35px] text-black">
                             <?= $page['hero_card_title'] ?>

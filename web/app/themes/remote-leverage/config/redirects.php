@@ -27,7 +27,58 @@ return [
     // Duplicate thank-you slugs on production: /thank-you/ and /vathankyou/ serve the
     // same confirmation page. /vathankyou/ is canonical in v2 (page ID 126,
     // page-vathankyou.blade.php), so the duplicate 301s to it rather than being rebuilt.
+    // The Livewire signature generator was removed 2026-09-15: /social-media-kit/ is a
+    // strict superset of it (same six variants, plus the asset library and the setup
+    // instructions), and keeping two implementations had already let their templates drift.
+    'tools/signature-generator' => 'social-media-kit',
     'thank-you' => 'vathankyou',
+
+    /*
+    | Social Media Kit assets, carried over from the retired rl-social-kit plugin.
+    |
+    | Filenames and the per-tab structure are unchanged; only the prefix moved, because
+    | Bedrock serves the theme from /app/themes/ rather than /wp-content/plugins/. Listed
+    | one by one because LegacyRedirectMiddleware matches on an exact normalized path and
+    | has no prefix rules — and because an explicit list is what the RoutesTest target check
+    | can verify actually exists on disk.
+    */
+    'wp-content/plugins/rl-social-kit/assets/resources/linkedin/RL_LKD_PersonalBanner_01_4400x1100.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/linkedin/RL_LKD_PersonalBanner_01_4400x1100.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/linkedin/RL_LKD_PersonalBanner_02_4400x1100.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/linkedin/RL_LKD_PersonalBanner_02_4400x1100.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/linkedin/RL_LKD_PersonalBanner_03_4400x1100.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/linkedin/RL_LKD_PersonalBanner_03_4400x1100.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/linkedin/RL_LKD_PersonalBanner_04_4400x1100.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/linkedin/RL_LKD_PersonalBanner_04_4400x1100.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/linkedin/RL_LKD_PersonalBanner_05_4400x1100.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/linkedin/RL_LKD_PersonalBanner_05_4400x1100.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/linkedin/RL_LKD_PersonalBanner_06_4400x1100.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/linkedin/RL_LKD_PersonalBanner_06_4400x1100.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/linkedin/RL_LKD_PersonalBanner_07_4400x1100.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/linkedin/RL_LKD_PersonalBanner_07_4400x1100.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/linkedin/RL_LKD_PersonalBanner_08_4400x1100.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/linkedin/RL_LKD_PersonalBanner_08_4400x1100.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/facebook/RL_FC_Personal_Banner_01_850x315.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/facebook/RL_FC_Personal_Banner_01_850x315.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/facebook/RL_FC_Personal_Banner_02_850x315.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/facebook/RL_FC_Personal_Banner_02_850x315.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/facebook/RL_FC_Personal_Banner_03_850x315.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/facebook/RL_FC_Personal_Banner_03_850x315.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/facebook/RL_FC_Personal_Banner_04_850x315.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/facebook/RL_FC_Personal_Banner_04_850x315.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/facebook/RL_FC_Personal_Banner_05_850x315.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/facebook/RL_FC_Personal_Banner_05_850x315.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/facebook/RL_FC_Personal_Banner_06_850x315.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/facebook/RL_FC_Personal_Banner_06_850x315.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/facebook/RL_FC_Personal_Banner_07_850x315.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/facebook/RL_FC_Personal_Banner_07_850x315.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/facebook/RL_FC_Personal_Banner_08_850x315.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/facebook/RL_FC_Personal_Banner_08_850x315.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/facebook/RL_FC_Personal_Banner_09_850x315.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/facebook/RL_FC_Personal_Banner_09_850x315.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/facebook/RL_FC_Personal_Banner_10_850x315.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/facebook/RL_FC_Personal_Banner_10_850x315.jpg',
+    'wp-content/plugins/rl-social-kit/assets/resources/other/avatar.png' => 'app/themes/remote-leverage/public/images/social-media-kit/other/avatar.png',
+    'wp-content/plugins/rl-social-kit/assets/resources/other/avatar_02-1.png' => 'app/themes/remote-leverage/public/images/social-media-kit/other/avatar_02-1.png',
+    'wp-content/plugins/rl-social-kit/assets/resources/other/avatar_02.png' => 'app/themes/remote-leverage/public/images/social-media-kit/other/avatar_02.png',
+    'wp-content/plugins/rl-social-kit/assets/resources/other/rl-logo-1.png' => 'app/themes/remote-leverage/public/images/social-media-kit/other/rl-logo-1.png',
+    'wp-content/plugins/rl-social-kit/assets/resources/other/rl-logo-2.png' => 'app/themes/remote-leverage/public/images/social-media-kit/other/rl-logo-2.png',
+    'wp-content/plugins/rl-social-kit/assets/resources/other/rl-logo-3.png' => 'app/themes/remote-leverage/public/images/social-media-kit/other/rl-logo-3.png',
+    'wp-content/plugins/rl-social-kit/assets/resources/other/rl-logo-4.png' => 'app/themes/remote-leverage/public/images/social-media-kit/other/rl-logo-4.png',
+    'wp-content/plugins/rl-social-kit/assets/resources/other/rl-logo-5.png' => 'app/themes/remote-leverage/public/images/social-media-kit/other/rl-logo-5.png',
+    'wp-content/plugins/rl-social-kit/assets/resources/other/rl-logo-6.png' => 'app/themes/remote-leverage/public/images/social-media-kit/other/rl-logo-6.png',
+    'wp-content/plugins/rl-social-kit/assets/resources/other/rl-logo-7.png' => 'app/themes/remote-leverage/public/images/social-media-kit/other/rl-logo-7.png',
+    'wp-content/plugins/rl-social-kit/assets/resources/other/rl-logo-8.png' => 'app/themes/remote-leverage/public/images/social-media-kit/other/rl-logo-8.png',
+    'wp-content/plugins/rl-social-kit/assets/fb.png' => 'app/themes/remote-leverage/public/images/social-media-kit/brand/fb.png',
+    'wp-content/plugins/rl-social-kit/assets/ig.png' => 'app/themes/remote-leverage/public/images/social-media-kit/brand/ig.png',
+    'wp-content/plugins/rl-social-kit/assets/ln.png' => 'app/themes/remote-leverage/public/images/social-media-kit/brand/ln.png',
+    'wp-content/plugins/rl-social-kit/assets/logo-icon-black.svg' => 'app/themes/remote-leverage/public/images/social-media-kit/brand/logo-icon-black.svg',
+    'wp-content/plugins/rl-social-kit/assets/logo-icon-white.svg' => 'app/themes/remote-leverage/public/images/social-media-kit/brand/logo-icon-white.svg',
+    'wp-content/plugins/rl-social-kit/assets/x.png' => 'app/themes/remote-leverage/public/images/social-media-kit/brand/x.png',
+    'wp-content/plugins/rl-social-kit/assets/yt.png' => 'app/themes/remote-leverage/public/images/social-media-kit/brand/yt.png',
+
 
     /*
     |--------------------------------------------------------------------------
@@ -36,10 +87,16 @@ return [
     |
     | PAGE-MIGRATION-STATUS.md closes migration scope at 48 URLs. Production has
     | 236 published pages; subtracting the in-scope URLs (§1 and §3 P0-P4), the 23
-    | case studies carried by row 8, and the four out-of-scope pages that already
-    | exist in v2 and must not be shadowed (/vapricing/, /affiliate-program/,
-    | /referral/, /comparison-wing-assistant-ads/ — §4a, decision still open) leaves
-    | 164 killed URLs. Each one gets a 301 here so no legacy URL 404s at cutover.
+    | case studies carried by row 8, and the out-of-scope pages that already exist
+    | in v2 and must not be shadowed (/vapricing/, /affiliate-program/,
+    | /comparison-wing-assistant-ads/ — kept, §4a resolved 2026-09-15) leaves the
+    | killed URLs. Each one gets a 301 here so no legacy URL 404s at cutover.
+    |
+    | /referral/ was in that must-not-shadow list until 2026-09-15. The local page
+    | (ID 213) was built from the wrong source — it rendered hire-va-4-full, while
+    | production's /referral/ is a homepage variant (27 of 27 headings match the
+    | homepage, 4 of 27 match /hire-va-4/). It was deleted, so the premise for
+    | excluding the key is gone and the key now exists in the homepage bucket.
     |
     | Policy: nearest live equivalent, else the site root. Where a target was not
     | obvious the production page was fetched and classified by its actual <title>
@@ -78,6 +135,9 @@ return [
     'home-tasks-variation-dark' => '',
     'home-test' => '',
     'homepage-sept-26-newer' => '',
+    // Production ID 27582, "Home – Referral" — a referral-traffic variant of the
+    // homepage, not a landing page. v2's page 213 was deleted 2026-09-15.
+    'referral' => '',
     'homepage-sept-26-old' => '',
     'howitworks' => '',
     'live-call-test-remote-leverage-home' => '',
@@ -199,10 +259,13 @@ return [
     // /hire-va-1st-month-free/.
     'hire-va-new-live-calling-feature' => 'hire-va-6',
 
-    // US/UK talent variant of the 70%-less campaign -> /hire-for-less/.
-    // Same campaign template and the same production <title>; the hero swaps LATAM pricing for
-    // "Hire American & British Professionals Living Abroad For $10-$15/Hour".
-    'hire-us-uk-now' => 'hire-for-less',
+    // US/UK talent variant of the 70%-less campaign -> /hire-va-4/.
+    // Same campaign template and the same production <title>, but the hero swaps LATAM pricing
+    // for "Hire American & British Professionals Living Abroad For $10-$15/Hour". It was pointed
+    // at /hire-for-less/ until 2026-09-15; that page sells Latin American VAs at $6-$10/hour, so
+    // it misstated the offer to anyone arriving on this URL. Retargeted to /hire-va-4/, the
+    // canonical hire page already used by the 'hire-va-old' / 'hire-virtual-assistant' 301s.
+    'hire-us-uk-now' => 'hire-va-4',
 
     // Consultation-landing A/B leftovers -> the live variant-b page.
     // Production's <title> and section set are byte-identical to
@@ -264,10 +327,10 @@ return [
     // /contractor-management/ covers in v2.
     'cor' => 'contractor-management',
 
-    // COR pricing sheet -> /contractor-payments/.
-    // Production /store/ is "Virtual Assistant Hiring Plans" but its body is Contractor-of-
-    // Record seat pricing, so the payments page is the nearest live equivalent.
-    'store' => 'contractor-payments',
+    // 'store' was here, 301ing to /contractor-payments/ as the nearest live equivalent of
+    // production's COR pricing sheet. Scope reopened on 2026-09-15 and /store/ is now being
+    // built as a real v2 page, so the key is removed: a redirect key that matches a live page
+    // slug would 301 that page away.
 
     // Partner recruitment page -> the v2 partner hub.
     'partner-capability-brief' => 'partners',
@@ -276,8 +339,6 @@ return [
     // Internal collateral, admin-gated tools, retired generators, one-off event pages and
     // build-time test pages. None of these has anything in v2 to point at, so they fall back to
     // the homepage rather than inventing a target.
-    'anyshore' => '',
-    'contractoragreement' => '',
     'hmchecklists' => '',
     'job-description-generator' => '',
     'job-description-generator-2' => '',
@@ -289,12 +350,35 @@ return [
     'recruiterchecklists' => '',
     'resume' => '',
     'saleschecklists' => '',
-    'services' => '',
     'test-landing-page-26' => '',
     'test-landing-page-26-2' => '',
     'text-optimizer' => '',
     'tools' => '',
     'workshop' => '',
     'youtube-script-generator' => '',
+
+    // 'contractoragreement' and 'services' were here, both 301ing to / under the no-live-
+    // equivalent policy. Scope reopened on 2026-09-15 and both are now being built as real v2
+    // pages, so the keys are removed: a redirect key that matches a live page slug would 301
+    // that page away, which is exactly what the shadowing check exists to prevent.
+
+    /*
+    |--------------------------------------------------------------------------
+    | External targets
+    |--------------------------------------------------------------------------
+    |
+    | A target may also be an absolute http(s):// URL, for content that moved off
+    | this site entirely. It is still a 301 and the incoming query string (UTM) is
+    | still preserved. Absolute targets are only ever read from this static map --
+    | never from request input -- so this cannot become an open redirect; see
+    | LegacyRedirectMiddleware::isExternalTarget() and the guard test in
+    | tests/Unit/LegacyRedirectTest.php.
+    |
+    */
+
+    // Anyshore spun out as its own product on its own domain; production /anyshore/ was its
+    // pre-launch landing page and there is no v2 equivalent to point at. Retargeted from /
+    // on 2026-09-15.
+    'anyshore' => 'https://anyshore.ai/',
 
 ];

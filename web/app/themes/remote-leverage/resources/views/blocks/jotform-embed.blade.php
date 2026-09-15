@@ -1,7 +1,12 @@
-{{-- Production's /payment/ and /vaonboardingform/: a single hosted JotForm on a coloured band.
+{{-- Production's /payment/, /vaonboardingform/ and /contractoragreement/: a single hosted
+     JotForm on a coloured band.
      Production loads form.jotform.com/jsform/<id>, a document.write() script that cannot run
      from a modern async context. The iframe embed renders the same form and is what JotForm
      recommends today.
+
+     /contractoragreement/ is the JotForm Sign variant: a signable document is not served from
+     form.jotform.com at all, so `product: sign` swaps the src for the www.jotform.com/sign/
+     invite URL production itself embeds. Everything else about the block is unchanged.
 
      The heading, intro and card are additions beyond production, added on request
      (2026-09-15) so these funnel pages read like the rest of the site rather than a bare
@@ -54,7 +59,7 @@
                     <iframe
                         id="JotFormIFrame-{{ $formId }}"
                         title="{{ $title ?: 'Form' }}"
-                        src="https://form.jotform.com/{{ $formId }}"
+                        src="{{ $embedSrc }}"
                         allow="geolocation; microphone; camera; fullscreen; payment"
                         frameborder="0"
                         scrolling="no"

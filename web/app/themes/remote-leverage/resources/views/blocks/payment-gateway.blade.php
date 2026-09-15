@@ -46,6 +46,9 @@
             data-publishable-key="{{ $publishableKey }}"
             data-intent-url="{{ $intentUrl }}"
             data-success-url="{{ $successUrl }}"
+            {{-- Read by resources/js/payment-gateway.js for the `Payment Gateway Viewed`
+                 funnel event, so a one- vs two-column checkout can be compared. --}}
+            data-layout="{{ $layout }}"
         >
             <h2 class="rl-payment-card__title font-display font-bold text-[24px] leading-[32px] mb-6">
                 {{ $productTitle }}

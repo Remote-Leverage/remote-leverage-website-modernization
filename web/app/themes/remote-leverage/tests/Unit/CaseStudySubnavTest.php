@@ -7,12 +7,16 @@ use App\Support\CaseStudySubnav;
 /**
  * Covers the shape of the "CASE STUDIES / TALENT PROFILES / REVIEWS" sub-nav.
  *
- * Scope note: the surface matching in activeTab() runs on WordPress conditional tags
- * (is_singular / is_post_type_archive / is_page), which this suite does not boot and
- * which are deliberately NOT stubbed here — defining them globally would leak into
- * every other test in the process. What is covered is everything that can go wrong
- * silently without WordPress: the tab set, their order, their labels, and the fact
- * that exactly one tab is ever marked active.
+ * Scope note: the surface matching in activeTab() runs on a WordPress conditional tag
+ * (is_singular), which this suite does not boot and which is deliberately NOT stubbed
+ * here — defining it globally would leak into every other test in the process. What is
+ * covered is everything that can go wrong silently without WordPress: the tab set, their
+ * order, their labels, and the fact that exactly one tab is ever marked active.
+ *
+ * Surface count (2026-09-15 parity revert): single case_study posts are now the only
+ * surface, so TAB_TALENT_PROFILES and TAB_REVIEWS can never be the *active* tab at
+ * runtime. They are still exercised below because tabs() is surface-agnostic by design —
+ * it takes the active tab as an argument — and because both remain real destinations.
  *
  * The failure this is really guarding against: the bar renders on every page on the
  * site. `tabs()` always returns all three tabs regardless of the active one, so a

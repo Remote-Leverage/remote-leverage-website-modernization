@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Application\Http\Middleware\LegacyRedirectMiddleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -35,8 +36,7 @@ describe('Application Routes', function () {
             ->and(Route::has('live-call.connect'))->toBeTrue()
             ->and(Route::has('referrer.portal'))->toBeTrue()
             ->and(Route::has('referrer.register'))->toBeTrue()
-            ->and(Route::has('referrer.dashboard.legacy'))->toBeTrue()
-            ->and(Route::has('tools.signature-generator'))->toBeTrue();
+            ->and(Route::has('referrer.dashboard.legacy'))->toBeTrue();
     });
 
     test('health check route returns healthy json response', function () {
@@ -62,7 +62,8 @@ describe('config/redirects.php targets resolve to something real', function () {
     });
 
     /*
-     * A redirect target must be a registered Laravel route or a real WordPress page.
+     * A redirect target must be one of three things: a registered Laravel route, a real
+     * WordPress page, or an absolute http(s):// URL on another site (see $externalTargets).
      * Tests have no database, so page-slug targets are declared here and verified by
      * hand against `wp post list --post_type=page`; the date below is that check.
      */
@@ -90,6 +91,18 @@ describe('config/redirects.php targets resolve to something real', function () {
     ];
 
     /*
+     * Absolute off-site destinations. These are a third valid target class: not a route and
+     * not a page, but a real URL on another host. Declared here so adding one stays a
+     * deliberate act — an unlisted external target still fails the test below.
+     *
+     * They are also the only hosts LegacyRedirectMiddleware will ever redirect off-site to,
+     * because the allowlist it hands wp_safe_redirect() is derived from this same static map.
+     */
+    $externalTargets = [
+        'https://anyshore.ai/' => 'Anyshore spun out onto its own domain; no v2 equivalent — 2026-09-15',
+    ];
+
+    /*
      * Targets known to point at nothing, quarantined so the suite stays green while the
      * underlying content decision is open. Adding an entry should be deliberate — the
      * default is to fix the target, not to list it here.
@@ -99,21 +112,81 @@ describe('config/redirects.php targets resolve to something real', function () {
         // knowingly dead while the content decision is open, and give the reason.
     ];
 
-    test('every target is a registered route, a known page, or explicitly quarantined', function () use ($wordPressPageTargets, $pendingTargets) {
+    test('every target is a registered route, a known page, a static file on disk, a declared external URL, or explicitly quarantined', function () use ($wordPressPageTargets, $externalTargets, $pendingTargets) {
         $config = require dirname(__DIR__, 2).'/config/redirects.php';
         $routeUris = collect(Route::getRoutes()->getRoutes())
             ->map(fn ($route) => trim($route->uri(), '/'))
             ->all();
 
+        // A fourth valid target class: a static asset served straight off disk, which is how
+        // the retired rl-social-kit plugin's 29 downloads are preserved. Checking the file
+        // really exists is the point — a typo or a deleted asset fails here rather than
+        // 404ing for whoever clicked an old link.
+        $themeRoot = dirname(__DIR__, 2);
+        $isStaticFile = static function (string $to) use ($themeRoot): bool {
+            $prefix = 'app/themes/remote-leverage/';
+
+            if (! str_starts_with($to, $prefix)) {
+                return false;
+            }
+
+            return is_file($themeRoot.'/'.substr($to, strlen($prefix)));
+        };
+
         foreach ($config as $from => $to) {
             $resolves = in_array($to, $routeUris, true)
                 || isset($wordPressPageTargets[$to])
+                || isset($externalTargets[$to])
+                || $isStaticFile($to)
                 || isset($pendingTargets[$to]);
 
             expect($resolves)->toBeTrue(
                 "'{$from}' => '{$to}': target is not a registered route, not a declared "
-                .'WordPress page, and not quarantined. Point it at something real, or add '
-                .'it to $pendingTargets with a reason.'
+                .'WordPress page, not a static file on disk, not a declared external URL, and '
+                .'not quarantined. Point it at something real, or add it to $pendingTargets '
+                .'with a reason.'
+            );
+        }
+    });
+
+    test('every declared external target is a real absolute http(s) URL', function () use ($externalTargets) {
+        foreach (array_keys($externalTargets) as $target) {
+            expect(LegacyRedirectMiddleware::isExternalTarget($target))->toBeTrue(
+                "'{$target}' is listed as an external target but is not an absolute http(s) URL."
+            );
+        }
+    });
+
+    test('every external target in the map is declared, and nothing else leaves the site', function () use ($externalTargets) {
+        $config = require dirname(__DIR__, 2).'/config/redirects.php';
+
+        $inMap = array_values(array_filter(
+            $config,
+            fn (string $to): bool => LegacyRedirectMiddleware::isExternalTarget($to)
+        ));
+
+        foreach ($inMap as $target) {
+            expect(array_key_exists($target, $externalTargets))->toBeTrue(
+                "'{$target}' redirects off-site but is not declared in \$externalTargets."
+            );
+        }
+
+        // The allowlist wp_safe_redirect() is given comes from the map, never from a request.
+        expect(LegacyRedirectMiddleware::externalHosts($config))
+            ->toBe(array_values(array_unique(array_map(
+                fn (string $t): string => (string) parse_url($t, PHP_URL_HOST),
+                $inMap
+            ))));
+    });
+
+    test('no redirect key shadows a page being built in v2', function () {
+        $config = require dirname(__DIR__, 2).'/config/redirects.php';
+
+        // Removed 2026-09-15 when each became a real v2 page. A key equal to a live page slug
+        // would 301 that page away.
+        foreach (['contractoragreement', 'services', 'store', 'hire-va'] as $liveSlug) {
+            expect(array_key_exists($liveSlug, $config))->toBeFalse(
+                "'{$liveSlug}' is a live v2 page slug; a redirect key of the same name would 301 the page away."
             );
         }
     });

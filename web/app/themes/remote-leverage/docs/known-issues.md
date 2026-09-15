@@ -372,11 +372,80 @@ Both are now in `docs/archive/` with a banner. For the record, what they got wro
 
 These are not bugs, but they are things a newcomer should know and the team may want to revisit.
 
-### Synchronous listeners are a latency risk at production volume
+### ~~Synchronous listeners are a latency risk at production volume~~ — 🔄 **RECLASSIFIED 2026-09-15**
 
-No listener implements `ShouldQueue` and no queue worker is deployed (WR-106, on hold). This is internally consistent and was a deliberate decision — but it means a single lead submission makes outbound HTTP calls to HubSpot, Slack, PostHog, Customer.io and a webhook **inside the user's request**, and the latency is additive. Staging traffic will not surface this; production traffic on the booking funnel might.
+**WR-106 is a throughput and reliability item, not a latency blocker.** The original entry (struck
+through below) and its ~800 ms decision rule were written against code that has since changed. The
+measurements are in [`performance-baseline.md`](performance-baseline.md), Part 2. Recorded here so
+the question is not re-litigated as a latency problem.
 
-**Proposal:** before cutover, measure the p95 of `CaptureLeadAction` end to end with all integrations live. If it exceeds ~800ms, provisioning a queue worker becomes a launch blocker rather than a deferred nicety.
+> ~~No listener implements `ShouldQueue` and no queue worker is deployed (WR-106, on hold). This is
+> internally consistent and was a deliberate decision — but it means a single lead submission makes
+> outbound HTTP calls to HubSpot, Slack, PostHog, Customer.io and a webhook **inside the user's
+> request**, and the latency is additive.~~
+>
+> ~~**Proposal:** before cutover, measure the p95 of `CaptureLeadAction` end to end with all
+> integrations live. If it exceeds ~800 ms, provisioning a queue worker becomes a launch blocker
+> rather than a deferred nicety.~~
+
+#### Why the premise no longer holds
+
+**Those five integrations are already deferred past the response.** `LeadServiceProvider::boot()`
+and `TrackingServiceProvider::boot()` wrap HubSpot, Slack, the lead webhook, the notification email
+and the PostHog/Customer.io tracking listener in `dispatch(static fn () => …)->afterResponse()`.
+`Roots\Acorn\Application\Concerns\Bootable` sends the response body on WordPress's `shutdown`
+action and calls `fastcgi_finish_request()` **before** `$kernel->terminate()`, which is what runs
+those deferred closures. The browser has the response before any of them opens a socket.
+
+**Measured, not assumed:** `CaptureLeadAction::execute()` on the step-1 partial capture is
+**6.75 ms p95** (n = 40, `hrtime()` via WP-CLI). That passes the ~800 ms rule by roughly **120×**,
+and it will stay passing however many integrations are switched on, because all seven of its
+outbound calls are already after the flush.
+
+**The one listener still fully synchronous** is `HandleLeadCreatedForBooking`, registered directly
+in `SchedulingServiceProvider`:
+
+```php
+Event::listen(LeadCreated::class, [HandleLeadCreatedForBooking::class, 'handle']);
+```
+
+It only fires when `preferred_slot` is set — the final booking submit, not the partial capture. It
+is genuinely in the user's request, and it did breach the rule: the duplicate-booking preflight
+alone measured **4 435 ms p50 / 5 495 ms p95** (n = 20, interleaved A/B on local Herd).
+
+**A queue worker would not have fixed that**, which is the crux of the reclassification. The user is
+waiting on the booking *result* — `submitBooking()` reads the meeting id and Meet URL out of the
+activity log to render the confirmation screen. Queueing that listener yields a spinner, not a fast
+response. The latency had to be removed, not relocated, and it was:
+`CalendlyClient::findExistingInvitee()` no longer re-fetches `users/me` per token and no longer
+walks all four pooled accounts after one has answered. Same method, same machine, same session:
+**521 ms p50 / 1 159 ms p95**, an 8.5× / 4.7× improvement, now one HTTP round-trip on a warm cache
+instead of eight.
+
+#### What WR-106 is actually worth — throughput and reliability
+
+None of these are response-time problems, and none of them are visible to a user:
+
+- **PHP-FPM worker occupancy.** `afterResponse` work still holds a worker for an estimated
+  **2.4–4.5 s per submission** after the response is sent (7 deferred calls on the partial capture,
+  9 on the booking submit, at ~340–450 ms each — the measured Customer.io pair is 685.57 ms p95 for
+  two calls). Under concurrent booking-funnel traffic that is a worker-pool exhaustion risk, which
+  is a different failure mode from slow responses and one staging traffic will not surface either.
+- **No retry, no dead-letter.** An `afterResponse` closure that throws is logged and lost. A HubSpot
+  500 or a Slack timeout silently drops the lead sync. A real queue gives retries and a
+  `failed_jobs` table.
+- **Four deferred calls have no timeout configured at all** — Customer.io ×2, PostHog and
+  `wp_mail`. They inherit Guzzle/WordPress defaults, so a hung endpoint holds a worker far longer
+  than the 5–10 s the explicitly-configured ones allow. This one is worth fixing independently of
+  the worker.
+
+#### Decision (2026-09-15)
+
+**Provisioning the queue worker stays deferred.** WR-106 remains on hold, re-labelled as a
+throughput/reliability item. The latency argument for making it a launch blocker is withdrawn: the
+path it was supposed to protect measures 6.75 ms, and the path that *was* slow was a Calendly
+preflight bug, now fixed. Revisit WR-106 on concurrency grounds — booking-funnel traffic causing
+`pm.max_children` saturation — or the first time a dropped integration call actually costs a lead.
 
 ### ~~Livewire components are registered under two names each~~ — ✅ **FIXED 2026-09-15**
 

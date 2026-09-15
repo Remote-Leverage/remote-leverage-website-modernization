@@ -9,8 +9,10 @@ use Log1x\AcfComposer\Block;
 use Log1x\AcfComposer\Builder;
 
 /**
- * Reproduces production's `/payment/` and `/vaonboardingform/` pages, which are each a single
- * Elementor HTML widget holding one JotForm embed script and nothing else.
+ * Reproduces production's `/payment/`, `/vaonboardingform/` and `/contractoragreement/` pages,
+ * which are each a single Elementor HTML widget holding one JotForm embed and nothing else.
+ * `/contractoragreement/` is a JotForm *Sign* document rather than a classic form, which is a
+ * different host and URL shape — see the `product` field.
  *
  * No existing block embeds a third-party form: acf/booking renders the in-house Livewire
  * scheduler, acf/impact-report-hero posts a name/email capture to our own endpoint, and
@@ -23,13 +25,13 @@ class JotformEmbedBlock extends Block
 
     public $slug = 'jotform-embed';
 
-    public $description = 'Embeds a hosted JotForm by form ID, on an optional coloured band.';
+    public $description = 'Embeds a hosted JotForm — a classic form or a Sign e-signature document — by form ID, on an optional coloured band.';
 
     public $category = 'remote-leverage';
 
     public $icon = 'feedback';
 
-    public $keywords = ['jotform', 'form', 'embed', 'payment', 'onboarding'];
+    public $keywords = ['jotform', 'form', 'embed', 'payment', 'onboarding', 'sign', 'esign', 'agreement'];
 
     public $view = 'blocks.jotform-embed';
 
@@ -45,9 +47,24 @@ class JotformEmbedBlock extends Block
 
     public function with(): array
     {
+        // JotForm IDs are numeric; anything else would inject an arbitrary script src.
+        $formId = preg_replace('/\D/', '', (string) (get_field('form_id') ?: ''));
+
+        // JotForm Sign documents are NOT served from form.jotform.com — that host answers
+        // "Form is missing" for a signable document. They live at
+        // www.jotform.com/sign/<id>/invite/<token>, and ?signEmbed=1 is what strips JotForm's
+        // own page chrome so the document sits flush inside the iframe. The invite token is
+        // the one JotForm mints for the public embed and is part of production's markup on
+        // /contractoragreement/, so it is content, not a secret.
+        $product = get_field('product') ?: 'form';
+        $invite = preg_replace('/[^A-Za-z0-9]/', '', (string) (get_field('sign_invite') ?: ''));
+        $isSign = $product === 'sign' && $invite !== '';
+
         return [
-            // JotForm IDs are numeric; anything else would inject an arbitrary script src.
-            'formId' => preg_replace('/\D/', '', (string) (get_field('form_id') ?: '')),
+            'formId' => $formId,
+            'embedSrc' => $isSign
+                ? 'https://www.jotform.com/sign/'.$formId.'/invite/'.$invite.'?signEmbed=1'
+                : 'https://form.jotform.com/'.$formId,
             'title' => BlockDefaults::cleanText(get_field('title') ?: ''),
             'background' => get_field('background') ?: 'light',
             'minHeight' => (int) (get_field('min_height') ?: 640),
@@ -67,6 +84,28 @@ class JotformEmbedBlock extends Block
             ->addText('form_id', [
                 'label' => 'JotForm Form ID',
                 'instructions' => 'Numeric ID only — the last path segment of the JotForm URL.',
+            ])
+            ->addSelect('product', [
+                'label' => 'JotForm product',
+                'instructions' => 'A classic form is served from form.jotform.com. A Sign document is not — it needs the invite token below.',
+                'choices' => [
+                    'form' => 'Form (default)',
+                    'sign' => 'Sign document (e-signature)',
+                ],
+                'default_value' => 'form',
+            ])
+            ->addText('sign_invite', [
+                'label' => 'Sign invite token',
+                'instructions' => 'Sign documents only: the token after /invite/ in the public embed URL.',
+                'conditional_logic' => [
+                    [
+                        [
+                            'field' => 'field_jotform_embed_block_product',
+                            'operator' => '==',
+                            'value' => 'sign',
+                        ],
+                    ],
+                ],
             ])
             ->addText('title', [
                 'label' => 'Accessible title',

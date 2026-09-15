@@ -257,9 +257,10 @@ sets is being migrated. What is left is concrete build work plus one small decis
 
 **Plus one decision batch:** v2 already contains 4 pages that are *not* on the list, built before
 scope closed — `/vapricing/`, `/affiliate-program/`, `/referral/`, `/comparison-wing-assistant-ads/`.
-Each needs a keep/redirect/delete call. `/referral/` is the urgent one: it was migrated from the
-wrong source and renders the `hire-va-4` landing page, when production's `/referral/` is actually a
-homepage variant (verified: 27 of 27 headings match the homepage, 4 of 27 match `/hire-va-4/`).
+Each needs a keep/redirect/delete call. `/referral/` was the urgent one and is **resolved
+(2026-09-15): deleted.** It had been migrated from the wrong source and rendered the `hire-va-4`
+landing page, when production's `/referral/` is actually a homepage variant (verified: 27 of 27
+headings match the homepage, 4 of 27 match `/hire-va-4/`). The other three are still open.
 
 Per-URL status, the out-of-scope inventory and the open decisions: [`PAGE-MIGRATION-STATUS.md`](PAGE-MIGRATION-STATUS.md).
 
@@ -291,7 +292,7 @@ A short list of things that are wrong right now and are worth knowing before you
 
 - **Both webhook endpoints now fail closed, and neither secret is set.** As of 2026-09-15 `/api/webhooks/stripe` and `/api/webhooks/calendly` return **503** with no signing secret configured, rather than processing unverified payloads. `STRIPE_WEBHOOK_SECRET` and `CALENDLY_WEBHOOK_SIGNING_KEY` are empty in every environment, so **both endpoints are dark until someone sets them** — Stripe Connect payout events included. Set them before this reaches staging.
 - **Sentry is configured but has no DSN**, so nothing is reported.
-- **`/referral/` holds the wrong content** — it renders the `hire-va-4` landing page. Production's `/referral/` is a homepage variant. Out of scope, so the call is redirect-or-delete rather than rework.
+- **`/referral/` was deleted (2026-09-15).** It held the wrong content — the `hire-va-4` landing page, where production's `/referral/` is a homepage variant. Out of scope, so the call was delete, not rework. Page 213 is trashed and recoverable; nothing linked to it. It still needs `'referral' => ''` in `config/redirects.php` so the live production URL does not 404 at cutover.
 - **`/robots.txt` and `/favicon.ico` report 404 locally** while serving correct content. A Herd/nginx artifact affecting only those two filenames; production returns 200. Do not chase it.
 
 **Fixed on 2026-09-14** (kept here briefly because they changed behaviour you may remember differently):
