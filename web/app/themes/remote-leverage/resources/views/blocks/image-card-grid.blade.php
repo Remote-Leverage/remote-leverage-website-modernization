@@ -29,7 +29,11 @@
                 'lg:grid-cols-4' => ! $isThree,
             ])>
                 @foreach ($cards as $card)
-                    <div class="flex flex-col overflow-hidden rounded-badge bg-white">
+                    {{-- `emphasis` draws production's black outline on the featured pricing card. --}}
+                    <div @class([
+                        'flex flex-col overflow-hidden rounded-badge bg-white',
+                        'border border-black' => ! empty($card['emphasis']),
+                    ])>
                         @if (! empty($card['image']))
                             <img src="{{ $card['image'] }}" alt="" loading="lazy" decoding="async"
                                  class="w-full object-cover {{ $isThree ? 'h-[168px]' : 'h-[212px]' }}">
@@ -50,6 +54,15 @@
 
                             @if (! empty($card['text']))
                                 <p class="text-card text-black">{{ $card['text'] }}</p>
+                            @endif
+
+                            {{-- Per-card CTA. Production's pricing cards each carry their own
+                                 black, 5px-radius button rather than one CTA for the section. --}}
+                            @if (! empty($card['cta_text']))
+                                <a href="{{ $card['cta_url'] ?: '#booking-footer' }}"
+                                   class="mt-auto inline-flex w-full items-center justify-center rounded-[5px] bg-black px-5 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-black/85">
+                                    {{ $card['cta_text'] }}
+                                </a>
                             @endif
                         </div>
                     </div>

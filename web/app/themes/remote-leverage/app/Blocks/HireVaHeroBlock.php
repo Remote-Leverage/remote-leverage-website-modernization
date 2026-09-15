@@ -121,7 +121,9 @@ class HireVaHeroBlock extends Block
         $hideProgressBar = $hideProgress === null ? true : (bool) $hideProgress;
 
         return [
-            'badgeText' => get_field('badge_text') ?: "2,000+ businesses we've helped hire",
+            // An explicitly empty badge means "no eyebrow pill" (production's /spanish/
+            // shows none); only an unset field falls back to the default.
+            'badgeText' => self::resolveBadgeText(get_field('badge_text')),
             'headline' => get_field('headline') ?: 'Latin American<br>Virtual Assistants<br>$6-$10 Per Hour',
             'bookingTitle' => get_field('booking_title') ?: 'Book a Free 15-Minute Consultation',
             'bookingSubtitle' => get_field('booking_subtitle') ?? '',
@@ -130,6 +132,58 @@ class HireVaHeroBlock extends Block
             'hideProfileHeader' => $hideProfileHeader,
             'hideProgressBar' => $hideProgressBar,
             'formButtonText' => get_field('form_button_text') ?: 'Find me an Assistant',
+            'checklist' => self::resolveChecklist(get_field('checklist')),
+        ];
+    }
+
+    /**
+     * Resolve the eyebrow pill text.
+     *
+     * A blank string is a deliberate "render no pill", which is why this cannot
+     * be a plain `?:` fallback — /spanish/ passes an empty badge on purpose.
+     */
+    public static function resolveBadgeText(mixed $value): string
+    {
+        if ($value === null || $value === false) {
+            return "2,000+ businesses we've helped hire";
+        }
+
+        return trim((string) $value);
+    }
+
+    /**
+     * The hero's reassurance checklist.
+     *
+     * Was hardcoded in the Blade view until 2026-09-15; /spanish/ runs the same
+     * hero with four Spanish items, so it became a field. An empty repeater
+     * keeps the original six, leaving /hire-va-4/ and /hire-for-less/ unchanged.
+     *
+     * @return array<int, string>
+     */
+    public static function resolveChecklist(mixed $rows): array
+    {
+        $items = is_array($rows)
+            ? array_values(array_filter(array_map(
+                static fn ($row) => trim((string) ($row['item'] ?? '')),
+                $rows,
+            )))
+            : [];
+
+        return $items === [] ? self::defaultChecklist() : $items;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function defaultChecklist(): array
+    {
+        return [
+            'Interview Before You Hire',
+            'Hire Direct - No Middleman',
+            'No contracts',
+            'Hire Within 72 Hours',
+            'Fluent English',
+            '30% Discount on Future Hires',
         ];
     }
 
@@ -163,6 +217,16 @@ class HireVaHeroBlock extends Block
                 'label' => 'Booking Card Subtitle',
                 'default_value' => '',
             ])
+            ->addRepeater('checklist', [
+                'label' => 'Reassurance Checklist',
+                'instructions' => 'Leave empty to use the standard six English items. Adding rows replaces the whole list.',
+                'layout' => 'table',
+                'button_label' => 'Add Item',
+            ])
+            ->addText('item', [
+                'label' => 'Item',
+            ])
+            ->endRepeater()
             ->addTab('form_isolated_fields', [
                 'label' => 'Form & Isolated Fields',
             ])

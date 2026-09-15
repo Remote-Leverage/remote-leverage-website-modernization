@@ -25,6 +25,7 @@ use App\Blocks\TestimonialsBlock;
 use App\Blocks\TrustStatsBlock;
 use App\Blocks\WhyHireBlock;
 use App\Support\HeaderMode;
+use App\Support\PageRobots;
 use Illuminate\Support\Facades\Vite;
 
 /**
@@ -231,6 +232,15 @@ if (defined('WP_ENV') && WP_ENV === 'development') {
 add_action('template_redirect', function () {
     (new LegacyRedirectMiddleware)->handle();
 }, 2);
+
+/**
+ * Per-page `noindex, nofollow` for pages that declare the `rl:noindex` marker.
+ *
+ * Bedrock's bedrock-disallow-indexing mu-plugin noindexes every non-production environment,
+ * so this has no visible effect locally — it exists so the exclusion survives into production,
+ * where that mu-plugin stops applying. See App\Support\PageRobots.
+ */
+add_filter('wp_robots', [PageRobots::class, 'filter'], 20);
 
 /**
  * Force a real 404 for pretty-permalink paths WordPress could not resolve, instead of

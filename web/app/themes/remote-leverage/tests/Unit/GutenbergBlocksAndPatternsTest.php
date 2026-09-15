@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
+use App\Support\BlockDefaults;
+
 describe('Gutenberg Blocks & Pattern Library QA (WR-93 Subtasks)', function () {
     test('every ACF Composer block class instantiates and defines a rich example preview', function () {
         // Derived from the filesystem rather than a hardcoded list: a hardcoded list rots the
@@ -112,5 +114,66 @@ describe('Gutenberg Blocks & Pattern Library QA (WR-93 Subtasks)', function () {
             ->and($cssContent)->toContain('is-style-pill-purple')
             ->and($cssContent)->toContain('rl-editorial-toc')
             ->and($cssContent)->toContain('rl-key-takeaways');
+    });
+});
+
+describe('BlockDefaults::encodeRepeater nested rows', function () {
+    test('a sub-field that is a list of arrays is encoded as its own repeater', function () {
+        $data = [];
+        BlockDefaults::encodeRepeater('cards', 'field_x_cards', [[
+            'name' => 'Andrés Molina',
+            'tools' => [
+                ['src' => 'https://example.test/epic.png', 'alt' => 'Epic'],
+                ['src' => 'https://example.test/zoom.png', 'alt' => 'Zoom'],
+            ],
+        ]], $data);
+
+        expect($data['cards'])->toBe(1)
+            ->and($data['cards_0_name'])->toBe('Andrés Molina')
+            // The nested repeater carries its own count and key...
+            ->and($data['cards_0_tools'])->toBe(2)
+            ->and($data['_cards_0_tools'])->toBe('field_x_cards_tools')
+            // ...and each nested row is addressed and keyed individually.
+            ->and($data['cards_0_tools_0_src'])->toBe('https://example.test/epic.png')
+            ->and($data['_cards_0_tools_0_src'])->toBe('field_x_cards_tools_src')
+            ->and($data['cards_0_tools_1_alt'])->toBe('Zoom')
+            ->and($data['_cards_0_tools_1_alt'])->toBe('field_x_cards_tools_alt');
+    });
+
+    test('an associative ACF image array is NOT mistaken for nested rows', function () {
+        $data = [];
+        BlockDefaults::encodeRepeater('cards', 'field_x_cards', [[
+            'image' => ['url' => 'https://example.test/a.png', 'id' => 7],
+        ]], $data);
+
+        expect($data['cards_0_image'])->toBe(['url' => 'https://example.test/a.png', 'id' => 7])
+            ->and($data['_cards_0_image'])->toBe('field_x_cards_image')
+            ->and($data)->not->toHaveKey('cards_0_image_0_url');
+    });
+
+    test('flat rows are encoded exactly as before', function () {
+        $data = [];
+        BlockDefaults::encodeRepeater('rows', 'field_x_rows', [
+            ['feature' => 'Time to hire', 'diy' => '4 - 8 weeks', 'rl' => '72 hrs'],
+        ], $data);
+
+        expect($data)->toBe([
+            'rows' => 1,
+            '_rows' => 'field_x_rows',
+            'rows_0_feature' => 'Time to hire',
+            '_rows_0_feature' => 'field_x_rows_feature',
+            'rows_0_diy' => '4 - 8 weeks',
+            '_rows_0_diy' => 'field_x_rows_diy',
+            'rows_0_rl' => '72 hrs',
+            '_rows_0_rl' => 'field_x_rows_rl',
+        ]);
+    });
+
+    test('an empty nested list falls through to a scalar write rather than recursing', function () {
+        $data = [];
+        BlockDefaults::encodeRepeater('cards', 'field_x_cards', [['tools' => []]], $data);
+
+        expect($data['cards_0_tools'])->toBe([])
+            ->and($data['_cards_0_tools'])->toBe('field_x_cards_tools');
     });
 });

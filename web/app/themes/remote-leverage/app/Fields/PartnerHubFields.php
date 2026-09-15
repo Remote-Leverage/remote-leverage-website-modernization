@@ -153,6 +153,14 @@ class PartnerHubFields extends Field
             'label' => 'Section Subtitle / Lead Description',
             'placeholder' => PartnerHubGlobalData::getServicesDesc(),
             'rows' => 2,
+            // Explicit key. ACF Composer derives a repeater sub-field's key as
+            // field_<group>_<repeater>_<sub>, so this top-level field would otherwise
+            // collide with the `desc` sub-field of the `_rl_services` repeater below —
+            // both resolve to field_partner_hub__rl_services_desc, and ACF silently
+            // renames the sub-field, blanking every custom service description.
+            // Keeping the meta key `_rl_services_desc` matters (it is the legacy key),
+            // so the key is disambiguated instead of the name.
+            'key' => 'services_lead_desc',
         ]);
         $fields->addRepeater('_rl_services', [
             'label' => 'Custom Service Catalogue',

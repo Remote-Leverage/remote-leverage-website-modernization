@@ -14,14 +14,8 @@
     ['name' => 'RE/MAX', 'src' => BlockDefaults::themeImg('home/remax-1.webp')],
   ];
 
-  $checklist = [
-    'Interview Before You Hire',
-    'Hire Direct - No Middleman',
-    'No contracts',
-    'Hire Within 72 Hours',
-    'Fluent English',
-    '30% Discount on Future Hires',
-  ];
+  // $checklist is supplied by HireVaHeroBlock::with(); it falls back to the
+  // standard six English items when the block's repeater is empty.
 @endphp
 
 <section class="relative overflow-hidden bg-[#1E0B38] text-white min-h-dvh flex flex-col justify-between pt-6 sm:pt-8 pb-6 sm:pb-8 lg:pb-10">
@@ -36,35 +30,29 @@
 
   <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex-1 flex flex-col justify-between">
 
-    {{-- Landing Header (Logo & Get Started CTA) --}}
-    <div class="flex items-center justify-between pb-6 sm:pb-8 relative z-20">
-      <a href="{{ home_url('/') }}" class="inline-flex items-center gap-2 group focus:outline-none" aria-label="Remote Leverage">
-        <img src="{{ Vite::asset('resources/images/logo.svg') }}" 
-             alt="{{ get_bloginfo('name', 'display') ?: 'Remote Leverage' }}"
-             class="h-6 sm:h-7 w-auto brightness-0 invert transition-opacity group-hover:opacity-90" />
-      </a>
-      <a href="#consultation-card" 
-         class="inline-flex items-center justify-center px-5 sm:px-6 py-2 sm:py-2.5 rounded-full bg-[#F8248A] hover:bg-[#D81575] text-white text-xs sm:text-sm font-bold tracking-wider uppercase shadow-md transition-all duration-150">
-        GET STARTED
-      </a>
-    </div>
+    {{-- No header bar inside the hero: the CTA-only header is a real page header,
+         sections/header-cta.blade.php, swapped in by layouts/app.blade.php via
+         App\Support\PageChrome. Production renders it above the hero on the page
+         background, not overlaid on the artwork. --}}
 
     {{-- Center Main Grid (Value Prop & Consultation Card) --}}
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center my-auto py-6 sm:py-8 lg:py-10">
       
       {{-- Left Column: Value Proposition --}}
       <div class="lg:col-span-6 xl:col-span-7">
-        {{-- Trust Eyebrow Pill --}}
-        <div class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/10 border border-white/15 text-white/90 text-xs sm:text-sm font-medium mb-6 backdrop-blur-xs shadow-xs">
-          <span>{!! $badgeText !!}</span>
-        </div>
+        {{-- Trust eyebrow pill — omitted entirely when the block passes a blank badge --}}
+        @if (! empty($badgeText))
+          <div class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/10 border border-white/15 text-white/90 text-xs sm:text-sm font-medium mb-6 backdrop-blur-xs shadow-xs">
+            <span>{!! $badgeText !!}</span>
+          </div>
+        @endif
 
         {{-- Main H1 --}}
         <h1 class="text-4xl sm:text-5xl lg:text-[52px] xl:text-[56px] font-bold font-display text-white tracking-tight leading-[1.08] mb-8">
           {!! $headline !!}
         </h1>
 
-        {{-- 6-item Checklist Grid (2 Columns, simple white checkmark) --}}
+        {{-- Reassurance checklist (2 columns, simple white checkmark) --}}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-3.5 gap-x-6">
           @foreach ($checklist as $item)
             <div class="flex items-center gap-3 text-white text-sm sm:text-base font-medium">

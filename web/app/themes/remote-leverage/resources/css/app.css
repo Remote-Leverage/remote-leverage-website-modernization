@@ -88,6 +88,15 @@
   --color-table-leverage: #00D982;
   --color-step-numeral: #878EA0;
   --color-roles-surface: #250D4A;
+
+  /* Roles bento tints, read off production's computed backgrounds on /hire-va-4/
+     (2026-09-15). The grid is deliberately asymmetric: only the Administrative card
+     is dark — Customer Support is a light lavender, not a second dark card. */
+  --color-roles-feature: #6341A2;
+  --color-roles-lavender: #E1E1F7;
+  --color-roles-blue: #C6DBFF;
+  --color-roles-sky: #E1ECF7;
+  --color-roles-violet: #ECE1F7;
   --color-brand-purple-deep: #6200A4;
   --color-brand-navy: #342567;
   --color-brand-midnight: #18112C;
@@ -934,7 +943,9 @@
 }
 .rl-process-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* Column count comes from the step count (see blocks/process-steps.blade.php); 3 is the
+     historical default, so existing 3-step usages are unchanged. */
+  grid-template-columns: repeat(var(--rl-process-cols, 3), 1fr);
   gap: 40px;
   width: 100%;
   position: relative;
@@ -1011,6 +1022,13 @@
   .rl-process-grid {
     grid-template-columns: 1fr;
     gap: 48px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+  .rl-process-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 40px;
   }
 }
 

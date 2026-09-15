@@ -15,6 +15,7 @@ use App\Infrastructure\WordPress\Admin\ReferralAdminDashboard;
 use App\Infrastructure\WordPress\Admin\WordPressAdminTheme;
 use App\Infrastructure\WordPress\PostTypes\CaseStudyPostType;
 use App\Infrastructure\WordPress\PostTypes\PartnerPostType;
+use App\Infrastructure\WordPress\SocialKitAssets;
 use Illuminate\Support\ServiceProvider;
 
 class DomainServiceProvider extends ServiceProvider
@@ -54,6 +55,7 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(PartnerHubAdmin::class, fn () => new PartnerHubAdmin);
         $this->app->singleton(ReferralAdminDashboard::class, fn () => new ReferralAdminDashboard);
         $this->app->singleton(CalendlyAdminDashboard::class, fn () => new CalendlyAdminDashboard);
+        $this->app->singleton(SocialKitAssets::class, fn () => new SocialKitAssets);
 
         if ($this->app->runningInConsole()) {
             $this->commands([RunDeployTasksCommand::class, PartnerSeedCommand::class]);
@@ -75,5 +77,6 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->make(PartnerHubAdmin::class)->register();
         $this->app->make(ReferralAdminDashboard::class)->register();
         $this->app->make(CalendlyAdminDashboard::class)->register();
+        $this->app->make(SocialKitAssets::class)->register();
     }
 }

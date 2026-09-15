@@ -6,7 +6,63 @@
         </h2>
     @endif
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-card">
+@php
+    // `split-chip` is production's "Scale your brand smarter, faster" shape: a 2-up of wide
+    // cards, each split into a gradient salary chip on the left and the role copy on the right.
+    // The default `stacked` variant is the photo-on-top card the other pages use.
+    $isSplitChip = ($variant ?? 'stacked') === 'split-chip';
+    $cols = ($columns ?? '4') === '2' ? 'lg:grid-cols-2' : 'lg:grid-cols-4';
+@endphp
+
+@if ($isSplitChip)
+    <div class="grid grid-cols-1 {{ $cols }} gap-2.5">
+        @foreach ($cards as $card)
+            <div class="flex flex-col gap-5 rounded-[10px] border border-[#92B4F4]/30 bg-white p-5 sm:flex-row sm:items-start">
+                {{-- Salary chip --}}
+                <div class="w-full shrink-0 rounded-[10px] p-5 sm:w-[307px]"
+                     style="background-image:linear-gradient(180deg,#F4F6FC 0%,#92B4F4 100%);">
+                    <div class="flex items-center gap-3">
+                        @if (! empty($card['photo']))
+                            <img src="{{ $card['photo'] }}" alt="{{ $card['chip_name'] ?? '' }}"
+                                 width="45" height="45" loading="lazy" decoding="async"
+                                 class="h-[45px] w-[45px] rounded-full object-cover">
+                        @endif
+                        <div>
+                            <div class="font-display text-[15px] font-bold text-[#1D4ED8]">{{ $card['chip_name'] ?? '' }}</div>
+                            <div class="text-xs text-black/70">{{ $card['chip_role'] ?? '' }}</div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4 border-t border-white/70">
+
+                    <div class="flex items-end justify-between gap-3">
+                        <div>
+                            <div class="text-xs text-black/70">{{ $card['price_label'] ?? 'Montly' }}</div>
+                            <div class="font-display text-xl font-bold text-black">{{ $card['price'] ?? '' }}</div>
+                        </div>
+                        @if (! empty($card['cta_text']))
+                            <a href="{{ $card['cta_url'] ?: '#booking-footer' }}"
+                               class="rounded-pill bg-[#8A2BE2] px-5 py-2 text-xs font-bold text-white transition hover:bg-[#7b20d4]">
+                                {{ $card['cta_text'] }}
+                            </a>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Role copy --}}
+                <div class="min-w-0 flex-1">
+                    <h3 class="font-display text-xl sm:text-2xl font-bold text-black tracking-[-0.02em] leading-snug mb-2">
+                        {{ $card['title'] }}
+                    </h3>
+                    @if (! empty($card['intro']))
+                        <p class="text-[15px] leading-relaxed text-black">{{ $card['intro'] }}</p>
+                    @endif
+                </div>
+            </div>
+        @endforeach
+    </div>
+@else
+    <div class="grid grid-cols-1 sm:grid-cols-2 {{ $cols }} gap-card">
         @foreach ($cards as $card)
             <div class="bg-white rounded-card overflow-hidden border border-black/5 shadow-[0_4px_24px_rgba(0,0,0,0.03)] flex flex-col">
                 @if (! empty($card['photo']))
@@ -64,4 +120,5 @@
             </div>
         @endforeach
     </div>
+@endif
 </div>

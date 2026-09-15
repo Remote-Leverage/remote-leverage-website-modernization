@@ -40,6 +40,8 @@ class PartnerHeroBlock extends Block
         $field = fn (string $key) => function_exists('get_field') ? get_field($key) : null;
 
         return [
+            'tone' => get_field('tone') ?: 'brand-gradient',
+            'badges' => is_array(get_field('badges')) ? get_field('badges') : [],
             'headline' => $field('headline') ?: 'Remote Leverage × Partner',
             'paragraphs' => $this->paragraphs(),
             'ctaText' => $field('cta_text') ?: 'Book a Strategy Sync',
@@ -86,6 +88,22 @@ class PartnerHeroBlock extends Block
                 'default_value' => true,
                 'ui' => true,
             ])
+            ->addSelect('tone', [
+                'label' => 'Tone',
+                'choices' => [
+                    'brand-gradient' => 'Partner brand gradient, white copy (default)',
+                    'light' => 'Light #F4F6FC, black copy, full-opacity backdrop',
+                ],
+                'default_value' => 'brand-gradient',
+            ])
+            ->addRepeater('badges', [
+                'label' => 'Reassurance pills',
+                'instructions' => 'Optional checked pills under the CTA, laid out two across.',
+                'layout' => 'table',
+                'button_label' => 'Add pill',
+            ])
+            ->addText('text', ['label' => 'Text'])
+            ->endRepeater()
             ->addRepeater('stats', ['label' => 'Stat Cards (4)', 'layout' => 'table', 'button_label' => 'Add stat'])
             ->addText('value', ['label' => 'Value', 'placeholder' => '70%'])
             ->addTextarea('label', ['label' => 'Label', 'rows' => 2])

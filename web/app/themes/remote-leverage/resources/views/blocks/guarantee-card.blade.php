@@ -9,7 +9,16 @@
   $icon3 = BlockDefaults::hireVaImg('material-symbols_person-check-rounded.svg');
 @endphp
 
-<section class="pt-12 sm:pt-16 lg:pt-20 pb-16 sm:pb-20 lg:pb-24 text-white relative overflow-hidden" style="background: radial-gradient(84.9% 75.5% at 65.45% 17.36%, #8A2BE2 0%, #250D4A 100%);">
+@php
+  // Production runs this band two ways: the radial purple wash on the hire-va pages, and a
+  // flat #250D4A on /ecommerce-virtual-assistant/. `background` picks between them.
+  $bg = ($background ?? 'radial-purple') === 'flat-midnight'
+      ? 'background: #250D4A;'
+      : 'background: radial-gradient(84.9% 75.5% at 65.45% 17.36%, #8A2BE2 0%, #250D4A 100%);';
+  $showReassurance = ! isset($showReassuranceItems) || $showReassuranceItems;
+@endphp
+
+<section class="pt-12 sm:pt-16 lg:pt-20 pb-16 sm:pb-20 lg:pb-24 text-white relative overflow-hidden" style="{{ $bg }}">
   <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
       
@@ -19,6 +28,9 @@
           {{ $headline }}
         </h2>
 
+        {{-- Reassurance items. /ecommerce-virtual-assistant/ shows the badge image alone,
+             so this trio is switchable rather than always-on. --}}
+        @if ($showReassurance)
         <div class="space-y-7 mb-10">
           {{-- Item 1 --}}
           <div class="flex items-start gap-4">
@@ -62,6 +74,7 @@
             </div>
           </div>
         </div>
+        @endif
 
         {{-- CTA Button --}}
         <div>

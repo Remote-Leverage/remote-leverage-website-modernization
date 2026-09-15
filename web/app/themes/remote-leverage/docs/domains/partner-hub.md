@@ -122,4 +122,8 @@ The gap against the legacy plugin was tracked as epic **WR-115** (subtasks WR-11
   mailto. Carried over from the source data deliberately — do not invent an address.
 - **No partner logos.** `_rl_partner_logo_url` is unset for all three, so directory cards
   fall back to a two-letter monogram. Needs the actual brand assets.
+- **The partner manager is a team, not a person.** `_rl_manager_name` is `Partnerships Team`
+  for every entry by design (2026-09-15) — a partner-facing contact should not depend on any
+  individual still being in the role. Do not put a personal name in
+  `resources/partners/partners.php`.
 - **`archive-rl_partner.blade.php` links to `/partner-dashboard`**, which currently throws. See [known-issues.md](../known-issues.md).

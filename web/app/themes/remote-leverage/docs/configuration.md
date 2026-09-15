@@ -68,9 +68,13 @@ GTM, LinkedIn Insight and Meta Pixel are configured inside the Google Site Kit /
 
 | Variable | Read by |
 | :--- | :--- |
-| `STRIPE_KEY`, `STRIPE_SECRET` | `StripeConnectGateway` |
+| `STRIPE_KEY`, `STRIPE_SECRET` | `StripeConnectGateway` (Connect payouts) and `StripePaymentIntentGateway` (live inbound charges) |
+| `STRIPE_TEST_KEY`, `STRIPE_TEST_SECRET` | `StripePaymentIntentGateway` when `STRIPE_TEST_MODE` is on |
+| `STRIPE_TEST_MODE` | Selects the test key pair for inbound charges |
 | `STRIPE_CONNECT_CLIENT_ID` | Connect onboarding |
-| `STRIPE_WEBHOOK_SECRET` | `StripeWebhookController` |
+| `STRIPE_WEBHOOK_SECRET` | `StripeWebhookController` signature verification |
+| `STRIPE_WEBHOOK_FORWARD_URL` | Where `payment_intent.succeeded` payloads are forwarded |
+| `STRIPE_DEFAULT_THANKYOU_URL` | Fallback post-payment redirect |
 | `REFERRAL_WEBHOOK_URL` | `DispatchReferralWebhook` |
 | `REFERRAL_DEFAULT_REWARD_AMOUNT` | Default commission |
 
@@ -116,7 +120,6 @@ Verified by grepping the whole theme (`app/`, `config/`, `resources/`). Each of 
 | `BARBA_ENABLED` | No Barba.js in the codebase |
 | `LOCOMOTIVE_ENABLED` | No Locomotive Scroll in the codebase |
 | `PRISM_SERVER_ENABLED` | `PrismAiAuditor` does not read it |
-| `STRIPE_TEST_KEY`, `STRIPE_TEST_SECRET` | Test mode is selected by using test values in `STRIPE_KEY`/`STRIPE_SECRET` |
 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | The code reads `GOOGLE_CALENDAR_CLIENT_ID`/`_SECRET` |
 
 Also in `.env` and unread by the theme: `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` — WordPress mail is not configured through Laravel's mailer here, so these only matter if an SMTP plugin or `wp_mail` filter is added.

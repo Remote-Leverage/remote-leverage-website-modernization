@@ -41,6 +41,8 @@ class RolesPricingGridBlock extends Block
     public function with(): array
     {
         return [
+            'variant' => get_field('variant') ?: 'stacked',
+            'columns' => get_field('columns') ?: '4',
             'headline' => BlockDefaults::cleanText(get_field('headline') ?: 'Virtual Assistant Roles'),
             'cards' => $this->cards(),
         ];
@@ -54,6 +56,19 @@ class RolesPricingGridBlock extends Block
             ->addText('headline', [
                 'label' => 'Section Headline',
                 'default_value' => 'Virtual Assistant Roles',
+            ])
+            ->addSelect('variant', [
+                'label' => 'Card shape',
+                'choices' => [
+                    'stacked' => 'Photo on top, tasks and tools below (default)',
+                    'split-chip' => 'Salary chip left, role copy right',
+                ],
+                'default_value' => 'stacked',
+            ])
+            ->addSelect('columns', [
+                'label' => 'Columns',
+                'choices' => ['4' => '4 across', '2' => '2 across'],
+                'default_value' => '4',
             ])
             ->addRepeater('cards', [
                 'label' => 'Role Cards (Leave empty for default 8 roles)',
@@ -74,6 +89,9 @@ class RolesPricingGridBlock extends Block
             ])
             ->addText('cta_text', ['label' => 'CTA Text', 'default_value' => 'Interview Assistants'])
             ->addText('cta_url', ['label' => 'CTA URL', 'default_value' => '#booking-footer'])
+            ->addText('chip_name', ['label' => 'Chip name', 'instructions' => 'split-chip variant only.'])
+            ->addText('chip_role', ['label' => 'Chip role', 'instructions' => 'split-chip variant only.'])
+            ->addText('price_label', ['label' => 'Price label', 'default_value' => 'Montly'])
             ->endRepeater();
 
         return $fields->build();

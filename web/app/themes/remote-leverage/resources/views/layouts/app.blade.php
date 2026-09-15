@@ -57,13 +57,16 @@
   <body @php(body_class('min-h-full flex flex-col bg-bg-light text-text-body font-sans antialiased selection:bg-brand-purple selection:text-white'))>
     @php(wp_body_open())
 
-    <div id="app" class="flex min-h-screen flex-col">
+    <div id="app" class="relative flex min-h-screen flex-col">
       <a class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-pill focus:bg-brand-purple focus:px-6 focus:py-3 focus:font-semibold focus:text-white focus:shadow-xl focus:outline-none" href="#main">
         {{ __('Skip to content', 'remote-leverage') }}
       </a>
 
+      {{-- The hire-va landing pages carry no site nav on production — a conversion page
+           deliberately offers no way out — so they get the CTA-only header instead. --}}
       @if (get_page_template_slug() !== 'template-landing.blade.php' && ! is_page_template('template-landing.blade.php'))
-        @include('sections.header')
+        @includeWhen(\App\Support\PageChrome::usesCtaOnlyHeader(), 'sections.header-cta')
+        @includeUnless(\App\Support\PageChrome::usesCtaOnlyHeader(), 'sections.header')
       @endif
 
       <main id="main" class="main flex-1 w-full">

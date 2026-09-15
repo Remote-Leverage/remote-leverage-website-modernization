@@ -11,46 +11,78 @@
         document.body.style.overflow = '';
     }
 }" class="w-full">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-card mb-20">
+    @php
+        // Kept as whole class strings so Tailwind's scanner sees them literally.
+        $isPlain = ($layout ?? 'cards') === 'plain';
+        $gridCols = ($columns ?? '3') === '2'
+            ? 'grid grid-cols-1 md:grid-cols-2 gap-card mb-20'
+            : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-card mb-20';
+        // Production's /signedup/ wall is a bare 16:9 video grid on a 20px gutter, with no
+        // quote, company or duration chrome. 'cards' stays the default everywhere else.
+        if ($isPlain) {
+            $gridCols = ($columns ?? '3') === '2'
+                ? 'grid grid-cols-1 md:grid-cols-2 gap-5 mb-20'
+                : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-20';
+        }
+    @endphp
+    <div class="{{ $gridCols }}">
         @foreach ($testimonials as $t)
-            <div class="bg-transparent hover:bg-white rounded-card p-card flex flex-col justify-between border border-transparent hover:border-black/4 hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
-                @click="openModal('{{ $t['video_url'] }}')">
-                <div>
-                    <div class="relative w-full aspect-4/3 rounded-xl overflow-hidden mb-4 bg-slate-900">
-                        <img src="{{ $t['image'] }}" alt="{{ $t['company'] }}" width="314"
-                            height="214" loading="lazy" decoding="async"
-                            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
-                        {{-- Center Glass Play Button --}}
-                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div
-                                class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/45 backdrop-blur-xs flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110">
-                                <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white translate-x-0.5"
-                                    fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M8 5v14l11-7z" />
-                                </svg>
-                            </div>
-                        </div>
-                        {{-- Duration Badge (bottom right) --}}
-                        @if (! empty($t['duration']))
-                            <span
-                                class="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded bg-black/60 backdrop-blur-xs text-white text-[10px] sm:text-[11px] font-medium font-mono pointer-events-none">
-                                {{ $t['duration'] }}
-                            </span>
-                        @endif
-                    </div>
-                    <div class="pt-1 pb-2">
-                        <h3
-                            class="font-display text-[16px] sm:text-[17px] font-bold text-black leading-[1.35] tracking-[-0.01em] mb-4">
-                            {{ $t['quote'] }}
-                        </h3>
-                    </div>
-                </div>
-                <div class="pb-1 mt-auto text-right">
-                    <span class="text-[11px] sm:text-[12px] text-black font-medium">
-                        {{ $t['company'] }}
+            @if ($isPlain)
+                <button type="button"
+                    class="group relative block w-full aspect-video rounded-xl overflow-hidden bg-slate-900 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple"
+                    @click="openModal('{{ $t['video_url'] }}')"
+                    aria-label="Play video testimonial{{ ! empty($t['company']) ? ': '.$t['company'] : '' }}">
+                    <img src="{{ $t['image'] }}" alt="{{ $t['company'] ?? '' }}" width="630" height="354"
+                        loading="lazy" decoding="async"
+                        class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                    <span class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span class="w-14 h-14 rounded-full bg-white/45 backdrop-blur-xs flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110">
+                            <svg class="w-6 h-6 text-white translate-x-0.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                        </span>
                     </span>
+                </button>
+            @else
+                <div class="bg-transparent hover:bg-white rounded-card p-card flex flex-col justify-between border border-transparent hover:border-black/4 hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
+                    @click="openModal('{{ $t['video_url'] }}')">
+                    <div>
+                        <div class="relative w-full aspect-4/3 rounded-xl overflow-hidden mb-4 bg-slate-900">
+                            <img src="{{ $t['image'] }}" alt="{{ $t['company'] }}" width="314"
+                                height="214" loading="lazy" decoding="async"
+                                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            {{-- Center Glass Play Button --}}
+                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div
+                                    class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/45 backdrop-blur-xs flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110">
+                                    <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white translate-x-0.5"
+                                        fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                </div>
+                            </div>
+                            {{-- Duration Badge (bottom right) --}}
+                            @if (! empty($t['duration']))
+                                <span
+                                    class="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded bg-black/60 backdrop-blur-xs text-white text-[10px] sm:text-[11px] font-medium font-mono pointer-events-none">
+                                    {{ $t['duration'] }}
+                                </span>
+                            @endif
+                        </div>
+                        <div class="pt-1 pb-2">
+                            <h3
+                                class="font-display text-[16px] sm:text-[17px] font-bold text-black leading-[1.35] tracking-[-0.01em] mb-4">
+                                {{ $t['quote'] }}
+                            </h3>
+                        </div>
+                    </div>
+                    <div class="pb-1 mt-auto text-right">
+                        <span class="text-[11px] sm:text-[12px] text-black font-medium">
+                            {{ $t['company'] }}
+                        </span>
+                    </div>
                 </div>
-            </div>
+            @endif
         @endforeach
     </div>
 

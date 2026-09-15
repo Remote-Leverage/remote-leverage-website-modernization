@@ -407,19 +407,57 @@ class BlockDefaults
         return $formatted;
     }
 
+    /**
+     * ACF-encode repeater rows into a block's `data` attributes.
+     *
+     * Handles nested repeaters: a sub-field whose value is a *list of arrays* is
+     * encoded as its own repeater under the composed name, which is what
+     * `acf/talent-dossier-carousel` needs for the `tools` strip inside each card.
+     * Without this, a nested list was passed through getAttachmentId() as a raw
+     * array and ACF could not load it — the strip silently rendered empty.
+     *
+     * An ACF image array (`['url' => …, 'id' => …]`) is associative, not a list,
+     * so it is never mistaken for nested rows.
+     */
     public static function encodeRepeater(string $fieldName, string $fieldKey, array $rows, array &$data = []): array
     {
         $data[$fieldName] = count($rows);
         $data['_'.$fieldName] = $fieldKey;
         foreach ($rows as $i => $row) {
             foreach ($row as $subfield => $val) {
-                $encodedVal = self::getAttachmentId($val);
-                $data["{$fieldName}_{$i}_{$subfield}"] = $encodedVal;
-                $data["_{$fieldName}_{$i}_{$subfield}"] = "{$fieldKey}_{$subfield}";
+                $subKey = "{$fieldKey}_{$subfield}";
+
+                if (self::isNestedRepeater($val)) {
+                    self::encodeRepeater("{$fieldName}_{$i}_{$subfield}", $subKey, $val, $data);
+
+                    continue;
+                }
+
+                $data["{$fieldName}_{$i}_{$subfield}"] = self::getAttachmentId($val);
+                $data["_{$fieldName}_{$i}_{$subfield}"] = $subKey;
             }
         }
 
         return $data;
+    }
+
+    /**
+     * Whether a sub-field value is a nested repeater's rows — a non-empty list
+     * whose every element is an array.
+     */
+    private static function isNestedRepeater(mixed $value): bool
+    {
+        if (! is_array($value) || $value === [] || ! array_is_list($value)) {
+            return false;
+        }
+
+        foreach ($value as $row) {
+            if (! is_array($row)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public static function patternBlock(string $slug, array $data = [], array $attrs = []): string
@@ -1169,31 +1207,58 @@ class BlockDefaults
     }
 
     // --- HIRE-VA-4: PROCESS STEPS ---
+    /**
+     * "Our Hiring Process" steps as production renders them on /hire-va-4/.
+     *
+     * Corrected 2026-09-15: these had drifted to Lano-partnership copy ("We
+     * handle pay & compliance", a Lano payroll dashboard in step 3) that
+     * production does not show on this page.
+     */
     public static function hireVa4ProcessSteps(): array
     {
         return [
             [
                 'num' => '01',
                 'title' => 'Tell us your<br>ideal hire',
-                'desc' => 'Book a 15-minute consultation. Describe the role, skills, and experience you need. Remote Leverage handles posting, screening, and interviewing candidates on your behalf.',
+                'desc' => 'Book a quick call to tell us the support you need to grow. Don’t have a job description? No problem. Tell us the bottlenecks in your business, and we’ll solve them.',
             ],
             [
                 'num' => '02',
                 'title' => 'Meet your<br>top 1% shortlist',
-                'desc' => 'Within 48–72 hours, receive 4–6 pre-vetted, fluent English-speaking candidates. You interview, you choose. No contracts, no commitments — you only pay if you hire.',
+                'desc' => 'Within 48–72 hours, receive 4–6 pre-vetted, English-fluent candidates matched for skill, experience, and fit. We do the hard part. You just interview and hire your favorite.',
             ],
             [
                 'num' => '03',
                 'title' => 'We handle pay<br>& compliance',
-                'desc' => 'You hire your favorite, and they are immediately integrated into your Lano payroll and compliance dashboard. No misclassification risk. No surprises.',
+                'desc' => 'In a single session, interview all candidates. Pick the best fit and hire directly. Can’t pick just 1? You don’t have to. At 70% savings, hire a team for the price of 1 U.S. hire.',
             ],
         ];
     }
 
-    public static function renderHireVa4ProcessSteps(array $overrides = []): string
+    /**
+     * The same three steps as /hire-for-less/ titles them. Production runs the
+     * two pages off one section with different step headings, so this shares
+     * hireVa4ProcessSteps()'s bodies rather than restating them.
+     */
+    public static function hireForLessProcessSteps(): array
+    {
+        $titles = [
+            'Tell Us Your<br>Ideal Hire',
+            'We Screen<br>Your Shortlist',
+            'Interview and<br>Hire Your Favorite',
+        ];
+
+        return array_map(
+            static fn (array $step, string $title) => [...$step, 'title' => $title],
+            self::hireVa4ProcessSteps(),
+            $titles,
+        );
+    }
+
+    public static function renderHireVa4ProcessSteps(array $overrides = [], ?array $steps = null): string
     {
         $data = [];
-        self::encodeRepeater('steps', 'field_process_steps_block_steps', self::hireVa4ProcessSteps(), $data);
+        self::encodeRepeater('steps', 'field_process_steps_block_steps', $steps ?? self::hireVa4ProcessSteps(), $data);
 
         return self::patternBlock('process-steps', array_merge($data, $overrides));
     }
@@ -1305,10 +1370,38 @@ class BlockDefaults
         ];
     }
 
-    public static function renderHireVa4Testimonials(array $overrides = []): string
+    /**
+     * The six reviews production actually shows under "Client Reviews" on
+     * /hire-va-4/ and /hire-for-less/, in production's order.
+     *
+     * The full hireVa4Testimonials() set is 14, which rendered five grid rows
+     * against production's two and made the page ~1460px taller than it should
+     * be. The wider wall still belongs on /reviews/, which is why this selects
+     * rather than shortening the source list.
+     */
+    public static function hireVa4FeaturedTestimonials(): array
+    {
+        $order = [
+            'PRES Property Management',
+            'Carbon Solutions Group',
+            'Coldwell Banker',
+            'The Zen Zone Wellness',
+            'Connect Church Colorado',
+            'Color Job',
+        ];
+
+        $byCompany = array_column(self::hireVa4Testimonials(), null, 'company');
+
+        return array_values(array_filter(array_map(
+            static fn (string $company) => $byCompany[$company] ?? null,
+            $order,
+        )));
+    }
+
+    public static function renderHireVa4Testimonials(array $overrides = [], ?array $testimonials = null): string
     {
         $data = [];
-        self::encodeRepeater('testimonials', 'field_testimonials_block_testimonials', self::hireVa4Testimonials(), $data);
+        self::encodeRepeater('testimonials', 'field_testimonials_block_testimonials', $testimonials ?? self::hireVa4Testimonials(), $data);
 
         return self::patternBlock('testimonials', array_merge($data, $overrides));
     }
@@ -2931,5 +3024,328 @@ Google Ads',
         self::encodeRepeater('items', 'field_sample_applicant_audio_block_items', self::sampleApplicantAudio(), $data);
 
         return self::patternBlock('sample-applicant-audio', array_merge($data, $overrides), ['align' => 'full']);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ------------------------------------------------------------------
+    // P3 — /ecommerce-virtual-assistant/
+    //
+    // That page composes 17 sections out of blocks whose render* helpers took
+    // only a flat $overrides array, so there was no way to hand them repeater
+    // rows. Repeater data has to be ACF-encoded — a raw array passed as an
+    // override is silently ignored and the block falls back to its presets,
+    // which is how a page ships looking wired up but showing the wrong content.
+    // This one helper encodes any repeater for any block rather than widening a
+    // dozen signatures.
+    // ------------------------------------------------------------------
+
+    /**
+     * Render a block, ACF-encoding one repeater into its attributes.
+     *
+     * @param  string  $slug  block slug without the `acf/` prefix
+     * @param  string  $fieldName  the repeater's field name (e.g. `cards`)
+     * @param  string  $fieldKey  the repeater's ACF key (e.g. `field_image_card_grid_block_cards`)
+     * @param  array<int, array<string, mixed>>  $rows
+     * @param  array<string, mixed>  $overrides  plain (non-repeater) fields
+     * @param  array<string, mixed>  $attrs  block attributes such as `align`
+     */
+    public static function renderBlockWithRepeater(
+        string $slug,
+        string $fieldName,
+        string $fieldKey,
+        array $rows,
+        array $overrides = [],
+        array $attrs = [],
+    ): string {
+        $data = [];
+        self::encodeRepeater($fieldName, $fieldKey, $rows, $data);
+
+        return self::patternBlock($slug, array_merge($data, $overrides), $attrs);
+    }
+
+    /** Repeater field keys for the blocks the ecommerce page composes. */
+    public const REPEATER_KEYS = [
+        'feature-cards' => ['cards', 'field_feature_cards_block_cards'],
+        'image-card-grid' => ['cards', 'field_image_card_grid_block_cards'],
+        'results-preview' => ['cards', 'field_results_preview_block_cards'],
+        'roles-pricing-grid' => ['cards', 'field_roles_pricing_grid_block_cards'],
+        'sample-applicant-videos' => ['cards', 'field_sample_applicant_videos_block_cards'],
+        'client-logos-marquee' => ['logos', 'field_client_logos_marquee_block_logos'],
+        'talent-carousel' => ['profiles', 'field_talent_carousel_block_profiles'],
+        'talent-marquee' => ['talent_cards', 'field_talent_marquee_block_talent_cards'],
+        'partner-hero' => ['badges', 'field_partner_hero_block_badges'],
+        'talent-dossier-carousel' => ['cards', 'field_talent_dossier_carousel_block_cards'],
+        'stats-band' => ['stats', 'field_stats_band_block_stats'],
+        'featured-posts' => ['cards', 'field_featured_posts_block_cards'],
+    ];
+
+    /**
+     * Convenience wrapper around renderBlockWithRepeater() for the blocks listed
+     * in REPEATER_KEYS, so a pattern names the block rather than its field key.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @param  array<string, mixed>  $overrides
+     * @param  array<string, mixed>  $attrs
+     */
+    public static function renderEcom(string $slug, array $rows, array $overrides = [], array $attrs = []): string
+    {
+        if (! isset(self::REPEATER_KEYS[$slug])) {
+            throw new \InvalidArgumentException("No repeater key registered for block '{$slug}'.");
+        }
+
+        [$fieldName, $fieldKey] = self::REPEATER_KEYS[$slug];
+
+        return self::renderBlockWithRepeater($slug, $fieldName, $fieldKey, $rows, $overrides, $attrs);
+    }
+
+    /** Page art for /ecommerce-virtual-assistant/, e.g. ecomImg('talent/Andres-M.jpg'). */
+    public static function ecomImg(string $file): string
+    {
+        return self::pageImg('ecommerce-virtual-assistant', ltrim($file, '/'));
+    }
+
+    // P2 — FUNNEL / OPERATIONAL PAGES
+    // Copy transcribed from production 2026-09-15. See PAGE-MIGRATION-STATUS.md §3 P2.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * /referral-program/ (production page 30560) hero copy.
+     *
+     * `stats` renders the two earnings figures production states in prose; `steps` feeds
+     * acf/process-steps, which production keeps inline in the hero instead.
+     *
+     * @return array{subheadline: string, stats: array<int, array{value: string, label: string}>, steps: array<int, array{num: string, title: string, desc: string}>}
+     */
+    public static function referralProgramHero(): array
+    {
+        return [
+            'subheadline' => 'Earn $1,000 when someone you refer hires through Remote Leverage — and they get $500 off their first hire.',
+            'stats' => [
+                ['value' => '$1,000', 'label' => 'You earn for every referral that hires'],
+                ['value' => '$500', 'label' => 'They save on their first hire'],
+            ],
+            'steps' => [
+                [
+                    'num' => '01',
+                    'title' => 'Sign up for the<br>Referral Program',
+                    'desc' => 'Join in under a minute. No cost, no commitment, and no cap on how much you can earn.',
+                ],
+                [
+                    'num' => '02',
+                    'title' => 'Get your unique<br>referral link',
+                    'desc' => 'We generate a link tied to your account so every business you send is credited to you.',
+                ],
+                [
+                    'num' => '03',
+                    'title' => 'Share it with<br>your network',
+                    'desc' => 'Pass it to founders and operators who are hiring. They get $500 off their first hire.',
+                ],
+                [
+                    'num' => '04',
+                    'title' => 'Earn $1,000 when<br>they hire',
+                    'desc' => 'Your commission qualifies as soon as your referral hires with us. Paid straight to you.',
+                ],
+            ],
+        ];
+    }
+
+    public static function renderReferralProgramHero(array $overrides = []): string
+    {
+        $data = [];
+        self::encodeRepeater('stats', 'field_referral_program_hero_block_stats', self::referralProgramHero()['stats'], $data);
+
+        return self::patternBlock(
+            'referral-program-hero',
+            array_merge($data, self::withFieldKeys('referral_program_hero_block', $overrides)),
+            ['align' => 'full'],
+        );
+    }
+
+    /** Render acf/process-steps with the /referral-program/ how-it-works steps. */
+    public static function renderReferralProgramSteps(array $overrides = []): string
+    {
+        $data = [];
+        self::encodeRepeater('steps', 'field_process_steps_block_steps', self::referralProgramHero()['steps'], $data);
+
+        return self::patternBlock('process-steps', array_merge($data, $overrides));
+    }
+
+    /**
+     * The four alternating image/copy rows below the /referral-program/ hero.
+     * Keys match the acf/media-copy fields.
+     *
+     * @return array<int, array{headline: string, body: string, image: string, image_position: string}>
+     */
+    public static function referralProgramRows(): array
+    {
+        $img = fn (string $file): string => self::pageImg('referral-program', $file);
+
+        $rows = [
+            [
+                'We’re the Fastest Growing Talent Startup in 2026',
+                '<p>In January alone, over 400 businesses signed up to hire through Remote Leverage—adding to a streak of rapid growth over the past several months.</p><p>As more founders turn to offshore talent to scale efficiently, we’re expanding fast and preparing to launch powerful new products and services throughout 2026 to support them even better.</p>',
+                'Section-3-Images-1.png',
+            ],
+            [
+                'Ethical &amp; Compliant Global Outsourcing',
+                '<p>The roles we fill are among the most attractive opportunities available to global professionals.</p><p>Candidates work directly with U.S. employers, earn their full compensation with no commissions or middle-man cuts, and join teams where their impact is real and long-term.</p>',
+                'Section-3-Images-2.png',
+            ],
+            [
+                'Access to Unique Global Talent Markets',
+                '<p>Remote Leverage gives U.S. teams access to elite talent from Latin America and other high-quality markets—working in your time zone, with strong English fluency and cultural alignment.</p><p>Our sourcing network and vetting process surface candidates most companies never reach, so you can hire faster and collaborate seamlessly from day one.</p>',
+                'Section-3-Images-3.png',
+            ],
+            [
+                'The Happiest Clients in Our Industry',
+                '<p>Our clients don’t just say they’re happy, <a href="/reviews/" class="underline">they show it</a>.</p><p>With nearly a hundred video testimonials from real founders and operators, Remote Leverage has earned a reputation for delivering elite talent, fast hiring, and a risk-free experience that keeps customers coming back.</p>',
+                'Section-3-Images-4.png',
+            ],
+        ];
+
+        return array_values(array_map(fn (array $row, int $i): array => [
+            'headline' => $row[0],
+            'body' => $row[1],
+            'image' => $img($row[2]),
+            // Production alternates the art: rows 1 and 3 right, rows 2 and 4 left.
+            'image_position' => $i % 2 === 0 ? 'right' : 'left',
+        ], $rows, array_keys($rows)));
+    }
+
+    /**
+     * Production /signedup/ (page 10848) confirmation panel copy.
+     *
+     * @return array{headline: string, intro_label: string, footnote: string, steps: array<int, array{label: string, text: string}>}
+     */
+    public static function signedUpPanel(): array
+    {
+        return [
+            'headline' => 'Agreement Completed.',
+            'intro_label' => 'Next steps:',
+            'footnote' => 'We’ve hired hundreds of Virtual Assistants for various businesses all across the US.',
+            'steps' => [
+                [
+                    'label' => 'Onboarding Meeting',
+                    'text' => 'A Hiring Manager will contact you soon to book an onboarding meeting to fully understand your ideal candidate requirements.',
+                ],
+                [
+                    'label' => 'Virtual Assistant Vetting',
+                    'text' => 'After the onboarding meeting, we will vet 4-6 qualified applicants that match your criteria. This process typically takes 1-2 weeks as we have to go through hundreds of applicants and conduct multiple interviews with each applicant prior to matching them to the job you’re hiring for. In some cases, we can process it faster if we have applicants in our database that match your criteria.',
+                ],
+                [
+                    'label' => 'Virtual Assistant Interviews',
+                    'text' => 'Once we have 4-6 qualified applicants that match your criteria, you’ll be invited to interview them with the hiring manager. During this interview, you can ask any questions you want to find the best fit. You can also request to do a 2nd round of interviews with your top applicants, and even get another batch if you want to interview more people. Do note that any applicants you meet may be hired by another company at any time during the hiring process, as all applicants are actively seeking jobs.',
+                ],
+                [
+                    'label' => 'Job Offer',
+                    'text' => 'Once you meet your ideal candidate, we’ll help you craft a job offer to bring them onboard. We can also help with negotiating the hourly rate if needed.',
+                ],
+                [
+                    'label' => 'Applicant <> Client Onboarding',
+                    'text' => 'We will then set up another meeting to help you with onboarding the applicant.',
+                ],
+                [
+                    'label' => 'Replacement Guarantee',
+                    'text' => 'The Hiring Manager will support you for 12 months, handling any questions or replacements. If you have any questions along the way and need fast responses, feel free to email Admin@RemoteLeverage.com or call 408-403-5574',
+                ],
+            ],
+        ];
+    }
+
+    public static function renderNextStepsPanel(array $overrides = []): string
+    {
+        $defaults = self::signedUpPanel();
+        $data = self::withFieldKeys('next_steps_panel_block', [
+            'badge_image' => self::pageImg('signedup', 'Satisfaction-badge.png'),
+        ]);
+        self::encodeRepeater('steps', 'field_next_steps_panel_block_steps', $defaults['steps'], $data);
+
+        return self::patternBlock(
+            'next-steps-panel',
+            array_merge($data, self::withFieldKeys('next_steps_panel_block', $overrides)),
+            ['align' => 'full'],
+        );
+    }
+
+    public static function renderPaymentSuccessBanner(array $overrides = []): string
+    {
+        return self::patternBlock(
+            'payment-success-banner',
+            self::withFieldKeys('payment_success_banner_block', $overrides),
+            ['align' => 'full'],
+        );
+    }
+
+    public static function renderJotformEmbed(string $formId, array $overrides = []): string
+    {
+        return self::patternBlock(
+            'jotform-embed',
+            self::withFieldKeys('jotform_embed_block', array_merge(['form_id' => $formId], $overrides)),
+            ['align' => 'full'],
+        );
+    }
+
+    /**
+     * The /signedup/ "Client Reviews" wall — production's sixteen videos, in production's
+     * DOM order (page 10848, read 2026-09-15).
+     *
+     * Fifteen of the sixteen are already curated in the 77-entry vaThankYouTestimonials()
+     * archive, so this selects them by Vimeo ID rather than duplicating their posters and
+     * quotes. The sixteenth (1067577717, "Vercasa Review") is not in the archive; its poster
+     * is the video's own frame, pulled from Vimeo's oEmbed endpoint.
+     *
+     * @return array<int, array<string, string>>
+     */
+    public static function signedUpTestimonials(): array
+    {
+        // Production's order, not the archive's.
+        $order = [
+            '1067577208', '1067577369', '1067577489', '1067577248',
+            '1067577464', '1067577620', '1067577549', '1067577665',
+            '1067577688', '1067577383', '1067577228', '1067577598',
+            '1067577293', '1067577442', '1067577645', '1067577717',
+        ];
+
+        $byId = [];
+        foreach (self::vaThankYouTestimonials() as $row) {
+            if (preg_match('#/(\d+)$#', (string) ($row['video_url'] ?? ''), $m) === 1) {
+                $byId[$m[1]] = $row;
+            }
+        }
+
+        $byId['1067577717'] ??= [
+            'video_url' => 'https://vimeo.com/1067577717',
+            'image' => self::pageImg('signedup', 'Vercasa-Review.jpg'),
+            'duration' => '00:27',
+            'quote' => '“Vercasa Review”',
+            'company' => 'Vercasa',
+        ];
+
+        return array_values(array_filter(array_map(
+            fn (string $id): ?array => $byId[$id] ?? null,
+            $order,
+        )));
+    }
+
+    public static function renderSignedUpTestimonials(array $overrides = []): string
+    {
+        $data = self::withFieldKeys('testimonials_block', array_merge([
+            // Production lays this wall out two across as bare 16:9 tiles with no
+            // quote or company chrome, not the block's default three-across cards.
+            'columns' => '2',
+            'layout' => 'plain',
+        ], $overrides));
+        self::encodeRepeater('testimonials', 'field_testimonials_block_testimonials', self::signedUpTestimonials(), $data);
+
+        return self::patternBlock('testimonials', $data);
+    }
+
+    public static function renderPaymentGateway(array $overrides = []): string
+    {
+        return self::patternBlock(
+            'payment-gateway',
+            self::withFieldKeys('payment_gateway_block', $overrides),
+            ['align' => 'full'],
+        );
     }
 }

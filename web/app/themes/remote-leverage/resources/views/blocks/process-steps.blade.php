@@ -3,7 +3,7 @@
      bands. --}}
 <div class="rl-process-container w-full">
     <div class="rl-process-line"></div>
-    <div class="rl-process-grid">
+    <div class="rl-process-grid" style="--rl-process-cols:{{ max(1, min(4, count($steps))) }}">
         @foreach ($steps as $step)
             <div class="rl-process-item">
                 <div class="rl-process-marker">

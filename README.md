@@ -224,7 +224,7 @@ flowchart LR
 | Test suite + CI | ✅ Done | No visual-regression suite (WR-103, deliberately not built) |
 | Staging deploy pipeline | ✅ Done | Production target does not exist yet |
 | Environment sync | ✅ Done | Production is gated off by design, in four independent places |
-| **In-scope URLs** | 🟡 14 of 48 | 5 nav-linked pages (P0), 5 partnership items, 6 funnel pages, 18 marketing/campaign pages |
+| **In-scope URLs** | 🟡 30 of 48 | P0 and P2 cleared; see [`PAGE-MIGRATION-STATUS.md`](PAGE-MIGRATION-STATUS.md) for the live count |
 | **Case studies** | ✅ 23 of 23 | Migrated to a real `case_study` CPT |
 | **Blog posts** | ✅ 119 of 119 | Imported clean; category counts match production |
 | **Taxonomies** | ✅ 7 of 7 categories, 8 of 8 tags | `Live Sessions` is empty locally (2 on production) |
@@ -241,7 +241,7 @@ The three business decisions that used to block ~107 pages (paid-traffic experim
 funnel pages, the role/industry template question) are **resolved by scope closure**: none of those
 sets is being migrated. What is left is concrete build work plus one small decision batch.
 
-**34 in-scope URLs to build**, in priority order:
+**18 in-scope URLs to build**, in priority order:
 
 1. **P0 — 5 pages the v2 nav already links to**, so the site currently points at its own 404s:
    `/vacalendar/`, `/samples/`, `/contractor-management/`, `/contractor-payments/`, `/impact-report-2026/`.
@@ -249,8 +249,11 @@ sets is being migrated. What is left is concrete build work plus one small decis
    landing pages, plus `oyster` / `lano` / `lexgo` hub entries. Note the asymmetry — Lano has no
    production hub entry and Lexgo no production landing page, so two of the five are new content,
    not migrations.
-3. **P2 — 6 funnel/operational pages** (`/payment/`, `/signedup/`, `/vaonboardingform/`,
-   `/referral-program/`, and two deposit/thank-you pages).
+3. ~~**P2 — 6 funnel/operational pages**~~ — **built 2026-09-15.** `/payment/`, `/signedup/`,
+   `/vaonboardingform/`, `/referral-program/`, `/referral-program-thank-you-page-deposit/` and
+   `/virtual-assistant-hiring-manager-refundable-deposit/`. The last of those is visually
+   complete but **cannot take a payment until Stripe credentials are moved** from
+   `rl-elementor-blocks` — see [`docs/stripe-payments.md`](web/app/themes/remote-leverage/docs/stripe-payments.md).
 4. **P3–P4 — 18 marketing and campaign pages.**
 
 **Plus one decision batch:** v2 already contains 4 pages that are *not* on the list, built before

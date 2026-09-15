@@ -34,8 +34,8 @@
       
       {{-- COLUMN 1: Tall Admin Card Top + 2 Medium Cards Below --}}
       <div class="flex flex-col gap-6">
-        {{-- Card 1: Administrative (Tall, Dark Purple, Woman Cutout) --}}
-        <div class="relative overflow-hidden bg-[#250D4A] rounded-card p-6 sm:p-8 text-white border border-white/10 shadow-sm flex flex-col justify-between min-h-[440px] group">
+        {{-- Card 1: Administrative (Tall, brand purple, woman cutout) — the ONE dark card --}}
+        <div class="relative overflow-hidden bg-roles-feature rounded-card p-6 sm:p-8 text-white border border-white/10 shadow-sm flex flex-col justify-between min-h-[440px] group">
           <div>
             <h3 class="text-2xl sm:text-3xl font-bold font-display text-white tracking-tight">Administrative</h3>
             <p class="text-sm sm:text-base text-white/80 mt-2 max-w-[280px] leading-relaxed">
@@ -48,7 +48,7 @@
         </div>
 
         {{-- Card 2: Marketing (Lavender, Horizontal Layout) --}}
-        <div class="bg-[#F2EDF9] rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
+        <div class="bg-roles-violet rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
           <div class="flex-1">
             <h3 class="text-xl font-bold font-display text-brand-hero">Marketing</h3>
             <p class="text-xs sm:text-sm text-text-muted mt-1.5 leading-relaxed max-w-[220px]">
@@ -61,7 +61,7 @@
         </div>
 
         {{-- Card 3: Graphic Design (Soft Blue, Horizontal Layout) --}}
-        <div class="bg-[#E1ECF7] rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
+        <div class="bg-roles-blue rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
           <div class="flex-1">
             <h3 class="text-xl font-bold font-display text-brand-hero">Graphic Design</h3>
             <p class="text-xs sm:text-sm text-text-muted mt-1.5 leading-relaxed max-w-[220px]">
@@ -77,7 +77,7 @@
       {{-- COLUMN 2: 2 Medium Cards Top + Tall Support Card Bottom --}}
       <div class="flex flex-col gap-6">
         {{-- Card 4: Lead Generation (Lavender, Horizontal Layout) --}}
-        <div class="bg-[#F2EDF9] rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
+        <div class="bg-roles-lavender rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
           <div class="flex-1">
             <h3 class="text-xl font-bold font-display text-brand-hero">Lead Generation</h3>
             <p class="text-xs sm:text-sm text-text-muted mt-1.5 leading-relaxed max-w-[220px]">
@@ -90,7 +90,7 @@
         </div>
 
         {{-- Card 5: Sales (SDR) (Soft Blue, Horizontal Layout) --}}
-        <div class="bg-[#E1ECF7] rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
+        <div class="bg-roles-blue rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
           <div class="flex-1">
             <h3 class="text-xl font-bold font-display text-brand-hero">Sales (SDR)</h3>
             <p class="text-xs sm:text-sm text-text-muted mt-1.5 leading-relaxed max-w-[220px]">
@@ -102,11 +102,11 @@
           </div>
         </div>
 
-        {{-- Card 6: Customer Support (Tall, Dark Purple, Man Cutout) --}}
-        <div class="relative overflow-hidden bg-[#250D4A] rounded-card p-6 sm:p-8 text-white border border-white/10 shadow-sm flex flex-col justify-between min-h-[440px] flex-1 group">
+        {{-- Card 6: Customer Support (Tall, light lavender, man cutout) — light on production --}}
+        <div class="relative overflow-hidden bg-roles-lavender rounded-card p-6 sm:p-8 border border-black/5 shadow-xs flex flex-col justify-between min-h-[440px] flex-1 group">
           <div>
-            <h3 class="text-2xl sm:text-3xl font-bold font-display text-white tracking-tight">Customer Support</h3>
-            <p class="text-sm sm:text-base text-white/80 mt-2 max-w-[280px] leading-relaxed">
+            <h3 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight">Customer Support</h3>
+            <p class="text-sm sm:text-base text-text-muted mt-2 max-w-[280px] leading-relaxed">
               Tickets, questions, and vendor calls handled so your customers stay happy.
             </p>
           </div>
@@ -119,7 +119,7 @@
       {{-- COLUMN 3: Social Media Top + Custom Role Bottom --}}
       <div class="flex flex-col gap-6">
         {{-- Card 7: Social Media (Soft Grey/Blue Surface, Post Mockup) --}}
-        <div class="bg-[#EBF1F6] rounded-card p-6 sm:p-8 border border-black/5 shadow-xs flex flex-col justify-between min-h-[360px]">
+        <div class="bg-roles-sky rounded-card p-6 sm:p-8 border border-black/5 shadow-xs flex flex-col justify-between min-h-[360px]">
           <div>
             <h3 class="text-2xl font-bold font-display text-brand-hero tracking-tight">Social Media</h3>
             <p class="text-sm text-text-muted mt-2 leading-relaxed max-w-[300px]">

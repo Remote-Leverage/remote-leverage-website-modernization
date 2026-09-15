@@ -19,6 +19,6 @@ use App\Support\BlockDefaults;
     <p class="has-text-muted-color has-text-color" style="font-size:0.95rem;margin-bottom:3rem">Don't just take our word for it, hear from business owners who've hired through Remote Leverage. See why quality makes all the difference!</p>
     <!-- /wp:paragraph -->
 
-    <?= BlockDefaults::renderHireVa4Testimonials() ?>
+    <?= BlockDefaults::renderHireVa4Testimonials([], BlockDefaults::hireVa4FeaturedTestimonials()) ?>
 </div>
 <!-- /wp:group -->

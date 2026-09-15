@@ -12,21 +12,36 @@
     ];
 @endphp
 
-<section class="relative w-full overflow-hidden pt-16 lg:pt-20"
-    style="background-image:linear-gradient(160deg,{{ $brandColor }} 0%,{{ $brandColorEnd }} 100%);">
-    {{-- Same world map the homepage hero and booking footer use, held back so the copy stays legible. --}}
-    <div class="pointer-events-none absolute inset-x-0 top-0 h-full z-0 opacity-25 bg-no-repeat bg-contain bg-top"
+@php
+    // `tone: light` swaps the partner-brand gradient for production's #F4F6FC band with black
+    // copy and a full-opacity illustration backdrop (/ecommerce-virtual-assistant/'s hero).
+    $isLight = ($tone ?? 'brand-gradient') === 'light';
+    $heroBg = $isLight
+        ? 'background-color:#F4F6FC;'
+        : 'background-image:linear-gradient(160deg,'.$brandColor.' 0%,'.$brandColorEnd.' 100%);';
+    $heroText = $isLight ? 'text-black' : 'text-white';
+    $heroBody = $isLight ? 'text-black/80' : 'text-white/90';
+@endphp
+
+<section class="relative w-full overflow-hidden pt-16 lg:pt-20" style="{{ $heroBg }}">
+    {{-- The shared world map on brand heroes; a full-opacity illustration on the light tone. --}}
+    <div @class([
+            'pointer-events-none absolute inset-x-0 top-0 h-full z-0 bg-no-repeat bg-top',
+            'opacity-25 bg-contain' => ! $isLight,
+            'bg-cover' => $isLight,
+        ])
         style="background-image:url('{{ $backdrop }}');"></div>
 
     <div class="relative z-10 w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
 
-        <h2 class="font-display font-bold text-[34px] leading-[42px] sm:text-[52px] sm:leading-[60px] tracking-[-1.56px] text-white mb-6 max-w-[860px] mx-auto">
+        <h2 class="font-display font-bold text-[34px] leading-[42px] sm:text-[52px] sm:leading-[60px] tracking-[-1.56px] {{ $heroText }} mb-6 max-w-[860px] mx-auto">
             {!! nl2br(e($headline)) !!}
         </h2>
 
         @foreach ($paragraphs as $paragraph)
             <p @class([
-                'text-[16px] leading-[26px] mb-4 text-white/90 max-w-[720px] mx-auto',
+                'text-[16px] leading-[26px] mb-4 max-w-[720px] mx-auto',
+                $heroBody,
                 'font-bold' => $loop->first,
             ])>{{ $paragraph }}</p>
         @endforeach
@@ -37,6 +52,22 @@
                 <span>{{ $ctaText }}</span>
                 @include('partials.icon-circle-arrow', ['class' => 'w-[22px] h-[22px] shrink-0'])
             </a>
+        @endif
+
+        {{-- Checked reassurance pills, read row-major in two columns. Production's ecommerce
+             hero runs six of these between the subhead and the CTA. --}}
+        @if (! empty($badges))
+            <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-[720px] mx-auto text-left">
+                @foreach ($badges as $badge)
+                    @continue(empty($badge['text']))
+                    <div class="flex items-center gap-3 rounded-pill border border-[#92B4F4]/30 bg-white px-[17px] py-3.5">
+                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#00D982]">
+                            <svg class="h-3 w-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        </span>
+                        <span class="text-[15px] text-black">{{ $badge['text'] }}</span>
+                    </div>
+                @endforeach
+            </div>
         @endif
 
         @if ($talentHtml)

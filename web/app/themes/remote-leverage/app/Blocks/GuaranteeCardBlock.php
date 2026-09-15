@@ -88,6 +88,11 @@ class GuaranteeCardBlock extends Block
             'headline' => get_field('headline') ?: '12-Month Replacement Guarantee',
             'ctaText' => get_field('cta_text') ?: 'BOOK MY FREE 15-MIN CALL',
             'ctaUrl' => get_field('cta_url') ?: '#booking-footer',
+            'background' => get_field('background') ?: 'radial-purple',
+            // Unset means "show them" — only an explicit off hides the trio.
+            'showReassuranceItems' => get_field('show_reassurance_items') === null
+                ? true
+                : (bool) get_field('show_reassurance_items'),
         ];
     }
 
@@ -104,6 +109,20 @@ class GuaranteeCardBlock extends Block
             ->addText('headline', [
                 'label' => 'Headline',
                 'default_value' => '12-Month Replacement Guarantee',
+            ])
+            ->addSelect('background', [
+                'label' => 'Background',
+                'choices' => [
+                    'radial-purple' => 'Radial purple wash (hire-va pages)',
+                    'flat-midnight' => 'Flat #250D4A (ecommerce page)',
+                ],
+                'default_value' => 'radial-purple',
+            ])
+            ->addTrueFalse('show_reassurance_items', [
+                'label' => 'Show the three reassurance items',
+                'instructions' => 'Off renders the guarantee badge alone, as production does on /ecommerce-virtual-assistant/.',
+                'ui' => 1,
+                'default_value' => 1,
             ])
             ->addText('cta_text', [
                 'label' => 'CTA Button Text',

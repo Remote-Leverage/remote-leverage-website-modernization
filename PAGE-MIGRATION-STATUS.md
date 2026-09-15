@@ -39,11 +39,15 @@ Local DB totals at verification: **22 pages, 119 posts, 23 case studies, 3 partn
 > The one exception is a genuine duplicate slug serving identical content, which is
 > handled by a codebase redirect rather than a rebuilt page (see §2).
 
-**Score: 24 of 48 migrated (50%). 24 remaining.**
+**Score: 47 of 48 migrated (98%). 1 remaining.**
+
+_P4's 14 campaign pages were added 2026-09-15. The count was 33 when that edit landed; if a
+P2/P3 row closed concurrently this line may lag by one — the per-priority sections below are
+authoritative._
 
 ---
 
-## 1. ✅ Migrated (24)
+## 1. ✅ Migrated (33)
 
 | # | Production URL | v2 implementation |
 |---|---|---|
@@ -63,6 +67,9 @@ Local DB totals at verification: **22 pages, 119 posts, 23 case studies, 3 partn
 | — | `/partners/oyster/` | page ID 122 → `resources/partners/partners.php` |
 | — | `/partners/lexgo/` | page ID 1000011 → `resources/partners/partners.php` |
 | — | `/partners/lano/` | page ID 1000012 → `resources/partners/partners.php` |
+| — | `/spanish/` | page ID 1000038 → `patterns/spanish-full.php` |
+| — | `/hire-for-less/` | page ID 1000031 → `patterns/hire-for-less-full.php` |
+| — | `/social-media-kit/` | Laravel route, `routes/web.php` → `pages/social-media-kit.blade.php` |
 | — | `/hire-va-4/` | page ID 1000000 → `patterns/hire-va-4-full.php` (migrated 2026-09-14) |
 | — | `/vacalendar/` | page ID 1000002 → `patterns/vacalendar-full.php` |
 | — | `/samples/` | page ID 1000005 → `patterns/samples-content.php` |
@@ -71,6 +78,12 @@ Local DB totals at verification: **22 pages, 119 posts, 23 case studies, 3 partn
 | — | `/impact-report-2026/` | page ID 1000008 → `patterns/impact-report-2026.php` — rebuilt 1:1 2026-09-15 |
 | — | `/remote-leverage-x-oyster/` | page ID 1000009 → `patterns/remote-leverage-x-oyster.php` — rebuilt 1:1 2026-09-15 |
 | — | `/remote-leverage-x-lano/` | page ID 1000010 → `patterns/remote-leverage-x-lano.php` — rebuilt 1:1 2026-09-15 |
+| — | `/payment/` | page ID 1000036 → `patterns/payment.php` — JotForm 242638425990061 (2026-09-15) |
+| — | `/signedup/` | page ID 1000032 → `patterns/signedup.php` (2026-09-15) |
+| — | `/vaonboardingform/` | page ID 1000033 → `patterns/vaonboardingform.php` — JotForm 242937701106049 (2026-09-15) |
+| — | `/referral-program/` | page ID 1000034 → `patterns/referral-program.php` (2026-09-15) |
+| — | `/referral-program-thank-you-page-deposit/` | page ID 1000035 → `patterns/referral-program-thank-you-deposit.php` (2026-09-15) |
+| — | `/virtual-assistant-hiring-manager-refundable-deposit/` | page ID 1000039 → `patterns/virtual-assistant-hiring-manager-refundable-deposit.php` — **⚠ built but cannot take payment**, see §3 P2 |
 
 ## 2. Duplicate slug resolved by redirect
 
@@ -89,7 +102,7 @@ so it ships with the code and survives a database refresh.
 
 ---
 
-## 3. ❌ Remaining (24), by priority
+## 3. Remaining by priority — P0, P1, P2 and P4 cleared; P3 has 1 row left
 
 ### P0 — Broken destinations v2 already ships — ✅ CLEARED 2026-09-15
 
@@ -161,43 +174,208 @@ have routed their referrals into Oyster's sheet — now unset), Oyster still has
 destination (`pending to define`), and none of the three has a logo, so cards fall back to a
 monogram.
 
-### P2 — Funnel / operational pages (6)
+### P2 — Funnel / operational pages — ✅ BUILT 2026-09-15 (1 blocker)
 
-Live money-path pages. Verify current behaviour with sales/ops as each is rebuilt.
+All six are built as patterns and published. Five are complete; the deposit page is visually
+complete but **cannot take a payment until Stripe credentials are moved**.
 
-- `/payment/`
-- `/signedup/`
-- `/vaonboardingform/`
-- `/referral-program/` (distinct from the already-built `/referral/` ID 213 and `/affiliate-program/` ID 212)
-- `/referral-program-thank-you-page-deposit/`
-- `/virtual-assistant-hiring-manager-refundable-deposit/`
+| Page | v2 | Built from |
+|---|---|---|
+| `/payment/` | ID 1000036 | JotForm `242638425990061` via `acf/jotform-embed` |
+| `/vaonboardingform/` | ID 1000033 | JotForm `242937701106049`, same block on a dark violet band |
+| `/signedup/` | ID 1000032 | `acf/next-steps-panel` + `acf/testimonials` (new `plain` / 2-column options) |
+| `/referral-program/` | ID 1000034 | `acf/referral-program-hero` + 4× `acf/media-copy` + `acf/cta-banner` |
+| `/referral-program-thank-you-page-deposit/` | ID 1000035 | `acf/payment-success-banner` + the same shared body |
+| `/virtual-assistant-hiring-manager-refundable-deposit/` | ID 1000039 | `acf/payment-gateway` — **⚠ blocked, below** |
 
-### P3 — Marketing / content pages (4)
+Heights measured against production at 1440px: 91%, 99%, 103%, 106%, 105% and 94% once the
+v2 footer (≈535px taller than production's on every page) is subtracted.
 
-- `/spanish/`
-- `/social-media-kit/` (note: the `rl-social-kit` plugin's generator already exists as a route at `/tools/signature-generator`; the page itself is a separate deliverable)
-- `/ecommerce-virtual-assistant/`
-- `/hire-for-less/`
+`/referral-program/` is confirmed distinct from the already-built `/referral/` (ID 213) and
+`/affiliate-program/` (ID 212). Both its CTAs point at `/referral-dashboard/?tab=sign-up` and
+`?tab=login`, which `routes/web.php` already serves — no new routing was needed.
 
-### P4 — Campaign & landing pages (14)
+Production's `/referral-program-thank-you-page-deposit/` is `/referral-program/` behind a
+"Payment Successful!" banner and nothing else, so both pages compose one shared body at
+`resources/patterns/referral-program-body.php` rather than duplicating it.
 
-Ad-traffic landing pages and variants. Per the scope directive these are all in scope —
-the previous audit's "test variant / dead" marks do not apply.
+**Per direction on 2026-09-15 these use theme tokens, not production's palette** — Inter
+Display rather than League Spartan, and the theme's action pills rather than production's
+green `#68B93D`.
 
-- `/1monthonus/`
-- `/1monthonus-flp/`
-- `/hire-real-estate-virtual-assistants-flp/`
-- `/hire-va-1st-month-free/`
-- `/hire-va-6/`
-- `/hire-va-email/`
-- `/hire-va-isolated-form/`
-- `/hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant/`
-- `/hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant-b/`
-- `/hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant-c/`
-- `/stealing-jobs/`
-- `/stealing-jobs-lp/`
-- `/steal-back-your-time/`
-- `/vastore5/`
+**Both referral pages were then refreshed onto the brand (2026-09-15, requested).** These are
+deliberate departures from production, not parity gaps:
+
+- The hero is the theme's `brand-midnight → brand-navy → brand-purple-deep` gradient with
+  ambient glows, an eyebrow pill, the $1,000/$500 figures as glass cards, and the magenta
+  action pill — production is a flat purple band with a plain text list.
+- "How it Works" moved out of the hero into its own section rendered by `acf/process-steps`,
+  the theme's numbered timeline. That block's grid was hard-coded to three columns; it now
+  reads `--rl-process-cols` from the step count (1–4) and still defaults to three.
+
+`/payment/` and `/vaonboardingform/` likewise gained a site-typography heading, an intro line
+and a card around the embed (requested 2026-09-15). Production has none of that chrome. The
+forms' interiors are JotForm's and cannot be styled from the theme.
+
+`/payment/`'s JotForm is configured for **Stripe Checkout** (`payment_type="stripeCheckout"`)
+with a customer-entered amount, so it charges through the Stripe account connected to
+**JotForm**, not through v2's keys. That is a second money path, separate from the deposit
+page's, with its records in the JotForm account.
+
+Two slug notes: `/payment/` collided with an unreferenced `payment.webp` attachment (ID 34)
+that held the slug — the attachment was re-slugged to `payment-webp-image`, which does not
+change its file URL. This is the basename collision in `docs/known-issues.md` §6.
+
+#### ⚠ Blocker: the deposit page cannot take a payment yet
+
+`/virtual-assistant-hiring-manager-refundable-deposit/` is a live $100 Stripe charge on
+production, served by the bespoke `rl_payment_gateway` widget in `rl-elementor-blocks`. That
+subsystem is now ported into the theme — `acf/payment-gateway`, a server-side
+`POST /api/payments/intent` that resolves the amount from the block (never from the browser),
+and `payment_intent.succeeded` handling with HMAC signature verification added to
+`StripeWebhookController`.
+
+**It is inert until someone moves the credentials.** They live in `rl-testing`'s WP options and
+were not readable from this session. The env vars and their legacy option names are documented
+in [`docs/stripe-payments.md`](web/app/themes/remote-leverage/docs/stripe-payments.md). Three
+things need a human decision before this page goes live:
+
+1. **Which Stripe account.** `STRIPE_KEY`/`STRIPE_SECRET` currently serve Connect payouts to
+   referrers. If the deposit is collected on a different account, that pair must change.
+2. **The webhook fails open.** With `STRIPE_WEBHOOK_SECRET` unset the controller logs a warning
+   and processes anyway — ported verbatim from the legacy plugin. Once the secret is set in
+   every environment this should be made fail-closed, or a forged `payment_intent.succeeded`
+   can drive onboarding.
+3. **Telemetry was dropped.** The legacy widget fired PostHog, Customer.io and an internal
+   `/wp-json/rl/v1/log` endpoint on every step of the checkout. v2 has no equivalent, so those
+   calls were removed rather than stubbed. If that attribution matters to sales/ops, it needs
+   rebuilding.
+
+Nothing was verified against Stripe end to end, because no key was available.
+
+### P3 — Marketing / content pages — 3 of 4 done 2026-09-15
+
+| Page | State |
+|---|---|
+| `/spanish/` | ✅ page ID 1000038 → `patterns/spanish-full.php` |
+| `/hire-for-less/` | ✅ page ID 1000031 → `patterns/hire-for-less-full.php` |
+| `/social-media-kit/` | ✅ **a route**, not a page — see below |
+| `/ecommerce-virtual-assistant/` | ❌ remaining |
+
+**`/spanish/`** is the homepage funnel in Spanish (minus the client-logo strip and the
+trust-and-impact band). Nine `spanish-*.php` patterns, no new blocks — every section reuses
+its English counterpart's block with copy transcribed verbatim from production rather than
+re-translated. 102% of production height.
+
+**`/hire-for-less/`** is `/hire-va-4/` with three differently-titled process steps — a
+heading diff of the two live pages shares 34 of 37. It reuses the hire-va-4 patterns wholesale
+and adds one pattern file. 108% of production height.
+
+**`/social-media-kit/` is a Laravel route, not a WordPress page** (`routes/web.php`), because
+it is a tool rather than editorial content. Full port of the `rl-social-kit` plugin — its CSS
+and JS carried over verbatim, 29 downloadable assets tracked in the theme, public by default.
+See [docs/social-media-kit.md](web/app/themes/remote-leverage/docs/social-media-kit.md). A
+WordPress page with that slug would shadow the route; the one created during the build was
+trashed.
+
+**`/ecommerce-virtual-assistant/`** is the one left. A full section-by-section spec exists
+(17 sections; 8 straight block reuses, 9 block extensions, 3 new blocks). Direction as of
+2026-09-15 is **copy production as-is**, including its content bugs — the page's `<title>`
+says "Hire Power Dialers from LATAM", the Featured Content block renders telehealth posts, the
+talent cards show medical software logos, and a pricing card reads "Remote Leverage Medical VA
+Average". These are reproduced, not corrected.
+
+#### `/hire-va-4/` corrected alongside (§1 row, was drifted)
+
+Building `/hire-for-less/` surfaced four defects in the already-migrated `/hire-va-4/`, all
+now fixed in shared blocks so both pages benefit:
+
+1. The hiring-process section rendered "The Bridge Between Compliance and Execution" with Lano
+   partnership copy where production shows "Our Hiring Process"; all three step bodies were
+   also wrong.
+2. The booking footer used the block's generic default headline instead of production's
+   "Smarter support starts here. Flexible, skilled, and ready to go."
+3. **Testimonials rendered all 14 (five grid rows) where production shows 6 (two rows)** —
+   1,461px of excess height on its own. `BlockDefaults::hireVa4FeaturedTestimonials()` selects
+   production's six; the full wall still belongs on `/reviews/`.
+4. Two headers stacked: `acf/hire-va-hero` rendered its own logo + CTA bar while the layout
+   also rendered the global site header.
+
+Both pages now sit at 108–110% of production height, in line with the other migrated rows.
+
+**Landing-page chrome.** Production serves the hire-va pages with no site nav — a conversion
+page deliberately offers no way out. `App\Support\PageChrome` walks the pattern registry to
+detect whether a page renders `acf/hire-va-hero` and, if so, `layouts/app.blade.php` swaps
+`sections.header` for `sections.header-cta` (90px, transparent over the hero, `#F90066` pill).
+Automatic rather than a page-template assignment, so it survives a database refresh and any
+future page using that hero inherits it.
+
+**Correction to an earlier finding:** "Talk to Sales Representative" is *not* missing from v2.
+It lives inside the hidden `rl-jlc` live-call modal, which v2 replaces with the
+`/live-call/connect` route.
+
+### P4 — Campaign & landing pages (14) — ✅ CLEARED 2026-09-15
+
+All 14 built, each as a single `wp:pattern` reference over a pattern file in git. Verified by
+screenshot diff against production at 1440px, measured independently of the building agent.
+
+The 14 pages are **five families of near-duplicates**, so they are built the
+`resources/patterns/partner-landing.php` way — one shared template per family, thin per-page
+config. Adding a sixth variant of any family is a config file, not a rebuild.
+
+| Production URL | ID | Pattern | Shared template | vs prod height |
+|---|---|---|---|---|
+| `/1monthonus-flp/` | 1000044 | `patterns/1monthonus-flp.php` | `consultation-landing.php` | 99.7% |
+| `/hire-va-email/` | 1000045 | `patterns/hire-va-email.php` | `consultation-landing.php` | 99.6% |
+| `/hire-virtual-assistants-…-variant/` | 1000046 | `patterns/…-variant.php` | `consultation-landing.php` | 99.8% |
+| `/hire-virtual-assistants-…-variant-b/` | 1000047 | `patterns/…-variant-b.php` | `consultation-landing.php` | 99.5% |
+| `/hire-virtual-assistants-…-variant-c/` | 1000048 | `patterns/…-variant-c.php` | `consultation-landing.php` | 99.2% |
+| `/hire-real-estate-virtual-assistants-flp/` | 1000049 | `patterns/hire-real-estate-virtual-assistants-flp.php` | `consultation-landing.php` | 99.6% |
+| `/hire-va-1st-month-free/` | 1000040 | `patterns/hire-va-1st-month-free.php` | `hire-va-campaign.php` | 110% |
+| `/hire-va-6/` | 1000041 | `patterns/hire-va-6.php` | `hire-va-campaign.php` | 107% |
+| `/1monthonus/` | 1000052 | `patterns/1monthonus.php` | `va-roles-landing.php` | 101.4% |
+| `/hire-va-isolated-form/` | 1000053 | `patterns/hire-va-isolated-form.php` | `va-roles-landing.php` | 101.2% |
+| `/stealing-jobs/` | 1000056 | `patterns/stealing-jobs.php` | `steal-campaign.php` | 103.3% |
+| `/stealing-jobs-lp/` | 1000058 | `patterns/stealing-jobs-lp.php` | `steal-campaign.php` | 104.2% |
+| `/steal-back-your-time/` | 1000060 | `patterns/steal-back-your-time.php` | `steal-campaign.php` | 103.8% |
+| `/vastore5/` | 1000050 | `patterns/vastore5.php` | — (one-off) | 105.1% (content 100%) |
+
+One new block: `acf/consult-landing-hero`. Everything else reuses existing blocks.
+
+**`/stealing-jobs/` and `/stealing-jobs-lp/` are NOT duplicates — do not redirect one to the
+other.** They are word-for-word identical but production *inverts the whole palette* on `-lp`:
+body `#0D0D0D` → `#F4F6FC`, hero `#0D0D0D` → `#3D1A5D`, roles `#0D0D0D` → `#13132F`. Confirmed
+against both live pages. This family is near-black, **not** the brand `#250D4A`.
+
+#### Decisions this raised
+
+1. **`/vastore5/` is internal sales collateral, not a landing page, and it publishes payment
+   details.** It is the only P4 page production serves `noindex, nofollow`, it is absent from
+   the sitemap, and nothing links to it. It carries a rep's call scripts plus a deposit panel
+   exposing Zelle `Abbas@RemoteLeverage.com`, Venmo `@RemoteLeverage`, and a live Stripe link
+   (`buy.stripe.com/9AQbKAcnC6NP2ukaFh`) — all reachable by anyone with the URL, on production
+   today. `noindex` is not access control. Built per the scope directive and mirrored 1:1, but
+   it should probably not be `publish` in v2. **Needs a call.**
+2. **The roles section on `/stealing-jobs/` and `/stealing-jobs-lp/` repeats "Customer Support"
+   as its fifth card** (same title, same chips). `/steal-back-your-time/` has a real fifth role
+   there. Reproduced as-is; looks like a production content bug worth fixing on the live pages.
+3. **`/hire-va-isolated-form/` canonicals to the homepage** and `/vastore5/` has no canonical.
+   Mirrored rather than silently "fixed".
+
+#### Known gaps, all block-level and pre-existing (not introduced by P4)
+
+- `acf/hire-va-hero` floors at `min-h-dvh`, so the hire-va family's hero runs 512px/337px taller
+  than production's 688px/863px. Same defect on the signed-off `/hire-va-4/`. Fix per CLAUDE.md
+  is a `height_mode` option defaulted to current behaviour, not a second block.
+- `acf/testimonials` has no "SHOW MORE" control; production has one wherever it uses that wall.
+  Also missing on `/hire-va-4/`.
+- `acf/accordion-faq` hard-renders two columns and unconditionally emits Schema.org `FAQPage`.
+  Two pages needed a single-column accordion and inlined it, losing the structured data.
+  A `columns` + `schema` option would let both fold back into the block.
+- `has-text-align-center` has **no CSS anywhere in the theme** (0 hits in every built
+  stylesheet) yet appears 29 times across 7 pattern files. The homepage is unaffected (a parent
+  centres it); the four comparison pages compute `text-align: start`, so multi-line headings go
+  left-ragged inside a centred block. One-line fix in `app.css`.
 
 ---
 

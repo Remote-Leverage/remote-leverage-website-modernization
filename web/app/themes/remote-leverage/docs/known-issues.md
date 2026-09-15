@@ -162,6 +162,50 @@ value you passed.
 
 **Proposed fix:** set the DSN for staging now, and treat "errors reported" as a cutover gate for production.
 
+### 9. A block field can silently blank a repeater sub-field of the same derived key
+
+ACF Composer derives a repeater sub-field's key as `field_<group>_<repeater>_<sub>`. A
+**top-level** field whose name happens to match that concatenation collides with it, and ACF
+resolves the clash by renaming the sub-field — which then reads back empty.
+
+Concretely: `NextStepsPanelBlock` had a top-level `steps_label` field and a `steps` repeater
+with a `label` sub-field. Both derived `field_next_steps_panel_block_steps_label`, so every
+step rendered without its bold lead-in — `/signedup/` shipped "1. : A Hiring Manager will…"
+instead of "1. Onboarding Meeting: A Hiring Manager will…".
+
+There is no error, no warning and no failing test. It surfaced only in a screenshot diff.
+
+**Rule:** for a repeater named `X`, do not add a top-level field named `X_<something>` that
+matches one of `X`'s sub-field names. Fixed here by renaming the top-level field to
+`intro_label`.
+
+Check the generated keys for any block with a repeater:
+
+```bash
+wp eval 'foreach (acf_get_field_groups() as $g) {
+  if (! str_contains($g["key"], "your_block")) continue;
+  foreach (acf_get_fields($g) as $f) {
+    printf("%s => %s\n", $f["name"], $f["key"]);
+    foreach ((array) ($f["sub_fields"] ?? []) as $sf) printf("  sub %s => %s\n", $sf["name"], $sf["key"]);
+  }
+}'
+```
+
+### 10. One broken pattern file takes down the entire site and `wp` CLI
+
+`app/setup.php` registers every file under `patterns/` at boot, so a fatal in any one of them —
+a missing `BlockDefaults` helper, an undefined array key in a shared template — 500s every page
+and every `wp` command, not just the page being edited.
+
+This bit twice on 2026-09-15: once from a block referencing a helper that had not been written
+yet, and once from `resources/patterns/steal-campaign.php` dereferencing `$steal['logos']`
+unconditionally when only one of its three configs defined that key.
+
+Not a bug to fix so much as a working habit: **`php -l` a pattern or block before saving it**,
+and treat a shared partial's optional keys as optional (`$x['k'] ?? []`). It is especially
+easy to miss when several people work the same checkout, because the breakage appears on
+someone else's page.
+
 ## Dead configuration
 
 Eight keys sit in `.env` and are read by nothing. All eight are documented in the archived README's environment reference as though they were live, which is how they survived.

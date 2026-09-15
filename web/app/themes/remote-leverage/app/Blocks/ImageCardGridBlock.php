@@ -92,6 +92,19 @@ class ImageCardGridBlock extends Block
             ->addText('eyebrow', ['label' => 'Eyebrow', 'instructions' => 'Optional small label above the title (e.g. a step number).'])
             ->addTextarea('title', ['label' => 'Title', 'rows' => 2, 'instructions' => 'Inline <br> allowed.'])
             ->addTextarea('text', ['label' => 'Text', 'rows' => 3])
+            ->addText('cta_text', [
+                'label' => 'Card CTA Label',
+                'instructions' => 'Optional. Renders a black, 5px-radius button at the foot of this card.',
+            ])
+            ->addText('cta_url', [
+                'label' => 'Card CTA URL',
+                'default_value' => '#booking-footer',
+            ])
+            ->addTrueFalse('emphasis', [
+                'label' => 'Featured card (black outline)',
+                'ui' => 1,
+                'default_value' => 0,
+            ])
             ->endRepeater()
             ->addText('cta_text', [
                 'label' => 'Footer CTA Text',

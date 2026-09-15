@@ -20,6 +20,11 @@ export default defineConfig({
         'resources/js/app.js',
         'resources/css/editor.css',
         'resources/js/editor.js',
+        // Social Media Kit — the ported rl-social-kit dashboard. Its CSS and JS are
+        // carried over verbatim from the plugin, so they stay separate entries rather
+        // than being folded into app.css/app.js.
+        'resources/css/social-kit.css',
+        'resources/js/social-kit.js',
       ],
       refresh: true,
       // Only the flat files here go through Vite's hashed pipeline. `resources/images/pages/**`

@@ -42,9 +42,12 @@ class MultistepBookingWizard extends Component
 
     public array $isolatedSteps = [];
 
-    public bool $hideProfileHeader = false;
+    /** Default off site-wide (2026-09-15): the avatar / "30 min · Google Meet" card and the
+     *  three-step progress rail are not wanted on any surface. A caller can still pass
+     *  false explicitly to bring either back. */
+    public bool $hideProfileHeader = true;
 
-    public bool $hideProgressBar = false;
+    public bool $hideProgressBar = true;
 
     /** Narrow contexts (the article sidebar) need first/last name on one row and
      *  the revenue picker as a dropdown rather than a wrapping row of pills. */
@@ -184,8 +187,8 @@ class MultistepBookingWizard extends Component
         string $skin = 'default',
         bool $enableIsolatedFields = false,
         array $isolatedSteps = [],
-        bool $hideProfileHeader = false,
-        bool $hideProgressBar = false,
+        bool $hideProfileHeader = true,
+        bool $hideProgressBar = true,
         bool $compactFields = false,
         string $buttonText = 'Next: Pick a Date',
         ...$rest

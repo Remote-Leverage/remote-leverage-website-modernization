@@ -1,4 +1,5 @@
-{{-- Benefit/feature card grid in 3 or 4 columns. Each card is an image, a title and a short
+{{-- Benefit/feature card grid in 2, 3 or 4 columns. The image is optional — production's
+     "Built to help you grow" band is a 2-up of text-only cards. Each card is an image, a title and a short
      description. `variant` picks production's inset image or flush-to-edge treatment; `ratio` sets
      the image aspect. --}}
 @php
@@ -15,7 +16,8 @@
     'grid grid-cols-1 gap-card w-full',
     'sm:grid-cols-2' => $columns !== '1',
     'lg:grid-cols-4 mb-[12px]' => $columns === '4',
-    'lg:grid-cols-3' => $columns !== '1' && $columns !== '4',
+    'lg:grid-cols-2' => $columns === '2',
+    'lg:grid-cols-3' => ! in_array($columns, ['1', '2', '4'], true),
 ])>
     @foreach ($cards as $card)
         @continue(!is_array($card))
@@ -25,6 +27,7 @@
             'overflow-hidden' => $isFlush,
         ])>
             <div @class(['grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_200px] gap-5 items-center' => $isHorizontal])>
+                @if (! empty($card['img']))
                 <div @class([
                     'w-full overflow-hidden bg-[#f7f8fc]',
                     'rounded-xl mb-5' => ! $isFlush && ! $isHorizontal,
@@ -42,6 +45,7 @@
                             'aspect-344/130' => ! $hasRatio && $columns !== '4',
                         ])>
                 </div>
+                @endif
                 <div @class(['p-3' => ! $isFlush && ! $isHorizontal, 'px-7 pt-6 pb-7' => $isFlush, 'sm:order-1' => $isHorizontal])>
                     <h3 @class([
                         'font-display font-bold text-black tracking-[-0.02em] leading-snug mb-3',

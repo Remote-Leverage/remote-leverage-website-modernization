@@ -48,6 +48,7 @@ class TalentCarouselBlock extends Block
         ));
 
         return [
+            'layout' => get_field('layout') ?: 'split',
             'headline' => BlockDefaults::cleanText($field('headline') ?: ''),
             'body' => $field('body') ?: '',
             'ctaText' => $field('cta_text') ?: '',
@@ -70,6 +71,14 @@ class TalentCarouselBlock extends Block
             ->addWysiwyg('body', ['label' => 'Body', 'tabs' => 'visual', 'media_upload' => 0])
             ->addText('cta_text', ['label' => 'CTA Text', 'default_value' => 'Book a consultation'])
             ->addUrl('cta_url', ['label' => 'CTA URL', 'default_value' => '#booking-footer'])
+            ->addSelect('layout', [
+                'label' => 'Layout',
+                'choices' => [
+                    'split' => 'Copy left, carousel right',
+                    'full' => 'Full-width carousel (no copy column)',
+                ],
+                'default_value' => 'split',
+            ])
             ->addRepeater('profiles', ['label' => 'Profiles', 'button_label' => 'Add profile', 'min' => 1])
             ->addImage('image', ['label' => 'Photo', 'return_format' => 'url'])
             ->addText('name', ['label' => 'Name'])

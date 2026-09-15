@@ -11,11 +11,31 @@ return [
     |
     */
 
+    /*
+     * Stripe.
+     *
+     * `key` / `secret` / `client_id` drive Stripe Connect (referrer payouts). The keys below
+     * them drive the embedded card checkout ported from rl-elementor-blocks, which keeps a
+     * live/test key pair and a runtime toggle instead of a single secret — see
+     * docs/stripe-payments.md for the WP option each one replaces.
+     *
+     * Live mode reuses STRIPE_KEY / STRIPE_SECRET rather than introducing a parallel
+     * STRIPE_LIVE_* pair. STRIPE_TEST_KEY / STRIPE_TEST_SECRET already exist in .env and were
+     * previously dead (see docs/configuration.md); the checkout is what now reads them.
+     */
     'stripe' => [
         'key' => env('STRIPE_KEY'),
         'secret' => env('STRIPE_SECRET'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
         'client_id' => env('STRIPE_CONNECT_CLIENT_ID'),
+
+        'test_mode' => filter_var(env('STRIPE_TEST_MODE', false), FILTER_VALIDATE_BOOLEAN),
+        'live_publishable_key' => env('STRIPE_KEY'),
+        'live_secret_key' => env('STRIPE_SECRET'),
+        'test_publishable_key' => env('STRIPE_TEST_KEY'),
+        'test_secret_key' => env('STRIPE_TEST_SECRET'),
+        'webhook_forward_url' => env('STRIPE_WEBHOOK_FORWARD_URL'),
+        'default_thankyou_url' => env('STRIPE_DEFAULT_THANKYOU_URL'),
     ],
 
     'calendly' => [

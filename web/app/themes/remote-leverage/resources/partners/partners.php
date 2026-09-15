@@ -53,7 +53,9 @@ return [
             '_rl_partner_resource_url' => 'https://oysterhr.notion.site/Remote-Leverage-x-Oyster-392601b0a58980f1b0b5fb1ebca5dcf4',
 
             '_rl_enable_comarketing' => '1',
-            '_rl_manager_name' => 'Adrián Salvatori',
+            // Deliberately a team, not a person: partner-facing contact should not
+            // depend on any individual still being in the role.
+            '_rl_manager_name' => 'Partnerships Team',
             '_rl_manager_email' => 'partnerships@remoteleverage.com',
             '_rl_manager_title' => 'Partnerships Director',
         ],
@@ -94,7 +96,7 @@ return [
             '_rl_partner_resource_url' => 'https://lexgo.co',
 
             '_rl_enable_comarketing' => '1',
-            '_rl_manager_name' => 'Adrián Salvatori',
+            '_rl_manager_name' => 'Partnerships Team',
             '_rl_manager_email' => 'partnerships@remoteleverage.com',
             '_rl_manager_title' => 'Partnerships Director',
         ],
@@ -133,7 +135,7 @@ return [
             '_rl_partner_resource_url' => 'https://lano.io',
 
             '_rl_enable_comarketing' => '1',
-            '_rl_manager_name' => 'Adrián Salvatori',
+            '_rl_manager_name' => 'Partnerships Team',
             '_rl_manager_email' => 'partnerships@remoteleverage.com',
             '_rl_manager_title' => 'Partnerships Director',
         ],

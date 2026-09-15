@@ -90,11 +90,11 @@ class ComparisonMatrixBlock extends Block
             'subheadline' => get_field('subheadline') ?: '70% Lower Cost, Same Quality',
             'ctaText' => get_field('cta_text') ?: 'BOOK MY FREE 15-MIN CALL',
             'ctaUrl' => get_field('cta_url') ?: '#booking-footer',
-            'card1Pill' => get_field('card_1_pill') ?: 'Traditional DIY',
+            'card1Pill' => get_field('card_1_pill') ?: '',
             'card1Title' => get_field('card_1_title') ?: 'Hiring on your own',
             'card1Line1' => get_field('card_1_line_1') ?: '4 to 8 weeks of posting, screening, and interviewing.',
             'card1Line2' => get_field('card_1_line_2') ?: 'Payroll, taxes, and compliance all on you.',
-            'card2Pill' => get_field('card_2_pill') ?: 'Remote Leverage Way',
+            'card2Pill' => get_field('card_2_pill') ?: '',
             'card2Title' => get_field('card_2_title') ?: 'Hiring with Remote Leverage',
             'card2Line1' => get_field('card_2_line_1') ?: 'Interview the top 1% in 72 hours.',
             'card2Line2' => get_field('card_2_line_2') ?: 'We handle payroll, compliance, and onboarding.',
@@ -131,7 +131,7 @@ class ComparisonMatrixBlock extends Block
             ])
             ->addText('card_1_pill', [
                 'label' => 'Left Card Pill Label',
-                'default_value' => 'Traditional DIY',
+                'instructions' => 'Optional. Production shows no pill here — leave empty for parity.',
             ])
             ->addText('card_1_title', [
                 'label' => 'Left Card Title',
@@ -147,7 +147,7 @@ class ComparisonMatrixBlock extends Block
             ])
             ->addText('card_2_pill', [
                 'label' => 'Right Card Pill Label',
-                'default_value' => 'Remote Leverage Way',
+                'instructions' => 'Optional. Production shows no pill here — leave empty for parity.',
             ])
             ->addText('card_2_title', [
                 'label' => 'Right Card Title',

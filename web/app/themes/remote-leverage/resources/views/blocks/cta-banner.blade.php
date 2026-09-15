@@ -4,19 +4,62 @@
 @php $isBand = ($variant ?? 'card') === 'band'; @endphp
 
 @if ($isBand)
-    <section class="w-full py-14" style="background-image:linear-gradient(90deg,#8A2BE2 0%,#6200A4 100%);">
-        <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="font-display font-bold text-[32px] leading-[40px] sm:text-[46px] sm:leading-[53px] tracking-[-1.44px] text-white mb-7 max-w-[1000px] mx-auto">
+    @php
+        // Artwork wins over the gradient when one is set (production's /referral-program/
+        // closes on a wave illustration); otherwise the flat purple gradient is unchanged.
+        // An artwork band also carries production's geometry: a 780px-tall canvas with the
+        // copy centred over it. The flat gradient keeps its original compact padding.
+        $hasArt = ($backgroundImage ?? '') !== '';
+        // `tone: light` drops the purple entirely for a #F4F6FC band with black copy and a
+        // purple pill (production's "We're committed to helping businesses…").
+        $isLight = ($tone ?? 'purple-gradient') === 'light';
+        // The gradient stops are overridable: production's "See what other clients are saying"
+        // strip runs #250D4A → #581FB0 rather than the default #8A2BE2 → #6200A4.
+        $gradFrom = ($gradientStart ?? '') ?: '#8A2BE2';
+        $gradTo = ($gradientEnd ?? '') ?: '#6200A4';
+        // `align: split` puts the heading left and the CTA right instead of centring both.
+        $isSplit = ($align ?? 'center') === 'split';
+        $bandBg = $hasArt
+            ? 'background-image:url('.\App\Support\BlockDefaults::preferWebp($backgroundImage).');background-size:cover;background-position:top center;background-repeat:no-repeat;'
+            : ($isLight
+                ? 'background-color:#F4F6FC;'
+                : 'background-image:linear-gradient(90deg,'.$gradFrom.' 0%,'.$gradTo.' 100%);');
+        $bandBox = $hasArt
+            ? 'w-full flex items-center min-h-[420px] sm:min-h-[600px] lg:min-h-[780px]'
+            : 'w-full py-14';
+        $headingColour = $isLight ? 'text-black' : 'text-white';
+        $bandHeading = $hasArt
+            ? 'font-display font-bold text-[34px] leading-[40px] sm:text-[52px] sm:leading-[58px] lg:text-[68px] lg:leading-[74px] tracking-[-2px] '.$headingColour.' mb-7 max-w-[1000px] mx-auto'
+            : 'font-display font-bold text-[32px] leading-[40px] sm:text-[46px] sm:leading-[53px] tracking-[-1.44px] '.$headingColour.' mb-7 max-w-[1000px] mx-auto';
+        if ($isSplit) {
+            $bandHeading = str_replace([' mx-auto', ' mb-7'], ['', ' mb-0'], $bandHeading);
+        }
+        $pill = $isLight
+            ? 'rounded-pill bg-[#8A2BE2] hover:bg-[#7b20d4] text-white'
+            : 'rounded-pill bg-black hover:opacity-90 text-white';
+    @endphp
+    <section class="{{ $bandBox }}" style="{{ $bandBg }}">
+        <div @class([
+            'w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8',
+            'text-center' => ! $isSplit,
+            'flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between' => $isSplit,
+        ])>
+            <h2 class="{{ $bandHeading }}">
                 {{ $headline }}
             </h2>
 
             @if ($subheadline)
-                <p class="text-[17px] leading-[30px] text-white/85 max-w-[900px] mx-auto mb-10">{{ $subheadline }}</p>
+                <p @class([
+                    'text-[17px] leading-[30px] mb-10',
+                    'text-white/85 max-w-[900px] mx-auto' => ! $isLight && ! $isSplit,
+                    'text-black/80 max-w-[900px] mx-auto' => $isLight && ! $isSplit,
+                    'text-white/85 mb-0' => $isSplit,
+                ])>{{ $subheadline }}</p>
             @endif
 
             @if ($ctaText)
                 <a href="{{ $ctaUrl }}"
-                    class="inline-flex items-center gap-3 rounded-pill bg-black px-7 py-3.5 font-display text-[15px] font-bold uppercase tracking-[-0.45px] text-white transition hover:opacity-90">
+                    class="inline-flex shrink-0 items-center gap-3 {{ $pill }} px-7 py-3.5 font-display text-[15px] font-bold uppercase tracking-[-0.45px] transition">
                     <span>{{ $ctaText }}</span>
                     @include('partials.icon-circle-arrow', ['class' => 'w-[18px] h-[18px] shrink-0'])
                 </a>

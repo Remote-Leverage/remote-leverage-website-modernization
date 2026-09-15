@@ -831,6 +831,22 @@ function scheduleLivewire() {
   }, true);
 }
 
+/**
+ * Stripe Elements checkout (acf/payment-gateway).
+ *
+ * Imported dynamically and only when a card is on the page: the module pulls in
+ * intl-tel-input and injects Stripe.js, none of which belongs on the other ~40 pages.
+ */
+function initPaymentGateway() {
+  if (!document.querySelector('.rl-payment-card')) {
+    return;
+  }
+
+  import('./payment-gateway.js')
+    .then(({ initPaymentGateways }) => initPaymentGateways())
+    .catch((err) => console.error('Payment gateway failed to initialise', err));
+}
+
 function initMobileNav() {
   const button = document.querySelector('[data-rl-nav-toggle]');
   const panel = document.getElementById('rl-mobile-nav');
@@ -859,10 +875,12 @@ function initMobileNav() {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     initMobileNav();
+    initPaymentGateway();
     scheduleLivewire();
   });
 } else {
   initMobileNav();
+  initPaymentGateway();
   scheduleLivewire();
 }
 

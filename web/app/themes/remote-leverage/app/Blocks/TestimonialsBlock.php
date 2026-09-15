@@ -38,6 +38,12 @@ class TestimonialsBlock extends Block
     {
         return [
             'testimonials' => $this->testimonials(),
+            // Production's /reviews/ and /vathankyou/ walls are three across; /signedup/ is
+            // two. Unset falls back to three so every existing usage is unchanged.
+            'columns' => get_field('columns') ?: '3',
+            // 'plain' drops the quote/company/duration chrome for a bare video wall
+            // (production's /signedup/). 'cards' is the default everywhere else.
+            'layout' => get_field('layout') ?: 'cards',
         ];
     }
 
@@ -46,6 +52,16 @@ class TestimonialsBlock extends Block
         $fields = Builder::make('testimonials_block');
 
         $fields
+            ->addSelect('layout', [
+                'label' => 'Card style',
+                'choices' => ['cards' => 'Cards with quote (default)', 'plain' => 'Bare video tiles'],
+                'default_value' => 'cards',
+            ])
+            ->addSelect('columns', [
+                'label' => 'Columns',
+                'choices' => ['3' => 'Three across (default)', '2' => 'Two across'],
+                'default_value' => '3',
+            ])
             ->addRepeater('testimonials', [
                 'label' => 'Testimonials List',
                 'layout' => 'block',

@@ -4,9 +4,17 @@
 <section class="w-full bg-bg-light py-14 lg:py-20">
     <div class="w-full px-4 sm:px-6 lg:px-8">
         <div class="rl-container">
-            <div class="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-10 lg:gap-14 lg:items-center">
+            @php
+              // `layout: full` drops the left copy column so the carousel can run full width
+              // under its own heading — production does that on /ecommerce-virtual-assistant/.
+              $isFull = ($layout ?? 'split') === 'full';
+            @endphp
+            <div @class([
+                'grid grid-cols-1 gap-10 lg:gap-14 lg:items-center',
+                'lg:grid-cols-[420px_1fr]' => ! $isFull,
+            ])>
 
-                <div class="flex flex-col">
+                <div @class(['flex flex-col', 'hidden' => $isFull])>
                     @if ($headline)
                         <h2 class="font-display font-semibold text-black text-3xl sm:text-4xl lg:text-[48px] lg:leading-[0.95] tracking-[-1.44px] mb-6 lg:mb-[30px]">
                             {!! $headline !!}

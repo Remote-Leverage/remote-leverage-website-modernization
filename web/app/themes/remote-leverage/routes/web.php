@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domains\Scheduling\Actions\RouteInstantCallAction;
+use App\Support\SocialKit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -80,3 +81,10 @@ Route::get('partners', function () {
 Route::get('tools/signature-generator', function () {
     return view('pages.signature-generator');
 })->name('tools.signature-generator');
+
+// Social Media Kit — the ported rl-social-kit dashboard (signatures + brand asset library).
+// A route rather than a WordPress page: it is a tool, not editorial content, so it belongs in
+// git like the other utility routes above and survives a database refresh.
+Route::get(SocialKit::SLUG, function () {
+    return view('pages.social-media-kit');
+})->name('social-media-kit');

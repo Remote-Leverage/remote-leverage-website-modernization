@@ -60,6 +60,7 @@ class FeatureCardsBlock extends Block
                 'label' => 'Columns Layout',
                 'choices' => [
                     '1' => '1 Column (stacked, pairs with the horizontal variant)',
+                    '2' => '2 Columns (wide cards; image optional)',
                     '3' => '3 Columns (6 Benefit Cards)',
                     '4' => '4 Columns (4 Metric Cards)',
                 ],
