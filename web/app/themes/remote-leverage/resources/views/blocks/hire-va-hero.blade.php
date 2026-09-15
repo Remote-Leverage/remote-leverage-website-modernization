@@ -1,3 +1,4 @@
+{{-- Hire-a-VA hero: headline and CTA over a background graphic with a grid of candidate portraits. --}}
 @php
   use App\Support\BlockDefaults;
 

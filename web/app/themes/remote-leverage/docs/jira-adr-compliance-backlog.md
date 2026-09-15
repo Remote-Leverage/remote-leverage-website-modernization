@@ -16,7 +16,7 @@ This document contains production-ready Jira tickets for all remaining engineeri
 
 * **Issue Type**: Story
 * **Priority**: High
-* **ADR Reference**: [ADR-0008 (§ Domain Events & Traceability)](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/doc/adr/0008-lead-bounded-context-retire-gravity-forms.md)
+* **ADR Reference**: [ADR-0008 (§ Domain Events & Traceability)](../../../../../doc/adr/0008-lead-bounded-context-retire-gravity-forms.md)
 * **Component**: `app/Domains/Lead`
 * **Estimate**: 3 Story Points
 
@@ -39,10 +39,10 @@ Scenario: Lead captured but booking not completed within timeout window
 ```
 
 ### Technical Implementation Details
-* **New Command**: [ProcessAbandonedLeadsCommand.php](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Domains/Lead/Commands/ProcessAbandonedLeadsCommand.php)
+* **New Command**: [ProcessAbandonedLeadsCommand.php](../app/Domains/Lead/Commands/ProcessAbandonedLeadsCommand.php)
   * Signature: `lead:process-abandoned {--hours=2 : Abandonment timeout threshold in hours}`
 * **Schedule**: Register in `app/Console/Kernel.php` or `Acorn` scheduler to run hourly: `$schedule->command('lead:process-abandoned')->hourly();`.
-* **Action**: Create or extend [CaptureLeadAction.php](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Domains/Lead/Actions/CaptureLeadAction.php) or create `MarkLeadAbandonedAction`.
+* **Action**: Create or extend [CaptureLeadAction.php](../app/Domains/Lead/Actions/CaptureLeadAction.php) or create `MarkLeadAbandonedAction`.
 * **Logging**: Ensure `LeadActivityLogger` records both dispatch and listener consumption.
 
 ### Verification Plan
@@ -54,7 +54,7 @@ Scenario: Lead captured but booking not completed within timeout window
 
 * **Issue Type**: Task
 * **Priority**: High
-* **ADR Reference**: [ADR-0004 (§ Tracking)](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/doc/adr/0004-ddd-bounded-contexts.md) & [ADR-0006 (§ Risk Mitigation)](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/doc/adr/0006-parallel-staging-zero-downtime-cutover.md)
+* **ADR Reference**: [ADR-0004 (§ Tracking)](../../../../../doc/adr/0004-ddd-bounded-contexts.md) & [ADR-0006 (§ Risk Mitigation)](../../../../../doc/adr/0006-parallel-staging-zero-downtime-cutover.md)
 * **Component**: `app/Infrastructure/WordPress/Hooks` & `app/Domains/Tracking`
 * **Estimate**: 2 Story Points
 
@@ -85,7 +85,7 @@ Scenario: Development environment without tracking IDs
 ```
 
 ### Technical Implementation Details
-* **Modify**: [TrackingHooks.php](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Infrastructure/WordPress/Hooks/TrackingHooks.php)
+* **Modify**: [TrackingHooks.php](../app/Infrastructure/WordPress/Hooks/TrackingHooks.php)
 * **Modify**: `config/services.php` to register `gtm`, `linkedin`, and `meta_pixel` keys.
 * **Environment Variables**: `GTM_CONTAINER_ID`, `LINKEDIN_PARTNER_ID=6411876`, `META_PIXEL_ID`.
 
@@ -98,7 +98,7 @@ Scenario: Development environment without tracking IDs
 
 * **Issue Type**: Story / Migration
 * **Priority**: Blocker
-* **ADR Reference**: [ADR-0005 Amendment (AI-Assisted Elementor Audit & Migration)](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/doc/adr/0005-native-gutenberg-blocks-acf-composer.md)
+* **ADR Reference**: [ADR-0005 Amendment (AI-Assisted Elementor Audit & Migration)](../../../../../doc/adr/0005-native-gutenberg-blocks-acf-composer.md)
 * **Component**: `app/Domains/ContentAudit`
 * **Estimate**: 5 Story Points
 
@@ -125,7 +125,7 @@ Scenario: Ingestion and conversion of legacy Elementor posts
 
 ### Technical Implementation Details
 * **New Command**: `wp acorn content:convert-elementor {--dry-run} {--post_id=}`
-* **Service Integration**: Call [ConvertElementorPostAction.php](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Domains/ContentAudit/Actions/ConvertElementorPostAction.php) across all records in `wp_postmeta WHERE meta_key = '_elementor_data'`.
+* **Service Integration**: Call [ConvertElementorPostAction.php](../app/Domains/ContentAudit/Actions/ConvertElementorPostAction.php) across all records in `wp_postmeta WHERE meta_key = '_elementor_data'`.
 
 ### Verification Plan
 * Execute dry run on staging database, inspect generated Gutenberg block comments, and verify with `wp post list`.
@@ -136,7 +136,7 @@ Scenario: Ingestion and conversion of legacy Elementor posts
 
 * **Issue Type**: Story
 * **Priority**: High
-* **ADR Reference**: [ADR-0005 Amendment (§ Mandatory Human Editorial Review)](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/doc/adr/0005-native-gutenberg-blocks-acf-composer.md)
+* **ADR Reference**: [ADR-0005 Amendment (§ Mandatory Human Editorial Review)](../../../../../doc/adr/0005-native-gutenberg-blocks-acf-composer.md)
 * **Component**: `app/Infrastructure/WordPress/Admin`
 * **Estimate**: 3 Story Points
 
@@ -170,7 +170,7 @@ Scenario: Content editor reviews an AI-converted post
 
 * **Issue Type**: Story
 * **Priority**: Medium
-* **ADR Reference**: [ADR-0008 (§ Form Configuration)](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/doc/adr/0008-lead-bounded-context-retire-gravity-forms.md)
+* **ADR Reference**: [ADR-0008 (§ Form Configuration)](../../../../../doc/adr/0008-lead-bounded-context-retire-gravity-forms.md)
 * **Component**: `app/Infrastructure/WordPress/Admin` & `app/Domains/Lead`
 * **Estimate**: 3 Story Points
 
@@ -192,7 +192,7 @@ Scenario: Admin configures lead retention and notification settings
 ```
 
 ### Technical Implementation Details
-* **New Submenu**: Register `rl-leads-settings` in [LeadsAdminDashboard.php](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Infrastructure/WordPress/Admin/LeadsAdminDashboard.php).
+* **New Submenu**: Register `rl-leads-settings` in [LeadsAdminDashboard.php](../app/Infrastructure/WordPress/Admin/LeadsAdminDashboard.php).
 * **Option Storage**: Persist settings under option key `rl_lead_settings`.
 * **Validation**: Reject values `< 30` for `retention_days` per ADR-0008 compliance.
 
@@ -202,7 +202,7 @@ Scenario: Admin configures lead retention and notification settings
 
 * **Issue Type**: Task
 * **Priority**: High
-* **ADR Reference**: [ADR-0006 (§ SEO & Risk Mitigation)](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/doc/adr/0006-parallel-staging-zero-downtime-cutover.md)
+* **ADR Reference**: [ADR-0006 (§ SEO & Risk Mitigation)](../../../../../doc/adr/0006-parallel-staging-zero-downtime-cutover.md)
 * **Component**: `app/Application/Http` & DevOps
 * **Estimate**: 3 Story Points
 
@@ -233,7 +233,7 @@ Scenario: Visual regression test suite execution
 
 * **Issue Type**: Improvement
 * **Priority**: Medium
-* **ADR Reference**: [ADR-0003 (§ InstantLiveCallButton)](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/doc/adr/0003-livewire-4-reactive-ux.md) & [ADR-0004 (§ Scheduling)](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/doc/adr/0004-ddd-bounded-contexts.md)
+* **ADR Reference**: [ADR-0003 (§ InstantLiveCallButton)](../../../../../doc/adr/0003-livewire-4-reactive-ux.md) & [ADR-0004 (§ Scheduling)](../../../../../doc/adr/0004-ddd-bounded-contexts.md)
 * **Component**: `app/Application/Livewire/Scheduling` & `app/Domains/Scheduling`
 * **Estimate**: 2 Story Points
 
@@ -256,8 +256,8 @@ Scenario: No consultants available / outside business hours
 ```
 
 ### Technical Implementation Details
-* **Modify**: [InstantLiveCallButton.php](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Application/Livewire/Scheduling/InstantLiveCallButton.php)
-* **Service**: Connect to [LiveCallAvailabilityRouter.php](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Domains/Scheduling/Services/LiveCallAvailabilityRouter.php) with a 60-second transient cache.
+* **Modify**: [InstantLiveCallButton.php](../app/Application/Livewire/Scheduling/InstantLiveCallButton.php)
+* **Service**: Connect to [LiveCallAvailabilityRouter.php](../app/Domains/Scheduling/Services/LiveCallAvailabilityRouter.php) with a 60-second transient cache.
 
 ---
 
@@ -265,7 +265,7 @@ Scenario: No consultants available / outside business hours
 
 * **Issue Type**: Task
 * **Priority**: Medium
-* **ADR Reference**: [ADR-0002 (§ Laravel Pint & PHPUnit/Pest)](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/doc/adr/0002-roots-bedrock-sage-acorn-stack.md) & [ADR-0007](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/doc/adr/0007-three-week-parallelized-sprint-roadmap.md)
+* **ADR Reference**: [ADR-0002 (§ Laravel Pint & PHPUnit/Pest)](../../../../../doc/adr/0002-roots-bedrock-sage-acorn-stack.md) & [ADR-0007](../../../../../doc/adr/0007-three-week-parallelized-sprint-roadmap.md)
 * **Component**: DevOps / Root
 * **Estimate**: 2 Story Points
 
@@ -298,7 +298,7 @@ Scenario: Pull request opened or updated
 
 * **Issue Type**: Task / Infra
 * **Priority**: High
-* **ADR Reference**: [ADR-0008 (§ Infrastructure & Queue Transports)](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/doc/adr/0008-lead-bounded-context-retire-gravity-forms.md)
+* **ADR Reference**: [ADR-0008 (§ Infrastructure & Queue Transports)](../../../../../doc/adr/0008-lead-bounded-context-retire-gravity-forms.md)
 * **Component**: Infrastructure / DevOps
 * **Estimate**: 3 Story Points
 

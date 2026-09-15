@@ -1,22 +1,53 @@
+{{-- Benefit/feature card grid in 3 or 4 columns. Each card is an image, a title and a short
+     description. `variant` picks production's inset image or flush-to-edge treatment; `ratio` sets
+     the image aspect. --}}
 @php
     $cards = is_array($cards ?? null) ? $cards : [];
+    $ratio = trim((string) ($ratio ?? ''));
+    // Only a plain "w/h" is honoured, so a bad field value can never emit arbitrary CSS.
+    $hasRatio = (bool) preg_match('#^\d{1,4}/\d{1,4}$#', $ratio);
+    [$ratioW, $ratioH] = $hasRatio ? explode('/', $ratio) : [null, null];
+    $variant = $variant ?? 'inset';
+    $isFlush = $variant === 'flush';
+    $isHorizontal = $variant === 'horizontal';
 @endphp
-<div
-    class="grid grid-cols-1 sm:grid-cols-2 {{ $columns === '4' ? 'lg:grid-cols-4 mb-[12px]' : 'lg:grid-cols-3' }} gap-card w-full">
+<div @class([
+    'grid grid-cols-1 gap-card w-full',
+    'sm:grid-cols-2' => $columns !== '1',
+    'lg:grid-cols-4 mb-[12px]' => $columns === '4',
+    'lg:grid-cols-3' => $columns !== '1' && $columns !== '4',
+])>
     @foreach ($cards as $card)
         @continue(!is_array($card))
-        <div
-            class="bg-white rounded-card p-card flex flex-col justify-between border border-black/4 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300">
-            <div>
-                <div class="w-full overflow-hidden rounded-xl mb-5 bg-[#f7f8fc]">
+        <div @class([
+            'bg-white rounded-card flex flex-col justify-between border border-black/4 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300',
+            'p-card' => ! $isFlush,
+            'overflow-hidden' => $isFlush,
+        ])>
+            <div @class(['grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_200px] gap-5 items-center' => $isHorizontal])>
+                <div @class([
+                    'w-full overflow-hidden bg-[#f7f8fc]',
+                    'rounded-xl mb-5' => ! $isFlush && ! $isHorizontal,
+                    'rounded-xl sm:order-2' => $isHorizontal,
+                ])>
                     <img src="{{ $card['img'] }}" alt="{!! strip_tags($card['title']) !!}"
-                        width="{{ $columns === '4' ? '248' : '344' }}" height="{{ $columns === '4' ? '190' : '230' }}"
+                        width="{{ $hasRatio ? $ratioW : ($columns === '4' ? '248' : '344') }}"
+                        height="{{ $hasRatio ? $ratioH : ($columns === '4' ? '190' : '230') }}"
                         loading="lazy" decoding="async"
-                        class="w-full h-auto {{ $columns === '4' ? 'aspect-248/190' : 'aspect-344/130' }} object-cover rounded-xl">
+                        @style(['aspect-ratio: ' . $ratioW . ' / ' . $ratioH => $hasRatio])
+                        @class([
+                            'w-full h-auto object-cover',
+                            'rounded-xl' => ! $isFlush,
+                            'aspect-248/190' => ! $hasRatio && $columns === '4',
+                            'aspect-344/130' => ! $hasRatio && $columns !== '4',
+                        ])>
                 </div>
-                <div class="p-3">
-                    <h3
-                        class="font-display text-xl sm:text-[22px] font-bold text-black tracking-[-0.02em] leading-snug mb-3">
+                <div @class(['p-3' => ! $isFlush && ! $isHorizontal, 'px-7 pt-6 pb-7' => $isFlush, 'sm:order-1' => $isHorizontal])>
+                    <h3 @class([
+                        'font-display font-bold text-black tracking-[-0.02em] leading-snug mb-3',
+                        'text-xl sm:text-[22px]' => ! $isFlush,
+                        'text-[22px] sm:text-[27px] sm:leading-[32px] tracking-[-0.81px]' => $isFlush,
+                    ])>
                         {!! $card['title'] !!}
                     </h3>
                     <p class="text-[14px] leading-relaxed text-black">

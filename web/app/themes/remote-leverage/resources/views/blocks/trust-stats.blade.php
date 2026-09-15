@@ -1,3 +1,5 @@
+{{-- Stacked trust cards — VAs onboarded with stacked avatars, plus supporting counts. Sits beside
+     hero copy rather than full width. --}}
 @php
     $img = fn (string $file) => \App\Support\BlockDefaults::homeImg($file);
 @endphp

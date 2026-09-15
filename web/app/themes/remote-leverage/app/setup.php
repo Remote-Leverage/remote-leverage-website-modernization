@@ -423,3 +423,15 @@ add_action('init', function () {
         }
     }
 });
+
+/**
+ * Flag pages whose opening section is a dark full-bleed hero, so the header can float over it
+ * in white instead of sitting on its own pale band. Derived from the pattern, not a DB setting.
+ */
+add_filter('body_class', function (array $classes): array {
+    if (\App\Support\HeaderMode::isOverDarkHero()) {
+        $classes[] = 'rl-header-over-hero';
+    }
+
+    return $classes;
+});

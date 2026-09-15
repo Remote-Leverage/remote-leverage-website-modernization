@@ -59,7 +59,9 @@ Details: [`docs/local-development.md`](docs/local-development.md).
 
 1. **1380px canonical container.** Every top-level section wrapper: `w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8`, and every root `wp:group` declares `"layout":{"type":"constrained","contentSize":"1380px"}`. Never `max-w-7xl`, `1140px` or `1200px`.
 2. **Bold (700) is the heaviest weight.** No `font-extrabold`, no `font-black`.
-3. **Bespoke sections are ACF blocks, never raw HTML inside `core/group`.** Raw markup inside container blocks triggers Gutenberg's "unexpected or invalid content" recovery modal. Blade inside an ACF block cannot.
-4. **Page content is authored as a `*-full.php` pattern in git**, then applied to the page — not edited in the database.
+3. **Reuse before you build.** 45 blocks already exist — read [`docs/block-inventory.md`](docs/block-inventory.md) before writing markup, and extend a block with an option rather than forking it. `tests/Unit/PatternBlockReuseTest.php` fails the build on hand-written card markup without a `// @bespoke:` justification. Regenerate the index with `wp acorn blocks:inventory`.
+4. **Bespoke sections are ACF blocks, never raw HTML inside `core/group`.** Raw markup inside container blocks triggers Gutenberg's "unexpected or invalid content" recovery modal. Blade inside an ACF block cannot.
+5. **Page content is authored as a `*-full.php` pattern in git**, then applied to the page — not edited in the database.
+6. **A migration is verified by screenshot diff against production**, not by matching headings and copy. See [`docs/page-migration-and-design-system-workflow.md`](docs/page-migration-and-design-system-workflow.md).
 
 Full rationale and the migration workflow: [`docs/page-migration-and-design-system-workflow.md`](docs/page-migration-and-design-system-workflow.md) and [`docs/design-system.md`](docs/design-system.md).

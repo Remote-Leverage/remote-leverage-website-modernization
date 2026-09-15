@@ -131,7 +131,7 @@ class ContactInquiryForm extends Component
 
 ### Step 2: Register the Component in LivewireServiceProvider
 
-Add your component registration to [app/Infrastructure/Providers/LivewireServiceProvider.php](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Infrastructure/Providers/LivewireServiceProvider.php):
+Add your component registration to [app/Infrastructure/Providers/LivewireServiceProvider.php](../app/Infrastructure/Providers/LivewireServiceProvider.php):
 
 ```php
 Livewire::component('forms.contact-inquiry-form', \App\Application\Livewire\Forms\ContactInquiryForm::class);

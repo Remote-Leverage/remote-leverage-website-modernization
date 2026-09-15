@@ -1,3 +1,5 @@
+{{-- Affiliate/referral hero: headline, subheadline and two CTAs on the left, hero image right,
+     plus three earnings stat callouts. --}}
 @php
   $heroBgUrl = get_template_directory_uri().'/public/images/affiliate/Gradient_04.png';
 @endphp

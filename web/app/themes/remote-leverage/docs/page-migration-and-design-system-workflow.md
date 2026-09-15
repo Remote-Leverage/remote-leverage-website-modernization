@@ -22,6 +22,16 @@ All pages and blocks in Remote Leverage v2 follow these foundational pillars:
 ## Non-Negotiable Core Directives
 
 > [!IMPORTANT]
+> **0. Reuse before you build (added 2026-09-15)**:
+> - Read [`block-inventory.md`](block-inventory.md) first — it maps every block to the production
+>   section it renders. Confirm with `grep -rn "Production" resources/views/blocks/*.blade.php`
+>   and by reading one existing full-page pattern (`patterns/comparison-full.php` composes 13 blocks).
+> - Production showing a *variant* of an existing block is not grounds for a second block. Add an
+>   option and default it to today's behaviour.
+> - Inline markup in a pattern is the last resort and must carry `// @bespoke: <blocks checked,
+>   why none fit>`. `tests/Unit/PatternBlockReuseTest.php` fails the build without it.
+> - Regenerate the index after adding a block or pattern: `wp acorn blocks:inventory`.
+>
 > **1. Canonical Container Width is ALWAYS 1380px**:
 > - Every main section container on every migrated page MUST be constrained to **1380px**.
 > - In Gutenberg Block Patterns: Every root `wp:group` MUST declare `"layout":{"type":"constrained","contentSize":"1380px"}`.
@@ -121,17 +131,17 @@ Dissect the production URL into standard Remote Leverage modular sections:
 
 | Section Type | Production Purpose | Remote Leverage Pattern / Block | Key Design System Tokens |
 | :--- | :--- | :--- | :--- |
-| **Hero** | Primary headline, subheadline, trust hook, primary CTA, visual showcase | `remote-leverage/hero`<br>[`TalentMarqueeBlock`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Blocks/TalentMarqueeBlock.php) | `bg-light`, `has-huge-font-size`, `letter-spacing: -0.03em`, pill purple button (`is-style-pill-purple`) |
-| **Social Proof / Logos** | Client & partner brand validation | `remote-leverage/client-logos`<br>[`ClientLogosMarqueeBlock`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Blocks/ClientLogosMarqueeBlock.php) | `bg-light`, infinite CSS ticker animation (`animate-marquee-logos`), shrink-0 item wrapping |
-| **Global Advantage / Features** | 3-column benefit cards highlighting nearshore talent quality | `remote-leverage/worlds-best-talent`<br>[`FeatureCardsBlock`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Blocks/FeatureCardsBlock.php) (`columns: 3`) | `rounded-card`, `p-card`, `shadow-[0_4px_24px_rgba(0,0,0,0.03)]`, hover translate `-translate-y-1` |
-| **Role Specialties** | Cards showcasing specific functions (Executive, Healthcare, Sales, Ops) | `remote-leverage/beyond-virtual-assistant`<br>[`DepartmentCardsBlock`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Blocks/DepartmentCardsBlock.php) | Background photography with dark gradient overlay, frosted glass blur layer (`backdrop-blur`), white typography |
-| **Trust & Impact Metrics** | VAs placed, countries, economic impact | `remote-leverage/trust-and-impact`<br>[`TrustStatsBlock`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Blocks/TrustStatsBlock.php) | Glassmorphism stats grid, dark card accent, bold metric counters |
-| **Comparison Matrix** | DIY / Traditional Agency vs Remote Leverage | `remote-leverage/why-companies-choose`<br>[`DataTableBlock`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Blocks/DataTableBlock.php) | Floating comparison rows, checkmark indicators, purple accent pills for Remote Leverage column |
-| **Onboarding Process** | 3-step sequence: vacancy to onboarded in days | `remote-leverage/process-steps`<br>[`ProcessStepsBlock`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Blocks/ProcessStepsBlock.php) | 3-column cards with numeric counters (`01`, `02`, `03`), clean descriptions |
+| **Hero** | Primary headline, subheadline, trust hook, primary CTA, visual showcase | `remote-leverage/hero`<br>[`TalentMarqueeBlock`](../app/Blocks/TalentMarqueeBlock.php) | `bg-light`, `has-huge-font-size`, `letter-spacing: -0.03em`, pill purple button (`is-style-pill-purple`) |
+| **Social Proof / Logos** | Client & partner brand validation | `remote-leverage/client-logos`<br>[`ClientLogosMarqueeBlock`](../app/Blocks/ClientLogosMarqueeBlock.php) | `bg-light`, infinite CSS ticker animation (`animate-marquee-logos`), shrink-0 item wrapping |
+| **Global Advantage / Features** | 3-column benefit cards highlighting nearshore talent quality | `remote-leverage/worlds-best-talent`<br>[`FeatureCardsBlock`](../app/Blocks/FeatureCardsBlock.php) (`columns: 3`) | `rounded-card`, `p-card`, `shadow-[0_4px_24px_rgba(0,0,0,0.03)]`, hover translate `-translate-y-1` |
+| **Role Specialties** | Cards showcasing specific functions (Executive, Healthcare, Sales, Ops) | `remote-leverage/beyond-virtual-assistant`<br>[`DepartmentCardsBlock`](../app/Blocks/DepartmentCardsBlock.php) | Background photography with dark gradient overlay, frosted glass blur layer (`backdrop-blur`), white typography |
+| **Trust & Impact Metrics** | VAs placed, countries, economic impact | `remote-leverage/trust-and-impact`<br>[`TrustStatsBlock`](../app/Blocks/TrustStatsBlock.php) | Glassmorphism stats grid, dark card accent, bold metric counters |
+| **Comparison Matrix** | DIY / Traditional Agency vs Remote Leverage | `remote-leverage/why-companies-choose`<br>[`DataTableBlock`](../app/Blocks/DataTableBlock.php) | Floating comparison rows, checkmark indicators, purple accent pills for Remote Leverage column |
+| **Onboarding Process** | 3-step sequence: vacancy to onboarded in days | `remote-leverage/process-steps`<br>[`ProcessStepsBlock`](../app/Blocks/ProcessStepsBlock.php) | 3-column cards with numeric counters (`01`, `02`, `03`), clean descriptions |
 | **Replacement Guarantee** | Zero-risk 12-month replacement guarantee | `remote-leverage/replacement-guarantee`<br>(Core blocks: `wp:group`, `wp:columns`) | `has-brand-dark-violet-background-color`, `has-white-color`, guarantee badge illustration |
-| **Video Testimonials** | Client video case studies and quotes | `remote-leverage/results-testimonials-faq`<br>[`TestimonialsBlock`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Blocks/TestimonialsBlock.php) | Vimeo video modal trigger, thumbnail poster, glass play icon, duration badge, client quote |
-| **Accordion FAQ** | SEO & objection handling | `remote-leverage/results-testimonials-faq`<br>[`AccordionFaqBlock`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Blocks/AccordionFaqBlock.php) | 2-column balanced Alpine.js accordion, automated Schema.org `FAQPage` JSON-LD |
-| **Booking Footer / Funnel** | Final conversion scheduler | `remote-leverage/booking-footer`<br>[`BookingBlock`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Blocks/BookingBlock.php) | Dark violet skin, embedded reactive booking funnel wizard |
+| **Video Testimonials** | Client video case studies and quotes | `remote-leverage/results-testimonials-faq`<br>[`TestimonialsBlock`](../app/Blocks/TestimonialsBlock.php) | Vimeo video modal trigger, thumbnail poster, glass play icon, duration badge, client quote |
+| **Accordion FAQ** | SEO & objection handling | `remote-leverage/results-testimonials-faq`<br>[`AccordionFaqBlock`](../app/Blocks/AccordionFaqBlock.php) | 2-column balanced Alpine.js accordion, automated Schema.org `FAQPage` JSON-LD |
+| **Booking Footer / Funnel** | Final conversion scheduler | `remote-leverage/booking-footer`<br>[`BookingBlock`](../app/Blocks/BookingBlock.php) | Dark violet skin, embedded reactive booking funnel wizard |
 
 ---
 
@@ -246,7 +256,7 @@ class SampleFeatureBlock extends Block
 ### The Problem This Solves
 When patterns contain empty block comments (`<!-- wp:acf/sample {"data":{}} /-->`), Gutenberg loads 0 rows in the sidebar form. When an editor clicks "Add Row", ACF saves that 1 new row, which stops `get_field(...)` from being empty—wiping out all hardcoded fallback data.
 
-### The Solution in [`BlockDefaults.php`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/app/Support/BlockDefaults.php)
+### The Solution in [`BlockDefaults.php`](../app/Support/BlockDefaults.php)
 
 1. **`cleanText(mixed $text): string`**: Decodes any HTML entities or corrupted unicode escapes (`u003c` -> `<`, `u0026` -> `&`, `u0022` -> `"`).
 2. **`resolveImageUrl(mixed $image): string`**: Safely resolves Attachment IDs, URL strings, or ACF image arrays into a direct URL string.
@@ -382,3 +392,21 @@ npm run build
 # 5. Lint PHP syntax
 php -l app/Support/BlockDefaults.php
 ```
+
+---
+
+## Verifying a migration (added 2026-09-15)
+
+Matching headings and copy is not the bar — a page can score 100% on section coverage and still
+look nothing like production. Verify with rendered screenshots:
+
+- Playwright + Chrome (`channel: 'chrome'`) at 1440px.
+- Force `img.loading = 'eager'` and scroll the whole page before capturing. Lazy images and lazy
+  CSS backgrounds otherwise read as missing, which is how a perfectly normal production section
+  was once misdiagnosed as broken.
+- Pull real design tokens off production with `getComputedStyle` rather than estimating.
+- Check the section is actually visible on production — some are `display:none` at every
+  breakpoint and must not be reproduced.
+
+See §5 of [`PAGE-MIGRATION-STATUS.md`](../../../../../PAGE-MIGRATION-STATUS.md) for the current
+per-page results and the list of known-benign diff noise.

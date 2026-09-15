@@ -7,7 +7,8 @@ All project documentation lives here. Start with the [repository README](../../.
 | Document | Covers |
 | :--- | :--- |
 | [architecture.md](architecture.md) | Boot order, service providers, the two request paths, events, schema |
-| [design-system.md](design-system.md) | Tokens, the 38 blocks, the 53 patterns, templates, `BlockDefaults` |
+| [design-system.md](design-system.md) | Tokens, the 45 blocks, the patterns, templates, `BlockDefaults` |
+| [block-inventory.md](block-inventory.md) | **Generated.** Every block mapped to the production section it renders, with fields and usages. Read before building a section; regenerate with `wp acorn blocks:inventory` |
 | [admin-screens.md](admin-screens.md) | Every WP Admin surface the theme adds, and where each is registered |
 | [configuration.md](configuration.md) | Environment variables, verified against the code that reads them |
 | [local-development.md](local-development.md) | Setup, Docker, WP-CLI inventory, running tests |

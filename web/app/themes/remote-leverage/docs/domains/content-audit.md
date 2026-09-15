@@ -39,17 +39,28 @@ flowchart TB
 | :--- | :--- |
 | `HeroWidget`, `HeroSectionWidget`, `HeroCarouselWidget` | `acf/hero-block` |
 | `HeadlessCalendlyMultistepWidget`, `GoogleCalendarMultistepWidget`, `IsolatedFieldsHeadlessCalendlyMultistepWidget` | `acf/booking-block` |
-| `JoinLiveCallWidget` | `acf/live-call-block` |
 | `TestimonialCardWidget`, `TestimonialListWidget`, `TrustSectionWidget` | `acf/testimonials-block` |
 | `DepartmentCardWidget`, `ContractorCardWidget`, `GlassCardWidget` | `acf/department-cards-block` |
 | `ProcessStepsWidget`, `HiringProcessWidget` | `acf/process-steps-block` |
-| `BenefitsSectionWidget`, `GuaranteeSectionWidget` | `acf/benefits-guarantee-block` |
 | `ArticleFAQAccordionWidget` | `acf/accordion-faq-block` |
 | `ArticleDataTableWidget` | `acf/data-table-block` |
 | `ContactCTAWidget`, `ArticleLeadFormWidget` | `acf/cta-banner-block` |
 | `heading`, `text-editor`, `image`, `button` | `core/heading`, `core/paragraph`, `core/image`, `core/button` |
 
 Anything outside this map is reported as unmapped rather than silently dropped. An unmapped widget is a decision for a human, not a conversion failure.
+
+**`JoinLiveCallWidget`, `BenefitsSectionWidget` and `GuaranteeSectionWidget` were removed from
+the map on 2026-09-15**, when the `live-call` and `benefits-guarantee` blocks were deleted as
+unused. Those widgets now fall through to the unmapped path, which is the correct outcome:
+live-call behaviour in v2 is the `/live-call/connect` route, not a block, so a human decides.
+
+> **Known bug — every target in this table is wrong.** The slugs all carry a `-block` suffix
+> (`acf/hero-block`, `acf/booking-block`, …) but no registered block uses that suffix; the real
+> slugs are `acf/booking`, `acf/testimonials`, `acf/department-cards` and so on. There is also no
+> `acf/hero` block at all. Any page this converter touches therefore emits block comments
+> WordPress cannot resolve, and they render as nothing. Pre-existing, found 2026-09-15 while
+> deleting unused blocks. The hand-migration path does not use this converter, so nothing
+> currently shipping is affected — but the table needs correcting before it is next run.
 
 ## The classes
 
@@ -76,7 +87,19 @@ wp acorn content:convert-elementor --post_id=123
 
 # Import blog posts from captured production JSON
 wp acorn content:import-posts
+
+# Regenerate docs/block-inventory.md — the "what already exists" index that page authors
+# read before writing markup. --check fails if the committed file is stale (CI-friendly).
+wp acorn blocks:inventory
+wp acorn blocks:inventory --check
 ```
+
+`BlockInventoryCommand` lives in this domain because it is migration tooling: it answers
+"which block already renders this production section?" by reading each block's class, its
+Blade view comment, its fields, and every pattern, view and `BlockDefaults::render*` helper
+that uses it. Usage detection must follow the helper indirection — a block reached only
+through `BlockDefaults::renderAboutHero()` has its slug nowhere in the pattern, and counting
+raw `acf/<slug>` matches alone reports well-used blocks as unused.
 
 ## Editorial review queue
 

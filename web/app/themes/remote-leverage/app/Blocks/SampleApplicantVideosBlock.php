@@ -24,6 +24,13 @@ class SampleApplicantVideosBlock extends Block
 
     public $view = 'blocks.sample-applicant-videos';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => ['is_preview' => true],
+        ],
+    ];
+
     public $supports = [
         'align' => ['full', 'wide'],
     ];

@@ -117,13 +117,39 @@ Confirmed local-only:
 
 **Note on `robots.txt`:** the static `web/robots.txt` does not contradict any of this. Modern `do_robots()` never emits `Disallow: /` — it always outputs only the admin disallow/allow and passes `$public` to the `robots_txt` filter (`wp-includes/functions.php:1725-1739`). WordPress relies on the `noindex` meta tag, not robots.txt, to keep non-public sites out of the index, which is the mechanism now doing the work. Serving `noindex` while allowing the crawl is also the correct way round: a `Disallow` would stop crawlers ever seeing the `noindex`.
 
-### 5. Calendly webhook signatures are unverified
+### ~~5. Failed WebP conversion left a 0-byte file that was then served forever~~ — ✅ **FIXED 2026-09-15**
+
+`BlockDefaults::preferWebp()` rewrites a local PNG/JPG URL to `.webp` and generates the file on
+demand. When the conversion failed it left a **zero-byte** file behind, and the `is_file()` check
+on the next request treated that as a valid cache — so the broken empty image was served from
+then on. Five files were affected; `contractor-management/hero-main.webp` was one, so that page's
+hero image had been invisible.
+
+`generateWebp()` now unlinks on failure and `preferWebp()` treats a zero-byte file as absent and
+retries. A related data problem was found at the same time: two files in `uploads/2026/09/`
+(`Frame-115.webp`, `clickup.webp`) were valid but did not match their own source image, so the
+page showed a different graphic than the one on disk. Both were deleted and regenerated. A
+perceptual scan of all 319 webp/source pairs found no others.
+
+### 6. Image URLs are silently swapped for same-named media-library attachments
+
+`BlockDefaults::encodeRepeater()` runs every subfield value through `getAttachmentId()`, which
+matches on basename. A theme-file image URL passed to a block therefore resolves to whatever
+attachment shares that filename — a different image, if one exists. This is how a
+`public/images/contractor-management/Frame-115.jpg` reference ended up rendering
+`uploads/2026/09/Frame-115.webp`.
+
+Not fixed: the behaviour is load-bearing for pages whose media is genuinely in the library. Worth
+knowing when a block renders an image you did not expect — check the rendered `src`, not the
+value you passed.
+
+### 7. Calendly webhook signatures are unverified
 
 `config/services.php` reads `CALENDLY_WEBHOOK_SIGNING_KEY`, but the key is absent from `.env` and from `.env.example`. With no key configured, `/api/webhooks/calendly` accepts unsigned payloads — anyone who can reach the endpoint can flip a lead to `booked` or `canceled`.
 
 **Proposed fix:** set the key in every environment, and make `CalendlyWebhookController` reject requests when no signing key is configured rather than falling through to accept.
 
-### 6. Sentry is installed but silent
+### 8. Sentry is installed but silent
 
 `sentry/sentry-laravel` is a dependency, `config/sentry.php` is fully populated, and `@sentry/browser` is in `package.json` — but no `SENTRY_LARAVEL_DSN` or `SENTRY_DSN` is set in `.env`. Nothing is reported from any environment.
 

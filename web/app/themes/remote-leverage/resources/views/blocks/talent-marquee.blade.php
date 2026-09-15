@@ -1,3 +1,5 @@
+{{-- Continuously scrolling marquee of candidate portraits. Decorative; carries a
+     screen-reader-only heading. --}}
 <div class="w-full overflow-hidden alignfull">
     <h2 class="sr-only">Pre-Vetted Remote Professionals</h2>
     <div class="animate-marquee-left gap-card py-2 pb-6">

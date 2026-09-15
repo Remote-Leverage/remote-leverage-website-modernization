@@ -40,7 +40,7 @@ class MediaCopyBlock extends Block
     public function with(): array
     {
         $hasGetField = function_exists('get_field');
-        $field = fn (string $key) => $hasGetField ? get_field($key) : null;
+        $field = fn(string $key) => $hasGetField ? get_field($key) : null;
 
         return [
             'headline' => BlockDefaults::cleanText($field('headline') ?: ''),
@@ -49,6 +49,8 @@ class MediaCopyBlock extends Block
             'imagePosition' => $field('image_position') ?: 'left',
             'ctaText' => $field('cta_text') ?: '',
             'ctaUrl' => $field('cta_url') ?: '#booking-footer',
+            // Production uses this shape on both a pale and a dark surface.
+            'tone' => $field('tone') ?: 'light',
         ];
     }
 
@@ -66,7 +68,12 @@ class MediaCopyBlock extends Block
                 'default_value' => 'left',
             ])
             ->addText('cta_text', ['label' => 'CTA Text', 'instructions' => 'Leave blank to hide.'])
-            ->addUrl('cta_url', ['label' => 'CTA URL', 'default_value' => '#booking-footer']);
+            ->addUrl('cta_url', ['label' => 'CTA URL', 'default_value' => '#booking-footer'])
+            ->addSelect('tone', [
+                'label' => 'Surface',
+                'choices' => ['light' => 'Pale (default)', 'dark' => 'Dark purple'],
+                'default_value' => 'light',
+            ]);
 
         return $fields->build();
     }

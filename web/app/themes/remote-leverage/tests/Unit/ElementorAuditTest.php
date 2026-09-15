@@ -13,7 +13,7 @@ describe('Elementor Audit & Conversion (ADR-0005 Amendment)', function () {
     });
 
     test('ElementorAuditService recognizes clean posts with no Elementor dependency', function () {
-        $service = new ElementorAuditService;
+        $service = new ElementorAuditService();
 
         $cleanResult = $service->auditElementorData('');
         expect($cleanResult['has_elementor_dependency'])->toBeFalse()
@@ -25,7 +25,7 @@ describe('Elementor Audit & Conversion (ADR-0005 Amendment)', function () {
     });
 
     test('ElementorAuditService traverses AST and categorizes mapped and unmapped widgets', function () {
-        $service = new ElementorAuditService;
+        $service = new ElementorAuditService();
 
         $elementorJson = json_encode([
             [
@@ -69,7 +69,7 @@ describe('Elementor Audit & Conversion (ADR-0005 Amendment)', function () {
     });
 
     test('ConvertElementorPostAction converts Elementor AST into Gutenberg block markup and queues for human review', function () {
-        $auditService = new ElementorAuditService;
+        $auditService = new ElementorAuditService();
         $convertAction = new ConvertElementorPostAction($auditService);
 
         $elementorAst = [
@@ -81,7 +81,7 @@ describe('Elementor Audit & Conversion (ADR-0005 Amendment)', function () {
                         'elements' => [
                             [
                                 'elType' => 'widget',
-                                'widgetType' => 'JoinLiveCallWidget',
+                                'widgetType' => 'ProcessStepsWidget',
                                 'settings' => ['btn_label' => 'Join Live Call Now'],
                             ],
                             [
@@ -98,7 +98,7 @@ describe('Elementor Audit & Conversion (ADR-0005 Amendment)', function () {
         $result = $convertAction->execute($elementorAst);
 
         expect($result['status'])->toBe('queued_for_human_editorial_review')
-            ->and($result['gutenberg_content'])->toContain('<!-- wp:acf/live-call-block')
+            ->and($result['gutenberg_content'])->toContain('<!-- wp:acf/process-steps-block')
             ->and($result['gutenberg_content'])->toContain('Join Live Call Now')
             ->and($result['gutenberg_content'])->toContain('[ATTENTION REQUIRED: Unmapped Elementor Widget: UnknownLegacyWidget]');
     });
@@ -108,7 +108,7 @@ describe('Elementor Audit & Conversion (ADR-0005 Amendment)', function () {
         update_post_meta($postId, '_elementor_data', json_encode([
             [
                 'elType' => 'widget',
-                'widgetType' => 'JoinLiveCallWidget',
+                'widgetType' => 'ProcessStepsWidget',
                 'settings' => ['btn_label' => 'Join Now'],
             ],
             [
@@ -118,14 +118,14 @@ describe('Elementor Audit & Conversion (ADR-0005 Amendment)', function () {
             ],
         ]));
 
-        $action = new ApplyElementorConversionAction(new ConvertElementorPostAction(new ElementorAuditService));
+        $action = new ApplyElementorConversionAction(new ConvertElementorPostAction(new ElementorAuditService()));
         $result = $action->execute($postId);
 
         expect($result['status'])->toBe('needs_review')
             ->and($result['unmapped_widgets'])->toBe(['UnknownLegacyWidget'])
             ->and($result['dry_run'])->toBeFalse();
 
-        expect($GLOBALS['_wp_mock_posts'][$postId]['post_content'])->toContain('<!-- wp:acf/live-call-block');
+        expect($GLOBALS['_wp_mock_posts'][$postId]['post_content'])->toContain('<!-- wp:acf/process-steps-block');
         expect(get_post_meta($postId, '_rl_conversion_status', true))->toBe('needs_review');
         expect(get_post_meta($postId, '_rl_conversion_unmapped_widgets', true))->toBe(['UnknownLegacyWidget']);
     });
@@ -136,7 +136,7 @@ describe('Elementor Audit & Conversion (ADR-0005 Amendment)', function () {
             ['elType' => 'widget', 'widgetType' => 'HeroWidget', 'settings' => []],
         ]));
 
-        $action = new ApplyElementorConversionAction(new ConvertElementorPostAction(new ElementorAuditService));
+        $action = new ApplyElementorConversionAction(new ConvertElementorPostAction(new ElementorAuditService()));
         $result = $action->execute($postId, dryRun: true);
 
         expect($result['status'])->toBe('needs_review')
@@ -147,7 +147,7 @@ describe('Elementor Audit & Conversion (ADR-0005 Amendment)', function () {
     });
 
     test('ApplyElementorConversionAction skips posts with no _elementor_data', function () {
-        $action = new ApplyElementorConversionAction(new ConvertElementorPostAction(new ElementorAuditService));
+        $action = new ApplyElementorConversionAction(new ConvertElementorPostAction(new ElementorAuditService()));
         $result = $action->execute(999);
 
         expect($result['status'])->toBe('skipped_no_elementor_data');
@@ -158,7 +158,7 @@ describe('Elementor Audit & Conversion (ADR-0005 Amendment)', function () {
         update_post_meta($postId, '_elementor_data', '{"foo":"bar"}');
         update_post_meta($postId, '_rl_conversion_status', 'needs_review');
 
-        $action = new ApplyElementorConversionAction(new ConvertElementorPostAction(new ElementorAuditService));
+        $action = new ApplyElementorConversionAction(new ConvertElementorPostAction(new ElementorAuditService()));
         $action->approve($postId);
 
         expect(get_post_meta($postId, '_rl_conversion_status', true))->toBe('approved')

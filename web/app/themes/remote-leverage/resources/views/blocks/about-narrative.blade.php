@@ -1,3 +1,5 @@
+{{-- About page long-form narrative: a prefixed section title, a lead statement, then two columns
+     of rich prose. Text only, no imagery. --}}
 <div class="w-full">
     {{-- Top Header Row --}}
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6">

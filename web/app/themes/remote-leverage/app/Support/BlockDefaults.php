@@ -53,7 +53,7 @@ class BlockDefaults
 
         $host = parse_url($homeUrl, PHP_URL_HOST);
         if (is_string($host) && $host !== '' && str_starts_with($homeUrl, 'https://')) {
-            $html = str_replace('http://'.$host, 'https://'.$host, $html);
+            $html = str_replace('http://' . $host, 'https://' . $host, $html);
         }
 
         return $html;
@@ -93,7 +93,7 @@ class BlockDefaults
             return $filteredImage;
         }
 
-        return str_replace($m[0], ' src='.$m[1].esc_attr($newSrc).$m[1], $filteredImage);
+        return str_replace($m[0], ' src=' . $m[1] . esc_attr($newSrc) . $m[1], $filteredImage);
     }
 
     /**
@@ -110,7 +110,7 @@ class BlockDefaults
 
         foreach ($bases as $baseUrl => $baseDir) {
             if ($baseUrl !== '' && str_starts_with($url, $baseUrl)) {
-                return $baseDir.substr($url, strlen($baseUrl));
+                return $baseDir . substr($url, strlen($baseUrl));
             }
         }
 
@@ -138,11 +138,17 @@ class BlockDefaults
             return $url;
         }
 
-        $webpPath = preg_replace('/\.'.preg_quote($ext, '/').'$/i', '.webp', $path);
-        $webpUrl = preg_replace('/\.'.preg_quote($ext, '/').'$/i', '.webp', $url);
+        $webpPath = preg_replace('/\.' . preg_quote($ext, '/') . '$/i', '.webp', $path);
+        $webpUrl = preg_replace('/\.' . preg_quote($ext, '/') . '$/i', '.webp', $url);
 
+        // A zero-byte file means an earlier conversion failed part-way. Treat it as absent
+        // and retry, otherwise every later request serves the broken empty image.
         if (is_file($webpPath)) {
-            return $webpUrl;
+            if (filesize($webpPath) > 0) {
+                return $webpUrl;
+            }
+
+            @unlink($webpPath);
         }
 
         if (self::generateWebp($path, $webpPath)) {
@@ -166,10 +172,19 @@ class BlockDefaults
         try {
             $saved = $editor->save($destPath, 'image/webp');
         } catch (\Throwable $e) {
+            @unlink($destPath);
+
             return false;
         }
 
-        return ! is_wp_error($saved) && is_file($destPath);
+        if (is_wp_error($saved) || ! is_file($destPath) || filesize($destPath) === 0) {
+            // Never leave a truncated file behind: preferWebp would hand it out forever.
+            @unlink($destPath);
+
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -246,9 +261,9 @@ class BlockDefaults
             return self::homeImg(substr($path, 5));
         }
 
-        $themePath = get_theme_file_path('public/images/'.$path);
+        $themePath = get_theme_file_path('public/images/' . $path);
         if (is_file($themePath)) {
-            return esc_url(set_url_scheme(get_template_directory_uri().'/public/images/'.$path, 'https'));
+            return esc_url(set_url_scheme(get_template_directory_uri() . '/public/images/' . $path, 'https'));
         }
 
         return self::homeImg(basename($path));
@@ -271,27 +286,27 @@ class BlockDefaults
         $file = ltrim($file, '/');
         $name = pathinfo($file, PATHINFO_FILENAME);
         $dirs = [
-            WP_CONTENT_DIR.'/uploads/home' => content_url('/uploads/home'),
-            WP_CONTENT_DIR.'/uploads/hire-va-4' => content_url('/uploads/hire-va-4'),
-            WP_CONTENT_DIR.'/uploads/2026/09' => content_url('/uploads/2026/09'),
-            WP_CONTENT_DIR.'/uploads/2026/07' => content_url('/uploads/2026/07'),
-            WP_CONTENT_DIR.'/uploads/2026/06' => content_url('/uploads/2026/06'),
-            WP_CONTENT_DIR.'/uploads/2026/05' => content_url('/uploads/2026/05'),
-            WP_CONTENT_DIR.'/uploads/2026/04' => content_url('/uploads/2026/04'),
-            get_theme_file_path('public/images/home') => get_template_directory_uri().'/public/images/home',
-            get_theme_file_path('public/images/hire-va-4') => get_template_directory_uri().'/public/images/hire-va-4',
+            WP_CONTENT_DIR . '/uploads/home' => content_url('/uploads/home'),
+            WP_CONTENT_DIR . '/uploads/hire-va-4' => content_url('/uploads/hire-va-4'),
+            WP_CONTENT_DIR . '/uploads/2026/09' => content_url('/uploads/2026/09'),
+            WP_CONTENT_DIR . '/uploads/2026/07' => content_url('/uploads/2026/07'),
+            WP_CONTENT_DIR . '/uploads/2026/06' => content_url('/uploads/2026/06'),
+            WP_CONTENT_DIR . '/uploads/2026/05' => content_url('/uploads/2026/05'),
+            WP_CONTENT_DIR . '/uploads/2026/04' => content_url('/uploads/2026/04'),
+            get_theme_file_path('public/images/home') => get_template_directory_uri() . '/public/images/home',
+            get_theme_file_path('public/images/hire-va-4') => get_template_directory_uri() . '/public/images/hire-va-4',
         ];
 
         foreach ($dirs as $dir => $url) {
             foreach (['webp', 'png', 'jpg', 'jpeg', 'svg'] as $ext) {
-                $path = $dir.'/'.$name.'.'.$ext;
+                $path = $dir . '/' . $name . '.' . $ext;
                 if (is_file($path)) {
-                    return esc_url(set_url_scheme(rtrim($url, '/').'/'.$name.'.'.$ext, 'https'));
+                    return esc_url(set_url_scheme(rtrim($url, '/') . '/' . $name . '.' . $ext, 'https'));
                 }
             }
         }
 
-        return esc_url(set_url_scheme(self::imgBase().'/'.$file, 'https'));
+        return esc_url(set_url_scheme(self::imgBase() . '/' . $file, 'https'));
     }
 
     /**
@@ -395,7 +410,7 @@ class BlockDefaults
     public static function encodeRepeater(string $fieldName, string $fieldKey, array $rows, array &$data = []): array
     {
         $data[$fieldName] = count($rows);
-        $data['_'.$fieldName] = $fieldKey;
+        $data['_' . $fieldName] = $fieldKey;
         foreach ($rows as $i => $row) {
             foreach ($row as $subfield => $val) {
                 $encodedVal = self::getAttachmentId($val);
@@ -416,7 +431,7 @@ class BlockDefaults
             'mode' => 'preview',
         ], $attrs);
 
-        return '<!-- wp:acf/'.$slug.' '.json_encode($blockAttrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE).' /-->';
+        return '<!-- wp:acf/' . $slug . ' ' . json_encode($blockAttrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ' /-->';
     }
 
     // --- PROCESS STEPS ---
@@ -449,6 +464,153 @@ class BlockDefaults
         return self::patternBlock('process-steps', array_merge($data, $overrides));
     }
 
+    /**
+     * The six profiles shown in the partner-page hero row, identical on both partner pages.
+     *
+     * @return array<int, array{name: string, title: string, desc: string, bg: string, logo: string}>
+     */
+    public static function partnerTalentCards(): array
+    {
+        $rows = [
+            ['con-07.png', 'André Vilalobos', 'Graphic Designer', '6+ years of experience helping brands of all sizes, from small and mid-sized businesses to big companies, look professional, polished, and unmistakably them.', 'State-Farm-01.png'],
+            ['cont-02.png', 'Juliana Silva', 'Lead Generation (SDR)', '6+ years of experience as an SDR, skilled in prospecting, active listening, clear communication, time management, and handling rejection to consistently generate and qualify sales leads.', 'mercado.png'],
+            ['con-05.png', 'Valeria Andrea', 'Medical / Healthcare', '4+ years of experience in fast-paced clinic and hospital settings. Skilled in EMR systems (Epic, Cerner), patient intake, vital signs, and assisting physicians with exams and procedures.', 'Allstate-01.png'],
+            ['con-08.png', 'Laura Valentina', 'Customer Support', '+4 years of experience in B2B SaaS customer support, I’ve supported customers in North America, Europe, and Latin America, adapting to different cultural expectations and communication styles while handling email, chat, and phone support.', 'Bank-of-America-01.png'],
+            ['cont-03.png', 'Sofía Pérez', 'Marketing', '4+ years of experience as a results-driven marketing professional, skilled in content creation, social media strategy, campaign management, and data analysis to drive brand awareness and customer engagement.', 'Frame-74-1.png'],
+            ['con-06.png', 'Luana Dias', 'Executive Assistant', '3+ years of experience supporting C-level executives in fast-paced environments. High organization, anticipate needs, and protect executive’s time like it’s my own.', 'NU-bank-01.png'],
+        ];
+
+        return array_map(static fn(array $r): array => [
+            'name' => $r[1],
+            'title' => $r[2],
+            'desc' => $r[3],
+            'bg' => self::pageImg('partners', $r[0]),
+            'logo' => self::pageImg('partners', $r[4]),
+        ], $rows);
+    }
+
+    /**
+     * @param  array<int, string>  $paragraphs
+     * @param  array<int, array{value: string, label: string, icon?: string}>  $stats
+     */
+    public static function renderPartnerHero(array $overrides, array $paragraphs = [], array $stats = []): string
+    {
+        $data = self::withFieldKeys('partner_hero_block', $overrides);
+
+        self::encodeRepeater(
+            'paragraphs',
+            'field_partner_hero_block_paragraphs',
+            array_map(static fn(string $text): array => ['text' => $text], $paragraphs),
+            $data,
+        );
+
+        self::encodeRepeater('stats', 'field_partner_hero_block_stats', $stats, $data);
+
+        return self::patternBlock('partner-hero', $data, ['align' => 'full']);
+    }
+
+    /** @param  array<int, array{title: string, text: string}>  $steps */
+    public static function renderProgressSteps(array $overrides, array $steps): string
+    {
+        $data = self::withFieldKeys('progress_steps_block', $overrides);
+        self::encodeRepeater('steps', 'field_progress_steps_block_steps', $steps, $data);
+
+        return self::patternBlock('progress-steps', $data, ['align' => 'full']);
+    }
+
+    /** Render acf/media-copy with field keys attached so overrides actually apply. */
+    public static function renderMediaCopy(array $overrides = []): string
+    {
+        return self::patternBlock('media-copy', self::withFieldKeys('media_copy_block', $overrides), ['align' => 'full']);
+    }
+
+    /** Render acf/cta-banner with field keys attached. */
+    public static function renderCtaBanner(array $overrides = []): string
+    {
+        return self::patternBlock('cta-banner', self::withFieldKeys('cta_banner_block', $overrides), ['align' => 'full']);
+    }
+
+    /**
+     * ACF only reads a block-comment value when its `_<name>` field key sits beside it.
+     * Without this, an override is silently dropped and the block renders its defaults.
+     *
+     * @param  array<string, mixed>  $values
+     * @return array<string, mixed>
+     */
+    public static function withFieldKeys(string $group, array $values): array
+    {
+        $data = [];
+
+        foreach ($values as $name => $value) {
+            $data[$name] = $value;
+            $data['_' . $name] = 'field_' . $group . '_' . $name;
+        }
+
+        return $data;
+    }
+
+    /** Theme-file URL for an asset that belongs to a single migrated page. */
+    public static function pageImg(string $page, string $file): string
+    {
+        return get_theme_file_uri('public/images/' . $page . '/' . $file);
+    }
+
+    /**
+     * The 2026 Impact Report placement counts, in production's order (row-wise across
+     * three columns). Kept here so the block renders correctly with no fields set.
+     *
+     * @return array<int, array{flag: string, country: string, count: string}>
+     */
+    public static function countryPlacements(): array
+    {
+        $rows = [
+            ['Mexico', '317', 'mexico.png'], ['Colombia', '185', 'Colombia.png'], ['Honduras', '145', 'Honduras.png'],
+            ['Jamaica', '140', 'jamaica.png'], ['Brazil', '102', 'Brazil.png'], ['Costa Rica', '95', 'Costa_rica.png'],
+            ['Nicaragua', '90', 'Nicaragua.png'], ['El Salvador', '85', 'El-Salvador.png'], ['D. Republic', '82', 'D.-Repblic.png'],
+            ['Guatemala', '68', 'Guatemala.png'], ['Argentina', '56', 'Argentina.png'], ['Ecuador', '38', 'ecuador.png'],
+            ['Peru', '37', 'Peru.png'], ['Panama', '34', 'Panama.png'], ['Belize', '31', 'Belize.png'],
+            ['Bolivia', '19', 'Bolivia.png'], ['Chile', '17', 'chile.png'], ['T. and Tobago', '8', 'T.-and-Tobago.png'],
+            ['Paraguay', '8', 'Paraguay.png'], ['Barbados', '7', 'barbados.png'], ['Guyana', '7', 'Guyana.png'],
+            ['Uruguay', '6', 'Uruguay.png'], ['St. Lucia', '5', 'St.-Lucia.png'], ['Dominica', '2', 'Dominica.png'],
+            ['A. and Barbuda', '1', 'A.-and-Barbuda.png'], ['C. Islands', '1', 'C.-Islands.png'], ['Curacao', '1', 'Curacao.png'],
+        ];
+
+        return array_map(static fn(array $r): array => [
+            'country' => $r[0],
+            'count' => $r[1],
+            'flag' => self::pageImg('impact-report-2026/flags', $r[2]),
+        ], $rows);
+    }
+
+    /**
+     * @param  array|null  $cards  Replaces the preset cards entirely (keys: icon, title, text).
+     */
+    public static function renderRolesCarousel(array $overrides = [], ?array $cards = null): string
+    {
+        $data = [];
+
+        if ($cards !== null) {
+            self::encodeRepeater('cards', 'field_roles_carousel_block_cards', $cards, $data);
+        }
+
+        foreach (['headline', 'subheadline'] as $text) {
+            if (isset($overrides[$text])) {
+                $data['_' . $text] = 'field_roles_carousel_block_' . $text;
+            }
+        }
+
+        return self::patternBlock('roles-carousel', array_merge($data, $overrides), ['align' => 'full']);
+    }
+
+    /** @param  array|null  $rows  Replaces the preset countries entirely. */
+    public static function renderCountryPlacements(array $overrides = [], ?array $rows = null): string
+    {
+        $data = [];
+        self::encodeRepeater('rows', 'field_country_placements_block_rows', $rows ?? self::countryPlacements(), $data);
+
+        return self::patternBlock('country-placements', array_merge($data, $overrides), ['align' => 'full']);
+    }
+
     // --- DEPARTMENT CARDS ---
     public static function departmentCards(): array
     {
@@ -478,10 +640,11 @@ class BlockDefaults
         ];
     }
 
-    public static function renderDepartmentCards(array $overrides = []): string
+    /** @param  array|null  $cards  Replaces the preset cards entirely (see renderFeatureCards). */
+    public static function renderDepartmentCards(array $overrides = [], ?array $cards = null): string
     {
         $data = [];
-        self::encodeRepeater('cards', 'field_department_cards_block_cards', self::departmentCards(), $data);
+        self::encodeRepeater('cards', 'field_department_cards_block_cards', $cards ?? self::departmentCards(), $data);
 
         return self::patternBlock('department-cards', array_merge($data, $overrides));
     }
@@ -550,13 +713,30 @@ class BlockDefaults
         ];
     }
 
-    public static function renderFeatureCards(string $columns = '3', array $overrides = []): string
+    /**
+     * @param  array|null  $cards  Replaces the preset cards entirely. Raw arrays cannot be
+     *                             passed through $overrides, because the encoded preset keys
+     *                             would still win — so custom cards go here.
+     * @param  string  $ratio  Optional card image aspect as "w/h" (e.g. '413/152').
+     */
+    public static function renderFeatureCards(string $columns = '3', array $overrides = [], ?array $cards = null, string $ratio = '', string $variant = 'inset'): string
     {
         $data = [
             'columns' => $columns,
             '_columns' => 'field_feature_cards_block_columns',
         ];
-        self::encodeRepeater('cards', 'field_feature_cards_block_cards', self::featureCards($columns), $data);
+
+        if ($ratio !== '') {
+            $data['ratio'] = $ratio;
+            $data['_ratio'] = 'field_feature_cards_block_ratio';
+        }
+
+        if ($variant !== 'inset') {
+            $data['variant'] = $variant;
+            $data['_variant'] = 'field_feature_cards_block_variant';
+        }
+
+        self::encodeRepeater('cards', 'field_feature_cards_block_cards', $cards ?? self::featureCards($columns), $data);
 
         return self::patternBlock('feature-cards', array_merge($data, $overrides));
     }
@@ -575,7 +755,8 @@ class BlockDefaults
         ];
     }
 
-    public static function renderDataTable(array $overrides = []): string
+    /** @param  array|null  $rows  Replaces the preset rows entirely (see renderFeatureCards). */
+    public static function renderDataTable(array $overrides = [], ?array $rows = null): string
     {
         $data = [
             'col_1_header' => 'DIY',
@@ -583,7 +764,7 @@ class BlockDefaults
             'col_2_header' => 'Remote Leverage',
             '_col_2_header' => 'field_data_table_block_col_2_header',
         ];
-        self::encodeRepeater('rows', 'field_data_table_block_rows', self::dataTableRows(), $data);
+        self::encodeRepeater('rows', 'field_data_table_block_rows', $rows ?? self::dataTableRows(), $data);
 
         return self::patternBlock('data-table', array_merge($data, $overrides));
     }
@@ -1832,10 +2013,25 @@ class BlockDefaults
 
     public static function renderVaPricingTalentGrid(array $overrides = []): string
     {
+        return self::renderTalentGrid($overrides);
+    }
+
+    /** @param  array|null  $cards  Replaces the preset talent cards entirely. */
+    public static function renderTalentGrid(array $overrides = [], ?array $cards = null): string
+    {
         $data = [];
-        self::encodeRepeater('talent_cards', 'field_talent_grid_block_talent_cards', self::vaPricingTalentCards(), $data);
+        self::encodeRepeater('talent_cards', 'field_talent_grid_block_talent_cards', $cards ?? self::vaPricingTalentCards(), $data);
 
         return self::patternBlock('talent-grid', array_merge($data, $overrides));
+    }
+
+    /** Stacked numbered step cards (headline, subheadline, steps[number,title,text,image]). */
+    public static function renderProcessStepCards(array $steps, array $overrides = []): string
+    {
+        $data = [];
+        self::encodeRepeater('steps', 'field_process_step_cards_block_steps', $steps, $data);
+
+        return self::patternBlock('process-step-cards', array_merge($data, $overrides));
     }
 
     // --- ROLES PRICING GRID (vapricing / reviews funnel) ---

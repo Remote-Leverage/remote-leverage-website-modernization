@@ -169,7 +169,7 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 - [ ] **`BookingBlock`** (`booking.blade.php`)
   - Replaces: `HeadlessCalendlyMultistepWidget`, `GoogleCalendarMultistepWidget`, `IsolatedFieldsHeadlessCalendlyMultistepWidget`.
   - Features: Embeds `MultistepBookingWizard` without iframes.
-- [ ] **`LiveCallBlock`** (`live-call.blade.php`)
+- [x] ~~**`LiveCallBlock`** (`live-call.blade.php`)~~ — **deleted 2026-09-15**, unused in code and DB; live-call is the `/live-call/connect` route, not a block
   - Replaces: `JoinLiveCallWidget`.
   - Features: Embeds `InstantLiveCallButton` with real-time presence polling.
 - [ ] **`TestimonialsBlock`** (`testimonials.blade.php`)
@@ -181,7 +181,7 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 - [ ] **`ProcessStepsBlock`** (`process-steps.blade.php`)
   - Replaces: `ProcessStepsWidget`, `HiringProcessWidget`.
   - Features: SVG stepper timeline with responsive collapse.
-- [ ] **`BenefitsGuaranteeBlock`** (`benefits.blade.php`)
+- [x] ~~**`BenefitsGuaranteeBlock`** (`benefits.blade.php`)~~ — **deleted 2026-09-15**, no code or database usage
   - Replaces: `BenefitsSectionWidget`, `GuaranteeSectionWidget`.
   - Features: Inline SVG badges and satisfaction guarantee callouts.
 - [ ] **`AccordionFaqBlock`** (`accordion.blade.php`)

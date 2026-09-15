@@ -1,3 +1,5 @@
+{{-- Roles grid: eyebrow, headline and a grid of role cards with photography, used to show what
+     kinds of hire are available. --}}
 @php
   use App\Support\BlockDefaults;
 

@@ -1,3 +1,5 @@
+{{-- Replacement-guarantee panel: guarantee terms on the left, supporting imagery and reassurance
+     points on the right. --}}
 @php
   use App\Support\BlockDefaults;
 

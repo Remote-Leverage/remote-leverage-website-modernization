@@ -4,6 +4,7 @@
 @source "../**/*.blade.php";
 @source "../**/*.js";
 @source "../../patterns/**/*.php";
+@source "../patterns/**/*.php";
 
 @import "./blog.css";
 
@@ -529,6 +530,26 @@
 /* ════════════════════════════════════════════════════════════════
    RL TALENT GRID CARD (STATIC SPLIT-HERO GRID)
    ════════════════════════════════════════════════════════════════ */
+/* Marquee variant of the talent grid: one continuously scrolling line of fixed-width
+   cards that bleeds the full viewport width. Needs real rules because
+   .rl-talent-grid-card sets width:100% for the grid layout. */
+.rl-talent-grid-marquee {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  overflow: hidden;
+}
+
+.rl-talent-grid-row {
+  display: flex;
+  gap: var(--spacing-card, 1rem);
+  width: max-content;
+}
+
+.rl-talent-grid-row > .rl-talent-grid-card {
+  width: 256px !important;
+  flex: 0 0 256px;
+}
+
 .rl-talent-grid-card {
   position: relative;
   width: 100%;
@@ -1805,4 +1826,69 @@ h2.wp-block-heading,
   .rl-profile-card-inner {
     transition: none;
   }
+}
+
+/* Header floating over a dark hero (see App\Support\HeaderMode). The header leaves the
+   document flow so the hero starts at the top of the viewport, and the chrome is recoloured
+   white. Scoped to the top-level bar only — dropdown panels keep their own white surface,
+   so anything inside .sub-menu must stay dark. */
+.rl-header-over-hero header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.rl-header-over-hero header > div a:not(.sub-menu a),
+.rl-header-over-hero header > div button,
+.rl-header-over-hero header > div > div > ul > li > a {
+  color: var(--color-surface-white);
+}
+
+/* Icons in the bar carry their own colour utilities (text-black on the CTA arrow,
+   text-slate-700 on the nav chevrons), so they never inherit from the link. Force them. */
+.rl-header-over-hero header > div svg,
+.rl-header-over-hero header > div a svg,
+.rl-header-over-hero header > div button svg {
+  color: var(--color-surface-white);
+}
+
+.rl-header-over-hero header .sub-menu svg {
+  color: var(--color-text-slate);
+}
+
+/* The logo is a dark SVG, so invert rather than ship a second asset. */
+.rl-header-over-hero header a[aria-label] img {
+  filter: brightness(0) invert(1);
+}
+
+.rl-header-over-hero header [class*="border-black"] {
+  border-color: var(--color-surface-white);
+}
+
+/* The default hover tint is brand purple, which disappears against a purple hero. Keep the
+   top-level bar white and lean on opacity for the hover affordance instead. */
+.rl-header-over-hero header > div a:not(.sub-menu a):hover,
+.rl-header-over-hero header > div a:not(.sub-menu a):hover svg,
+.rl-header-over-hero header > div > div > ul > li > a:hover,
+.rl-header-over-hero header > div > div > ul > li:hover > a svg {
+  color: var(--color-surface-white);
+  opacity: 0.75;
+}
+
+/* Explicitly restore the dropdown, which sits on its own white panel. */
+.rl-header-over-hero header .sub-menu,
+.rl-header-over-hero header .sub-menu li,
+.rl-header-over-hero header .sub-menu a {
+  color: var(--color-text-slate);
+}
+
+.rl-header-over-hero header .sub-menu a:hover {
+  color: var(--color-brand-purple);
+}
+
+.rl-header-over-hero header .sub-menu img {
+  filter: none;
 }

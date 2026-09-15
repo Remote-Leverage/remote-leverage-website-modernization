@@ -5,11 +5,17 @@
     <div class="w-full px-4 sm:px-6 lg:px-8">
         <div class="rl-container">
             <div class="flex flex-wrap items-end justify-between gap-6 mb-10">
-                @if ($headline)
-                    <h2 class="font-display font-bold text-bg-light text-3xl sm:text-4xl lg:text-section">
-                        {!! $headline !!}
-                    </h2>
-                @endif
+                <div>
+                    @if ($headline)
+                        <h2 class="font-display font-bold text-bg-light text-3xl sm:text-4xl lg:text-section">
+                            {!! $headline !!}
+                        </h2>
+                    @endif
+
+                    @if (! empty($subheadline))
+                        <p class="text-white/70 text-[15px] leading-[24px] mt-3">{{ $subheadline }}</p>
+                    @endif
+                </div>
 
                 <div class="flex gap-3">
                     <button type="button" data-rl-carousel-prev

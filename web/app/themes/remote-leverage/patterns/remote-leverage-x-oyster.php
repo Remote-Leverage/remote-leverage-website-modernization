@@ -1,95 +1,110 @@
 <?php
+
 /**
  * Title: Full Page - Remote Leverage x Oyster
  * Slug: remote-leverage/remote-leverage-x-oyster
  * Categories: remote-leverage
- * Description: 1:1 complete co-branded landing page for Remote Leverage and Oyster partnership.
+ * Description: Co-branded Remote Leverage x Oyster landing page, rebuilt section-for-section against production (2026-09-14).
  */
-?>
-<!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"6rem","bottom":"6rem"}}},"backgroundColor":"brand-midnight","className":"rl-co-branded-hero relative overflow-hidden bg-[#250D4A] text-white","layout":{"type":"constrained","contentSize":"1380px"}} -->
-<div class="wp-block-group alignfull rl-co-branded-hero relative overflow-hidden bg-[#250D4A] text-white has-brand-midnight-background-color has-background" style="padding-top:6rem;padding-bottom:6rem">
-    <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center max-w-3xl mx-auto mb-10">
-            <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-pill bg-white/10 border border-white/15 text-xs font-bold uppercase tracking-wider text-purple-200 mb-6 backdrop-blur-sm">
-                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span>Strategic Global Talent Partnership</span>
-            </div>
+$partner = [
+    'name' => 'Oyster',
+    'hero_bg' => 'var(--color-brand-purple-deep)',
+    'hero_bg_end' => 'var(--color-brand-dark-violet)',
+    'deep_bg' => 'var(--color-brand-dark-violet)',
+    'final_cta_text' => 'Book a Strategy Sync',
 
-            <h1 class="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.1] mb-6">
-                Remote Leverage &times; Oyster
-            </h1>
+    'hero_title' => 'Remote Leverage × Oyster',
+    'hero_paragraphs' => [
+        'Hire the right people globally. Employ and pay them compliantly in 180+ countries.',
+        'Oyster gives you the employment infrastructure to hire full-time team members anywhere in the world, without opening a legal entity.',
+        'Remote Leverage fills those seats with the top 1% of global talent in as little as 48 hours.',
+        'Ready to build your global team?',
+    ],
+    'hero_cta_text' => 'Book a Strategy Sync',
+    'hero_cta_url' => '/vacalendar',
 
-            <p class="text-base sm:text-xl text-slate-200 leading-relaxed mb-8">
-                Hire the right people globally. Employ and pay them compliantly in 180+ countries with top-tier Latin American talent and seamless EOR infrastructure.
-            </p>
+    'stats' => [
+        ['icon' => 'ICONS2-1-1.png', 'value' => '70%', 'label' => 'Cost savings vs. U.S. employees'],
+        ['icon' => 'ICONS-1-2.png', 'value' => '48 hrs', 'label' => 'To a shortlist of top 1% talent'],
+        ['icon' => 'ICONS14-1-1.png', 'value' => '180+', 'label' => 'Countries covered by Oyster'],
+        ['icon' => 'ICONS8-1-1.png', 'value' => '100%', 'label' => 'Payroll, benefits, and compliance handled'],
+    ],
 
-            <div class="flex flex-wrap items-center justify-center gap-4">
-                <a href="#booking-footer" class="px-8 py-3.5 rounded-pill bg-gradient-to-r from-brand-purple to-brand-magenta hover:opacity-95 text-white font-bold text-sm shadow-btn transition cursor-pointer">
-                    Book a Strategy Call &rarr;
-                </a>
-                <a href="#partnership-details" class="px-8 py-3.5 rounded-pill bg-white/10 hover:bg-white/15 text-white font-semibold text-sm border border-white/20 transition cursor-pointer backdrop-blur-sm">
-                    How We Partner
-                </a>
-            </div>
-        </div>
+    'bridge_title' => 'The Bridge Between Employment Infrastructure and Execution.',
+    'bridge_paragraphs' => [
+        'Remote Leverage makes it seamless to find the high performers who will drive your business forward. Oyster makes sure every one of them is employed, paid, and cared for compliantly – from localized employment agreements and statutory benefits to payroll, expenses, and time off across 180+ countries.',
+        'Together, we provide a plug-and-play solution for high-growth firms looking to build teams and operate across borders without the overhead of U.S. salaries, the friction of traditional recruiting, or the risk of non-compliant employment.',
+    ],
 
-        <!-- 4 Stat Metric Badges -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto pt-6 border-t border-white/10 text-center">
-            <div class="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                <span class="font-display text-3xl font-bold text-white block">70%</span>
-                <span class="text-xs font-semibold text-purple-200/80">Lower Cost vs US</span>
-            </div>
-            <div class="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                <span class="font-display text-3xl font-bold text-white block">48 hrs</span>
-                <span class="text-xs font-semibold text-purple-200/80">Average Match Time</span>
-            </div>
-            <div class="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                <span class="font-display text-3xl font-bold text-white block">180+</span>
-                <span class="text-xs font-semibold text-purple-200/80">Countries Covered</span>
-            </div>
-            <div class="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                <span class="font-display text-3xl font-bold text-white block">100%</span>
-                <span class="text-xs font-semibold text-purple-200/80">Replacement Guarantee</span>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- /wp:group -->
-
-<!-- wp:acf/talent-marquee {"name":"acf/talent-marquee","align":"full","mode":"preview"} /-->
-
-<!-- wp:acf/client-logos-marquee {"name":"acf/client-logos-marquee","align":"full","mode":"preview"} /-->
-
-<!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"5rem","bottom":"5rem"}}},"backgroundColor":"bg-light","layout":{"type":"constrained","contentSize":"1380px"}} -->
-<div id="partnership-details" class="wp-block-group alignfull has-bg-light-background-color has-background" style="padding-top:5rem;padding-bottom:5rem">
-    <!-- wp:acf/feature-cards {"name":"acf/feature-cards","data":{"headline":"The Bridge Between Employment Infrastructure and Execution","columns":"3","cards":[{"title":"Fast Talent Sourcing","desc":"Remote Leverage sources, vets, and screens the top 1% of English-fluent professionals in Latin America for your exact roles.","badge":"Sourcing"},{"title":"Seamless EOR & Payroll","desc":"Oyster provides global employer of record, localized contracts, benefits, and compliant payroll across 180+ countries.","badge":"Compliance"},{"title":"Ongoing Retention & Success","desc":"Dedicated talent success managers ensure seamless day-to-day operations and high long-term retention.","badge":"Support"}]},"align":"full","mode":"preview"} /-->
-</div>
-<!-- /wp:group -->
-
-<!-- wp:pattern {"slug":"remote-leverage/beyond-virtual-assistant"} /-->
-
-<?= \App\Support\BlockDefaults::renderProcessSteps([
-    'headline' => 'Three Steps to a Fully Staffed Team',
-    'badge' => 'Simple Co-Branded Onboarding',
     'steps' => [
         [
-            'number' => '01',
-            'title' => 'Define Your Role Requirements',
-            'desc' => 'Share your target job description, required tools, and budget on our 15-minute consultation call.',
+            'title' => 'Tell us your ideal hire',
+            'paragraphs' => [
+                'Book a 15-minute consultation. Describe the role, skills, and experience you need.',
+                'Remote Leverage handles posting, screening, and interviewing candidates on your behalf.',
+            ],
         ],
         [
-            'number' => '02',
-            'title' => 'Interview Pre-Vetted Candidates',
-            'desc' => 'Within 48 hours, interview 3 curated professionals with verified references and background checks.',
+            'title' => 'Meet your top 1% shortlist',
+            'paragraphs' => [
+                'Within 48 hours, receive 4–6 pre-vetted, English-fluent candidates.',
+                'You interview, you choose. No contracts, no payment until we find the right fit.',
+            ],
         ],
         [
-            'number' => '03',
-            'title' => 'Onboard Compliantly via Oyster',
-            'desc' => 'Execute contracts, set up payroll, and welcome your new hire with full compliance protection.',
+            'title' => 'We handle pay & compliance',
+            'paragraphs' => [
+                'Your new hire is onboarded as a full-time employee through Oyster, using Oyster’s local entities in 180+ countries. Localized contracts, statutory benefits, payroll, and tax withholding are handled from day one. No entity required. No surprises.',
+            ],
         ],
     ],
-]) ?>
 
-<!-- wp:pattern {"slug":"remote-leverage/hire-va-4-testimonials"} /-->
+    'value_title' => 'Scale smarter, faster, and compliantly.',
+    'value_paragraphs' => [
+        'Standing up global employment and payroll is only half the equation. The other half – finding specialized talent that can hit the ground running – is where most companies stall. Many lose weeks interviewing low-quality candidates only to overpay by filling the role domestically.',
+        'Remote Leverage removes the talent bottleneck. Oyster removes the employment one. Together, we provide the execution layer your business needs to hire fast and operate with confidence anywhere in the world.',
+    ],
+    'value_cards' => [
+        [
+            'img' => 'Frame-76-3.png',
+            'title' => 'Top-tier Latin American talent',
+            'desc' => 'Remote Leverage reviews 2,000+ applicants daily and forwards only the top 1% for U.S. businesses – tight time zone overlap, strong cultural alignment, and fluent English. Only the best make it to your inbox.',
+        ],
+        [
+            'img' => 'Frame-76-4.png',
+            'title' => 'Compliant employment in 180+ countries',
+            'desc' => 'Oyster acts as the legal employer. Employment agreements, statutory benefits, tax withholding, and local labor requirements are handled through Oyster’s own network of local entities, so you can hire in a new market without incorporating in it.',
+        ],
+        [
+            'img' => 'Frame-76-2-copy.png',
+            'title' => 'Direct hire. No ongoing markups.',
+            'desc' => 'Most staffing agencies pay their placements a fraction of what they charge you, every single month. Not us. You pay a one-time flat placement fee and hire the professional directly. Every hire comes with a 12-month replacement guarantee at no extra cost.',
+        ],
+        [
+            'img' => 'Frame-76-2.png',
+            'title' => 'One platform for payroll and people operations',
+            'desc' => 'Your new hire slots straight into Oyster. Run consolidated global payroll, manage expenses, time off, documents, and benefits, and give managers and finance the access levels they need, all from a single dashboard.',
+        ],
+    ],
 
-<!-- wp:pattern {"slug":"remote-leverage/hire-va-4-booking-footer"} /-->
+    'roles_title' => 'Beyond the “Virtual Assistant”',
+
+    'table_heading' => 'Remote Leverage × Oyster',
+    'table_rows' => [
+        ['Time to Hire', '4 - 8 weeks', '72 hrs'],
+        ['Vetting Quality', 'Hit or miss', 'Top 1% pre-screened'],
+        ['Ongoing fees', 'often 15-30% monthly markup', 'One-time flat fee only'],
+        ['Payroll & taxes', 'DIY or expensive local lawyer', 'Fully handled by Oyster'],
+        ['Compliance risk', 'High - misclassification, local laws', 'Zero - 170+ countries covered'],
+        ['Replacement guarantee', 'None', '6-months, no extra costs'],
+        ['Centralized reporting', 'Spreadsheets', 'Oyster dashboard'],
+    ],
+
+    'shortlist_desc' => 'Within 48 hours, we present you 4–6 candidates. You interview and hire your favorite.',
+    'onboarding_desc' => 'Your new hire is onboarded into Oyster as a full-time employee, with contracts, benefits, and payroll handled from day one.',
+
+    'final_title' => 'Ready to build your global team on compliant employment infrastructure?',
+    'final_paragraph' => 'Remote Leverage finds the talent. Oyster employs, pays, and supports them. Together, we give you everything you need to hire fast, operate confidently, and scale anywhere in the world – without a single unnecessary complication.',
+];
+
+include get_theme_file_path('resources/patterns/partner-landing.php');

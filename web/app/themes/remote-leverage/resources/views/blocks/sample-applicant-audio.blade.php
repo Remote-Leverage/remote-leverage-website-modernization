@@ -1,3 +1,4 @@
+{{-- Four-column grid of applicant voice auditions with inline audio players and a role filter. --}}
 <section class="w-full bg-[#F4F6FC] py-12 sm:py-16 lg:py-20">
     <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
         {{-- 4-Column Grid Matching 1:1 Production --}}

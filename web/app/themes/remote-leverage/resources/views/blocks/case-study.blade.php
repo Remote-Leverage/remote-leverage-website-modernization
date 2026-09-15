@@ -1,3 +1,5 @@
+{{-- Case study template body: dark hero band, then the study's prose, metrics and quotes. Rendered
+     from case_study post content. --}}
 @php
     $proseClasses = '[&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-black/70 [&_p]:leading-relaxed [&_p]:text-lg '
         .'[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-4 [&_ul]:space-y-2 [&_ul]:text-black/70 [&_ul]:text-lg '

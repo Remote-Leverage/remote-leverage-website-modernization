@@ -70,31 +70,17 @@ $uploads = home_url('/app/uploads/2026/09');
 
 <!-- wp:group {"align":"full","className":"min-h-[90vh] flex flex-col justify-center items-stretch","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}},"color":{"background":"#F9EAFF"}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
 <div class="wp-block-group alignfull has-background min-h-[90vh] flex flex-col justify-center items-stretch" style="padding-top:4rem;padding-bottom:4rem;background-color:#F9EAFF">
-    <!-- wp:html -->
-    <h2 class="w-full font-display text-3xl sm:text-4xl font-bold text-black tracking-[-0.03em] mb-4">How It Works</h2>
-    <p class="w-full text-black/80 leading-relaxed mb-10">Joining the program is simple. You can go from signing
-        up to earning your first commission in three steps:</p>
-    <svg class="w-full h-auto mb-14" width="1231" height="10" viewBox="0 0 1231 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M5 5.97583L1230 4.00002" stroke="black" stroke-linecap="round" />
-        <path d="M79 5H815" stroke="black" stroke-width="5" stroke-linecap="round" />
-        <path d="M5 5H400" stroke="black" stroke-width="10" stroke-linecap="round" />
-    </svg>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-card w-full divide-y sm:divide-y-0 sm:divide-x divide-black/15">
-        <div class="py-6 sm:py-8 sm:pr-8">
-            <h4 class="font-display text-lg font-bold text-black tracking-[-0.02em] mb-2">No Earning Caps:</h4>
-            <p class="text-sm text-black/70 leading-relaxed">The more you refer, the more you earn.</p>
-        </div>
-        <div class="py-6 sm:py-8 sm:px-8">
-            <h4 class="font-display text-lg font-bold text-black tracking-[-0.02em] mb-2">High Conversion:</h4>
-            <p class="text-sm text-black/70 leading-relaxed">We provide the “Top 1%” of talent at a 70% cost reduction.
-            </p>
-        </div>
-        <div class="py-6 sm:py-8 sm:pl-8">
-            <h4 class="font-display text-lg font-bold text-black tracking-[-0.02em] mb-2">Simple Payouts:</h4>
-            <p class="text-sm text-black/70 leading-relaxed">Direct payments for every successful placement.</p>
-        </div>
-    </div>
-    <!-- /wp:html -->
+    <?= \App\Support\BlockDefaults::renderProgressSteps(
+        [
+            'headline' => 'How It Works',
+            'subheadline' => 'Joining the program is simple. You can go from signing up to earning your first commission in three steps:',
+        ],
+        [
+            ['title' => 'No Earning Caps:', 'text' => 'The more you refer, the more you earn.'],
+            ['title' => 'High Conversion:', 'text' => 'We provide the “Top 1%” of talent at a 70% cost reduction.'],
+            ['title' => 'Simple Payouts:', 'text' => 'Direct payments for every successful placement.'],
+        ],
+    ) ?>
 </div>
 <!-- /wp:group -->
 

@@ -21,11 +21,17 @@ actually exists in the v2 database and codebase. **48 URLs in scope.**
 > v2 already contains some content that is *not* on the list (built before scope was
 > closed). It is inventoried in §4 and needs a keep/redirect/delete decision.
 
-**Last verified: 2026-09-14** — against the live local DB (`wp post list`), the theme's
+**Last verified: 2026-09-15** — against the live local DB (`wp post list`), the theme's
 Laravel routes, and `config/redirects.php`. Not hand-maintained: every row below was
 checked against the database on that date.
 
-Local DB totals at verification: **15 pages, 119 posts, 23 case studies, 1 partner.**
+Local DB totals at verification: **22 pages, 119 posts, 23 case studies, 3 partners.**
+
+> **What "migrated" means here (tightened 2026-09-15).** A row only counts as migrated when
+> the page is **visually 1:1 with production**, verified by screenshot diff — not when the
+> same sections and copy are present. Five rows previously counted as done had complete
+> content but invented layout; they were rebuilt against production's real design and
+> re-verified. See §6 for the method.
 
 > **Scope directive (2026-09-14):** everything on the transfer list gets migrated.
 > Earlier audit notes marking some of these as "dead", "test variant" or "confirmed
@@ -33,11 +39,11 @@ Local DB totals at verification: **15 pages, 119 posts, 23 case studies, 1 partn
 > The one exception is a genuine duplicate slug serving identical content, which is
 > handled by a codebase redirect rather than a rebuilt page (see §2).
 
-**Score: 14 of 48 migrated (29%). 34 remaining.**
+**Score: 21 of 48 migrated (44%). 27 remaining.**
 
 ---
 
-## 1. ✅ Migrated (14)
+## 1. ✅ Migrated (21)
 
 | # | Production URL | v2 implementation |
 |---|---|---|
@@ -55,6 +61,13 @@ Local DB totals at verification: **15 pages, 119 posts, 23 case studies, 1 partn
 | 42 | `/thank-you/` | 301 → `/vathankyou/` (page ID 126) — see §2 |
 | — | `/partners/` | `archive-rl_partner.blade.php` + `PartnerPostType` — template built; **content is the gap**, see P1 |
 | — | `/hire-va-4/` | page ID 1000000 → `patterns/hire-va-4-full.php` (migrated 2026-09-14) |
+| — | `/vacalendar/` | page ID 1000002 → `patterns/vacalendar-full.php` |
+| — | `/samples/` | page ID 1000005 → `patterns/samples-content.php` |
+| — | `/contractor-management/` | page ID 1000006 → `patterns/contractor-management.php` — rebuilt 1:1 2026-09-15 |
+| — | `/contractor-payments/` | page ID 1000007 → `patterns/contractor-payments.php` — rebuilt 1:1 2026-09-15 |
+| — | `/impact-report-2026/` | page ID 1000008 → `patterns/impact-report-2026.php` — rebuilt 1:1 2026-09-15 |
+| — | `/remote-leverage-x-oyster/` | page ID 1000009 → `patterns/remote-leverage-x-oyster.php` — rebuilt 1:1 2026-09-15 |
+| — | `/remote-leverage-x-lano/` | page ID 1000010 → `patterns/remote-leverage-x-lano.php` — rebuilt 1:1 2026-09-15 |
 
 ## 2. Duplicate slug resolved by redirect
 
@@ -73,51 +86,44 @@ so it ships with the code and survives a database refresh.
 
 ---
 
-## 3. ❌ Remaining (34), by priority
+## 3. ❌ Remaining (27), by priority
 
-### P0 — Broken destinations v2 already ships (5)
+### P0 — Broken destinations v2 already ships — ✅ CLEARED 2026-09-15
 
-Every one of these is already referenced from shipping v2 code, so the site currently
-points at its own 404s. **Fix first.** In each case migrating the page fixes the
-reference; no template change is needed, and nothing should be un-linked — the
-references are all correct against production.
+All five chrome-linked pages are built, so the site no longer points at its own 404s:
+`/vacalendar/`, `/samples/`, `/contractor-management/`, `/contractor-payments/`,
+`/impact-report-2026/`. `/hire-va-4/`, the target of the `hire-va-old` and
+`hire-virtual-assistant` 301s, was cleared 2026-09-14.
 
-**Linked from the site chrome (5):**
+Three of those five (`contractor-management`, `contractor-payments`, `impact-report-2026`)
+were first built with the right copy but invented layout, and were rebuilt against
+production's actual design on 2026-09-15. See §6.
 
-| Page | Linked from |
-|---|---|
-| `/vacalendar/` | `resources/views/sections/header.blade.php:106`, `:120`, `:177` |
-| `/samples/` | `resources/views/sections/header.blade.php:50`, `:170` |
-| `/contractor-management/` | `resources/views/sections/footer.blade.php:59` |
-| `/contractor-payments/` | `resources/views/sections/footer.blade.php:60` |
-| `/impact-report-2026/` | `resources/views/sections/footer.blade.php:85` |
-
-**Target of a live 301 redirect — ✅ resolved 2026-09-14:**
-
-`/hire-va-4/` is **migrated** (page ID 1000000, rendering `patterns/hire-va-4-full.php`).
-`hire-va-old` and `hire-virtual-assistant` both 301 to it and land on a 200; verified
-end-to-end against `remoteleverage-v2.test`. See §1.
-
-### P1 — Partnerships (5)
+### P1 — Partnerships (3 remaining)
 
 **Resolved 2026-09-14: the standalone landing pages and the partner hub are both kept.**
 They serve different jobs — the `/remote-leverage-x-*/` pages are marketing pages *about*
 a partnership, the hub is the partner directory — so neither folds into the other.
 
-**Standalone landing pages (2)** — on the transfer list, must not be folded into `/partners/{slug}/`:
+**Standalone landing pages — ✅ done 2026-09-15.** `/remote-leverage-x-oyster/` and
+`/remote-leverage-x-lano/` are built from `resources/patterns/partner-landing.php`, a shared
+template the two thin pattern files supply copy and brand colour to. Rebuilt 1:1 against
+production the same day.
 
-- `/remote-leverage-x-oyster/`
-- `/remote-leverage-x-lano/`
+They deliberately **do not** use production's partner-blue palette: per direction on
+2026-09-15 they use theme tokens instead (Oyster `brand-purple-deep → brand-dark-violet`,
+Lano `brand-navy → brand-midnight`), the shared world map rather than production's globe
+graphic, and a transparent white header over the hero.
 
-**Partner hub entries (3)** — added to scope 2026-09-14. Templates
-(`archive-rl_partner.blade.php`, `single-rl_partner.blade.php`, `PartnerPostType`) are
-already built, so this is content work only:
+**Partner hub entries (3)** — templates (`archive-rl_partner.blade.php`,
+`single-rl_partner.blade.php`, `PartnerPostType`) are built, so this is content work only.
+All three entries now exist but are one-line placeholders (~70 chars each):
 
 | Entry | Local state | Production |
 |---|---|---|
-| `/partners/oyster/` | exists (ID 122) but **66 chars — a stub** | live, 200 |
-| `/partners/lano/` | missing | *(no `rl_partner` entry on production)* |
-| `/partners/lexgo/` | missing | live, 200 |
+| `/partners/oyster/` | exists (ID 122) — **stub, 66 chars** | live, 200 |
+| `/partners/lano/` | exists (ID 1000012) — **stub, 69 chars** | *(no `rl_partner` entry on production)* |
+| `/partners/lexgo/` | exists (ID 1000011) — **stub, 71 chars** | live, 200 |
 
 Note the asymmetry: production carries Oyster + Lexgo as `rl_partner` entries and
 Oyster + Lano as landing pages. **Lano has no production hub entry and Lexgo has no
@@ -264,7 +270,34 @@ returning 200 for any path below it. Root-level paths 404 correctly. Any future 
 check must calibrate against a known-bad URL before trusting a 200; this already produced one
 false positive (`/tools/signature-generator`) during the 2026-09-14 audit.
 
-## 5. Open questions
+## 5. How a page is verified (added 2026-09-15)
+
+Content parity is not visual parity. A page counts as migrated only after a screenshot diff
+against production, because heading-level checks pass happily on a page whose layout was
+invented.
+
+1. **Capture both sides** with Playwright + Chrome (`channel: 'chrome'`) at 1440px. Force
+   `img.loading = 'eager'` and scroll the full page *before* capturing — lazy images and lazy
+   CSS backgrounds otherwise read as missing, which produced two wrong conclusions in the
+   2026-09-15 session (a section called "broken on production" that simply had a lazy
+   background, and images reported absent that were merely below the fold).
+2. **Read design tokens off production** with `getComputedStyle` — font sizes, letter-spacing,
+   section background colours and gradients — rather than estimating them from a screenshot.
+3. **Confirm a section is actually visible** before reproducing it. `contractor-management`
+   ships two sections on production (`One source of truth for your entire workforce`,
+   `Use everything, or only what you need`) that are `display:none` at every breakpoint; they
+   are intentionally absent from v2.
+4. **Compare page heights** as a cheap regression signal, then review the side-by-side panels.
+   Current: contractor-payments 94%, contractor-management 92%, impact-report 109%,
+   oyster 93%, lano 91% of production height. The residual is mostly the v2 footer differing
+   from production's.
+
+Known-benign differences that will always show up in a heading-level diff: hero stat values
+render as non-headings in v2 blocks, step numerals render as spans, Calendly embed headings
+are absent until the widget loads, and Elementor concatenates its A/B headline variants into
+one DOM node.
+
+## 6. Open questions
 
 1. ~~**The partner hub and Lexgo**~~ — **resolved 2026-09-14**: both the
    `/remote-leverage-x-*/` landing pages and `/partners/` are kept. Lexgo rides the hub
@@ -280,3 +313,13 @@ false positive (`/tools/signature-generator`) during the 2026-09-14 audit.
 5. **Affiliate Program "How It Works"** — shows the same three cards duplicated from the
    section above instead of real steps. Exists on production too, so left alone pending a
    copy decision. Moot if `/affiliate-program/` is dropped under §4a.
+6. **`public/images/` is gitignored** — 46MB of hand-maintained page imagery that nothing
+   tracks. The Sync domain only transfers the WP uploads directory, so a fresh clone loses
+   every image on `contractor-management`, `samples`, `hire-va-4`, the homepage and the pages
+   rebuilt on 2026-09-15. Needs an un-ignore decision or a different home.
+7. **The Impact Report download form is not wired.** `acf/impact-report-hero` renders the
+   gated name/email capture, but `form_action` is empty — production posts to a gated
+   download this project has no endpoint for yet. Needs a Lead domain endpoint and the
+   actual PDF.
+8. **Partner hub entries are stubs.** All three `rl_partner` entries exist but hold a single
+   placeholder sentence. Content work, not template work — see §3 P1.

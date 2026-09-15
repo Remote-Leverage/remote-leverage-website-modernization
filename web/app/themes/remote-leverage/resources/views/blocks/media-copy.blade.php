@@ -1,6 +1,7 @@
 {{-- Image one side, heading + rich copy + CTA the other. Type from the shared
      `section` / `card` tokens; the CTA matches production's black pill. --}}
-<section class="w-full bg-bg-light py-14 lg:py-20">
+@php $isDark = ($tone ?? 'light') === 'dark'; @endphp
+<section @class(['w-full py-14 lg:py-20', 'bg-bg-light' => ! $isDark, 'bg-brand-dark-violet' => $isDark])>
     <div class="w-full px-4 sm:px-6 lg:px-8">
         <div class="rl-container">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 lg:items-center">
@@ -14,7 +15,7 @@
 
                 <div @class(['flex flex-col', 'lg:order-1' => $imagePosition === 'right'])>
                     @if ($headline)
-                        <h2 class="font-display font-bold text-black text-3xl sm:text-4xl lg:text-section mb-6">
+                        <h2 @class(['font-display font-bold text-3xl sm:text-4xl lg:text-section mb-6', 'text-black' => ! $isDark, 'text-white' => $isDark])>
                             {!! $headline !!}
                         </h2>
                     @endif

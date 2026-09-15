@@ -23,6 +23,13 @@ class VacalendarHeroBlock extends Block
 
     public $view = 'blocks.vacalendar-hero';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => ['is_preview' => true],
+        ],
+    ];
+
     public $supports = [
         'align' => ['full', 'wide'],
     ];

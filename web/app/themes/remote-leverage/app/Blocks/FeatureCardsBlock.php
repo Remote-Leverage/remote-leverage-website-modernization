@@ -40,6 +40,13 @@ class FeatureCardsBlock extends Block
 
         return [
             'columns' => $columns,
+            // Production uses several card image ratios across pages; `ratio` lets a pattern
+            // pick one without forking the card markup. Empty falls back to the column default.
+            'ratio' => (string) ((function_exists('get_field') ? get_field('ratio') : null) ?: ''),
+            // Production ships two card treatments: 'inset' (homepage — image padded inside
+            // the card) and 'flush' (product/report pages — image bleeds to the card edges
+            // with a larger title). Default stays 'inset' so existing callers are unchanged.
+            'variant' => (string) ((function_exists('get_field') ? get_field('variant') : null) ?: 'inset'),
             'cards' => $this->cards($columns),
         ];
     }
@@ -52,10 +59,25 @@ class FeatureCardsBlock extends Block
             ->addSelect('columns', [
                 'label' => 'Columns Layout',
                 'choices' => [
+                    '1' => '1 Column (stacked, pairs with the horizontal variant)',
                     '3' => '3 Columns (6 Benefit Cards)',
                     '4' => '4 Columns (4 Metric Cards)',
                 ],
                 'default_value' => '3',
+            ])
+            ->addSelect('variant', [
+                'label' => 'Card Treatment',
+                'choices' => [
+                    'inset' => 'Inset image (default)',
+                    'flush' => 'Image flush to card edges',
+                    'horizontal' => 'Text left, image right',
+                ],
+                'default_value' => 'inset',
+            ])
+            ->addText('ratio', [
+                'label' => 'Card Image Ratio',
+                'instructions' => 'Optional, as width/height (e.g. 413/152). Leave empty to use the column default.',
+                'placeholder' => '413/152',
             ])
             ->addRepeater('cards', [
                 'label' => 'Custom Cards (Leave empty to use preset defaults)',

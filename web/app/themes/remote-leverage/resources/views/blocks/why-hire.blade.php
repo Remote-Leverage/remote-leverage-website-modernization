@@ -1,3 +1,5 @@
+{{-- 'Why hire through us' band: section heading over four icon cards on a pale surface, with a
+     globe graphic. --}}
 @php
   use App\Support\BlockDefaults;
 

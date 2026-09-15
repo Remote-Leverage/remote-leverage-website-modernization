@@ -24,6 +24,13 @@ class SampleApplicantAudioBlock extends Block
 
     public $view = 'blocks.sample-applicant-audio';
 
+    public $example = [
+        'attributes' => [
+            'mode' => 'preview',
+            'data' => ['is_preview' => true],
+        ],
+    ];
+
     public $supports = [
         'align' => ['full', 'wide'],
     ];

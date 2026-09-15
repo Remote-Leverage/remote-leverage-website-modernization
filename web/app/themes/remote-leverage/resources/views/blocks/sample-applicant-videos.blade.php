@@ -1,3 +1,4 @@
+{{-- Stacked cards of candidate video introductions with play overlays and durations. --}}
 <section class="w-full bg-[#F4F6FC] py-12 sm:py-16 lg:py-20">
     <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
         {{-- Video Cards Stack Matching 1:1 Production (No extra title or subtitle) --}}

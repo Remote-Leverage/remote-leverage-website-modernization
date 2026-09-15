@@ -1,3 +1,5 @@
+{{-- Full-bleed talent photo banner with an overlaid one-line statement and an optional video
+     trigger. Fixed 320-440px tall band. --}}
 <div class="relative w-full h-[320px] sm:h-[380px] lg:h-[440px] bg-[#250D4A] overflow-hidden flex items-center justify-center">
     {{-- Background Image: Talent Grid --}}
     @if (! empty($backgroundImage))

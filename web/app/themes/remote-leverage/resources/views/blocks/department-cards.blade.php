@@ -1,3 +1,5 @@
+{{-- Role/department cards: a four-across grid of photo-backed cards with a frosted overlay and
+     white title + description sitting at the bottom. --}}
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-card">
     @foreach ($cards as $sp)
         <div class="rl-department-card min-h-105">

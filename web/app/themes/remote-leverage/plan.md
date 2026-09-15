@@ -190,7 +190,7 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 - [x] **`BookingBlock`** (`booking.blade.php`)
   - Replaces: `HeadlessCalendlyMultistepWidget`, `GoogleCalendarMultistepWidget`, `IsolatedFieldsHeadlessCalendlyMultistepWidget`.
   - Features: Embeds `MultistepBookingWizard` without iframes.
-- [x] **`LiveCallBlock`** (`live-call.blade.php`)
+- [x] ~~**`LiveCallBlock`** (`live-call.blade.php`)~~ — **deleted 2026-09-15**, unused in code and DB; live-call is the `/live-call/connect` route, not a block
   - Replaces: `JoinLiveCallWidget`.
   - Features: Embeds `InstantLiveCallButton` with real-time presence polling.
 - [x] **`TestimonialsBlock`** (`testimonials.blade.php`)
@@ -202,7 +202,7 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 - [x] **`ProcessStepsBlock`** (`process-steps.blade.php`)
   - Replaces: `ProcessStepsWidget`, `HiringProcessWidget`.
   - Features: SVG stepper timeline with responsive collapse.
-- [x] **`BenefitsGuaranteeBlock`** (`benefits-guarantee.blade.php`)
+- [x] ~~**`BenefitsGuaranteeBlock`** (`benefits-guarantee.blade.php`)~~ — **deleted 2026-09-15**, no code or database usage
   - Replaces: `BenefitsSectionWidget`, `GuaranteeSectionWidget`.
   - Features: Inline SVG badges and satisfaction guarantee callouts.
 - [x] **`AccordionFaqBlock`** (`accordion-faq.blade.php`)
@@ -245,7 +245,7 @@ Phased execution roadmap for the **Remote Leverage Website Modernization** proje
 - [x] **Webhook QA**
   - Test Stripe Connect `account.updated` and payout transfers (`StripeWebhookTest`).
   - Test Calendly `invitee.created` booking payload ingestion (`CalendlyWebhookTest`).
-  - QA Runbook compiled in [`docs/qa-attribution-webhooks.md`](file:///Users/adriansalvatori/Documents/projects-rl/remoteleverage-v2/web/app/themes/remote-leverage/docs/qa-attribution-webhooks.md).
+  - QA Runbook compiled in [`docs/qa-attribution-webhooks.md`](docs/qa-attribution-webhooks.md).
 
 ---
 

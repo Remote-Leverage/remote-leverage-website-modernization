@@ -41,6 +41,9 @@ class TalentGridBlock extends Block
     {
         return [
             'cards' => $this->cards(),
+            // 'row' matches the partner landing pages, where production shows one
+            // horizontally scrolling row instead of the default wrapping grid.
+            'layout' => (string) ((function_exists('get_field') ? get_field('layout') : null) ?: 'grid'),
         ];
     }
 
@@ -49,6 +52,11 @@ class TalentGridBlock extends Block
         $fields = Builder::make('talent_grid_block');
 
         $fields
+            ->addSelect('layout', [
+                'label' => 'Layout',
+                'choices' => ['grid' => 'Wrapping grid (4 across)', 'row' => 'Single scrolling row'],
+                'default_value' => 'grid',
+            ])
             ->addRepeater('talent_cards', [
                 'label' => 'Talent Cards (Leave empty for default 8 cards)',
                 'layout' => 'block',
@@ -82,7 +90,7 @@ class TalentGridBlock extends Block
                 if ($srcset) {
                     $card['bg_srcset'] = preg_replace_callback(
                         '/(\S+)(?=\s+\d+w)/',
-                        fn ($m) => BlockDefaults::preferWebp($m[1]),
+                        fn($m) => BlockDefaults::preferWebp($m[1]),
                         $srcset,
                     );
                     $card['bg_sizes'] = '(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw';

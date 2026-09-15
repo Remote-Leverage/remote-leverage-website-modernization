@@ -1,3 +1,5 @@
+{{-- About page hero: dark #250D4A band with ambient purple glows, eyebrow badge, headline,
+     subtitle, CTA button and a globe graphic, over a 'trusted by' strip. --}}
 <div class="relative w-full bg-[#250D4A] overflow-hidden">
     {{-- Subtle background glow effects --}}
     <div class="absolute -top-40 right-10 w-96 h-96 bg-[#8A2BE2]/20 rounded-full blur-[140px] pointer-events-none"></div>

@@ -40,16 +40,17 @@ class RolesCarouselBlock extends Block
     public function with(): array
     {
         $hasGetField = function_exists('get_field');
-        $field = fn (string $key) => $hasGetField ? get_field($key) : null;
+        $field = fn(string $key) => $hasGetField ? get_field($key) : null;
 
         $cards = array_values(array_filter(
             (array) ($field('cards') ?: []),
-            fn ($c) => ! empty($c['title'])
+            fn($c) => ! empty($c['title']),
         ));
 
         return [
             'headline' => BlockDefaults::cleanText($field('headline') ?: ''),
-            'cards' => array_map(fn ($c) => [
+            'subheadline' => BlockDefaults::cleanText($field('subheadline') ?: ''),
+            'cards' => array_map(fn($c) => [
                 'icon' => BlockDefaults::resolveImageUrl($c['icon'] ?? ''),
                 'title' => BlockDefaults::cleanText($c['title'] ?? ''),
                 'text' => $c['text'] ?? '',
@@ -63,6 +64,7 @@ class RolesCarouselBlock extends Block
 
         $fields
             ->addTextarea('headline', ['label' => 'Headline', 'rows' => 2])
+            ->addTextarea('subheadline', ['label' => 'Subheadline', 'rows' => 2])
             ->addRepeater('cards', ['label' => 'Cards', 'button_label' => 'Add card', 'min' => 1])
             ->addImage('icon', ['label' => 'Icon', 'return_format' => 'url'])
             ->addTextarea('title', ['label' => 'Title', 'rows' => 2, 'instructions' => 'Inline <br> allowed.'])

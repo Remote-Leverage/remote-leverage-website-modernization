@@ -1,3 +1,4 @@
+{{-- Roles with pricing: per-role cards listing typical tasks, tools and an hourly rate band. --}}
 <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
     @if (! empty($headline))
         <h2 class="font-display text-3xl sm:text-4xl font-bold text-black tracking-[-0.03em] leading-tight mb-10 text-center">

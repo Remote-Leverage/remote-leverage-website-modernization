@@ -156,11 +156,13 @@ scratch. Without recommendations these will sit.
   for it.
 - **`e-landing-page` CPT (2 entries)** has no equivalent post type in v2 and no
   decision recorded anywhere.
-- **`/remote-leverage-x-oyster/` and `/remote-leverage-x-lano/`** standalone
-  pages — still unresolved whether they fold into the partner hub. Note "Lano"
-  is a third partner name that appears nowhere else in the audit (only Oyster
-  and Lexgo exist as `rl_partner`), so this may be a dead page or a missing
-  partner record.
+- ~~**`/remote-leverage-x-oyster/` and `/remote-leverage-x-lano/`** standalone
+  pages~~ — **resolved 2026-09-14/15.** They are kept separate from the hub (a
+  marketing page *about* a partnership is not a directory entry), and both were
+  built 2026-09-15 from the shared `resources/patterns/partner-landing.php`. Lano
+  now also exists as an `rl_partner` entry, so all three hub records (Oyster, Lano,
+  Lexgo) are present — though all three are still one-line stubs. See
+  [`PAGE-MIGRATION-STATUS.md`](../../../../../PAGE-MIGRATION-STATUS.md) §3 P1.
 - **`plan.md` progress is badly out of date** — Phases 3–8 all read `0%
   Completed`, but Phase 5 (Gutenberg blocks) has 28 blocks built and Phase 6
   (Blade templates) is clearly well underway. Whoever reads `plan.md` for

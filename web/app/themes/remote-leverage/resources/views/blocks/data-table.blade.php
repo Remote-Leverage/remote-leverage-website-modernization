@@ -1,3 +1,5 @@
+{{-- Feature-by-feature comparison rows: a header row of two column names, then white rounded rows
+     with a red ✗ against DIY and a green ✓ against Remote Leverage. --}}
 <div class="flex flex-col gap-3 mb-20 sm:mb-24 w-full">
     {{-- Header Row --}}
     <div

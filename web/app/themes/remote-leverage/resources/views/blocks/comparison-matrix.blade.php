@@ -1,3 +1,5 @@
+{{-- Competitor comparison: two pill-headed cards side by side (Remote Leverage vs a named
+     competitor), each with title and two supporting lines over a photo. --}}
 @php
   use App\Support\BlockDefaults;
 

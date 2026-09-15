@@ -354,7 +354,9 @@ gantt
 ### Sprint 1: Foundation & Core Domain Architecture (Days 1–5)
 - Scaffold fresh clean Bedrock repository, Sage 11, Acorn 5, Livewire 4, and Tailwind CSS v4.
 - Map brand tokens (`League Spartan`, `Inter Variable`, `Poppins`, `#0d6efd`, dark slate).
-- Build the global Blade shell ([header.blade.php](file:///Users/adriansalvatori/Documents/projects-rl/rl-testing/web/app/themes/alma/resources/views/sections/header.blade.php) and [footer.blade.php](file:///Users/adriansalvatori/Documents/projects-rl/rl-testing/web/app/themes/alma/resources/views/sections/footer.blade.php)).
+- Build the global Blade shell (`sections/header.blade.php` and `sections/footer.blade.php`).
+  <!-- Originally linked to the `alma` theme in the separate `rl-testing` repo, by absolute path
+       on one machine. Left as plain references: that repo is not part of this project. -->
 - Migrate `Referral`, `Scheduling`, and `Tracking` bounded contexts into `app/Domains/`.
 - Deploy centralized `TrackingServiceProvider` (GTM, LinkedIn Insight, Meta Pixels, HandL UTMs).
 

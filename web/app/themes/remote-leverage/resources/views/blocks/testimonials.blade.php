@@ -1,3 +1,5 @@
+{{-- Client review wall: a grid of video testimonial cards with play buttons, quote and company
+     attribution, opening in a modal. --}}
 <div x-data="{
     activeVideo: null,
     openModal(url) {

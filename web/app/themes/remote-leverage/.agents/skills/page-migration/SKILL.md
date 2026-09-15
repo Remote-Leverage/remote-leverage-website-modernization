@@ -136,11 +136,56 @@ Before writing any Blade template or registering any block, compile and print th
 
 ---
 
-### Phase 2: Bespoke Block Modeling (No Sloppy Slotting)
+### Phase 2: Block Selection — Search Before You Build (MANDATORY)
 
-- **Do NOT shoehorn content into generic theme blocks** if the visual topology does not match 100%.
-- If a section has a bespoke layout (e.g. Bento grid, Asymmetric split with bleeding globe, Unified single-box comparison, Frosted glass footer card), **create a dedicated code-first ACF Block** (`Log1x\AcfComposer\Block`) with a dedicated Blade template.
-- Blade allows full expression of Tailwind CSS v4, custom grid spans, exact background tints, and image positioning without fighting Gutenberg's block validation.
+The theme ships 40+ blocks. Most production sections are already modelled by one. Building a
+second copy forks the design system and means a fix to the block never reaches the duplicate.
+
+**Work down this ladder. You may only move to the next rung after ruling out the one above,
+and you must record what you ruled out.**
+
+1. **Reuse an existing block as-is.** Start by reading `docs/block-inventory.md` — it maps
+   every block to the production section it renders, with its fields and current usages.
+   Then confirm against the source:
+
+   ```bash
+   # The view comments name the production sections they reproduce.
+   grep -rn "Production" resources/views/blocks/*.blade.php
+
+   # See how a real full page composes blocks before authoring a new one.
+   grep -oE "acf/[a-z0-9-]+" patterns/comparison-full.php | sort -u
+   ```
+
+2. **Extend the block with an option.** If production shows a *variant* of something that
+   already exists, add a field to the block (a `variant`, `layout`, `ratio` select) and
+   default it to today's behaviour. Production having two treatments of a card is not a
+   reason for two card implementations — see `acf/feature-cards` (`inset` / `flush`) and
+   `acf/talent-grid` (`grid` / `row`).
+
+3. **Create a new block.** Only for a genuinely new shape. Code-first
+   (`Log1x\AcfComposer\Block`) with a Blade view, and open the view with a comment naming
+   the production section it reproduces — that comment is what feeds the inventory and what
+   the next person greps for.
+
+4. **Inline markup in a pattern — last resort.** Acceptable only for a one-off composition
+   that will never recur (a page-specific hero). It must carry:
+
+   ```php
+   // @bespoke: <blocks you checked and why none fit>
+   ```
+
+   `tests/Unit/PatternBlockReuseTest.php` fails the build on hand-written card/grid markup
+   without this annotation. Do not add the annotation to silence the test — it is a record
+   that you searched, and it is read in review.
+
+After the page is built, regenerate the inventory so the new usages are indexed:
+
+```bash
+wp acorn blocks:inventory
+```
+
+**Anti-pattern this replaces:** judging a block against a single page, discarding it, and never
+reconsidering it for later pages. Re-check the inventory per section, not per project.
 
 ---
 

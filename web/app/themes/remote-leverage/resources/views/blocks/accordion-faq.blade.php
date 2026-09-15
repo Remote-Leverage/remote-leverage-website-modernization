@@ -1,3 +1,5 @@
+{{-- FAQ accordion split into two balanced columns of question/answer rows, with Schema.org FAQPage
+     structured data emitted automatically. --}}
 <div class="w-full px-4 sm:px-6 lg:px-8 pt-12">
     <div class="rl-container">
     @if (! empty($headline))

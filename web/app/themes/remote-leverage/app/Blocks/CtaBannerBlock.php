@@ -42,6 +42,8 @@ class CtaBannerBlock extends Block
             'globeImage' => get_field('globe_image') ?: null,
             'ctaText' => get_field('cta_text') ?: 'Book Your 15-Minute Strategy Call',
             'ctaUrl' => get_field('cta_url') ?: '#booking-wizard',
+            // 'band' is production's flat centred CTA strip; 'card' is the gradient panel.
+            'variant' => get_field('variant') ?: 'card',
         ];
     }
 
@@ -67,6 +69,11 @@ class CtaBannerBlock extends Block
             ->addText('cta_text', [
                 'label' => 'CTA Button Text',
                 'default_value' => 'Book Your 15-Minute Strategy Call',
+            ])
+            ->addSelect('variant', [
+                'label' => 'Style',
+                'choices' => ['card' => 'Gradient card (default)', 'band' => 'Flat centred band'],
+                'default_value' => 'card',
             ])
             ->addUrl('cta_url', [
                 'label' => 'CTA Link URL',

@@ -1,3 +1,6 @@
+{{-- Numbered process timeline: a horizontal rule with a dot per step, an oversized numeral above
+     each, and a centred title + description below. Production uses it for 3-step 'how it works'
+     bands. --}}
 <div class="rl-process-container w-full">
     <div class="rl-process-line"></div>
     <div class="rl-process-grid">
