@@ -37,7 +37,7 @@ Registered in order by `DomainServiceProvider::$providers`:
 | `TrackingServiceProvider` | PostHog + Customer.io clients; `LeadCreated` → tracking identify; `TrackingHooks` script injection |
 | `LeadServiceProvider` | The event hub — nine `Event::listen` registrations plus the hourly abandoned-lead cron |
 | `ContentAuditServiceProvider` | Elementor audit/convert services and their commands |
-| `LivewireServiceProvider` | Component namespace, view path, and 14 component aliases (7 components × 2 names) |
+| `LivewireServiceProvider` | Component namespace, view path, and 6 component aliases — one name each since the duplicate registration was removed on 2026-09-15 |
 | `RouteServiceProvider` | Loads `routes/web.php` (web middleware) and `routes/api.php` (api middleware, `/api` prefix) |
 | `SyncServiceProvider` | Sync abilities, commands, `EnvironmentSyncAdmin` |
 | `AiServiceProvider` | MCP landing-page abilities |
@@ -77,17 +77,20 @@ flowchart TB
 - The legacy 301 map is applied by calling `LegacyRedirectMiddleware::handle()` from a `template_redirect` hook in `app/setup.php`, not by registering it in a middleware group.
 - `ReferralAttributionMiddleware` is registered in `ReferralServiceProvider`, but only affects Acorn-routed requests; the cookie is also set on ordinary page loads through the same hook pattern.
 
-Acorn routes (`routes/web.php`) are genuinely separate application pages: `/book-consultation`, `/live-call/connect`, `/referrer-portal`, `/referrer-register`, `/referral-dashboard`, `/social-media-kit`. Webhooks live at `/api/webhooks/stripe` and `/api/webhooks/calendly`, with `/api/health` for load-balancer checks.
+Acorn routes (`routes/web.php`) are genuinely separate application pages: `/book-consultation`, `/book`, `/live-call/connect`, `/referrer-portal`, `/referrer-register`, `/referral-dashboard`, `/partner-dashboard`, `/partners`, `/social-media-kit` (the last mounted from `SocialKit::SLUG`, not a literal). `routes/api.php` carries `/api/webhooks/stripe` and `/api/webhooks/calendly`, `/api/payments/intent` (Stripe PaymentIntent), `/api/leads/gated-download`, and `/api/health` for load-balancer checks.
 
 ## 3. Layering
 
 ```
 Application/            ← delivery: what a user or an external system touches
-├── Livewire/           7 components — hold UI state, call domain actions
-├── Http/Controllers/   2 webhook controllers
-└── Http/Middleware/    attribution, legacy redirects, PostHog redirects
+├── Livewire/           6 components — hold UI state, call domain actions
+├── Http/Controllers/   4 — Calendly + Stripe webhooks, PaymentIntent, GatedDownload
+└── Http/Middleware/    attribution, legacy redirects, PostHog redirects, missing-path 404
 
 Domains/<Context>/      ← the business logic, framework-light
+                        8 contexts: ContentAudit · Lead · PartnerHub · Payment ·
+                        Referral · Scheduling · Sync · Tracking
+                        (Payment has no service provider — its services resolve directly)
 ├── Actions/            one public method, the unit of work
 ├── Data/               readonly DTOs crossing the boundary
 ├── Events/             past-tense facts
@@ -100,7 +103,7 @@ Domains/<Context>/      ← the business logic, framework-light
 Infrastructure/         ← the WordPress and framework edges
 ├── Providers/          wiring
 ├── Database/Migrations 12 migrations
-├── WordPress/Admin/    10 admin classes
+├── WordPress/Admin/    11 admin classes
 ├── WordPress/PostTypes rl_partner, case_study
 ├── WordPress/Hooks/    TrackingHooks
 └── Console/Commands/   rl:deploy
@@ -260,6 +263,6 @@ It controls indexing only — a noindex page is still served to anyone holding t
 
 ## 8. Testing
 
-672 Pest tests, 2525 assertions, in `tests/Unit` and `tests/Feature` (2026-09-15). `tests/stubs.php` and `tests/bootstrap.php` provide WordPress function stubs so the suite runs with **no WordPress and no database** — which is why it is fast (~8s) and why it can gate every PR in CI.
+774 Pest tests, 3677 assertions, in `tests/Unit` (58 files) and `tests/Feature` (6 files) (2026-09-15). `tests/stubs.php` and `tests/bootstrap.php` provide WordPress function stubs so the suite runs with **no WordPress and no database** — which is why it is fast (~8s) and why it can gate every PR in CI.
 
 That also bounds what it can prove: it verifies domain logic, DTOs, attribution, block/pattern grammar and sync mechanics, not real WordPress integration. There is no browser or visual-regression layer (WR-103, deliberately not built — see [adr-status.md](adr-status.md)).

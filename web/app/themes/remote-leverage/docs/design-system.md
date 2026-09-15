@@ -180,7 +180,9 @@ Notes worth knowing:
 
 ## Patterns
 
-53 patterns in `patterns/`, registered under five categories (`app/setup.php`):
+102 patterns in `patterns/`, registered under five categories (`app/setup.php`). A further 11 shared
+partials live in `resources/patterns/` — they are *not* registered as patterns (WordPress scans
+`patterns/` recursively and rejects headerless files there), so they are `include`d directly:
 
 | Category | Slug |
 | :--- | :--- |
@@ -194,7 +196,7 @@ Every pattern is **pre-hydrated** — block attributes carry real content, so in
 
 The naming convention carries meaning:
 
-- **`*-full.php`** — a complete page. `about-full`, `reviews-full`, `vapricing-full`, `affiliate-full`, `comparison-full`, `comparison-wing-full`, `comparison-wing-ads-full`, `comparison-athena-full`, `hire-va-4-full`, `full-homepage`. These are the unit of page authoring: build the page as a `-full` pattern in git, then apply it.
+- **`*-full.php`** — a complete page. Twelve of them: `about-full`, `affiliate-full`, `comparison-athena-full`, `comparison-full`, `comparison-wing-ads-full`, `comparison-wing-full`, `hire-for-less-full`, `hire-va-4-full`, `reviews-full`, `spanish-full`, `vacalendar-full`, `vapricing-full` — plus `full-homepage.php`, which predates the convention. These are the unit of page authoring: build the page as a `-full` pattern in git, then apply it. Most of the other ~90 patterns are whole pages too, named after their slug (`services`, `store`, `sales-talents`, `impact-report-2026`, …) rather than carrying the `-full` suffix.
 - **`<page>-<section>.php`** — a section carrying that page's copy override, used when production copy diverges from the sitewide default (for example `reviews-guarantee-6mo` is the 6-month guarantee, while `vapricing`'s own is 12-month).
 - **Bare section names** (`hero`, `client-logos`, `process-steps`, `trust-and-impact`, `booking-footer`, `testimonials-video-modal`, `replacement-guarantee`, `worlds-best-talent`, `why-companies-choose`, `beyond-virtual-assistant`) — sitewide-default sections, reusable anywhere.
 - **`guide-*.php`** — editorial furniture: table of contents, key takeaways, author bio, related articles.
@@ -216,13 +218,14 @@ resources/views/
 ├── archive-rl_partner.blade.php     Partner directory
 ├── single-rl_partner.blade.php      Co-branded partner hub (9 tabs)
 ├── pages/                           Acorn-routed pages: book-consultation, referrer-portal,
-│                                    referrer-register, signature-generator
-├── blocks/                          One view per ACF block
+│                                    referrer-register, social-media-kit
+├── blocks/                          One view per ACF block (56)
 ├── livewire/                        One view per Livewire component
+├── forms/                           Shared form partials
+├── layouts/                         app, and the layout chrome
 ├── sections/                        header, footer, sidebar
 ├── partials/                        content, entry-meta, page-header, comments, …
-├── components/                      alert
-└── signatures/                      sig-1|2|3 × light|dark (static HTML)
+└── components/                      alert
 ```
 
 `template-legal.blade.php` is worth calling out as the pattern to copy when content should stay ordinary editable Gutenberg rich text rather than becoming a block: it derives its anchors and sticky table of contents at render time from the `h2`s in the content (`App\Support\DocumentOutline`), so adding a section to a legal document adds it to the navigation for free — nothing is duplicated into fields.
@@ -231,11 +234,17 @@ resources/views/
 
 | Class | Does |
 | :--- | :--- |
-| `BlockDefaults` | Centralised demo content, attachment mapping, sanitisation |
+| `BlockDefaults` | Centralised demo content, attachment mapping, sanitisation, `pageImg()`/`themeImg()`/`preferWebp()` |
+| `CaseStudySubnav` | The CASE STUDIES / TALENT PROFILES / REVIEWS bar; `surfaces()` matches `is_singular('case_study')` and nothing else |
 | `DocumentOutline` | Heading extraction → anchors + TOC (used by the legal template) |
+| `HeaderMode` | Derives whether the header floats transparently over a dark hero, from the pattern the page references |
 | `MediaLibrary` | Attachment lookup helpers for blocks |
+| `PageChrome` | Decides which header a page gets — the hire-va landing pages suppress the site nav, since `acf/hire-va-hero` renders its own bar |
+| `PageRobots` | Per-page `noindex`, opted into by a marker emitted in the page's pattern |
 | `Pattern` | Pattern registration helpers |
 | `ReadingTime` | Article reading-time estimate |
+| `ResponsiveImage` | `srcset`/`sizes`/width/height for **media-library** attachments (the uploads/EFS pipeline, not `resources/images/pages`) |
+| `SocialKit` | Data layer ported from the `rl-social-kit` plugin, behind `/social-media-kit/` |
 
 ## Front-end behaviour
 

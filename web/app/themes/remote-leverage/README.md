@@ -11,17 +11,19 @@ All documentation: [`docs/`](docs/README.md).
 app/
 ├── Ai/                 MCP-callable landing-page abilities
 ├── Application/        Livewire components · HTTP controllers · middleware
-├── Blocks/             38 ACF Composer blocks (Blade views in resources/views/blocks)
-├── Domains/            7 bounded contexts — the business logic
+├── Blocks/             56 ACF Composer blocks (Blade views in resources/views/blocks)
+├── Domains/            8 bounded contexts — the business logic
 ├── Fields/             ACF field groups
 ├── Infrastructure/     Service providers · migrations · console commands · WP admin & hooks
-├── Support/            BlockDefaults · MediaLibrary · DocumentOutline · Pattern · ReadingTime
+├── Support/            BlockDefaults · MediaLibrary · DocumentOutline · PageChrome · PageRobots ·
+│                       ResponsiveImage · CaseStudySubnav · HeaderMode · SocialKit · Pattern · ReadingTime
 ├── View/               Blade composers · nav walkers
 ├── filters.php         WP filters
 └── setup.php           Theme supports, asset pipeline, template_redirect hooks
 
-config/                 services · redirects · post-types · rl-sync · ai · ai-wordpress · sentry
-patterns/               53 Gutenberg block patterns
+config/                 services · redirects · post-types · rl-sync · ai · ai-wordpress · sentry ·
+                        gated-assets
+patterns/               102 Gutenberg block patterns
 resources/              css/ (app, blog, editor) · js/ · views/ · fonts/ · images/
 routes/                 web.php · api.php   (Acorn routes — WP pages do NOT pass through these)
 tests/                  Pest: Unit/ + Feature/
@@ -34,7 +36,7 @@ Run from this directory.
 ```bash
 npm run dev            # Vite dev server + HMR
 npm run build          # production assets + optimizes resources/images/pages/ -> public/images/
-./vendor/bin/pest      # 422 tests, 1368 assertions
+./vendor/bin/pest      # 774 tests, 3677 assertions
 ./vendor/bin/pint      # format   (--test to check only)
 ```
 
@@ -59,7 +61,7 @@ Details: [`docs/local-development.md`](docs/local-development.md).
 
 1. **1380px canonical container.** Every top-level section wrapper: `w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8`, and every root `wp:group` declares `"layout":{"type":"constrained","contentSize":"1380px"}`. Never `max-w-7xl`, `1140px` or `1200px`.
 2. **Bold (700) is the heaviest weight.** No `font-extrabold`, no `font-black`.
-3. **Reuse before you build.** 45 blocks already exist — read [`docs/block-inventory.md`](docs/block-inventory.md) before writing markup, and extend a block with an option rather than forking it. `tests/Unit/PatternBlockReuseTest.php` fails the build on hand-written card markup without a `// @bespoke:` justification. Regenerate the index with `wp acorn blocks:inventory`.
+3. **Reuse before you build.** 56 blocks already exist — read [`docs/block-inventory.md`](docs/block-inventory.md) before writing markup, and extend a block with an option rather than forking it. `tests/Unit/PatternBlockReuseTest.php` fails the build on hand-written card markup without a `// @bespoke:` justification. Regenerate the index with `wp acorn blocks:inventory`.
 4. **Bespoke sections are ACF blocks, never raw HTML inside `core/group`.** Raw markup inside container blocks triggers Gutenberg's "unexpected or invalid content" recovery modal. Blade inside an ACF block cannot.
 5. **Page content is authored as a `*-full.php` pattern in git**, then applied to the page — not edited in the database.
 6. **A migration is verified by screenshot diff against production**, not by matching headings and copy. See [`docs/page-migration-and-design-system-workflow.md`](docs/page-migration-and-design-system-workflow.md).

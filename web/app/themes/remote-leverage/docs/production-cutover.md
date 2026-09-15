@@ -32,25 +32,24 @@ reconciling production's library.
 flowchart TB
     subgraph DONE["✅ Complete"]
         A1["Platform — Bedrock · Sage · Acorn"]
-        A2["7 domains — all 8 legacy plugins ported"]
-        A3["38 blocks · 53 patterns"]
-        A4["422 tests · CI on every PR"]
+        A2["8 domains — all 8 legacy plugins ported"]
+        A3["56 blocks · 102 patterns"]
+        A4["774 tests · CI on every PR"]
         A5["Staging deploy — ECR → ECS"]
         A6["Environment sync"]
         A7["23 of 23 case studies"]
         A8["119 of 119 posts · 7 categories · 8 tags"]
+        A9["48-URL migration scope — 54 of 54 built"]
     end
 
     subgraph PART["🟡 Partial"]
-        B1["15 of 233 pages"]
-        B2["1 of 2 partners"]
         B3["ADR-0005 gate — no _elementor_data,<br/>but no review record either"]
+        B5["Performance — mobile 99-100 and CLS met;<br/>LCP &lt; 1.2s passes on nothing"]
         B4["SEO parity — meta imported (190 items),<br/>media URLs still on production"]
     end
 
     subgraph BLOCKED["🔴 Not started"]
-        C5["Performance baseline"]
-        C6["Production infra · DNS · rollback"]
+        C6["Production infra · DNS · rollback<br/>(owned outside this workstream)"]
     end
 
     DONE --> GATE{"Cutover gates"}
@@ -66,23 +65,36 @@ flowchart TB
 
 ### Content
 
-Local counts queried 2026-09-14; production counts from the 2026-09-10 audit.
+Local counts re-queried **2026-09-15**; production counts from the 2026-09-10 audit.
+
+**Read the `page` row against the closed 48-URL scope, not against production's 235.** The
+"remaining" column is meaningless for pages: 191 production pages are discarded, not pending.
 
 | Type | Production | Migrated | Remaining |
 | :--- | ---: | ---: | ---: |
-| `page` | 233 | 15 | 218 |
+| `page` (in scope) | 48 in scope of 235 published | 54 built of 54 — 100% | 0 |
 | `case_study` (pages on production) | 23 | 23 | 0 |
 | `post` | 119 | 119 | 0 |
-| `rl_partner` | 2 | 1 | 1 |
+| `rl_partner` | 2 | 3 (Oyster, Lexgo, Lano) | 0 |
 | Categories | 7 | 7 | 0 |
 | Tags | 8 | 8 | 0 |
-| `attachment` | **not being ported** | 512 | — (see below) |
+| `attachment` | **not being ported** | 513 | — (see below) |
 
-Migrated pages: `home`, `about-us`, `reviews`, `vapricing`, `privacy-policy`, `terms-of-use`, `comparison`, `compare-athena`, `wing-assistant-vs-remote-leverage`, `comparison-wing-assistant-ads`, `affiliate-program`, `referral`, `vathankyou`, `hire-va-4`, `blog`. *(Updated 2026-09-14: `hire-va-4-preview` was deleted; `hire-va-4` migrated in its place. `referral` holds incorrect content and is out of scope — see PAGE-MIGRATION-STATUS.md §4a.)*
+The page denominator is `48 + 5 + 1` — the closed transfer list, the five non-indexed pages found
+in the 2026-09-15 sweep, and one addition. Per-URL state lives in
+[`PAGE-MIGRATION-STATUS.md`](../../../../../PAGE-MIGRATION-STATUS.md); **one page still cannot go
+live** (Stripe credentials, §P2 there).
+
+~~Migrated pages: `home`, `about-us`, `reviews`, …~~ **This 15-page list is superseded.** All 54 in-scope pages are built; the per-URL list lives in [`PAGE-MIGRATION-STATUS.md`](../../../../../PAGE-MIGRATION-STATUS.md), which is re-queried against the database rather than hand-maintained. *(`referral` (ID 213) was deleted on 2026-09-15 — [cutover-decisions.md §12](cutover-decisions.md).)*
 
 Per-category post counts match production exactly — Business Growth 91, Outsourcing 95, Case Studies 13, Salary Guides 12, Real Estate Posts 9, News 2. The apparent **Live Sessions: 2 on production, 0 locally** discrepancy was **not real** (checked 2026-09-15): both items are `post_type=page`, not posts — production registers `category` on pages too, and a term count is not post-type-scoped. Nothing was dropped. Details in [content-migration-checklist.md](content-migration-checklist.md).
 
-The 218 remaining pages break down as:
+### ~~The 218 remaining pages~~ — superseded 2026-09-14
+
+**This breakdown and "The three decisions" below are kept only for rationale.** Scope closed at
+48 URLs on 2026-09-14 and every decision here was answered in
+[cutover-decisions.md](cutover-decisions.md); the 191 discarded pages carry 301s in
+`config/redirects.php`. Nothing in the next two sections is an open work item.
 
 | Group | Count | State |
 | :--- | ---: | :--- |
@@ -93,7 +105,9 @@ The 218 remaining pages break down as:
 | §7 Tools & lead magnets | ~10 | Interactive apps — need their own scoping pass |
 | Everything else | remainder | Utility/nav pages needing keep/kill calls |
 
-## The three decisions
+## ~~The three decisions~~ — all answered 2026-09-15
+
+> Resolved in [cutover-decisions.md](cutover-decisions.md). Retained for the reasoning only.
 
 Each needs a named owner and a yes/no. Each has a recommended default so the owner approves a proposal rather than authoring one.
 
@@ -150,7 +164,7 @@ These must all be green before DNS moves. One is green; the redirect gate closed
 | Gate | Source | State |
 | :--- | :--- | :--- |
 | Zero posts carry `_elementor_data` | ADR-0005 | ✅ Verified 2026-09-14 — 0 posts across the whole install |
-| Every converted post human-approved | ADR-0005 amendment | 🔴 Queue exists (`ContentAuditAdmin`); no post carries `_rl_conversion_status`, so nothing went through it. Either run the 119 posts through the queue, or record an explicit decision that the import path made it unnecessary |
+| Every converted post human-approved | ADR-0005 amendment | ✅ **Closed 2026-09-15 by decision, not by queue.** No post carries `_rl_conversion_status` and none will: [cutover-decisions.md §11](cutover-decisions.md) records that the `content:import-posts` path made the review queue unnecessary. Zero posts carry `_elementor_data`, so the letter of ADR-0005 is met |
 | SEO parity — Yoast installed, meta carried, redirect map complete | §9 of the checklist | 🟡 **Import done 2026-09-15.** Yoast 28.5 active and deliberately configured; `wp acorn content:import-seo` run for real — 190 local items, 863 postmeta rows, from 0. Every canonical rewritten onto the local host (0 rows still on `remoteleverage.com`); re-running reports 0 changes. `/blog/` is the canonical archive; `referral-program` and `ecommerce-virtual-assistant` excluded from production's stale `noindex`; redirect map complete in `config/redirects.php` (no Yoast Premium). **Not green yet:** (a) `services`, `store` and `contractoragreement` — built as v2 pages after the decision — inherited production's `noindex` and need a ruling; (b) `company_logo` and 171 OpenGraph image URLs still point at production, pending the media library; (c) the import and the Yoast configuration have to be repeated on staging and production. See [seo-meta-migration.md](seo-meta-migration.md) |
 | Every killed URL has a 301 | ADR-0006 | ✅ **Closed 2026-09-15.** `config/redirects.php` holds 166 entries, grouped by bucket with the rule stated per group. Every target verified to resolve 200; no 301 chains; no key shadows a live v2 page. Revised 2026-09-15 after the client decisions: `contractoragreement`, `services` and `store` are being built as real v2 pages, so their keys were dropped rather than 301ing the live pages away; `hire-us-uk-now` was re-pointed from `/hire-for-less/` (LATAM VAs at $6-$10/hr) to `/hire-va-4/`, since the production page sells American and British professionals at $10-$15/hr; and `anyshore` now 301s off-site to `https://anyshore.ai/`, the first absolute external target the map carries |
 | Performance baseline met (mobile 96+, LCP < 1.2s, CLS 0.00) | [performance-baseline.md](performance-baseline.md) | 🟡 **Two of three targets met locally, 2026-09-15.** After the font and image work every measured page scores **99–100** mobile (from 60–93) and CLS is at or near 0. **LCP < 1.2s passes on nothing** — best is 1.54s. Headline wins: `/hire-va-4/` 61→94 (LCP 6.93s→2.43s), a single blog post 79→99 (3.27MB→0.59MB). Staging numbers, which is what this gate actually asks for, not yet taken |
@@ -164,21 +178,30 @@ These must all be green before DNS moves. One is green; the redirect gate closed
 
 ## Recommended sequence
 
-1. Install Yoast; settle `/guides/` vs `/blog/` canonical. *(Unblocks §9 and prevents rework — and with 119 posts already imported, doing it late now means a second pass over 157 items, not 38.)*
-2. Send decision requests 1 and 2 — longest lead time, send first.
-3. Clear the no-sign-off work: sub-nav, booking-footer sweep, Lexgo, tracker reconciliation.
-4. Settle the ADR-0005 review gate — run the posts through the queue, or record why the import path made it unnecessary.
-5. Agree decision 3 and build the role/industry template — the long pole.
-6. Build production infrastructure and the DNS/rollback runbook in parallel with content. **This is the one workstream with no content dependency and no decision blocker, and it has not started.**
-7. Measure performance; close the remaining gates; flip.
+~~1. Install Yoast; settle `/guides/` vs `/blog/` canonical.~~ ✅ Done 2026-09-15.
+~~2. Send decision requests 1 and 2.~~ ✅ Answered — see [cutover-decisions.md](cutover-decisions.md).
+~~3. Clear the no-sign-off work: sub-nav, booking-footer sweep, Lexgo, tracker reconciliation.~~ ✅ All four done 2026-09-15.
+~~4. Settle the ADR-0005 review gate.~~ ✅ Recorded as decision §11.
+~~5. Agree decision 3 and build the role/industry template.~~ ✅ Moot — scope closed at 48 URLs; the ~45 role/industry pages are discarded.
+
+**What is actually left, in order:**
+
+1. Set the webhook signing secrets and `STRIPE_DEFAULT_THANKYOU_URL`; repoint the four Calendly
+   redirects. Cheap, and two of them silently break paying customers.
+2. Re-point `company_logo` and the 171 OpenGraph image URLs off `remoteleverage.com`.
+3. Repeat the Yoast configuration and `content:import-seo` on staging and production.
+4. Take the performance numbers **on staging** — the local run is not what the gate asks for.
+5. Build production infrastructure and the DNS/rollback runbook. **Owned outside this workstream,
+   still a hard gate.**
+6. Resolve Sentry's DSN and the `MAIL_*` values; close the remaining gates; flip.
 
 ## Gaps this plan does not cover
 
-- **Drafts, private and password-protected content were never audited on production.** The REST API only exposes published content without auth; an application password against wp-admin would allow `status=any`. A missed draft is invisible until someone asks for it.
+- ~~**Drafts, private and password-protected content were never audited on production.**~~ **Accepted risk, 2026-09-15** ([cutover-decisions.md §16](cutover-decisions.md)). The REST API only exposes published content without auth. Deliberately not chased — a missed draft is invisible until someone asks for it, and that is understood, not forgotten.
 - **Google Site Kit is installed but inactive**, so no GTM snippet is emitted and no tag inside the container fires. Activating it and connecting the container is admin work, but it is a prerequisite for any GTM-delivered tracking at cutover.
-- **`e-landing-page` CPT (2 entries)** has no equivalent post type in v2 and no recorded decision.
+- ~~**`e-landing-page` CPT (2 entries)** has no equivalent post type in v2 and no recorded decision.~~ **Dropped 2026-09-15** ([cutover-decisions.md §14](cutover-decisions.md)) — both entries are inside the discarded set and already redirect. No post type is built.
 - **Production's media library is deliberately not being ported** (decided 2026-09-15). Local holds 512 attachments; production's was never counted and will not be. Page art is tracked as source in `resources/images/pages/` and generated into `public/images/` at build time, so it does not depend on a library migration. This is a closed decision, not an open gap.
-- **`/comparison/` is a never-filled-in internal template on production** — literal `[X]` placeholders, "Text here Text here", a stray "NEW SECTION" label. It was reproduced verbatim under the strict-fidelity rule. Someone should decide whether it ships that way.
+- **`/comparison/` is a never-filled-in internal template on production** — literal `[X]` placeholders, "Text here Text here", a stray "NEW SECTION" label. It was reproduced verbatim under the strict-fidelity rule. **Settled 2026-09-15:** it ships that way but `noindex`, and stays database-resident ([cutover-decisions.md §10, §10b](cutover-decisions.md)).
 
 ## SEO gates added 2026-09-14
 

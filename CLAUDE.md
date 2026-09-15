@@ -5,7 +5,7 @@ Theme root: `web/app/themes/remote-leverage`. Run all theme commands from there.
 
 ## Reuse before you build
 
-The theme ships 40+ ACF blocks. **Before writing markup in a pattern, find out what already
+The theme ships 56 ACF blocks. **Before writing markup in a pattern, find out what already
 exists.** Skipping this is the most common and most expensive mistake in this repo: it forks
 the design system, and a fix to the block never reaches the hand-written copy.
 
@@ -135,7 +135,9 @@ laravel-vite-plugin's `assets` glob, which content-hashes what it touches.
   fallback, so there is nothing to gain from recompressing an already-lossy JPEG.
 - Every raster also gets a sibling `.webp` — lossless from a PNG (flags and icons band badly
   otherwise), q82 from a JPEG. `BlockDefaults::preferWebp()` serves these.
-- Results are cached by content hash in `node_modules/.cache/`; a warm rebuild is ~2s, cold ~18s.
+- Results are cached by content hash in `node_modules/.cache/`; a warm rebuild is a few seconds, a
+  cold one tens of seconds. There are 629 source rasters under `resources/images/pages/`, expanding
+  to ~1,340 files in `public/images/`, so both timings scale as art is added.
 
 The loose files directly in `resources/images/` are a separate thing: those go through Vite and
 are referenced with `Vite::asset()`.
@@ -146,4 +148,9 @@ is still hand-maintained and untracked — the 64MB VSL does not belong in git.
 ## Conventions
 
 - Do not commit or push unless asked.
-- Container width: match production per page (measure it) rather than assuming a global value.
+- **Container width is the one thing you do NOT measure off production.** The canonical container
+  is `w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8`, and every root `wp:group` declares
+  `"layout":{"type":"constrained","contentSize":"1380px"}`. Production's Elementor pages measure
+  1260–1320px; migrated pages still use 1380px. `/signedup/` and `/referral-program/` were built
+  at production's measured 1260px and had to be corrected on 2026-09-15. Measure production for
+  type scale, spacing and colour — never for the container. See `docs/design-system.md` rule 1.

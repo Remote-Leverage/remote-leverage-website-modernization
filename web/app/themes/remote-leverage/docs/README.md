@@ -7,7 +7,7 @@ All project documentation lives here. Start with the [repository README](../../.
 | Document | Covers |
 | :--- | :--- |
 | [architecture.md](architecture.md) | Boot order, service providers, the two request paths, events, schema |
-| [design-system.md](design-system.md) | Tokens, the 45 blocks, the patterns, templates, `BlockDefaults` |
+| [design-system.md](design-system.md) | Tokens, the 56 blocks, the patterns, templates, `BlockDefaults` |
 | [block-inventory.md](block-inventory.md) | **Generated.** Every block mapped to the production section it renders, with fields and usages. Read before building a section; regenerate with `wp acorn blocks:inventory` |
 | [admin-screens.md](admin-screens.md) | Every WP Admin surface the theme adds, and where each is registered |
 | [configuration.md](configuration.md) | Environment variables, verified against the code that reads them |
@@ -23,9 +23,10 @@ All project documentation lives here. Start with the [repository README](../../.
 | [domains/tracking.md](domains/tracking.md) | PostHog + Customer.io dual dispatch, feature flags |
 | [domains/referral.md](domains/referral.md) | Referrer portal, click attribution, Stripe Connect payouts |
 | [domains/partner-hub.md](domains/partner-hub.md) | `rl_partner` CPT, co-branded hubs, CPT-backed partner directory |
-| [domains/content-audit.md](domains/content-audit.md) | Elementor audit/conversion, blog import, email signatures |
+| [domains/content-audit.md](domains/content-audit.md) | Elementor audit/conversion, blog import, Yoast meta import, block inventory |
 | [domains/sync.md](domains/sync.md) | Environment-to-environment dataset transfer |
-| [social-media-kit.md](social-media-kit.md) | `/social-media-kit/` route — signature generator + brand asset library (ported `rl-social-kit`) |
+| [stripe-payments.md](stripe-payments.md) | `app/Domains/Payment` — Stripe deposit/checkout gateway, funnel telemetry |
+| [social-media-kit.md](social-media-kit.md) | `/social-media-kit/` route — email-signature generator + brand asset library (ported `rl-social-kit`); the sole home of signature generation since 2026-09-15 |
 
 ## Migration & launch
 
@@ -38,7 +39,7 @@ All project documentation lives here. Start with the [repository README](../../.
 | [seo-meta-migration.md](seo-meta-migration.md) | Yoast install, and `content:import-seo` — carrying production's `_yoast_wpseo_*` meta onto v2 |
 | [page-migration-and-design-system-workflow.md](page-migration-and-design-system-workflow.md) | How to migrate a page: extract, dissect, build blocks, publish |
 | [performance-baseline.md](performance-baseline.md) | The Phase 8 performance gate: mobile Lighthouse, the `CaptureLeadAction` p95 rule, and Parts 3–5 covering the font subsetting, preload, Calendly preflight and blog image work of 2026-09-15 |
-| [adr-status.md](adr-status.md) | ADR compliance and WR-98–106 backlog status (verified 2026-09-09) |
+| [adr-status.md](adr-status.md) | ADR compliance and WR-98–106 backlog status (2026-09-09; WR-100, WR-105, WR-106 and the ADR-0008 transport note re-verified 2026-09-15) |
 | [jira-adr-compliance-backlog.md](jira-adr-compliance-backlog.md) | The original backlog write-up |
 
 ## Runbooks & design notes
@@ -65,5 +66,8 @@ Superseded documents, kept for rationale. **They describe intent, not the codeba
 | :--- | :--- |
 | [archive/architecture-proposal.md](archive/architecture-proposal.md) | The original repository README — an architecture proposal |
 | [archive/theme-readme-proposal.md](archive/theme-readme-proposal.md) | The original theme README — aspirational feature documentation |
+| [archive/plan-root.md](archive/plan-root.md) | The repository phase plan — a hand-maintained percentage tracker that drifted; archived 2026-09-15 |
+| [archive/plan-theme.md](archive/plan-theme.md) | The theme's near-duplicate of the same plan; archived 2026-09-15 |
+| [archive/content-migration-next-phase-plan.md](archive/content-migration-next-phase-plan.md) | The next-phase migration plan; archived 2026-09-15 once its four blocking decisions were resolved |
 
 Architecture decisions live outside this tree, in [`doc/adr/`](../../../../../doc/adr/) at the repository root (ADR-0001 through ADR-0008).

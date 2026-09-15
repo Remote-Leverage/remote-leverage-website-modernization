@@ -163,4 +163,4 @@ The bridge verifies nothing itself. `wp_authenticate_application_password()` sti
 
 ## Tests
 
-Sixteen files, the largest test group in the suite: `SyncTransferPusherTest`, `SyncTransferPullerTest`, `SyncContentExporterTest`, `SyncContentImporterTest`, `SyncAttachmentRemapTest`, `SyncMediaFileTest`, `SyncUploadPathTest`, `SyncUndoLogTest`, `SyncSessionTest`, `SyncJobProgressTest`, `SyncDatasetsTest`, `SyncPurgeTest`, `SyncEnvironmentTest`, `SyncBodyAuthTest`, `SyncClientBodyAuthTest`.
+Eighteen files, the largest test group in the suite: `SyncAttachmentRemapTest`, `SyncBodyAuthTest`, `SyncCleanBeforeImportTest`, `SyncClientBodyAuthTest`, `SyncContentExporterTest`, `SyncContentImporterTest`, `SyncDatasetCleanerTest`, `SyncDatasetsTest`, `SyncEnvironmentTest`, `SyncJobProgressTest`, `SyncMediaFileTest`, `SyncPurgeTest`, `SyncSessionTest`, `SyncTransferLogPurgeTest`, `SyncTransferPullerTest`, `SyncTransferPusherTest`, `SyncUndoLogTest`, `SyncUploadPathTest`.

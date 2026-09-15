@@ -1,8 +1,8 @@
 # ContentAudit domain
 
-`app/Domains/ContentAudit` — the tooling that gets content off Elementor, plus the email-signature generator.
+`app/Domains/ContentAudit` — the tooling that gets content off Elementor, plus the Yoast meta import and the block-inventory generator. (The email-signature generator **left this domain on 2026-09-15** — see the end of this document.)
 
-Replaces the `rl-content-auditor` and `rl-social-kit` plugins.
+Replaces the `rl-content-auditor` plugin. (`rl-social-kit` was also ported here originally; since 2026-09-15 it lives in `App\Support\SocialKit` behind `/social-media-kit/` — see [social-media-kit.md](../social-media-kit.md).)
 
 This domain exists to serve the migration. Once production content is off Elementor, most of it becomes dead weight and can be retired — that is expected, not a design flaw.
 
@@ -73,7 +73,7 @@ live-call behaviour in v2 is the `/live-call/connect` route, not a block, so a h
 | `YoastMetaMapper` | Pure. Production's `yoast_head_json` → `_yoast_wpseo_*` postmeta, with canonical rewriting and Search Appearance template detection — see [seo-meta-migration.md](../seo-meta-migration.md) |
 | `PrismAiAuditor` | AI-assisted content review over markdown |
 | `AuditMarkdownContentAction` | Wraps the auditor |
-| `GenerateSignatureHtmlAction` | Email-signature HTML (below) |
+| `BlockInventoryCommand` | Generates [`docs/block-inventory.md`](../block-inventory.md) — `wp acorn blocks:inventory` |
 
 ## Commands
 
@@ -116,6 +116,12 @@ raw `acf/<slug>` matches alone reports well-used blocks as unused.
 - an **Approve & Mark Clean** row action
 
 This is WR-101, and it is what makes ADR-0005's human sign-off gate real rather than aspirational.
+
+**The 119 imported blog posts never went through it**, and by decision they will not. They came
+in via `content:import-posts`, so none carries `_rl_conversion_status`; zero carry
+`_elementor_data`, so the letter of ADR-0005 is met. [cutover-decisions.md §11](../cutover-decisions.md)
+records that the import path made the queue unnecessary. The queue remains the path for anything
+converted from Elementor from here on.
 
 ## ~~Email signatures~~ — moved out of this domain 2026-09-15
 

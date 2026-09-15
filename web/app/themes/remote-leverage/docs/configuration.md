@@ -92,6 +92,7 @@ Local only — read by the sync commands to call *out* to a remote. Never added 
 | :--- | :--- |
 | `STAGING_SYNC_URL`, `STAGING_SYNC_USER`, `STAGING_SYNC_APP_PASSWORD` | The `sync-service` user's application password on staging |
 | `PRODUCTION_SYNC_URL`, `PRODUCTION_SYNC_USER`, `PRODUCTION_SYNC_APP_PASSWORD` | Present so gate 3 has a URL to refuse. Setting these does not make production syncable — three other gates still refuse. |
+| `STAGING_SYNC_BODY_AUTH` | **Temporary.** Sends the sync credential in the request body as well as the `Authorization` header, because CloudFront strips the header before it reaches the origin. Read by `SyncClient`; the receiving half is `web/app/mu-plugins/rl-sync-body-auth.php`. A workaround for an infrastructure defect, not a design — **target for removal 2026-10-15.** `SyncClient` refuses to attach it when either side is production. See [domains/sync.md](domains/sync.md). |
 
 ## Monitoring
 

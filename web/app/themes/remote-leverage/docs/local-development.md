@@ -61,8 +61,10 @@ This is the same `Dockerfile` staging runs, plus MySQL 8 and Redis 7. `app/` and
 
 `public/` is gitignored and produced entirely by that build, page art included — the sources live
 in `resources/images/pages/`. A fresh clone shows no images until the first `npm run build`; a cold
-run takes ~18s for 383 images, and subsequent runs ~2s from the content-hash cache in
-`node_modules/.cache/`. Never add an image by writing into `public/images/`: it survives locally
+run takes roughly 20-30s for the 629 page rasters under `resources/images/pages/` (they expand to
+~1,340 files in `public/images/`, since every raster also gets a `.webp` sibling); a warm rebuild is
+~3-5s from the content-hash cache in `node_modules/.cache/`. Both scale with the image count, so
+treat these as orders of magnitude, not benchmarks. Never add an image by writing into `public/images/`: it survives locally
 and disappears on deploy. Compare against <https://staging.remoteleverage.com>.
 
 Two local-only behaviours worth knowing:
@@ -73,7 +75,7 @@ Two local-only behaviours worth knowing:
 ## Testing
 
 ```bash
-./vendor/bin/pest                                   # 422 tests, 1368 assertions, ~8s
+./vendor/bin/pest                                   # 774 tests, 3677 assertions, ~9s
 ./vendor/bin/pest tests/Unit/LeadDomainTest.php     # one file
 ./vendor/bin/pest --filter="attribution"            # by name
 ```

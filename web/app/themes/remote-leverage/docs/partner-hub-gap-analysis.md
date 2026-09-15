@@ -10,7 +10,7 @@ Tracked as Jira epic **WR-115** with subtasks **WR-116** through **WR-120**. All
 - `single-rl_partner.blade.php` now reads all ~35 per-partner fields (both referral directions, resources, per-section PDF attachments, content overrides, the co-marketing toggle), with a new right sidebar restoring the resources/quick-actions/manager blocks.
 - New `PartnerHubGlobalData` service ports the legacy's full default content library (10 services, 6 case studies, 14 FAQs, 8-row comparison matrix, 6-stage referral lifecycle, etc.) as the fallback for any blank override field.
 - New `PartnerHubTabResolver` extracts the co-marketing tab visibility logic into a unit-testable class.
-- Pest coverage added in `tests/Unit/PartnerHubTest.php` (24 tests) covering the admin save handler, the global data library, and tab resolution.
+- Pest coverage added in `tests/Unit/PartnerHubTest.php` (34 tests as of 2026-09-15) covering the admin save handler, the global data library, tab resolution, the per-partner override resolver, the CPT-backed directory DTO and directory filtering.
 
 The rest of this document is the original gap analysis, kept for reference.
 

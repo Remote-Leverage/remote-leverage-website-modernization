@@ -443,22 +443,27 @@ WR-105 said *"No `.github/workflows` directory anywhere in the repo."* Both `ci.
 
 ### `docs/content-migration-checklist.md`
 
-~~Refers to `App\Support\LegalDocument` with 9 Pest tests.~~ ✅ **Corrected 2026-09-15** to `App\Support\DocumentOutline` (`tests/Unit/DocumentOutlineTest.php`).
+~~Refers to `App\Support\LegalDocument` with 9 Pest tests.~~ ✅ **Corrected 2026-09-15** to `App\Support\DocumentOutline` (`tests/Unit/DocumentOutlineTest.php`, 11 tests).
 
 **Separately, scope closure changed what this file is.** It was written as a "migrate everything" audit of 235 production pages; 191 of those are now discarded. A banner marks every unticked box void and flags §§2, 3, 4, 5, 7 as out of scope. Anyone reading it for work items will otherwise be badly misled.
 
 ### The archived READMEs
 
-Both are now in `docs/archive/` with a banner. For the record, what they got wrong:
+Both are now in `docs/archive/` with a banner. For the record, what they got wrong.
 
-| Claim | Reality |
+**The "Reality" column is a snapshot taken when the archive banners were written (2026-09-15);
+the codebase has grown since.** Current figures: **56** blocks, **102** patterns, **774 tests /
+3677 assertions**, **8** bounded contexts. Treat this table as evidence that the proposals were
+wrong, not as a live count — `README.md` and `docs/design-system.md` hold the current numbers.
+
+| Claim | Reality when archived |
 | :--- | :--- |
 | "Sage 11 + Acorn 5" (root README) | Sage 10 + Acorn 6 |
 | "Vite 6" | Vite 8 |
 | "~16 unified blocks" | 38 |
 | "21+ block patterns" | 54 |
 | "53 tests, 251 assertions" | 422 tests, 1368 assertions |
-| "5 bounded contexts" | 7 (Sync and Lead are absent from the proposal entirely) |
+| "5 bounded contexts" | 7 (Sync and Lead are absent from the proposal entirely); 8 today, with Payment |
 | `PartnerPortalDashboard`, `PartnerRegistrationForm` | `ReferrerPortalDashboard`, `ReferrerRegistrationForm` |
 | `RegisterPartnerAction` | `RegisterReferrerAction` |
 | Magenta `#F8248A` / `#E91E63` | `#F90066` / `#D90057` |
