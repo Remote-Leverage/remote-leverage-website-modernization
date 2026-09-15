@@ -450,6 +450,36 @@
   .rl-logo-marquee-dark .rl-logo-marquee-item:hover img {
     opacity: 1;
   }
+
+  /* Size modifiers, the counterpart to .rl-logo-marquee-dark above.
+     The base rule letterboxes every mark into 28px × 140px, which flattens a set of mixed
+     aspect ratios into one box. Pick a modifier on the marquee's container — any ancestor of
+     .rl-logo-marquee-item — instead of re-declaring `.rl-logo-marquee-item img` at higher
+     specificity from a pattern. They sit AFTER the dark modifier deliberately: the two carry
+     equal specificity, so a size modifier combined with -dark keeps its own opacity while
+     -dark's !important filter still wins. */
+
+  /* A 50px lockup on a 60px row — for wordmark-heavy sets that read as too small at 28px. */
+  .rl-logo-marquee-lg .rl-logo-marquee-item {
+    height: 60px;
+  }
+
+  .rl-logo-marquee-lg .rl-logo-marquee-item img {
+    max-height: 50px;
+    max-width: 176px;
+    opacity: 1;
+  }
+
+  /* Sized on WIDTH with no height cap, so each mark keeps its own aspect ratio rather than
+     being letterboxed, and with the base brightness(0) off for source art that is already the
+     colour it should be. Override the width per page with --rl-logo-marquee-width. */
+  .rl-logo-marquee-natural .rl-logo-marquee-item img {
+    max-height: none;
+    max-width: var(--rl-logo-marquee-width, 104px);
+    height: auto;
+    filter: none;
+    opacity: 1;
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════

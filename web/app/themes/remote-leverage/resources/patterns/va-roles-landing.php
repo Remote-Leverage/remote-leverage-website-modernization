@@ -16,7 +16,8 @@
  * CTA. Every colour, size and box below was read off production with getComputedStyle and
  * verified against screenshot pixels (2026-09-15).
  *
- * Blocks reused: acf/client-logos-marquee, acf/testimonials, acf/booking.
+ * Blocks reused: acf/consult-landing-hero (its `va-roles` skin), acf/client-logos-marquee,
+ * acf/testimonials, acf/booking.
  * See the @bespoke notes at each hand-written section for what was ruled out and why.
  */
 
@@ -141,152 +142,52 @@ $faqs = [
     ['q' => 'Can I start with Part Time?', 'a' => '<p>Yes, you can start with either part-time or full-time.</p><p>The minimum is 20 hours per week, as our most qualified Virtual Assistants prefer stable positions with consistent hours.</p>'],
 ];
 
-// Production's hero tick: 22x22, #01FF00 (getComputedStyle fill on the Elementor icon, 2026-09-15).
-$check = '<svg class="h-[22px] w-[22px] shrink-0 text-[#01FF00]" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true"><path d="M173.9 439.4l-166.4-166.4c-10-10-10-26.2 0-36.2l36.2-36.2c10-10 26.2-10 36.2 0L192 312.7 432.1 72.6c10-10 26.2-10 36.2 0l36.2 36.2c10 10 10 26.2 0 36.2l-294.4 294.4c-10 10-26.2 10-36.2 0z"/></svg>';
+// --- Hero -----------------------------------------------------------------------------------
+// acf/consult-landing-hero renders this shape on its `va-roles` skin: the #6200A4 -> #6E1686
+// band, the gold-gradient headline line, the two-column tick list and the solid white booking
+// card. The markup that used to be hand-written here now lives in the block, so a fix reaches
+// both this family and the consultation family that shares it.
+//
+// Every breakpoint literal a page needs (hero_bg_image_class) is spelled out in the page config,
+// never assembled — Tailwind scans source text and silently drops a concatenated class.
+$heroData = BlockDefaults::withFieldKeys('consult_landing_hero', [
+    'variant' => 'va-roles',
+    'headline' => $page['hero_title_lead'] ?? '',
+    'headline_gradient' => $page['hero_title_gradient'] ?? '',
+    'headline_size' => ($page['hero_headline_size'] ?? '64') === '80' ? '80' : '64',
+    'intro' => 'Recruiting agency helping businesses hire English speaking Virtual Assistants from <strong class="font-bold">Latin America</strong> for 70% less than U.S. Employees.',
+    'background_image' => ! empty($page['hero_bg_image']) ? $img($page['hero_bg_image']) : '',
+    'background_image_class' => $page['hero_bg_image_class'] ?? '',
+    'split_at' => ($page['hero_split_at'] ?? 'xl') === '2xl' ? '2xl' : 'xl',
+    'cta_text' => $page['hero_cta_text'] ?? '',
+    'cta_url' => $bookUrl,
 
-// Hero headline scale differs between the two pages: /hire-va-isolated-form/ runs 80/88 because its
-// headline is three lines, /1monthonus/ runs 64/70.4 because its fourth line ("First Month FREE!")
-// would otherwise overflow the 768px column. Both literals are spelled out so Tailwind scans them.
-$heroHeadline = ($page['hero_headline_size'] ?? '64') === '80'
-    ? 'text-[40px] leading-[1.1] sm:text-[64px] sm:leading-[70.4px] xl:text-[80px] xl:leading-[88px]'
-    : 'text-[40px] leading-[1.1] sm:text-[64px] sm:leading-[70.4px]';
+    // An empty card title means the page has no hero booking card, which is how /1monthonus/
+    // and /hire-va/ render.
+    'booking_title' => $page['hero_card_title'] ?? '',
+    'form_button_text' => $page['hero_card_button'] ?? 'Find me an Assistant',
+]);
 
-// Width at which the hero stops being a centred single column and becomes the left-aligned
-// copy/card row. Production's own Elementor breakpoint for this is ~1500px: measured on
-// /hire-va/ 2026-09-15, the hero h2 computes text-align:center at 1440 and start at 1600/1920.
-//
-// 'xl' (1280px) is the default because that is what the two pages already on this template
-// ship, and for /hire-va-isolated-form/ it is deliberate: production's own 1500px break leaves
-// its booking card overflowing off-screen at 1440, which is a production bug, not a design.
-//
-// A page with no booking card has nothing to rescue, so it can opt into '2xl' (1536px) and
-// reproduce production's centred 1440px hero exactly. Both class sets are spelled out in full
-// below so Tailwind's scanner sees every literal.
-//
-// The wide set is written as min-[1536px]: rather than 2xl: on purpose. This theme's Tailwind
-// build emits no 2xl: variant at all — verified by compiling a probe file carrying both spellings:
-// min-[1536px]:flex-row landed in public/build/assets/app-*.css, 2xl:flex-row did not. The
-// arbitrary variant resolves to the same 96rem media query.
-$heroSplitAt = ($page['hero_split_at'] ?? 'xl') === '2xl' ? '2xl' : 'xl';
-$heroRow = $heroSplitAt === '2xl'
-    ? 'min-[1536px]:flex-row min-[1536px]:items-center'
-    : 'xl:flex-row xl:items-center';
-$heroCol = $heroSplitAt === '2xl'
-    ? 'min-[1536px]:flex-1 min-[1536px]:text-left'
-    : 'xl:flex-1 xl:text-left';
-$heroFlush = $heroSplitAt === '2xl' ? 'min-[1536px]:mx-0' : 'xl:mx-0';
-$heroCardCol = $heroSplitAt === '2xl'
-    ? 'min-[1536px]:w-[492px] min-[1536px]:shrink-0'
-    : 'xl:w-[492px] xl:shrink-0';
+// Production reads the ticks down the left column then the right; the block lays a single list
+// out as three rows flowing into columns, so the two config keys merge in that order. A raw
+// array override is silently ignored, so it goes through the ACF encoder.
+BlockDefaults::encodeRepeater(
+    'checklist',
+    'field_consult_landing_hero_checklist',
+    array_map(
+        static fn (string $item): array => ['item' => $item],
+        array_merge($page['hero_checks_left'] ?? [], $page['hero_checks_right'] ?? []),
+    ),
+    $heroData,
+);
 
 ?>
 <!-- ============ HERO ============ -->
 <!-- rl:cta-only-header — production serves this family with no site nav, only a logo and a
      single Get Started pill. App\Support\PageChrome reads this marker and swaps
      sections.header for sections.header-cta. -->
-<?php /* @bespoke: two-column hero. acf/consult-landing-hero renders the same shape (copy left,
-         booking card right) but is hard-wired to the consultation family's near-black #060218 band,
-         a translucent glass card and a single-column tick list; this page family is a #6200A4→#6E1686
-         violet band with a solid white card, a gold-gradient headline span and a two-column tick
-         list, and the block exposes no variant/skin field to switch between them. acf/hire-va-hero
-         is a portrait-grid hero, acf/comparison-hero a photographic one, acf/impact-report-hero a
-         purple-gradient capture card on a pale band — none matches. Adding a `variant` option to
-         acf/consult-landing-hero is the right long-term fix and is reported rather than made here,
-         because existing blocks are off-limits in this pass.
+<?= BlockDefaults::patternBlock('consult-landing-hero', $heroData, ['align' => 'full']) ?>
 
-         Measured off production 2026-09-15 at 1920px with getComputedStyle:
-           band            linear-gradient(135deg,#6200A4 0%,#6E1686 100%), 780px tall
-           inner           max-width 1280px, flex row, gap 20px, align-items center
-           left column     768px   headline 80/88 (isolated-form) or 64/70.4 (1monthonus), 700 white
-                                   gold span linear-gradient(120deg,#FFA51E 20%,#FFDC10 70%)
-                                   intro 22/33 white, max-width 670px
-                                   ticks 22x22 #01FF00, labels 24/40 600 white, two columns
-           right column    492px   white card 472px wide, radius 10px, padding 30px,
-                                   shadow rgba(138,43,226,.7) 0 4px 150px
-                                   title 27/35 700 black centred; label 15/20 black
-                                   input bg #F4F6FC radius 4px; button #F8248A, radius 100px,
-                                   16px 700 white, 372x46
-
-         Production only switches to this row layout above its own 1500px Elementor breakpoint; at
-         1440px it gives the left column the full 1280px and the booking card overflows off-screen,
-         clipped and unreadable. That is a production bug, not a design, so the split here starts at
-         xl (1280px) — the width the 1280px inner actually needs — rather than reproducing the break. */ ?>
-<!-- wp:group {"align":"full","layout":{"type":"constrained","contentSize":"1380px"}} -->
-<div class="wp-block-group alignfull relative flex min-h-[780px] items-center overflow-hidden bg-[linear-gradient(135deg,#6200A4_0%,#6E1686_100%)] py-16">
-    <?php if (! empty($page['hero_bg_image'])) { ?>
-        <?php /* `alignfull` + max-w-none keep this out of the constrained layout's
-                 `:where(.is-layout-constrained) > :not(.alignfull)` rule, which otherwise caps a
-                 direct child of the group at contentSize (1380px) and centres it, leaving the band
-                 bare either side of the art. */ ?>
-        <?php /* `hero_bg_image_class` optionally hides the art below a breakpoint. Empty (the
-                 default) shows it at every width, which is what /1monthonus/ does; /hire-va/
-                 passes `hidden min-[1280px]:block`. The full literal lives in the page config
-                 rather than being assembled here, because Tailwind scans source text — a class
-                 built by concatenation is never emitted and the utility silently does nothing. */ ?>
-        <img src="<?= esc_url($img($page['hero_bg_image'])) ?>" alt="" aria-hidden="true"
-             class="alignfull pointer-events-none absolute inset-0 h-full w-full max-w-none select-none object-cover object-right <?= esc_attr($page['hero_bg_image_class'] ?? '') ?>" />
-    <?php } ?>
-
-    <div class="<?= $wrap ?> relative z-10">
-        <div class="mx-auto flex w-full max-w-[1280px] flex-col items-center gap-5 <?= $heroRow ?>">
-
-            <!-- Left: headline, intro, tick list, optional CTA -->
-            <div class="w-full text-center <?= $heroCol ?>">
-                <h2 class="font-display font-bold <?= $heroHeadline ?> text-white">
-                    <?= $page['hero_title_lead'] ?? '' ?><br />
-                    <span class="bg-[linear-gradient(120deg,#FFA51E_20%,#FFDC10_70%)] bg-clip-text text-transparent">
-                        <?= $page['hero_title_gradient'] ?? '' ?>
-                    </span>
-                </h2>
-
-                <p class="mx-auto mt-6 max-w-[670px] font-display text-[18px] leading-[27px] text-white sm:text-[22px] sm:leading-[33px] <?= $heroFlush ?>">
-                    Recruiting agency helping businesses hire English speaking Virtual Assistants from <strong class="font-bold">Latin America</strong> for 70% less than U.S. Employees.
-                </p>
-
-                <div class="mx-auto mt-8 flex w-fit flex-col gap-x-14 gap-y-1 sm:grid sm:grid-flow-col sm:grid-rows-3 <?= $heroFlush ?>">
-                    <?php foreach (array_merge($page['hero_checks_left'] ?? [], $page['hero_checks_right'] ?? []) as $item) { ?>
-                        <span class="flex items-center gap-2 text-left font-display text-[18px] font-semibold leading-10 text-white sm:text-[24px]">
-                            <?= $check ?><?= $item ?>
-                        </span>
-                    <?php } ?>
-                </div>
-
-                <?php if (! empty($page['hero_cta_text'])) { ?>
-                    <div class="mt-10">
-                        <a href="<?= esc_url($bookUrl) ?>" class="inline-block rounded-[5px] bg-[#68B93D] px-10 py-4 font-display text-[20px] sm:text-[24px] font-bold leading-6 text-white transition hover:opacity-90"><?= $page['hero_cta_text'] ?></a>
-                    </div>
-                <?php } ?>
-            </div>
-
-            <!-- Right: booking card -->
-            <?php if (! empty($page['hero_card_title'])) { ?>
-                <div class="w-full <?= $heroCardCol ?>">
-                    <div class="mx-auto w-full max-w-[472px] rounded-[10px] bg-white p-[30px] shadow-[0_4px_150px_0_rgba(138,43,226,0.7)]">
-                        <h3 class="text-center font-display text-[27px] font-bold leading-[35px] text-black">
-                            <?= $page['hero_card_title'] ?>
-                        </h3>
-                        <?php /* The wizard itself lives in the #booking-footer section below. acf/booking
-                                 exposes only a `skin` field, so it cannot be embedded here in production's
-                                 isolated single-email first step; this card carries the same field and
-                                 button and hands off to the real wizard. Reported, not worked around. */ ?>
-                        <form action="<?= esc_url($bookUrl) ?>" method="get" class="mt-5 px-5">
-                            <label for="hero-business-email" class="block font-display text-[15px] leading-5 text-black">Business Email<span aria-hidden="true">*</span></label>
-                            <input id="hero-business-email" name="email" type="email" autocomplete="email"
-                                   class="mt-1.5 w-full rounded-[4px] bg-[#F4F6FC] px-4 py-3.5 font-display text-[16px] leading-[38px] text-[#1A1A1A] outline-none focus:ring-2 focus:ring-[#F8248A]/40" />
-                            <button type="submit"
-                                    class="mt-4 flex h-[46px] w-full items-center justify-center gap-2 rounded-[100px] bg-[#F8248A] px-7 font-display text-[16px] font-bold leading-4 text-white transition hover:opacity-90">
-                                <?= $page['hero_card_button'] ?? 'Find me an Assistant' ?>
-                                <span aria-hidden="true">&rarr;</span>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            <?php } ?>
-
-        </div>
-    </div>
-</div>
-<!-- /wp:group -->
 
 <!-- ============ CLIENT LOGO STRIP ============ -->
 <!-- wp:group {"align":"full","layout":{"type":"constrained","contentSize":"1380px"}} -->

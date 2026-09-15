@@ -61,6 +61,7 @@ The four event-type vars seed `CalendlyEventTypeRoleResolver` (option `rl_calend
 | :--- | :--- |
 | `POSTHOG_API_KEY`, `POSTHOG_HOST` | `PostHogClient`, front-end snippet. Host defaults to `https://us.i.posthog.com`. |
 | `CUSTOMERIO_SITE_ID`, `CUSTOMERIO_API_KEY`, `CUSTOMERIO_APP_API_KEY` | `CustomerIOClient` |
+| `CUSTOMERIO_CDP_WRITE_KEY` | `TrackingHooks` — the browser CDP snippet (`window.cioanalytics`), added 2026-09-15 when v2 switched from the classic `_cio` tracker to match production. **Not the site id**: CDP takes a write key, a different Customer.io product, and a site id here 404s the asset URL and silently queues every event forever. Blank → no snippet, every client call site no-ops. Server-side Track API v1 still uses `SITE_ID`/`API_KEY`. |
 
 GTM, LinkedIn Insight and Meta Pixel are configured inside the Google Site Kit / GTM container, not here.
 

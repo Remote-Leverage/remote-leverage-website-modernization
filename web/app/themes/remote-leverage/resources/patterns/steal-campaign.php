@@ -365,19 +365,16 @@ $orbit = [
              mark at max-height:28px and paints it with filter:brightness(0), which flattens
              nine different logo shapes into one letterbox. Production sizes on WIDTH instead —
              a 104px box with the mark at its natural size when it is narrower (Sivia Law stays
-             99px) — keeps each aspect, applies no filter because the source PNGs are already
-             white, and dims the whole rail to 50%. These overrides are scoped through
-             .rl-logo-marquee-item so they outrank that rule without touching the shared block
-             or the shared stylesheet. Production also runs the rail edge-to-edge with no fade
-             mask, so the wrapper's mask and max-width come off too. */ ?>
-    <div class="relative z-[2] py-[10px] <?= $isDark ? 'bg-[rgba(13,13,13,0.7)] shadow-[0_-100px_80px_0_#0D0D0D]' : 'bg-[rgba(30,12,56,0.57)] shadow-[0_-50px_70px_0_#1E0C38]' ?>
+             99px) — keeps each aspect and applies no filter because the source PNGs are already
+             white. That is exactly the .rl-logo-marquee-natural size modifier, so it is picked
+             here rather than re-declared at higher specificity. The 50% dim stays page-local:
+             it is the rail's treatment on this family, not a property of the size. Production
+             also runs the rail edge-to-edge with no fade mask, so the wrapper's mask and
+             max-width come off too. */ ?>
+    <div class="rl-logo-marquee-natural relative z-[2] py-[10px] <?= $isDark ? 'bg-[rgba(13,13,13,0.7)] shadow-[0_-100px_80px_0_#0D0D0D]' : 'bg-[rgba(30,12,56,0.57)] shadow-[0_-50px_70px_0_#1E0C38]' ?>
                 [&_.rl-logo-marquee-wrapper]:max-w-none [&_.rl-logo-marquee-wrapper]:px-0
                 [&_.rl-logo-marquee-wrapper]:[mask-image:none] [&_.rl-logo-marquee-wrapper]:[-webkit-mask-image:none]
-                [&_.animate-marquee-logos]:gap-[60px] [&_.animate-marquee-logos]:opacity-50
-                [&_.rl-logo-marquee-item_img]:max-h-none [&_.rl-logo-marquee-item_img]:max-w-[104px]
-                [&_.rl-logo-marquee-item_img]:w-auto [&_.rl-logo-marquee-item_img]:h-auto
-                [&_.rl-logo-marquee-item_img]:object-contain [&_.rl-logo-marquee-item_img]:filter-none
-                [&_.rl-logo-marquee-item_img]:opacity-100">
+                [&_.animate-marquee-logos]:gap-[60px] [&_.animate-marquee-logos]:opacity-50">
         <?= BlockDefaults::renderClientLogosMarquee($logoData) ?>
     </div>
 </div>

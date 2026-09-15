@@ -76,6 +76,20 @@ $performanceFootnote = <<<'HTML'
 <p><strong>4 Week Cycle</strong>: $400/4 Weeks + $500 one-time setup ($5,700/year total)<br><span style="color:#ff6600;">OR</span><br><strong>Annual Plan (Best Value)</strong>: $3,000 one-time annual payment (<strong>save $2,700</strong>)</p>
 HTML;
 
+/*
+ * Robots posture. Production serves /services/ `noindex, nofollow` — it is post-hire client
+ * onboarding collateral, not a marketing page. App\Support\PageRobots reads this marker out of
+ * the registered pattern's content and emits that pair.
+ *
+ * The marker lives here, in git, rather than as Yoast postmeta: postmeta is database state and
+ * this project loses database state on a refresh, which would silently make the page indexable.
+ * It must be echoed, not written as a PHP comment — PageChrome::patternContent() reads the
+ * REGISTERED pattern content, i.e. this file's output, so a comment would never be seen.
+ *
+ * The page stays published and reachable. This is not access control.
+ */
+echo "<!-- rl:noindex -->\n";
+
 echo BlockDefaults::renderOfferStack([
     [
         'headline' => 'Virtual Assistant Free Onboarding Guide',

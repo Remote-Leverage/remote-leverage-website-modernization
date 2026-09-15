@@ -69,6 +69,10 @@
          Resolved through the Vite manifest rather than hardcoded: these filenames are
          content-hashed build output and change on every font rebuild. A hardcoded hash would
          silently 404 and, worse, still look correct in the markup. --}}
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+          href="{{ Vite::asset('resources/fonts/inter-display-latin.woff2') }}">
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+          href="{{ Vite::asset('resources/fonts/inter-latin-wght-normal.woff2') }}">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
   </head>

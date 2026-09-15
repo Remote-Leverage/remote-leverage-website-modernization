@@ -221,6 +221,9 @@ $footerNote = '<span class="mt-7 block max-w-[619px] space-y-2.5">'
     .'<span class="mt-7 block max-w-[619px] rounded-[9px] bg-[#F2F1ED]/[0.18] px-5 py-5 pl-[17px] text-[15px] leading-[23px] tracking-[-0.46px] text-white">'
     .'This consultation will be done over zoom so it is best if you could be on a computer.</span>';
 ?>
+<!-- rl:noindex — SDR landing page; production keeps it out of search. App\Support\PageRobots reads this marker and emits
+     noindex, nofollow, matching production. The page stays published and reachable; this
+     keeps it out of search results only, it is NOT access control. -->
 
 <!-- ============ §1 HERO ============ -->
 <!-- wp:group {"align":"full","backgroundColor":"bg-light","layout":{"type":"constrained","contentSize":"1380px"}} -->

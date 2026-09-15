@@ -25,6 +25,24 @@ use App\Support\BlockDefaults;
 // getComputedStyle at 1440px. min_height 5000 is the height production's iframe settles at:
 // the frame is scrolling="no", so under-reserving would clip the contract rather than scroll
 // it. The postMessage listener in the block shrinks it if JotForm reports a smaller document.
+/*
+ * Robots posture. Production serves /contractoragreement/ `noindex, FOLLOW` — note the follow.
+ * It is an e-sign document people are sent a direct link to, so it should not be indexed, but
+ * links out of it should still carry weight.
+ *
+ * That pair could not be expressed by the theme's marker until `rl:noindex-follow` was added on
+ * 2026-09-15, which is why this page briefly relied on Yoast postmeta alone. Postmeta is
+ * database state and is lost on a refresh; the marker is in git, so it is the durable home.
+ *
+ * CAREFUL: `rl:noindex` is a PREFIX of `rl:noindex-follow`. PageRobots tests the longer marker
+ * first for exactly this reason — a naive substring check matches the short one and silently
+ * adds nofollow, which is the opposite of what this page wants.
+ *
+ * Echoed rather than written as a PHP comment: PageChrome::patternContent() reads the REGISTERED
+ * pattern content, i.e. this file's output, so a comment would never be seen.
+ */
+echo "<!-- rl:noindex-follow -->\n";
+
 echo BlockDefaults::renderJotformEmbed('242478488540063', [
     'product' => 'sign',
     'sign_invite' => '01j703pb6g46c5fff73807bfcf',

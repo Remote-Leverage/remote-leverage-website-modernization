@@ -14,7 +14,7 @@ class AccordionFaqBlock extends Block
 
     public $slug = 'accordion-faq';
 
-    public $description = 'Semantic 2-column accordion FAQ with automated Schema.org structured data.';
+    public $description = 'Semantic accordion FAQ in one or two columns, with optional Schema.org FAQPage structured data.';
 
     public $category = 'remote-leverage';
 
@@ -37,14 +37,18 @@ class AccordionFaqBlock extends Block
     public function with(): array
     {
         $faqs = $this->faqs();
-        $total = count($faqs);
-        $half = (int) ceil($total / 2);
+        $columns = $this->columns();
+
+        // One column keeps every row in reading order; two columns balance them, which is the
+        // block's original and still-default behaviour.
+        $split = $columns === '1' ? count($faqs) : (int) ceil(count($faqs) / 2);
 
         return [
-            'headline' => (function_exists('get_field') ? get_field('headline') : null) ?: 'Frequently Asked Questions',
-            'faqsLeft' => array_slice($faqs, 0, $half, true),
-            'faqsRight' => array_slice($faqs, $half, null, true),
-            'schemaJson' => $this->generateSchemaJson($faqs),
+            'headline' => $this->headline(),
+            'columns' => $columns,
+            'faqsLeft' => array_slice($faqs, 0, $split, true),
+            'faqsRight' => array_slice($faqs, $split, null, true),
+            'schemaJson' => $this->schemaEnabled() ? $this->generateSchemaJson($faqs) : '',
         ];
     }
 
@@ -57,6 +61,22 @@ class AccordionFaqBlock extends Block
                 'label' => 'Headline',
                 'default_value' => 'Frequently Asked Questions',
             ])
+            ->addSelect('columns', [
+                'label' => 'Columns',
+                'instructions' => 'Two balanced columns is the default. Use one column where the rows are worked through in order rather than scanned.',
+                'choices' => ['2' => 'Two columns (balanced)', '1' => 'One column'],
+                'default_value' => '2',
+                'allow_null' => 0,
+                'multiple' => 0,
+                'ui' => 0,
+                'return_format' => 'value',
+            ])
+            ->addTrueFalse('schema', [
+                'label' => 'Emit Schema.org FAQPage data',
+                'instructions' => 'On by default. Turn it off on internal or noindex pages, where customer-facing FAQ markup does not belong.',
+                'default_value' => 1,
+                'ui' => 1,
+            ])
             ->addRepeater('faqs', [
                 'label' => 'FAQ Items (Leave empty for default 10 questions)',
                 'layout' => 'block',
@@ -67,6 +87,43 @@ class AccordionFaqBlock extends Block
             ->endRepeater();
 
         return $fields->build();
+    }
+
+    /**
+     * An explicitly empty headline means "render no heading" — used where the surrounding
+     * pattern already supplies its own. Only an absent field falls back to the default.
+     */
+    public function headline(): string
+    {
+        $headline = function_exists('get_field') ? get_field('headline') : null;
+
+        return $headline === null ? 'Frequently Asked Questions' : (string) $headline;
+    }
+
+    /**
+     * '1' or '2'. Anything else — including a block saved before this field existed —
+     * is the original two-column layout.
+     */
+    public function columns(): string
+    {
+        $columns = function_exists('get_field') ? get_field('columns') : null;
+
+        return (string) $columns === '1' ? '1' : '2';
+    }
+
+    /**
+     * Whether to emit Schema.org FAQPage structured data. A block saved before this field
+     * existed reports null and keeps emitting, which is what it does today.
+     */
+    public function schemaEnabled(): bool
+    {
+        if (! function_exists('get_field')) {
+            return true;
+        }
+
+        $schema = get_field('schema');
+
+        return $schema === null || $schema === '' ? true : (bool) $schema;
     }
 
     public function faqs(): array

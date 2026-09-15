@@ -197,6 +197,65 @@ TALENT PROFILES points at `/samples/`.
 `/case-study/`'s weight — while the same outline already shipped as subsetted woff2. The mobile
 header's hamburger overflowed the viewport by 9px at 400px site-wide.
 
+### 24b. The mobile header matches production's logo, not its chrome
+The mobile Consultation pill was dropped and the logo is now **200×23.38, centred, identical to
+production to the pixel at 320/375/400px**. Two measured differences were left in place
+deliberately:
+
+| | Production | v2 | Why v2 keeps its own |
+| :--- | ---: | ---: | :--- |
+| Header height | 63.38px | 81px | Changing it moves the sticky-header offset sitewide |
+| Hamburger / gutter | 33px / 10px | 40px / 16px | 40px is a far better tap target than 33px |
+
+Consequence to know: **"Book a Consultation" → `/vacalendar` in the drawer is now the only mobile
+path to booking.** It is present and verified, and the markup carries a comment saying so, but
+the margin for error there is zero.
+
+### 24c. Two upscaled images are left as they are
+`sales-talent.png` (536px source in a `max-w-[627px]` box) and `SPU-Image-1.png` (560px in
+`max-w-[662px]`) render upscaled and slightly soft. They match production's own sizing, so
+capping the display size would diverge from production and replacing the sources is a content
+task. Cosmetic, recorded rather than fixed.
+
+### 24d. The font-family merge was measured and **backed out**
+Decision 24 authorised merging `--font-sans` and `--font-display` (two downloads of the same
+outline at different optical-size pins, ~48KB). It was measured and **not shipped** —
+`resources/css/app.css` is unchanged.
+
+The premise was inverted: the merge does not touch headings, which stay on `--font-display`. It
+repoints `--font-sans`, so it changes **body copy and card headings**. Width change: −1.07% at
+16px, −3.22% at 20px, −9.67% at ≥32px.
+
+`/blog/` settled it. Its noise floor is **zero** (two captures of the unchanged page are
+byte-identical) and the merge changed **14.04%** of the page: "How Much Does a Virtual Legal
+Assistant Cost?" drops from 3 lines to 2 and pulls everything below it up 25px, moving half the
+index. 48KB does not buy a silently reflowed blog archive.
+
+Costed but not recommended blind: pairing the merge with `font-optical-sizing: none` cuts the
+16px discrepancy from −1.07% to ~0.07%. It needs its own verification pass; the numbers are in
+`performance-baseline.md` Part 4.
+
+### 24e. Font preload shipped — the win is stability, not LCP
+Two faces preloaded (`inter-display-latin.woff2`, `inter-latin-wght-normal.woff2`), chosen by
+measuring which faces six pages actually request. The latin-ext pair and the italic are never
+requested above the fold; preloading them would put ~125KB of dead weight on every visit.
+
+**LCP did not move, and the doc says so.** On both measured pages the LCP element is text, which
+`font-display: swap` already paints instantly in the fallback — preload changes which typeface
+that paint uses, not when. What it fixes is the swap itself (the face now lands *before* first
+paint instead of 0.6–0.9s after) and the reflow that followed: **`/case-study/` CLS 0.0502 →
+0.0013**, of which 0.0488 was font-attributable.
+
+### 6b. Customer.io CDP needs a new credential — `CUSTOMERIO_CDP_WRITE_KEY`
+Decision 6's "match production — use CDP" carried a trap. **CDP takes a write key, not a site
+id** — they are different Customer.io products, and production's write key is not this install's
+`CUSTOMERIO_SITE_ID`. Pointing CDP at a site id 404s the asset URL and **silently queues every
+event forever**, which fails in the worst possible way: no error, no events.
+
+So the browser snippet is gated on a new `CUSTOMERIO_CDP_WRITE_KEY` rather than on `SITE_ID`.
+`SITE_ID`/`API_KEY` remain server-side for `CustomerIOClient`'s Track API v1. **Blank today —
+someone must set it or the browser sends nothing.**
+
 ### 25. The Calendly preflight is fixed
 `findExistingInvitee()` cost a measured 4.0s p50 / 6.1s p95 **synchronously** inside booking
 submit: 2 sequential GETs per pooled token across 4 tokens, never short-circuiting when there was

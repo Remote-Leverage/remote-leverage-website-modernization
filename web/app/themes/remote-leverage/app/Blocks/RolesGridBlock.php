@@ -41,6 +41,7 @@ class RolesGridBlock extends Block
             'headline' => BlockDefaults::cleanText((function_exists('get_field') ? get_field('headline') : null) ?: 'The Roles That Buy Back Your Time'),
             'ctaText' => BlockDefaults::cleanText((function_exists('get_field') ? get_field('cta_text') : null) ?: 'BOOK A FREE CONSULTATION'),
             'ctaUrl' => (function_exists('get_field') ? get_field('cta_url') : null) ?: '#booking-footer',
+            'adminTint' => $this->adminTint(),
             'cards' => $this->cards(),
         ];
     }
@@ -66,6 +67,18 @@ class RolesGridBlock extends Block
                 'label' => 'CTA Button Target URL',
                 'default_value' => '#booking-footer',
             ])
+            ->addSelect('admin_tint', [
+                'label' => 'Administrative Card Tint',
+                'instructions' => 'Dark is production\'s treatment: /hire-va-4/, /hire-va-6/ and '
+                    .'/hire-va-1st-month-free/ all render this card #6341A2 with white text '
+                    .'(measured 2026-09-15). Lavender makes it read as one of the light cards.',
+                'choices' => [
+                    'dark' => 'Dark — brand purple, white text (production)',
+                    'lavender' => 'Light lavender — dark text',
+                ],
+                'default_value' => 'dark',
+                'return_format' => 'value',
+            ])
             ->addRepeater('cards', [
                 'label' => 'Role Cards (Leave empty to use preset defaults)',
                 'layout' => 'block',
@@ -77,6 +90,19 @@ class RolesGridBlock extends Block
             ->endRepeater();
 
         return $fields->build();
+    }
+
+    /**
+     * Administrative card tint.
+     *
+     * Defaults to 'dark', which is what every production page shipping this block renders,
+     * so an unset field leaves those pages untouched.
+     */
+    public function adminTint(): string
+    {
+        $tint = function_exists('get_field') ? get_field('admin_tint') : null;
+
+        return $tint === 'lavender' ? 'lavender' : 'dark';
     }
 
     public function cards(): array

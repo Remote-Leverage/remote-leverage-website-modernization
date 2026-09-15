@@ -1096,6 +1096,9 @@ $nodes = [
     ],
 ];
 ?>
+<!-- rl:noindex-follow — internal ops tool, but production still passes link equity through. App\Support\PageRobots reads this marker and emits
+     noindex, follow, matching production. The page stays published and reachable; this
+     keeps it out of search results only, it is NOT access control. -->
 <!-- wp:html -->
 <section class="w-full bg-bg-light py-10 sm:py-14">
     <div class="<?= esc_attr($wrap) ?>">

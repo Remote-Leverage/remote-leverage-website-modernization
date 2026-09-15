@@ -788,17 +788,400 @@ Two of the three now clear the **Perf ≥ 96** gate and the third went from 58�
 
 ## What was found and deliberately not fixed
 
-- **`--font-sans` and `--font-display` are two 48 KB + 70 KB downloads of the same outline.**
-  Merging them is a type-design decision, not a perf one.
-- **Neither font is preloaded**, and `font-display: swap` means first paint uses a fallback and
-  reflows. With the font now at 70 KB a `<link rel="preload">` is cheap and would remove that swap;
-  it was out of scope here.
-- **`/blog/` and `/blog/outsourcing-customer-service/` are now overwhelmingly image-bound**
+- ~~**`--font-sans` and `--font-display` are two 48 KB + 70 KB downloads of the same outline.**
+  Merging them is a type-design decision, not a perf one.~~ → **Investigated and rejected**, see
+  [Part 4, Fix 4](#fix-4--merging---font-sans-into---font-display-measured-and-rejected).
+- ~~**Neither font is preloaded**, and `font-display: swap` means first paint uses a fallback and
+  reflows.~~ → **Fixed**, see [Part 4, Fix 3](#fix-3--the-two-above-the-fold-faces-are-preloaded).
+- ~~**`/blog/` and `/blog/outsourcing-customer-service/` are now overwhelmingly image-bound**
   (2.6 MB and 3.1 MB of full-size PNGs). With the font gone, these are the largest remaining wins
-  in the whole document.
+  in the whole document.~~ → **Fixed**, see [Part 5](#part-5--blog-image-weight-2026-09-15):
+  image weight down 89–91 % and all three blog pages now score 99.
 - **The logo aspect-ratio attributes were wrong in three templates.** They are corrected, but the
   same class of bug — a declared `width`/`height` that does not match the asset — was not audited
   across the rest of the theme's `<img>` tags.
 - **Below ~350 px the header logo gets small** (88.6 px at 320 px). It no longer overflows and it
   is not distorted, but if the mobile `CONSULTATION` pill were dropped — as production has it —
   the logo could stay full size at every width. That is a marketing call, not a layout one.
+
+---
+
+# Part 4 — Font loading, second pass (2026-09-15)
+
+Closes the two font items Part 3 left open. One shipped, one was measured and **rejected**.
+
+> ⚠️ **The Lighthouse numbers in this part are the weakest evidence here, and deliberately not
+> the basis for either decision.** This machine was running a video call and several concurrent
+> agents while the work was done; a first baseline pass recorded TBT of **1 171 ms** on `/` and
+> **3 150 ms** on `/hire-va-4/` at load average 25, against 0–254 ms for the same build at load
+> average 8 twenty minutes later. That is a 5–14× swing on an unchanged tree, far beyond the
+> variance warning at the top of this document, and it is larger than the whole effect being
+> measured. The first baseline was therefore **discarded** and re-taken under conditions matching
+> the after run. The conclusions below rest on the two low-variance measurements instead —
+> resource timing and layout-shift attribution — both of which are composition facts that carry
+> to production.
+
+## Fix 3 — the two above-the-fold faces are preloaded
+
+### What was wrong
+
+Nothing preloaded the fonts, and `font-display: swap` is set. A font face is only discovered
+once `app.css` has been fetched *and* parsed, so on every cold visit the browser painted text in
+the system fallback and then re-painted and reflowed it when the real face arrived.
+
+Measured, 9 cold trials per state (fresh context, cache disabled, 1.6 Mbps / 150 ms RTT,
+4× CPU throttle, 412 × 915), medians:
+
+| | `/` before | `/` after | `/hire-va-4/` before | `/hire-va-4/` after |
+| :--- | ---: | ---: | ---: | ---: |
+| `app.css` request start | 963 ms | 1 007 ms | 919 ms | 775 ms |
+| `app.css` `responseEnd` | 1 423 ms | 1 883 ms | 1 561 ms | 1 823 ms |
+| display face request start | 1 603 ms | **1 005 ms** | 1 685 ms | **772 ms** |
+| display face `responseEnd` | 3 017 ms | **2 048 ms** | 2 804 ms | **2 144 ms** |
+| sans face `responseEnd` | 2 783 ms | **1 941 ms** | 2 592 ms | **1 909 ms** |
+| First Contentful Paint | 2 128 ms | 2 592 ms | 2 196 ms | 2 380 ms |
+| **face arrives vs FCP** | **+889 ms** | **−544 ms** | **+608 ms** | **−236 ms** |
+
+The last row is the whole point. Before, the real face landed **0.6–0.9 s after** the first
+paint — that is the swap, and it is guaranteed on every cold visit. After, both faces are in
+place **before** the first paint, so the first paint is already the final one. Font discovery
+moves **598 ms** earlier on `/` and **913 ms** earlier on `/hire-va-4/`, from "after the
+stylesheet finished" to the same millisecond the stylesheet is requested — i.e. into the
+preload scanner.
+
+Note that FCP itself gets *later* (`/`: 2 128 → 2 592 ms). That is real and expected: 118 KB of
+font now competes with the stylesheet on a 1.6 Mbps link. The trade is a slightly later first
+paint in exchange for that paint being correct, instead of an earlier paint in the wrong
+typeface followed by a reflow.
+
+### What was done
+
+Two `<link rel="preload" as="font" type="font/woff2" crossorigin>` in
+`resources/views/layouts/app.blade.php`, immediately before the `@vite` call:
+
+| Face | Size | Preloaded | Why |
+| :--- | ---: | :-: | :--- |
+| `inter-display-latin.woff2` | 70 KB | ✅ | `--font-display`; requested by every page measured |
+| `inter-latin-wght-normal.woff2` | 48 KB | ✅ | `--font-sans`; requested by every page measured |
+| `inter-display-latin-ext.woff2` | 125 KB | ❌ | U+0100+; **requested by no page measured** |
+| `inter-latin-ext-wght-normal.woff2` | — | ❌ | as above |
+| `inter-latin-wght-italic.woff2` | — | ❌ | requested on `/about-us/` only, and nothing above the fold there is italic |
+
+Which faces each page actually pulls was measured, not assumed — `/`, `/hire-va-4/`,
+`/case-study/`, `/blog/`, `/about-us/` and `/blog/outsourcing-customer-service/` were loaded and
+their `woff2` responses recorded. All six request **exactly the two preloaded faces** and no
+others. Preloading all five would put ~125 KB of never-parsed bytes on the critical path of
+every visit, which is a larger regression than the swap being removed.
+
+The hrefs go through `Vite::asset('resources/fonts/…')`. These filenames are content-hashed
+build output (`inter-display-latin-B9ONkGYY.woff2` today); a hardcoded hash would 404 after any
+font rebuild while still looking correct in the markup.
+
+`crossorigin` is required even though the fonts are same-origin — `@font-face` always fetches in
+anonymous CORS mode, and a preload whose mode does not match is simply fetched a second time.
+Verified across all five pages: **each face is fetched exactly once** and Chrome logs no
+"preloaded but not used" warning.
+
+### Result — layout stability
+
+7 cold trials per page per state, same throttling. This is the environment-independent number.
+"Post-arrival" is the shift that lands in the 450 ms window around the last font's `responseEnd`
+— i.e. the portion attributable to the swap.
+
+| Page | CLS before | CLS after | post-arrival before | post-arrival after |
+| :--- | ---: | ---: | ---: | ---: |
+| `/` | 0.0089 | **0.0030** | 0.0056 | **0.0000** |
+| `/hire-va-4/` | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| `/case-study/` | 0.0502 | **0.0013** | 0.0488 | 0.0013 |
+| `/blog/` | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+
+**`/case-study/`'s CLS was almost entirely the font swap** — 0.0488 of 0.0502 — and it is now
+0.0013. On `/`, the font-attributable shift goes to exactly zero. The two pages that were
+already 0.0000 are unaffected. Two of the seven `/case-study/` after-runs recorded 0.0257/0.0260
+rather than 0.0013; the median is reported.
+
+### Result — Lighthouse (mobile, 3 runs, median)
+
+Both columns taken at load average ≈ 8, twenty minutes apart, on the same build. Read the CLS
+and FCP columns; treat LCP as inconclusive.
+
+| Page | Metric | Before | After |
+| :--- | :--- | ---: | ---: |
+| `/` | Performance | 97 | 99 |
+| | FCP | 1 982 ms | **1 250 ms** |
+| | LCP | 2 057 ms | 2 067 ms |
+| | CLS | 0.0037 | **0.0000** |
+| | Speed Index | 2 282 ms | 2 259 ms |
+| `/hire-va-4/` | Performance | 94 | 95 |
+| | FCP | 1 299 ms | 1 246 ms |
+| | LCP | 1 732 ms | 2 296 ms |
+| | CLS | 0.0000 | 0.0000 |
+| | Speed Index | 2 338 ms | 2 621 ms |
+
+Per-run LCP, because the medians hide the spread: `/` before 1869 / 2063 / 2057, after 2100 /
+1994 / 2067 — flat. `/hire-va-4/` before 2416 / 1732 / 1703, after 2296 / 2302 / 2294 — the
+before median rests on two fast runs and the after runs are unusually tight, so the apparent
+564 ms regression is **not** supported. **LCP did not measurably move in either direction on
+this machine.** That is consistent with the mechanism: on both pages the LCP element is a text
+node, which `swap` already painted immediately in the fallback, so preloading changes *which
+typeface* that paint uses, not when it happens. The wins are in CLS and FCP.
+
+## Fix 4 — merging `--font-sans` into `--font-display`: measured and rejected
+
+**Not applied.** `resources/css/app.css` is unchanged.
+
+The saving is real (~48 KB, dropping `inter-latin-wght-normal.woff2`) and the change is one
+line. It was authorised on the understanding that it might alter rendering. It does, visibly,
+so it was backed out before shipping.
+
+### First, a correction to the premise
+
+The concern was that merging would change **headings**. It does not. Headings are on
+`--font-display`, which keeps the dual-axis face and is untouched. The merge points
+`--font-sans` at that same face, so what changes is **body copy, card headings and every other
+run on `--font-sans`** — the opposite of the worry. Part 3 had this right: *"Collapsing them
+would save another 48 KB and change how body copy renders."*
+
+The mechanism is the `opsz` axis. `--font-sans` is backed by a wght-only subset, which pins
+`opsz` at 14; `--font-display` keeps both axes, and with `font-optical-sizing` at its default
+`auto` it renders at `opsz` = the element's own px size, clamped to [14, 32]. So the two are
+metrically identical only at ≤ 14 px and diverge steadily above it.
+
+Measured directly — same string, size and weight under each family, 260 combinations:
+
+| Font size | Width change if merged |
+| ---: | ---: |
+| 13 px | −0.08 % |
+| 14 px | −0.08 % |
+| 15 px | −0.56 % |
+| 16 px | −1.07 % |
+| 17 px | −1.61 % |
+| 18 px | −2.15 % |
+| 20 px | −3.22 % |
+| 24 px | −5.37 % |
+| ≥ 32 px | −9.67 % |
+
+The theme puts a lot of `--font-sans` text above 14 px — `/blog/` alone has 60 runs at 18 px.
+
+### Page-level diff
+
+Full-page 1440 px captures of `/`, `/hire-va-4/`, `/case-study/` and `/blog/`, images forced
+eager and the page scrolled to the end first, before and after the merge. Isolation is exact:
+the two captures are the same page load with only `--font-sans` repointed (plus an italic face
+added to `Inter Display`, so italics are not synthesised), so no other tree change can leak in.
+The noise floor is the same page captured twice with no change at all.
+
+| Page | Page height | Runs on `--font-sans` | Wrap points moved | Lines gained/lost | Pixels differing | Diff % | Noise floor |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `/` | 11 402 → 11 402 | 24 | 0 | 0 | 376 442 | 2.29 % | 2.04 % |
+| `/hire-va-4/` | 8 922 → 8 922 | 97 | **13** | 0 | 65 584 | 0.51 % | 0.07 % |
+| `/case-study/` | 3 524 → 3 524 | 66 | **1** | 0 | 24 145 | 0.48 % | 0.08 % |
+| `/blog/` | 10 287 → **10 262** | 215 | **60** | **1** | 2 074 429 | **14.04 %** | **0.00 %** |
+
+`/` is the only page that passes, and only because just 24 of its 305 text runs are on
+`--font-sans` and all but one are ≤ 14 px — its 2.29 % sits inside a 2.04 % noise floor produced
+by a rotating component, and no wrap point moves. The other three are 6×, 6× and unboundedly
+above their noise floors.
+
+**`/blog/` settles it.** Its noise floor is **zero** — two captures of the unchanged page are
+byte-identical — and the merge changes **14 % of the page**. A row-band analysis of the diff
+shows why: from y ≈ 200 to y ≈ 4 800 the per-band differences are modest (2 500–7 700 px) and
+are the 60 card headings re-wrapping in place; from y ≈ 4 900 they jump to 40 000–75 000 px per
+band and stay there. That step is the card heading *"How Much Does a Virtual Legal Assistant
+Cost?"* dropping from three lines to two, which pulls **everything below it up by 25 px**. Half
+the blog index moves.
+
+`/hire-va-4/` is milder but not clean: 13 runs re-wrap, including the 28 px
+`Book a Free 15-Minute Consultation` heading and a 15 px paragraph whose first line takes on
+28.8 px more text.
+
+### Verdict
+
+This is not imperceptible, so per the standing instruction it was not shipped. A re-lined
+heading and a 25 px page-height change are exactly the "silently restyled type scale" that is
+worse than 48 KB. `--font-sans` and `--font-display` stay as two downloads.
+
+### The version that might work
+
+Worth recording for whoever revisits this: the merge is only unshippable *as a pure swap*. If
+`--font-sans` consumers are simultaneously pinned with **`font-optical-sizing: none`**, the
+dual-axis face renders at its default `opsz` instead of tracking the element size, which is very
+nearly the `opsz 14` pin the wght-only subset provides — so the 48 KB file could go without
+re-wrapping anything.
+
+Measured the same way (4 strings × 4 weights per size, widths against the current
+`--font-sans` face):
+
+| Font size | Pure swap (`auto`) | With `font-optical-sizing: none` |
+| ---: | ---: | ---: |
+| 16 px | −1.07 % | 0.34 px (≈ 0.07 %) |
+| 18 px | −2.15 % | 0.39 px |
+| 20 px | −3.22 % | 0.44 px |
+| 24 px | −5.37 % | 0.52 px |
+| 32 px | −9.67 % | 0.70 px |
+
+`none` is **not** bit-identical — a residual of about 0.022 px per px of font size remains at
+every size, which looks like per-glyph subpixel rounding accumulating over a ~65-character
+string rather than a different instance. But it is 15× closer than the pure swap and, at a third
+of a pixel per line at body sizes, below the level that moved wrap points above.
+
+That is a larger change than this task allowed and it still needs its own wrap-point and
+screenshot pass before anyone trusts it — the 0.022 px/px residual has not been shown to be
+harmless on a real page, only small. It is the version worth costing.
+
+---
+
+# Part 5 — Blog image weight (2026-09-15)
+
+Closes the item Part 3 left as *"the largest remaining wins in the whole document"*: **`/blog/`
+and the single post are image-bound.** They are not any more.
+
+## Which pipeline the weight was on
+
+**All of it was on the WordPress media library (`web/app/uploads/`), not on
+`resources/images/pages/` → `public/images/`.** The `themeImages()` Vite plugin and the
+`BlockDefaults::pageImg()` filename contract were **not touched**, nothing was written into
+`public/`, and `tests/Unit/ThemeImageSourcesTest.php` is green and unweakened.
+
+The blog templates hand-built a single `src` from an attachment and shipped it with no
+`srcset`, no `sizes` and no `width`/`height`:
+
+| Template | Requested | Actually painted at | Cost |
+| :--- | :--- | :--- | ---: |
+| `partials/blog-index.blade.php` | `medium_large` (768×512 PNG) | ≤ 420 px wide card | 321–391 KB × 20 |
+| `partials/content-single.blade.php` — hero | **`full`** (1024×683 PNG) | ≤ 469 px wide, and it is the LCP element | 513 KB |
+| `partials/talent-carousel.blade.php` — photos | **the untouched original** (771×1024 PNG) | **220 × 265 px card** | 197–666 KB **× 5** |
+| `partials/talent-carousel.blade.php` — flags | the untouched original (512×512 PNG) | **24 × 24 px circle** | 8–18 KB × 5 |
+| `partials/content-single.blade.php` — author avatar | the 250×250 original, over **`http://`** | 44 px and 100 px | 65 KB × 2 |
+
+The talent carousel alone was **2.48 MB of the single post's 3.06 MB**, and it renders on all
+88 posts that carry it. WordPress had already generated `226x300` and `768x1020` subsizes of
+every one of those files at upload time; nothing was using them.
+
+## What changed
+
+New `app/Support/ResponsiveImage.php` builds `src`/`srcset`/`sizes`/`width`/`height` for an
+attachment id, routing **every** candidate through the existing `BlockDefaults::preferWebp()`.
+The three blog partials now call it. `MediaLibrary::id()` was extracted so the carousel, which
+resolves art by filename, can reach the subsizes; `MediaLibrary::url()` is unchanged in
+behaviour.
+
+Two smaller defects fixed in passing:
+
+- **`BlockDefaults::filterContentImgTag()` rewrote only `src`.** A matching `srcset` candidate
+  always outranks `src`, so for any content image WordPress had given a srcset the WebP was
+  never requested and the PNG was downloaded anyway. It now rewrites both.
+- **The author avatar's stored `http://` URL** — the single post's mixed-content warning, and
+  the reason its Best Practices score was 79 — is resolved to an attachment and re-emitted on
+  the site's own scheme.
+
+The first `/blog/` card is the LCP element at every breakpoint and was `loading="lazy"`; it is
+now `fetchpriority="high"` with no lazy attribute. Every other blog image stays lazy.
+
+## Before / after — **interleaved** A/B, mobile Lighthouse
+
+⚠️ **The first attempt at these numbers was wrong and is not reported.** Another agent was
+editing the same working tree and rebuilt `resources/js/app.js` and `layouts/app.blade.php`
+*during* the measurement; the app bundle hash changed between run 1 and run 2, which showed up
+as a TBT "regression" of 94 → 1665 ms on the post and cost ~25 performance points. None of it
+was this change.
+
+What is reported below is an **interleaved A/B on one tree**: the three partials are swapped
+between their pre- and post-change form, three alternating passes, so anything else moving in
+the tree is common-mode. `npx lighthouse@12.8.2`, default mobile preset, median of 3, values
+per run shown.
+
+| Page | Perf | LCP | CLS | TBT | Total weight | Images |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `/blog/` | 90 → **99** | 3.61 s → **1.56 s** | 0.000 → 0.000 | 0 → 19 ms | 2.74 MB → **0.47 MB** | 2 611 KB → **288 KB** |
+| `/blog/outsourcing-customer-service/` | 79 → **99** | 4.71 s → **2.10 s** | 0.000 → 0.000 | 42 → 41 ms | 3.27 MB → **0.59 MB** | 3 011 KB → **274 KB** |
+| `/blog/project-manager-cost/` | 81 → **99** | 4.53 s → **1.54 s** | 0.000 → 0.000 | 41 → 64 ms | 3.25 MB → **0.58 MB** | 2 999 KB → **268 KB** |
+| `/case-study/` *(control)* | 100 → **100** | 1.68 s → 1.66 s | 0.002 → 0.002 | 0 → 0 ms | 0.26 MB → 0.26 MB | 75 KB → 75 KB |
+
+Per-run performance: `/blog/` 89/90/99 → 99/99/99 · outsourcing 75/79/79 → 100/99/98 ·
+project-manager-cost 81/80/82 → 100/99/99 · control 98/100/100 → 100/100/100.
+
+**The control is unmoved on every column**, which is what says the change is scoped to the
+blog templates.
+
+**All three blog pages now clear the Perf ≥ 96 gate** — the first pages in this document to do
+so besides `/` and `/case-study/`. **LCP < 1.2 s still passes on nothing**; the blog pages went
+from 3.6–4.7 s to 1.5–2.1 s and what is left is not image bytes.
+
+Image weight fell **89–91 %**. The single post went from **13 requests totalling 3.06 MB** to the
+same 13 requests totalling **274 KB**; the six images that were over 450 KB are now 30–69 KB.
+
+## Proof the rendering did not move
+
+Playwright, `channel: 'chrome'`, full-page screenshots at **1440 px and 400 px**, both arms
+captured on the same tree minutes apart, `img.loading` forced to `eager` and the page scrolled
+before capture.
+
+| Page | 1440 px | 400 px |
+| :--- | ---: | ---: |
+| `/blog/` | **0 px differ (0.000 %)** | 68 px (0.001 %) |
+| `/blog/outsourcing-customer-service/` | 1 px shorter, see below | 10 270 px (0.111 %) |
+| `/blog/project-manager-cost/` | 52 298 px (0.309 %) | 6 976 px (0.093 %) |
+| `/case-study/` *(control, unchanged code)* | 8 375 px (0.165 %) | 1 312 px (0.049 %) |
+
+**The control page sets the noise floor at 0.165 %** — it has no code change at all and still
+differs by that much between two captures. Every measured page is at or below it. The residual
+on the two posts is WebP's lossy edge reconstruction on the hero photo, visible only as sparse
+single-pixel speckle in the diff, not as anything perceptible side by side.
+
+A stronger check than pixels — `getBoundingClientRect()` on **every `<img>` on both pages at
+both widths**:
+
+```
+blog  1440: docHeight 10287 -> 10287, 62 images, 0 broken, every box identical (<= 0.5px)
+blog   400: docHeight 28911 -> 28911, 62 images, 0 broken, every box identical (<= 0.5px)
+post  1440: docHeight 14375 -> 14374, 15 images, 0 broken, every box identical (<= 0.5px)
+post   400: docHeight 23206 -> 23206, 15 images, 0 broken, every box identical (<= 0.5px)
+```
+
+The post's **1 px** at 1440 is `.rl-article-header-wrapper` going 472.813 → 472.656 px, i.e.
+**0.157 px**, which then rounds the document height down. The hero sits in a flex item with no
+definite height, so its box comes from the *loaded* file's intrinsic ratio, and WordPress's
+768×512 subsize is 0.666667 where the 1024×683 original is 0.666992. It is sub-pixel, it is
+inherent to using the generated sizes, and CLS measured 0.000 on every run of both arms.
+
+### The trap in verifying this
+
+The first screenshot pass reported `/blog/` at **21 % different** with the lower cards blank.
+That was the capture, not the page: `decoding="async"` lets Chrome take a `fullPage` screenshot
+before a just-loaded image has been rasterised. All 180 image URLs returned 200. Forcing
+`img.decoding = 'sync'` and awaiting `img.decode()` on every image before capture took the same
+page to **0 px different**. Any future screenshot diff in this repo needs that await, or it will
+report phantom regressions on exactly the pages that were made faster.
+
+### Quality at the worst case
+
+The talent card is the largest downscale in the change — a 771×1024 original replaced by a
+226×300 WebP in a 220×265 box. Element-level captures at three densities:
+
+| Element | 1440 @1x | 1440 @2x | 400 @2.625x |
+| :--- | ---: | ---: | ---: |
+| talent carousel | 0.360 % | 0.003 % | 0.002 % |
+| article hero | 0.001 % | 0.000 % | 0.002 % |
+| author bio card | — | 0.001 % | 0.011 % |
+
+At **@1x** the browser picks the 226 w candidate and the 0.36 % is very slightly softer hair
+detail, invisible unless flicked between the two. At **@2x and above — every real phone,
+including Lighthouse's own Moto G Power emulation at 2.625x — it picks the 768 w candidate and
+the result is pixel-identical.** The 1x arm is the floor, not the common case.
+
+## Found and deliberately not fixed
+
+- **`getScheduledEvent` / mixed content in post *content*.** The two posts measured have no
+  in-content images, so `filterContentImgTag`'s srcset fix is reasoned-about but **not
+  measured**. A post that does carry body images should be checked before this is called done.
+- **No intermediate size between 226 px and 768 px**, so a 220 px card at 2x asks for 577 px and
+  is served 768 px (30–61 KB of WebP). Closing that needs a registered `add_image_size` plus a
+  `wp media regenerate` across 119 posts — a media-library migration, not a template change.
+- **The `2048x2048` and `1536x1536` subsizes are never offered**, because no blog image is wider
+  than 1024 px to begin with. The originals are already small; there is nothing above `large`.
+- **`/blog/` still loads all 20 cards' art.** They are lazy and the page is now 0.47 MB, so this
+  is no longer worth paging or deferring further.
+- **Flags are served at `thumbnail` (150 px) into a 24 px circle** because that is the smallest
+  registered size. It is 2–4 KB each as WebP; not worth a new subsize.
+- **CLS on `/case-study/` is still 0.002–0.052 and still unstable.** Untouched here.

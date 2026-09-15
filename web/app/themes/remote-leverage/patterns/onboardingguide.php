@@ -124,6 +124,9 @@ $parts = [
     ]],
 ];
 ?>
+<!-- rl:noindex-follow — client-enablement content; production noindexes it but keeps follow. App\Support\PageRobots reads this marker and emits
+     noindex, follow, matching production. The page stays published and reachable; this
+     keeps it out of search results only, it is NOT access control. -->
 
 <!-- ============ §1 GUIDE: HERO VIDEO, FAQ, REFERENCE LINKS ============ -->
 <!-- wp:group {"align":"full","layout":{"type":"constrained","contentSize":"1170px"}} -->

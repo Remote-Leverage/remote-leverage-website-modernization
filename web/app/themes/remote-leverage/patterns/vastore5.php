@@ -24,20 +24,19 @@ use App\Support\BlockDefaults;
  * now be the right answer. Each one below was ruled out on a concrete, reproducible defect rather
  * than "it looks different".
  *
- *   Objections accordion  - acf/accordion-faq is the closest component and was the strongest
- *       candidate. Three blocking defects, all in resources/views/blocks/accordion-faq.blade.php,
- *       none fixable without editing a shared block this agent may not touch:
- *         (a) it hard-splits the rows into two balanced columns (`faqsLeft`/`faqsRight` in
- *             AccordionFaqBlock::with()). A rep works down 13 objections live on a call; a
- *             zig-zag two-column scan is the wrong reading order for that.
- *         (b) AccordionFaqBlock::generateSchemaJson() always emits Schema.org FAQPage
- *             structured data. This page is internal collateral served noindex,nofollow —
- *             publishing customer-facing FAQ markup from it is wrong regardless of indexing.
- *         (c) the answer slot is `text-[15px] leading-relaxed` with no list styling, and the
- *             theme has no global `ul{list-style}` rule (Tailwind preflight strips markers;
- *             only .rl-legal-doc re-adds them). Three of the 13 objection bodies carry <ul>/<ol>
- *             ("Interviewing other companies", "I need to talk to partner/team", "I don't want
- *             to pay upfront") and would silently lose their bullets and their 1-4 numbering.
+ *   Objections accordion  - NOW acf/accordion-faq. The three defects that ruled it out were
+ *       all in the block itself, and the client approved fixing them there (2026-09-15) rather
+ *       than keeping a second accordion alive in this pattern:
+ *         (a) it hard-split the rows into two balanced columns. The block now takes a `columns`
+ *             option; this page passes `1` so a rep reads down 13 objections in order.
+ *         (b) it always emitted Schema.org FAQPage data. The block now takes a `schema` option;
+ *             this page passes off, because it is internal collateral served noindex,nofollow.
+ *         (c) the answer slot had no list styling and the theme has no global `ul{list-style}`
+ *             rule (Tailwind preflight strips markers; only .rl-legal-doc re-adds them), so
+ *             three of the 13 objection bodies ("Interviewing other companies", "I need to talk
+ *             to partner/team", "I don't want to pay upfront") lost their bullets and their 1-4
+ *             numbering. The block's answer slot now restores disc/decimal markers.
+ *       Both options default to the old behaviour, so no page that already used the block moved.
  *   Hourly-rate + bundle price rows
  *                         - acf/data-table hard-renders a red cross and a green tick on every
  *       row (it is a feature matrix, not a price list) — "$6/hr ✗ ... $4992 ✓" is nonsense.
@@ -265,6 +264,24 @@ $objections = [
     ],
 ];
 
+/* acf/accordion-faq payload for the objections section. The headline is deliberately empty —
+   the section renders its own <h2> in the v5 band's style — and an explicitly empty headline
+   suppresses the block's default one. */
+$objectionData = [
+    'headline' => '',
+    '_headline' => 'field_accordion_faq_block_headline',
+    'columns' => '1',
+    '_columns' => 'field_accordion_faq_block_columns',
+    'schema' => 0,
+    '_schema' => 'field_accordion_faq_block_schema',
+];
+BlockDefaults::encodeRepeater(
+    'faqs',
+    'field_accordion_faq_block_faqs',
+    array_map(fn (array $o): array => ['question' => $o['q'], 'answer' => $o['a']], $objections),
+    $objectionData
+);
+
 $roleCategories = [
     [
         'id' => 'it-dev',
@@ -414,9 +431,6 @@ $roleCategories = [
         ],
     ],
 ];
-
-$iconPlus = '<svg class="v5-acc__icon v5-acc__icon--plus" viewBox="0 0 448 512" aria-hidden="true"><path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"/></svg>';
-$iconMinus = '<svg class="v5-acc__icon v5-acc__icon--minus" viewBox="0 0 448 512" aria-hidden="true"><path d="M416 208H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h384c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"/></svg>';
 
 /* Jump-nav targets. Labels are the sections' own headings verbatim; "Roles" is the one
    coined label, because the role catalogue carries no heading of its own. */
@@ -740,16 +754,19 @@ include get_theme_file_path('resources/patterns/sales-playbook-deposit.php');
                 </div>
             </div>
 
-            <div class="v5-acc">
-                <?php foreach ($objections as $item) { ?>
-                    <details>
-                        <summary>
-                            <span><?= esc_html($item['q']) ?></span>
-                            <span class="v5-acc__ico"><?= $iconPlus ?><?= $iconMinus ?></span>
-                        </summary>
-                        <div class="v5-acc__body"><?= $item['a'] ?></div>
-                    </details>
-                <?php } ?>
+            <?php /* acf/accordion-faq now covers this section: `columns: 1` keeps the 13 rows in
+                     the order a rep works down them on a call, and `schema: 0` keeps Schema.org
+                     FAQPage markup off a noindex,nofollow internal page. The block's answer slot
+                     restores <ul>/<ol> markers, which is what the three list-bearing objections
+                     needed. Only the paragraph/list rhythm is page-local, so it is scoped here
+                     through the block's .rl-faq-answer hook rather than pushed into the block;
+                     the block's own outer padding is zeroed because .v5-obj already supplies the
+                     band's gutters and .v5-obj__intro its top margin. */ ?>
+            <div class="[&>div]:p-0
+                        [&_.rl-faq-answer_p]:mb-3 [&_.rl-faq-answer_p:last-child]:mb-0
+                        [&_.rl-faq-answer_ul]:mb-3.5 [&_.rl-faq-answer_ol]:mb-3.5
+                        [&_.rl-faq-answer_li]:mb-1.5">
+                <?= BlockDefaults::patternBlock('accordion-faq', $objectionData) ?>
             </div>
         </div>
     </div>

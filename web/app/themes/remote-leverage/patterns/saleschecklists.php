@@ -810,6 +810,9 @@ $nodes = [
     ],
 ];
 ?>
+<!-- rl:noindex — internal ops tool — checklist forms that POST to live n8n webhooks. App\Support\PageRobots reads this marker and emits
+     noindex, nofollow, matching production. The page stays published and reachable; this
+     keeps it out of search results only, it is NOT access control. -->
 <!-- wp:html -->
 <section class="w-full bg-bg-light py-10 sm:py-14">
     <div class="<?= esc_attr($wrap) ?>">

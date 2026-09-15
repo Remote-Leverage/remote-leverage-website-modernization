@@ -27,7 +27,7 @@ class ConsultLandingHeroBlock extends Block
      *
      * @var string
      */
-    public $description = "Production's consultation landing-page hero (/1monthonus-flp/, /hire-va-email/, the isolated-form-fields variants and /hire-real-estate-virtual-assistants-flp/): a compact black-to-magenta banner band carrying the headline, a short intro, a single-column tick list, and a translucent glass card holding the booking wizard with its email field isolated as step one.";
+    public $description = "Shared landing-page hero in two skins. 'Consultation' (the default) is production's consultation landing hero (/1monthonus-flp/, /hire-va-email/, the isolated-form-fields variants and /hire-real-estate-virtual-assistants-flp/): a compact black-to-magenta banner band carrying the headline, a short intro, a single-column tick list, and a translucent glass card holding the booking wizard with its email field isolated as step one. 'VA roles' is the older /1monthonus/, /hire-va-isolated-form/ and /hire-va/ family: the same shape on a 780px violet band with a gold-gradient headline line, a two-column tick list and a solid white booking card.";
 
     /**
      * The block category.
@@ -86,28 +86,62 @@ class ConsultLandingHeroBlock extends Block
      */
     public function with()
     {
+        $variant = self::resolveVariant(get_field('variant'));
+        $isVaRoles = $variant === 'va-roles';
+        $backgroundImage = BlockDefaults::resolveImageUrl(get_field('background_image'));
+
         return [
+            'variant' => $variant,
             'headline' => get_field('headline') ?: 'Latin American<br>Virtual Assistants<br>$6-$10 Per Hour',
+            'headlineGradient' => get_field('headline_gradient') ?: '',
+            'headlineSize' => get_field('headline_size') === '80' ? '80' : '64',
             'intro' => get_field('intro') ?: '',
-            'checklist' => self::resolveChecklist(get_field('checklist')),
+            'checklist' => self::resolveChecklist(get_field('checklist'), $isVaRoles),
             'tickColor' => get_field('tick_color') ?: '#10B981',
-            'backgroundImage' => BlockDefaults::resolveImageUrl(get_field('background_image'))
-                ?: BlockDefaults::pageImg('consultation-landing', 'banner-02.jpg'),
-            'bookingTitle' => get_field('booking_title') ?: 'Book a Free Consultation',
+
+            // The consultation skin always paints the shared banner; the va-roles band is a bare
+            // gradient unless the page supplies art, so it gets no fallback.
+            'backgroundImage' => $isVaRoles
+                ? $backgroundImage
+                : ($backgroundImage ?: BlockDefaults::pageImg('consultation-landing', 'banner-02.jpg')),
+            'backgroundImageClass' => (string) (get_field('background_image_class') ?: ''),
+            'splitAt' => get_field('split_at') === '2xl' ? '2xl' : 'xl',
+            'ctaText' => get_field('cta_text') ?: '',
+            'ctaUrl' => get_field('cta_url') ?: '#booking-footer',
+
+            // Every consultation page carries the booking card, so it keeps its default title.
+            // On the va-roles skin an empty title means the page has no hero card at all, which
+            // is how /1monthonus/ and /hire-va/ render — so no fallback there either.
+            'bookingTitle' => $isVaRoles
+                ? (get_field('booking_title') ?: '')
+                : (get_field('booking_title') ?: 'Book a Free Consultation'),
             'formButtonText' => get_field('form_button_text') ?: 'Find me an Assistant',
             'isolatedSteps' => self::resolveIsolatedSteps(get_field('isolated_steps')),
         ];
     }
 
     /**
+     * Which skin to render.
+     *
+     * Anything unset or unrecognised is the consultation skin, so the six consultation pages —
+     * none of which sets the field — render exactly as they did before the skin existed.
+     */
+    public static function resolveVariant(mixed $value): string
+    {
+        return $value === 'va-roles' ? 'va-roles' : 'consultation';
+    }
+
+    /**
      * The reassurance tick list.
      *
      * An empty repeater keeps production's standard four items; /hire-real-estate-
-     * virtual-assistants-flp/ differs only in promising a 48-hour match.
+     * virtual-assistants-flp/ differs only in promising a 48-hour match. The va-roles skin
+     * passes $skipDefaults, because its pages always supply their own ticks and the
+     * consultation copy would be wrong there.
      *
      * @return array<int, string>
      */
-    public static function resolveChecklist(mixed $rows): array
+    public static function resolveChecklist(mixed $rows, bool $skipDefaults = false): array
     {
         $items = is_array($rows)
             ? array_values(array_filter(array_map(
@@ -116,12 +150,16 @@ class ConsultLandingHeroBlock extends Block
             )))
             : [];
 
-        return $items === [] ? [
+        if ($items !== [] || $skipDefaults) {
+            return $items;
+        }
+
+        return [
             'No contracts or recurring fees',
             'Get matched within 72 hours',
             'Fluent English + U.S. time zones',
             '12-month replacement guarantee',
-        ] : $items;
+        ];
     }
 
     /**
@@ -167,10 +205,35 @@ class ConsultLandingHeroBlock extends Block
         $fields = new FieldsBuilder('consult_landing_hero');
 
         $fields
+            ->addSelect('variant', [
+                'label' => 'Skin',
+                'instructions' => 'Consultation is the black-to-magenta band with the glass booking '
+                    .'card. VA roles is the older violet band with the gold-gradient headline line, '
+                    .'a two-column tick list and a solid white card.',
+                'choices' => [
+                    'consultation' => 'Consultation — #060218 band, glass card',
+                    'va-roles' => 'VA roles — violet band, white card',
+                ],
+                'default_value' => 'consultation',
+                'return_format' => 'value',
+            ])
             ->addTextarea('headline', [
                 'label' => 'Headline (HTML allowed)',
                 'default_value' => 'Latin American<br>Virtual Assistants<br>$6-$10 Per Hour',
                 'rows' => 3,
+            ])
+            ->addTextarea('headline_gradient', [
+                'label' => 'Headline Gold-Gradient Line (VA roles skin, HTML allowed)',
+                'instructions' => 'Rendered under the headline as a gold gradient span. Ignored by '
+                    .'the consultation skin.',
+                'rows' => 2,
+            ])
+            ->addSelect('headline_size', [
+                'label' => 'Headline Scale (VA roles skin)',
+                'instructions' => '80/88 for a three-line headline, 64/70.4 for a four-line one.',
+                'choices' => ['64' => '64 / 70.4', '80' => '80 / 88'],
+                'default_value' => '64',
+                'return_format' => 'value',
             ])
             ->addTextarea('intro', [
                 'label' => 'Intro Paragraph (HTML allowed)',
@@ -194,6 +257,29 @@ class ConsultLandingHeroBlock extends Block
                 'label' => 'Banner Background',
                 'return_format' => 'url',
                 'instructions' => 'Defaults to the shared black-to-magenta banner.',
+            ])
+            ->addText('background_image_class', [
+                'label' => 'Banner Background Extra Classes (VA roles skin)',
+                'instructions' => 'Full Tailwind literals only — e.g. "hidden min-[1280px]:block" to '
+                    .'hide the art below 1280px. A class assembled by concatenation is never '
+                    .'emitted, because Tailwind scans source text.',
+            ])
+            ->addSelect('split_at', [
+                'label' => 'Copy/Card Split Breakpoint (VA roles skin)',
+                'instructions' => 'Width at which the centred single column becomes the left-aligned '
+                    .'copy/card row. A page with a hero booking card needs xl to keep the card '
+                    .'on-screen at 1440.',
+                'choices' => ['xl' => 'xl — 1280px', '2xl' => '2xl — 1536px'],
+                'default_value' => 'xl',
+                'return_format' => 'value',
+            ])
+            ->addText('cta_text', [
+                'label' => 'Hero CTA Button Text (VA roles skin)',
+                'instructions' => 'Leave empty for no CTA button.',
+            ])
+            ->addText('cta_url', [
+                'label' => 'Hero CTA / Card Target URL',
+                'default_value' => '#booking-footer',
             ])
             ->addText('booking_title', [
                 'label' => 'Booking Card Title',
