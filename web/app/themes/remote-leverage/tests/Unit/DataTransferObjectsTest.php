@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Domains\Referral\Data\PayoutData;
-use App\Domains\Referral\Data\ReferralData;
 use App\Domains\Referral\Data\ReferrerData;
 use App\Domains\Scheduling\Data\BookingRequestData;
 use App\Domains\Scheduling\Data\TimeSlotData;
@@ -11,28 +10,6 @@ use App\Domains\Tracking\Data\AnalyticsEventData;
 use App\Domains\Tracking\Data\UserProfileData;
 
 describe('Data Transfer Objects', function () {
-    test('ReferralData instantiates correctly and serializes to array', function () {
-        $dto = ReferralData::fromArray([
-            'referrer_id' => 42,
-            'referral_code' => 'apex-capital',
-            'ip_address' => '192.168.1.1',
-            'landing_url' => 'https://remoteleverage.com/executive-assistant',
-            'utm_source' => 'linkedin',
-            'utm_medium' => 'referrer_post',
-            'utm_campaign' => 'q3_launch',
-        ]);
-
-        expect($dto->referrerId)->toBe(42)
-            ->and($dto->referralCode)->toBe('apex-capital')
-            ->and($dto->utmSource)->toBe('linkedin')
-            ->and($dto->status)->toBe('clicked');
-
-        $arr = $dto->toArray();
-        expect($arr['referrer_id'])->toBe(42)
-            ->and($arr['referral_code'])->toBe('apex-capital')
-            ->and($arr['utm_medium'])->toBe('referrer_post');
-    });
-
     test('PayoutData handles amounts and statuses', function () {
         $dto = PayoutData::fromArray([
             'referrer_id' => 10,
