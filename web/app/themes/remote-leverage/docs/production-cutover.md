@@ -159,6 +159,7 @@ These must all be green before DNS moves. One is green; the redirect gate closed
 | Transactional email deliverability verified | [performance-baseline.md](performance-baseline.md) | 🔴 Not started — every `MAIL_*` value is empty |
 | Webhook signing secrets set in every environment | [known-issues.md](known-issues.md) #7 | 🔴 **New gate, 2026-09-15.** Both webhook endpoints now fail closed: with no secret they return 503 and process nothing. `STRIPE_WEBHOOK_SECRET` and `CALENDLY_WEBHOOK_SIGNING_KEY` are empty everywhere, so deploying as-is takes Stripe Connect payout events and Calendly booking events dark. Set both before this reaches staging |
 | Error monitoring reporting | — | 🔴 Sentry has no DSN. `SENTRY_LARAVEL_DSN` is now present and blank in `.env` / `.env.example` (2026-09-15) — the key exists, the value is still the gate |
+| Funnel redirect URLs repointed off production | [Funnel URLs configured outside WordPress](#funnel-urls-configured-outside-wordpress) | 🔴 **New gate, 2026-09-15.** Four Calendly events and the Stripe deposit element carry redirect targets set outside WordPress. They still point at `remoteleverage.com`, and `STRIPE_DEFAULT_THANKYOU_URL` is unset so the v2 deposit page emits an empty `success-url` |
 
 ## Recommended sequence
 
@@ -185,3 +186,47 @@ These must all be green before DNS moves. One is green; the redirect gate closed
 - [x] **Stop forcing indexability on non-production** — ✅ done 2026-09-14. The theme's indexability override was **removed entirely**; WordPress/Bedrock defaults now apply, so `DISALLOW_INDEXING` (set in `config/environments/development.php` and `staging.php`) does its job. Verified locally: `blog_public=0` and `<meta name="robots" content="noindex, nofollow" />`. Production is unaffected — the DB value is `1`. See known-issues.md #4. **Re-confirm on staging after deploy** that the page source contains that noindex meta, and that production does *not*.
 - [x] **Confirm the sitemap** — ✅ **decided 2026-09-15: Yoast's `/sitemap_index.xml`.** Activating Yoast settles it — with `enable_xml_sitemap` on, Yoast serves `/sitemap_index.xml` and 301s core's `/wp-sitemap.xml` onto it, verified locally and exactly what production has served for years. Letting Yoast win keeps the URL Search Console already has, and core's sitemap would otherwise advertise the eight pages this migration just marked `noindex`, since it cannot read `_yoast_wpseo_meta-robots-noindex`. `web/robots.txt` updated to match. (Core's sitemap 404s locally anyway: `blog_public` is `0`, which disables it. Yoast's serves regardless.)
 - [ ] **Re-point `company_logo` and the OpenGraph image URLs** — Yoast's Organization logo and 171 imported `_yoast_wpseo_opengraph-image` values still resolve against `remoteleverage.com`, because the media library is deliberately not ported. Harmless while production is up; they must be re-pointed at local uploads before the DNS flip, or the new site's social cards depend on the old one.
+
+
+## Funnel URLs configured outside WordPress
+
+Audited 2026-09-15. These are the redirect targets the 301 map **cannot** fix, because they
+live in Calendly's and Stripe's own settings rather than in this codebase. Nothing 404s today
+— `config/redirects.php` catches each old page — but every one of these bounces a paying or
+booking customer through an extra hop to a generic page, and they will break outright if
+`remoteleverage.com` ever stops answering.
+
+### Stripe — the one that is actually broken
+
+Production's deposit element hardcodes an absolute success URL:
+
+```
+success-url="https://remoteleverage.com/referral-program-thank-you-page-deposit/"
+```
+
+v2 does the right thing and reads it from config — `PaymentGatewayBlock` falls back to
+`services.stripe.default_thankyou_url` — but **`STRIPE_DEFAULT_THANKYOU_URL` is not set in
+`.env`**, so the rendered page emits `success-url=""`. A customer who pays today lands
+nowhere. Set it to the v2 `/referral-program-thank-you-page-deposit/` before the deposit page
+goes live. This sits alongside the Stripe-credentials blocker already recorded against that
+page in [PAGE-MIGRATION-STATUS.md](../../../../../PAGE-MIGRATION-STATUS.md) §P2.
+
+### Calendly — four events to re-check
+
+The post-booking redirect for each of these is set in the Calendly dashboard and is not
+readable from the page, so each needs opening and confirming by hand:
+
+| Calendly event | Booked from | Old confirmation page |
+| :--- | :--- | :--- |
+| `d/cyrw-79t-s5r/remote-leverage-hr-cor-compliance-consultation` | `/service-cor/` | `/cor-thank-you/` |
+| `d/cxqp-9vk-mvc/remote-leverage-onboarding-applicant-criteria` | `/service-hiring/` | `/cor-thank-you/` |
+| `d/crh5-d9t-pt9/remote-leverage-2nd-interview-w-top-candidates` | `/vainterview2/` | — |
+| `d/cpyj-nvv-fbm/15-minute-virtual-assistant-hiring-consultation` | sitewide | `/virtual-assistant-consultation-scheduled/` |
+
+The last one is embedded on most pages, so it is the highest-traffic of the four.
+
+**Why this is not just a redirect-map entry.** `/cor-thank-you/`, `/deposit-received/` and
+`/virtual-assistant-consultation-scheduled/` all 301 to the generic `/vathankyou/`. Each had
+its own copy on production — post-payment next steps, COR-specific booking confirmation — so
+until these external settings are repointed, a customer completing a deposit or a COR booking
+reads a generic thank-you instead of the one written for them.

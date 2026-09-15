@@ -62,6 +62,22 @@ Both were rebuilt in v2, so production's suppression is stale rather than intent
 five noindex pages (`signedup`, `vaonboardingform`, `payment`, `vastore5`,
 `referral-program-thank-you-page-deposit`) inherit it correctly.
 
+### 8b. The three pages built today stay `noindex`
+`/contractoragreement/`, `/services/` and `/store/` inherited production's `noindex` and were
+created *after* decision 8 was made, so they needed their own ruling. **They keep it.** They are
+operational pages, not marketing: an e-sign form, a post-hire onboarding guide, and COR pricing
+built as a sibling of `/vastore5/` — which is itself noindex. That is the same family as the five
+that correctly inherit it, and the opposite of the two rebuilt marketing pages in decision 8.
+Eight pages are now noindex: those three plus `payment`, `signedup`, `vaonboardingform`,
+`vastore5`, `referral-program-thank-you-page-deposit`.
+
+### 9b. Yoast's `/sitemap_index.xml` is the canonical sitemap, not core's
+`web/robots.txt` points at it. Production already serves it and 301s core's `/wp-sitemap.xml`
+onto it, so choosing core's would have changed the sitemap URL Search Console knows at exactly
+the moment the site changed underneath it. Decisive technical reason: **core's sitemap cannot
+read `_yoast_wpseo_meta-robots-noindex`**, so it would advertise all eight noindexed pages while
+their markup says otherwise. Nothing is lost — the 301 keeps old references working.
+
 ### 9. Yoast Premium is not being bought
 `config/redirects.php` already covers every discarded URL, ships with the code, survives a
 database refresh, and is guarded by tests against 301 chains and dangling targets. Premium's

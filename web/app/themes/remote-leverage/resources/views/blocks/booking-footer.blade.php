@@ -24,7 +24,9 @@
           {{-- lazy:false to match blocks/booking.blade.php — Livewire is injected after
                DOM ready by the island loader, so a #[Lazy] placeholder never gets
                hydrated and the form renders empty. --}}
-          <livewire:booking.multistep-booking-wizard skin="glass" :lazy="false" />
+          {{-- revenue-first is a no-op on the glass skin, whose step 1 already leads with the
+               revenue radios; passed so the intent survives a future skin change here. --}}
+          <livewire:booking.multistep-booking-wizard skin="glass" :revenue-first="true" :revenueFirst="true" :lazy="false" />
         </div>
 
       </div>

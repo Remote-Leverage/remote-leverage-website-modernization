@@ -126,6 +126,12 @@ production caching exists. **It is not the reason any page is failing.**
 
 ## The dominant cost: one 844 KB font, on every page
 
+> ✅ **Fixed on 2026-09-15.** Everything in this section is the *pre-fix* measurement and is
+> kept as the record of what was wrong. The font is now two `unicode-range`-subsetted woff2
+> files cut from that same TTF; a page transfers **69 KB instead of 844 KB**. See
+> [Part 3](#part-3--fixes-applied-2026-09-15) for the after numbers and the proof that the
+> rendering did not move.
+
 | Page | Requests | `InterVariable.ttf` | All fonts | Images | JS | CSS |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
 | `/` | 45 | **844 KB** | 891 KB | 221 KB | 21 KB | 39 KB |
@@ -580,3 +586,219 @@ Run each URL 3× and take the median; discard any report whose `runtimeError.cod
 `NO_ERROR`. The Part 2 numbers come from `hrtime()` timings around
 `app(CaptureLeadAction::class)->execute()` and the individual listener/gateway calls, run through
 `wp eval-file`, with the benchmark leads and their activity-log rows deleted afterwards.
+
+---
+
+# Part 3 — Fixes applied (2026-09-15)
+
+Two front-end changes were made *after* the measurement pass above, and re-measured with the same
+method (`lighthouse@12.8.2`, default mobile preset, 3 runs, median). **Because run-to-run variance
+on this machine is high, the before column here is a fresh re-measurement taken minutes before the
+change, not the Part 1 table** — Part 1 and this re-measurement disagree by up to 3 points on the
+same unchanged build, which is itself the best available illustration of the variance warning at
+the top of this document.
+
+## Fix 1 — `Inter Display` is now a subsetted woff2
+
+### What was actually wrong
+
+`InterVariable.ttf` was not a distinct "display" typeface. Its own `name` table reports the family
+as **"Inter Variable", Inter 4.000**, with axes `opsz 14–32` and `wght 100–900`. The CSS aliased it
+to the family name `"Inter Display"`, and the comment beside it claimed optical sizing was "turned
+off on headings below".
+
+**That claim was false.** `font-optical-sizing`, `opsz` and `font-variation-settings` appear nowhere
+in `resources/`, `app/`, `patterns/` or `theme.json`, so the CSS default (`font-optical-sizing: auto`)
+was live: every element on `--font-display` was rendering at `opsz` = its own px size, clamped to
+[14, 32]. The `@fontsource-variable/inter` files backing `--font-sans` are axis-subsetted to `wght`
+only, which pins `opsz` at 14.
+
+So the obvious cheap fix — delete the family and point its consumers at `Inter Variable` — **was
+rejected**: it would have restyled every heading on the site (the type scale runs to 201 px, all of
+which currently render at `opsz 32`). The 844 KB was a packaging problem, not a typeface problem.
+
+### What was done
+
+`pyftsubset` was run over that exact TTF, once per unicode range, preserving both axes:
+
+| | Before | After |
+| :--- | ---: | ---: |
+| `InterVariable.ttf` (TrueType, unsubsetted) | 862 936 B on disk / **864 020 B transferred** | — |
+| `inter-display-latin.woff2` | — | 70 380 B / **70 581 B transferred** |
+| `inter-display-latin-ext.woff2` | — | 125 212 B, **not requested by any page measured** |
+| Per-page font transfer | **891 KB** | **116 KB** |
+
+The latin range is the Inter Variable range already used for body copy, plus `U+2190-2199`,
+`U+2264-2265`, `U+2713` and `U+2717` — a `→` in `.rl-also-read-link` on blog articles was verified
+to render *in this face*, so dropping it would have been a visible regression.
+
+### Proof the rendering did not move
+
+Pixel diffing alone could not settle this, so the fonts were compared directly and then in the DOM.
+
+1. **Font-level.** Instancing both the source TTF and the subsets at six `(opsz, wght)` locations
+   spanning the whole design space — `(14,400) (14,100) (17,500) (24,600) (32,700) (32,900)` — and
+   comparing every one of the 1 010 shared glyphs with a decomposing pen:
+   **0 advance-width differences and 0 outline differences at every location.** `upem`, `hhea`
+   ascender/descender/lineGap and all four OS/2 vertical metrics are identical; `avar`, `HVAR`,
+   `MVAR`, `STAT` and `GDEF` all survive; `kern`, `mark`, `mkmk`, `calt`, `ccmp` and `locl` all
+   survive. Only opt-in features (`ss01-08`, `cv01-13`, `tnum`, `smcp`, `case`, `salt`, `dlig` …)
+   were dropped, and nothing in the theme requests any of them — there is no `font-feature-settings`
+   anywhere, and the only `font-variant-numeric` declarations sit on `--font-sans` elements.
+
+   > Using `@fontsource-variable/inter`'s ready-made `*-opsz-*.woff2` files instead would have been
+   > less work but is **not** equivalent: those are Inter **4.001**, and the same comparison finds
+   > 7 differing outlines and 5 differing advance widths against 4.000 — including the digit `5`,
+   > which moves by 30/2048 em (≈ 2.9 px at the 201 px numeral size). Hence subsetting the repo's
+   > own TTF rather than swapping in the packaged files.
+
+2. **DOM-level.** A harness rendered 9 text samples (body copy, the hero string, the uppercase
+   `CONSULTATION` pill, prices, accented latin-ext, and the arrow/tick/currency run) at 11 sizes
+   from 12 px to 201 px × 7 weights under both faces — **693 text runs** — and compared width,
+   height and the per-character `Range` rect of every character. **692 of 693 are identical to four
+   decimal places.** The one exception is `₱` at 201 px, whose width differs by **0.0156 px** (one
+   1/64 px subpixel quantum); the run realigns on the next character. `₱` does not appear on the
+   site.
+
+3. **Page-level.** Full-page 1440 px screenshots of `/`, `/hire-va-4/`, `/case-study/` and
+   `/case-study/bench-accounting/`, images forced eager and the page scrolled to the end first.
+   **Every page height is unchanged to the pixel** and no line break moves. What remains is
+   sub-glyph antialiasing: 0.03–0.22 % of pixels differ on the three deterministic pages, mean
+   delta 26–32 of 255, confined to glyph edges. The noise floor was established by capturing the
+   same build twice: `/`, `/hire-va-4/` and both case-study pages are **byte-identical between
+   runs**, except one band on `/` (x 852–1407, y 5733–6222) which is a rotating component and
+   accounts for roughly half of that page's raw diff.
+
+### Result
+
+| Page | Perf | LCP (s) | CLS | TBT (ms) | Speed Index (s) | Total weight |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `/` | 97 → **99** | 1.46 → 1.50 | 0.004 → 0.011 | 107 → 76 | 2.47 → 2.32 | 1 206 KB → **432 KB** |
+| `/case-study/` | 99 → **99** | 1.38 → 1.83 | 0.052 → 0.002 | 0 → 0 | 1.56 → 1.65 | 1 043 KB → **268 KB** |
+| `/hire-va-4/` | 61 → **94** | 6.93 → **2.43** | 0.000 → 0.000 | 137 → 168 | 5.73 → 2.42 | 1 362 KB → **587 KB** |
+
+Every page lost **exactly 775 KB**, which is the whole of the font delta and confirms nothing else
+moved between the two runs. Per-run detail, because the medians hide how noisy this machine is:
+
+| Page | LCP before (3 runs, ms) | LCP after (3 runs, ms) |
+| :--- | :--- | :--- |
+| `/` | 1407 / 5879 / 1463 | 1499 / 1774 / 1315 |
+| `/case-study/` | 1375 / 1379 / 1463 | 1376 / 1920 / 1828 |
+| `/hire-va-4/` | 6934 / 6181 / 8229 | **2744 / 2328 / 2434** |
+
+`/hire-va-4/` is the unambiguous win: its *worst* post-fix run is 3.4 s faster than its *best*
+pre-fix run, and the LCP element is the same `<h1>` text node throughout. `/case-study/`'s median
+LCP reading got worse while its fastest run did not (1375 → 1376 ms) — that is variance, not a
+regression, and its CLS improved from 0.052 to 0.002. Do not read the `/` and `/case-study/` LCP
+columns as a result in either direction.
+
+**Still true after the fix:** `--font-sans` and `--font-display` remain two separate downloads
+(48 KB + 70 KB) because they are genuinely two different axis configurations of the same outline.
+Collapsing them would save another 48 KB and change how body copy renders.
+
+## Fix 2 — the site-wide 9 px horizontal overflow at 400 px
+
+### What was actually wrong
+
+`document.documentElement.scrollWidth` was **409** in a 400 px viewport on every page. The reported
+culprit — the mobile header's `.flex.lg:hidden.items-center.gap-3` reaching `x = 408.8` — was the
+symptom. The cause is arithmetic:
+
+| Box | Width |
+| :--- | ---: |
+| available inside the `px-4` gutters | **368.0** |
+| logo `<img>` | 205.3 |
+| `CONSULTATION` pill | 135.4 |
+| `gap-3` between pill and hamburger | 12.0 |
+| hamburger button | 40.0 |
+| **content total** | **392.7** |
+
+392.7 into 368 does not go, and **nothing in the row was allowed to give**: the logo column was
+`shrink-0`, and the pill and the mobile group carry the flexbox default `min-width: auto`, which
+forbids shrinking below content size. The row overflowed its container, and `header` has no
+clipping ancestor, so it reached the document.
+
+The logo is 205.3 px rather than the 144 px its own markup implies because
+`resources/images/logo.svg` is **154 × 18** (ratio 8.556:1) while the `<img>` declared
+`width="168" height="28"` (6:1). `h-6 w-auto` sizes from the *intrinsic* ratio, so the attributes
+only ever controlled the box reserved *before* the SVG loads — i.e. they were also a latent CLS
+source, and `/` does carry a small non-zero CLS. `footer.blade.php` declared `180 × 40` (4.5:1)
+against the same asset, and `header-cta.blade.php` declared nothing at all.
+
+For reference, production's mobile header at 400 px has a **centred 200 px logo and no
+Consultation pill** — the inline mobile CTA is something v2 added, and it is what makes the row
+not fit.
+
+### What was done
+
+No `overflow-x: hidden` anywhere. The declared intrinsic size was made truthful and the row was
+made able to respond:
+
+- all three `logo.svg` `<img>` tags now declare `width="154" height="18"`, matching the asset;
+- the header logo column is `min-w-0` instead of `shrink-0`, its `<a>` is `min-w-0`, and the
+  `<img>` gains `max-w-full object-contain object-left` — so below ~425 px the logo is the box
+  that yields, scaled down inside its own box with its aspect ratio intact rather than squashed
+  or clipped;
+- the mobile pill + hamburger group is `shrink-0`, so the tap targets never shrink;
+- the header row gains `gap-3`, so the logo and the pill cannot touch at the widths where the
+  logo has shrunk. Above ~425 px `justify-between` already separates them and the gap is inert.
+
+The same treatment was applied to `header-cta.blade.php` (its `Get Started` pill is now `shrink-0`)
+and the footer logo.
+
+### Verification
+
+Playwright, `channel: 'chrome'`, mobile emulation, full-page scroll before measuring, checking
+`document.documentElement.scrollWidth` and every element whose right edge clears the viewport
+without a clipping ancestor:
+
+| Viewport | `/` | `/samples/` | `/case-study/` | `/case-study/bench-accounting/` | `/hire-va-4/` | `/blog/` | `/blog/outsourcing-customer-service/` | `/about-us/` | `/vapricing` | `/impact-report-2026/` | `/vacalendar` |
+| ---: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| 320 px | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 360 px | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 375 px | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 400 px | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+`scrollWidth == clientWidth` in all 44 cases, and the offender list is empty. The drawer was opened
+at 320 px and 400 px: `aria-expanded` flips, all six links render, the drawer's right edge lands on
+the viewport edge, and `scrollWidth` stays put with the menu open. The logo is scaled, never
+clipped — 168.6 px wide at 400 px, 88.6 px at 320 px, aspect ratio preserved by `object-contain`.
+
+At 1440 px the header change is inert: the footer band is **byte-identical**, and the header band
+differs by at most 16/255 on the logo's antialiased edges with zero pixels above that threshold.
+
+## Final state
+
+Measured on the tree as it stands after both fixes:
+
+| Page | Perf | LCP | CLS | Total weight |
+| :--- | ---: | ---: | ---: | ---: |
+| `/` | 98 | 1.43 s | 0.011 | 432 KB |
+| `/case-study/` | 99 | 1.47 s | 0.002 | 268 KB |
+| `/hire-va-4/` | 92 | 2.18 s | 0.000 | 589 KB |
+
+Two of the three now clear the **Perf ≥ 96** gate and the third went from 58–61 to 92–94.
+**LCP < 1.2 s still passes on nothing** — the remaining gap is no longer the font.
+
+> ⚠️ This last table was taken after other work landed in the same tree (`patterns/hire-va.php`
+> and `patterns/hire-va-4-testimonials.php` both changed between the Fix 1 and Fix 2 measurements,
+> which is also why `/hire-va-4/`'s full-page screenshot grew 26 px taller and its TBT moved).
+> The Fix 1 before/after table above is the clean isolation of the font change; this one is a
+> snapshot of the tree.
+
+## What was found and deliberately not fixed
+
+- **`--font-sans` and `--font-display` are two 48 KB + 70 KB downloads of the same outline.**
+  Merging them is a type-design decision, not a perf one.
+- **Neither font is preloaded**, and `font-display: swap` means first paint uses a fallback and
+  reflows. With the font now at 70 KB a `<link rel="preload">` is cheap and would remove that swap;
+  it was out of scope here.
+- **`/blog/` and `/blog/outsourcing-customer-service/` are now overwhelmingly image-bound**
+  (2.6 MB and 3.1 MB of full-size PNGs). With the font gone, these are the largest remaining wins
+  in the whole document.
+- **The logo aspect-ratio attributes were wrong in three templates.** They are corrected, but the
+  same class of bug — a declared `width`/`height` that does not match the asset — was not audited
+  across the rest of the theme's `<img>` tags.
+- **Below ~350 px the header logo gets small** (88.6 px at 320 px). It no longer overflows and it
+  is not distorted, but if the mobile `CONSULTATION` pill were dropped — as production has it —
+  the logo could stay full size at every width. That is a marketing call, not a layout one.

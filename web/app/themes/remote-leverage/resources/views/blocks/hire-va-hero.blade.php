@@ -89,8 +89,11 @@
             :hideProfileHeader="(bool) ($hideProfileHeader ?? false)"
             :hide-progress-bar="(bool) ($hideProgressBar ?? false)"
             :hideProgressBar="(bool) ($hideProgressBar ?? false)"
-            :button-text="$formButtonText ?? 'Next: Pick a Date'"
-            :buttonText="$formButtonText ?? 'Next: Pick a Date'"
+            {{-- Deliberately NOT revenue-first: this is the hero's progressive form, which opens
+                 on the email field alone and reveals the rest after. The revenue-first radio
+                 treatment is scoped to the page-bottom booking blocks only. --}}
+            :button-text="$formButtonText ?? 'Book a Consultation'"
+            :buttonText="$formButtonText ?? 'Book a Consultation'"
           />
         </div>
       </div>

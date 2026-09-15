@@ -449,6 +449,17 @@
               ['step_label' => 'Email', 'step_fields' => ['email']],
               ['step_label' => 'Complete First Step', 'step_fields' => ['name', 'phone', 'monthly_revenue', 'consent']],
             ];
+
+            // Revenue leads the form on the page-bottom booking blocks and the hire-va hero
+            // (direction 2026-09-15). Lift it out of whichever sub-step declared it and put it
+            // at the head of the first one, so it is genuinely before every other field rather
+            // than merely first within its own group.
+            if ($revenueFirst) {
+              foreach ($renderedSteps as $i => $s) {
+                $renderedSteps[$i]['step_fields'] = array_values(array_diff($s['step_fields'] ?? [], ['monthly_revenue']));
+              }
+              $renderedSteps[0]['step_fields'] = array_merge(['monthly_revenue'], $renderedSteps[0]['step_fields'] ?? []);
+            }
           @endphp
 
           @foreach ($renderedSteps as $stepIdx => $subStep)
@@ -504,7 +515,25 @@
                       ];
                     @endphp
 
-                    @if ($compactFields)
+                    @if ($revenueFirst)
+                      {{-- Vertical radio list, matching the glass skin's treatment. --}}
+                      <div class="space-y-2 pt-0.5">
+                        @foreach ($revenueOptions as $val => $label)
+                          <label class="group flex cursor-pointer select-none items-center gap-2.5 text-[13.5px] font-medium text-slate-900">
+                            <input
+                              type="radio"
+                              name="monthlyRevenue"
+                              value="{{ $val }}"
+                              x-model="monthlyRevenueVal"
+                              wire:model.live="monthlyRevenue"
+                              @change="onFieldInput('monthly_revenue', {{ $stepIdx }})"
+                              class="h-4 w-4 cursor-pointer border-slate-300 text-[#F8248A] transition-transform duration-150 focus:ring-2 focus:ring-[#F8248A]/20 group-hover:scale-110"
+                            />
+                            <span class="transition-colors duration-150 group-hover:text-slate-700">{{ $val }}</span>
+                          </label>
+                        @endforeach
+                      </div>
+                    @elseif ($compactFields)
                       <select
                         id="default-monthly-revenue"
                         name="monthlyRevenue"
@@ -552,8 +581,10 @@
                   </div>
 
                 @elseif ($fieldKey === 'name')
-                  {{-- 3. Name — stacked normally, side by side in narrow contexts. --}}
-                  <div class="{{ $compactFields ? 'grid grid-cols-2 gap-3' : 'space-y-4' }}">
+                  {{-- 3. Name — ALWAYS side by side, on every instance of this form (direction
+                       2026-09-15). It was previously stacked unless $compactFields was set; the
+                       glass branch above has always paired them, and the two must not disagree. --}}
+                  <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1.5">
                       <label for="default-first-name" class="block text-[13.5px] font-medium text-slate-900 cursor-pointer">
                         First Name: <span class="text-slate-900">*</span>

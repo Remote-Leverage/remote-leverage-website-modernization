@@ -49,11 +49,20 @@ class MultistepBookingWizard extends Component
 
     public bool $hideProgressBar = true;
 
-    /** Narrow contexts (the article sidebar) need first/last name on one row and
-     *  the revenue picker as a dropdown rather than a wrapping row of pills. */
+    /** Narrow contexts (the article sidebar) need the revenue picker as a dropdown
+     *  rather than a wrapping row of pills. First/last name are now always paired,
+     *  on every instance, so this no longer controls that. */
     public bool $compactFields = false;
 
-    public string $buttonText = 'Next: Pick a Date';
+    /** The page-bottom booking blocks (acf/booking, acf/booking-footer) lead with the revenue
+     *  question, rendered as a vertical radio list rather than a row of pills (direction
+     *  2026-09-15). The glass skin has always done this; this brings the other skins in line.
+     *
+     *  Scoped to those blocks on purpose — the hero forms (acf/hire-va-hero,
+     *  acf/consult-landing-hero) keep their progressive email-first reveal. */
+    public bool $revenueFirst = false;
+
+    public string $buttonText = 'Book a Consultation';
 
     // Step 1: Contact / Qualification Details
     public string $email = '';
@@ -190,9 +199,18 @@ class MultistepBookingWizard extends Component
         bool $hideProfileHeader = true,
         bool $hideProgressBar = true,
         bool $compactFields = false,
-        string $buttonText = 'Next: Pick a Date',
+        bool $revenueFirst = false,
+        string $buttonText = 'Book a Consultation',
         ...$rest
     ): void {
+        if (isset($rest['revenue-first'])) {
+            $revenueFirst = (bool) $rest['revenue-first'];
+        }
+        if (isset($rest['revenueFirst'])) {
+            $revenueFirst = (bool) $rest['revenueFirst'];
+        }
+        $this->revenueFirst = $revenueFirst;
+
         if (isset($rest['enable-isolated-fields'])) {
             $enableIsolatedFields = (bool) $rest['enable-isolated-fields'];
         }
