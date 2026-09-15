@@ -10,11 +10,11 @@
             <img
               src="{{ Vite::asset('resources/images/logo.svg') }}"
               alt="{{ $siteName ?? 'Remote Leverage' }}"
-              width="180"
-              height="40"
+              width="154"
+              height="18"
               loading="lazy"
               decoding="async"
-              class="h-9 w-auto brightness-0 invert"
+              class="h-9 w-auto max-w-full object-contain object-left brightness-0 invert"
               onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
             />
             <span class="hidden text-xl font-display font-bold text-white tracking-tight">

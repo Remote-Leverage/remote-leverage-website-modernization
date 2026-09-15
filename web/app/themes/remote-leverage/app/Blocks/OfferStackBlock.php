@@ -99,6 +99,11 @@ class OfferStackBlock extends Block
                 // Production drops the bundle card's pill column 88px so the first pill clears
                 // the heading beside it. Every other card starts its pills flush with the top.
                 'pillsOffset' => (bool) ($card['pills_offset'] ?? false),
+                // Production's guarantee and performance cards each carry a 520×347 photo
+                // between the pill and the price. It sits behind an Elementor entrance
+                // animation, so it reads as empty white space in any capture that scrolls
+                // back to the top before shooting.
+                'image' => BlockDefaults::preferWebp(BlockDefaults::resolveImageUrl($card['image'] ?? '')),
                 'footnote' => (string) ($card['footnote'] ?? ''),
             ];
         }
@@ -142,6 +147,10 @@ class OfferStackBlock extends Block
             ])
             ->addTextarea('text', ['label' => 'Text', 'rows' => 2])
             ->endRepeater()
+            ->addImage('image', [
+                'label' => 'Image (right column, under the pills)',
+                'return_format' => 'url',
+            ])
             ->addTrueFalse('pills_offset', [
                 'label' => 'Drop the pill column to clear the heading',
                 'default_value' => 0,

@@ -20,7 +20,14 @@
     // 16px/32px #333, with production's paragraph rhythm and bullet indent.
     // `break-words` matters: the onboarding card prints a bare guide URL, which otherwise
     // pushes the page into horizontal scroll at phone widths.
-    $prose = 'text-[16px] leading-[32px] text-[#333] break-words [&_p]:mb-[14.4px] [&_p:last-child]:mb-0 [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-10 [&_ul]:mb-[14.4px] [&_a]:underline';
+    // The 30px inset is production's: its text widgets run 1220px inside the 1280px card
+    // and 570px inside the 630px column. Without it the copy wraps a line early or late.
+    $prose = 'text-[16px] leading-[32px] text-[#333] break-words px-[30px] [&_p]:mb-[14.4px] [&_p:last-child]:mb-0 [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-10 [&_ul]:mb-[14.4px] [&_a]:underline';
+
+    // In a split card production's copy column is 630px, not the 640 an even two-column grid
+    // gives at 1440. Capping it keeps the measure at production's 570px so the prose breaks
+    // on the same words.
+    $proseSplit = $prose.' lg:max-w-[630px]';
 
     $cta = 'inline-flex items-center justify-center rounded-[5px] bg-brand-orange hover:bg-brand-orange-warm px-[60px] py-4 font-display text-[24px] leading-[24px] font-bold text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange focus-visible:ring-offset-2';
 
@@ -37,10 +44,11 @@
                     @if ($card['layout'] === 'split')
                         <div class="grid grid-cols-1 lg:grid-cols-2">
 
-                            {{-- Copy column --}}
-                            <div class="flex flex-col lg:pr-5">
+                            {{-- Copy column. Production centres it vertically; the card's
+                                 height is set by whichever column is taller. --}}
+                            <div class="flex flex-col lg:justify-center">
                                 @if ($card['headline'])
-                                    <h2 class="{{ $h2 }} mb-8">{!! $card['headline'] !!}</h2>
+                                    <h2 class="{{ $h2 }} mb-5">{!! $card['headline'] !!}</h2>
                                 @endif
 
                                 @if ($card['widget'] === 'bundle-calculator')
@@ -48,11 +56,11 @@
                                 @endif
 
                                 @if ($card['body'])
-                                    <div class="{{ $prose }}">{!! $card['body'] !!}</div>
+                                    <div class="{{ $proseSplit }}">{!! $card['body'] !!}</div>
                                 @endif
 
                                 @if ($card['ctaText'])
-                                    <div class="mt-8 text-center">
+                                    <div class="mt-5 text-center">
                                         <a href="{{ $card['ctaUrl'] }}"
                                            @if ($card['ctaNewTab']) target="_blank" rel="noopener" @endif
                                            class="{{ $cta }}">{{ $card['ctaText'] }}</a>
@@ -60,11 +68,12 @@
                                 @endif
                             </div>
 
-                            {{-- Offer pills + footnote. Production divides the two columns with
-                                 a 2px #DBDBDB rule owned by the right column, and spreads the
-                                 pills and the price to the card's top and bottom edges. --}}
+                            {{-- Offer pills, photo and price. Production divides the two
+                                 columns with a 2px #DBDBDB rule owned by the right column and
+                                 centres the group vertically; only the bundle card, which has
+                                 no photo, drops its pills to clear the heading opposite. --}}
                             <div @class([
-                                'mt-10 lg:mt-0 flex flex-col items-center gap-5 lg:border-l-2 lg:border-[#DBDBDB] lg:p-[10px] lg:justify-between',
+                                'mt-10 lg:mt-0 flex flex-col items-center gap-5 lg:border-l-2 lg:border-[#DBDBDB] lg:p-[10px] lg:justify-center',
                                 'lg:pt-[88px] lg:justify-start' => $card['pillsOffset'],
                             ])>
                                 @foreach ($card['pills'] as $pillText)
@@ -78,6 +87,12 @@
                                     </div>
                                 @endforeach
 
+                                @if ($card['image'])
+                                    <img src="{{ $card['image'] }}" alt="" loading="lazy" decoding="async"
+                                         width="520" height="347"
+                                         class="w-full max-w-[520px] h-auto rounded-badge">
+                                @endif
+
                                 @if ($card['footnote'])
                                     <div class="{{ $footnote }}">{!! $card['footnote'] !!}</div>
                                 @endif
@@ -88,7 +103,7 @@
                         {{-- Single centred column: the onboarding-guide card. --}}
                         <div class="flex flex-col">
                             @if ($card['headline'])
-                                <h2 class="{{ $h2 }} mb-8">{!! $card['headline'] !!}</h2>
+                                <h2 class="{{ $h2 }} mb-5">{!! $card['headline'] !!}</h2>
                             @endif
 
                             @if ($card['widget'] === 'bundle-calculator')
@@ -100,7 +115,7 @@
                             @endif
 
                             @if ($card['ctaText'])
-                                <div class="mt-8 text-center">
+                                <div class="mt-5 text-center">
                                     <a href="{{ $card['ctaUrl'] }}"
                                        @if ($card['ctaNewTab']) target="_blank" rel="noopener" @endif
                                        class="{{ $cta }}">{{ $card['ctaText'] }}</a>

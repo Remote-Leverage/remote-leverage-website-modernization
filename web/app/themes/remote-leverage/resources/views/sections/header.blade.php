@@ -2,16 +2,16 @@
     class="sticky top-0 z-40 w-full bg-bg-light border-b border-slate-200/60 transition-all duration-200">
     <div class="w-full px-4 sm:px-6 lg:px-8">
         <div class="rl-container">
-        <div class="flex items-center justify-between h-20">
+        <div class="flex items-center justify-between gap-3 h-20">
 
             <!-- Brand Logo -->
-            <div class="shrink-0">
+            <div class="min-w-0">
                 <a href="{{ home_url('/') }}"
-                    class="flex items-center gap-3 group focus:outline-none focus:ring-2 focus:ring-brand-purple focus:ring-offset-2 rounded-lg"
+                    class="flex min-w-0 items-center gap-3 group focus:outline-none focus:ring-2 focus:ring-brand-purple focus:ring-offset-2 rounded-lg"
                     aria-label="{{ $siteName ?? 'Remote Leverage' }}">
                     <img src="{{ Vite::asset('resources/images/logo.svg') }}" alt="{{ $siteName ?? 'Remote Leverage' }}"
-                        width="168" height="28"
-                        class="h-6 sm:h-7 w-auto transition-transform group-hover:scale-[1.02]"
+                        width="154" height="18"
+                        class="h-6 sm:h-7 w-auto max-w-full object-contain object-left transition-transform group-hover:scale-[1.02]"
                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
                     <span class="hidden text-2xl font-display font-extrabold text-brand-navy tracking-tight">
                         Remote Leverage
@@ -116,7 +116,7 @@
             </div>
 
             <!-- Mobile Menu Button -->
-            <div class="flex lg:hidden items-center gap-3">
+            <div class="flex shrink-0 lg:hidden items-center gap-3">
                 <a href="{{ home_url('/vacalendar') }}"
                     class="inline-flex items-center gap-1.5 rounded-full border border-black px-4 py-1.5 text-xs font-display font-bold uppercase tracking-wider text-black bg-transparent">
                     <span>{{ __('Consultation', 'remote-leverage') }}</span>

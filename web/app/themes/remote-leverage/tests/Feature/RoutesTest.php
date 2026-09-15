@@ -88,6 +88,7 @@ describe('config/redirects.php targets resolve to something real', function () {
         'vastore5' => 'page ID 1000050 — verified 2026-09-15',
         '1monthonus' => 'page ID 1000052 — verified 2026-09-15',
         'hire-va-isolated-form' => 'page ID 1000053 — verified 2026-09-15',
+        'hire-va' => 'page ID 1000066 — verified 2026-09-15',
     ];
 
     /*
@@ -184,7 +185,14 @@ describe('config/redirects.php targets resolve to something real', function () {
 
         // Removed 2026-09-15 when each became a real v2 page. A key equal to a live page slug
         // would 301 that page away.
-        foreach (['contractoragreement', 'services', 'store', 'hire-va'] as $liveSlug) {
+        foreach ([
+            'contractoragreement', 'services', 'store', 'hire-va',
+            // Freed 2026-09-15 when scope reopened for them: three internal ops tools whose
+            // forms POST to live Zapier/n8n webhooks, the only SDR-vertical landing page, and
+            // the 28-video client onboarding guide.
+            'hmchecklists', 'recruiterchecklists', 'saleschecklists',
+            'sales-talents', 'onboardingguide',
+        ] as $liveSlug) {
             expect(array_key_exists($liveSlug, $config))->toBeFalse(
                 "'{$liveSlug}' is a live v2 page slug; a redirect key of the same name would 301 the page away."
             );

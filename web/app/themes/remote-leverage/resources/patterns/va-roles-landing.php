@@ -218,8 +218,13 @@ $heroCardCol = $heroSplitAt === '2xl'
                  `:where(.is-layout-constrained) > :not(.alignfull)` rule, which otherwise caps a
                  direct child of the group at contentSize (1380px) and centres it, leaving the band
                  bare either side of the art. */ ?>
+        <?php /* `hero_bg_image_class` optionally hides the art below a breakpoint. Empty (the
+                 default) shows it at every width, which is what /1monthonus/ does; /hire-va/
+                 passes `hidden min-[1280px]:block`. The full literal lives in the page config
+                 rather than being assembled here, because Tailwind scans source text — a class
+                 built by concatenation is never emitted and the utility silently does nothing. */ ?>
         <img src="<?= esc_url($img($page['hero_bg_image'])) ?>" alt="" aria-hidden="true"
-             class="alignfull pointer-events-none absolute inset-0 h-full w-full max-w-none select-none object-cover object-right" />
+             class="alignfull pointer-events-none absolute inset-0 h-full w-full max-w-none select-none object-cover object-right <?= esc_attr($page['hero_bg_image_class'] ?? '') ?>" />
     <?php } ?>
 
     <div class="<?= $wrap ?> relative z-10">

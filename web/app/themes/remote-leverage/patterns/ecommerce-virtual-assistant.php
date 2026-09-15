@@ -183,17 +183,16 @@ $tableRows = array_map(fn (array $r): array => ['feature' => $r[0], 'diy' => $r[
 // ── §9a pricing cards ────────────────────────────────────────────────────────
 // Card 3's label says "Medical VA Average" on an ecommerce page. Production's copy.
 //
-// No `image` here on purpose. Production's markup points these cards at pricing/green-1.png
-// and pricing/green.png, but both are broken on the live page — the <img> reports
-// naturalWidth 0 and complete=false, so the card top renders blank. image-card-grid paints
-// a card image full-bleed at h-[168px], so wiring the (downloaded, intact) files in would
-// stamp a 433px green coin on each card that production never shows. Matching what
-// production *renders* means leaving them out. The files stay under pricing/ for whenever
-// the live page is fixed.
+// Production's markup points these cards at pricing/green-1.png and pricing/green.png. Both
+// are broken on the LIVE page (the <img> reports naturalWidth 0), so production renders a
+// blank card top — but the files themselves are intact, and Adrián's call on 2026-09-15 was
+// to wire them in. They render through the block's new `icon` field, which draws them at
+// their natural ~88px/146px rather than full-bleed at h-[168px]; painting them full-bleed
+// was what would have stamped a 433px green coin on each card.
 $pricingCards = [
-    ['title' => '$6 – 10 hr', 'text' => 'Experienced Professionals', 'cta_text' => 'FIND MY NEXT HIRE', 'cta_url' => '#booking-footer'],
-    ['title' => '$11 – 15 hr', 'text' => 'Senior Level Support', 'cta_text' => 'FIND MY NEXT HIRE', 'cta_url' => '#booking-footer', 'emphasis' => 1],
-    ['title' => '$9.21 hr', 'text' => 'Remote Leverage Medical VA Average', 'cta_text' => 'FIND MY NEXT HIRE', 'cta_url' => '#booking-footer'],
+    ['icon' => $img('pricing/green-1.png'), 'icon_width' => '88', 'title' => '$6 – 10 hr', 'text' => 'Experienced Professionals', 'cta_text' => 'FIND MY NEXT HIRE', 'cta_url' => '#booking-footer'],
+    ['icon' => $img('pricing/green.png'), 'icon_width' => '146', 'title' => '$11 – 15 hr', 'text' => 'Senior Level Support', 'cta_text' => 'FIND MY NEXT HIRE', 'cta_url' => '#booking-footer', 'emphasis' => 1],
+    ['icon' => $img('pricing/green-1.png'), 'icon_width' => '88', 'title' => '$9.21 hr', 'text' => 'Remote Leverage Medical VA Average', 'cta_text' => 'FIND MY NEXT HIRE', 'cta_url' => '#booking-footer'],
 ];
 
 // ── §9b talent carousel ──────────────────────────────────────────────────────
@@ -327,15 +326,10 @@ $posts = array_map(fn (array $p): array => ['image' => $img('cards/'.$p[0]), 'ti
         <p class="<?= $lead ?> text-black text-center mx-auto mb-10 max-w-[700px]">Ecommerce Virtual Assistant” covers a wide range of tasks that can help your brand grow. Tell us which of these looks like your open role and we will shortlist against it specifically.</p>
     </div>
 
-    <?php
-    // roles-pricing-grid's with() falls back to its own "Virtual Assistant Roles" headline
-    // whenever the field is falsy, so an empty headline is impossible and the block would
-    // add a heading production does not have. An empty span suppresses the text; the real
-    // (48px, centred) heading is rendered above. The block wants a "no headline" option.
-    $s3Suppress = '<span class="sr-only"></span>';
-?>
+    <?php // A blank headline now genuinely renders no heading (the real 48px centred one is
+          // above); the block no longer forces its own default in.?>
     <?= BlockDefaults::renderEcom('roles-pricing-grid', $roleCards, [
-        'headline' => $s3Suppress,
+        'headline' => '',
         'variant' => 'split-chip',
         'columns' => '2',
     ]) ?>

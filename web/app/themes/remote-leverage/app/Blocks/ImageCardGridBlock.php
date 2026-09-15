@@ -47,7 +47,7 @@ class ImageCardGridBlock extends Block
 
         $cards = array_values(array_filter(
             (array) ($field('cards') ?: []),
-            fn ($c) => ! empty($c['title']) || ! empty($c['image'])
+            fn ($c) => ! empty($c['title']) || ! empty($c['image']) || ! empty($c['icon'])
         ));
 
         return [
@@ -55,13 +55,22 @@ class ImageCardGridBlock extends Block
             'subheadline' => BlockDefaults::cleanText($field('subheadline') ?: ''),
             'columns' => (int) ($field('columns') ?: 4),
             'ctaText' => $field('cta_text') ?: '',
+            'align' => $field('align') ?: 'left',
             'ctaUrl' => $field('cta_url') ?: '#booking-footer',
             'titleSize' => $field('card_title_size') ?: 'small',
+            // Every per-card field has to be listed here. A field added to fields() but not
+            // mapped never reaches the view, and nothing errors — the card just renders
+            // without it.
             'cards' => array_map(fn ($c) => [
                 'image' => BlockDefaults::resolveImageUrl($c['image'] ?? ''),
+                'icon' => BlockDefaults::resolveImageUrl($c['icon'] ?? ''),
+                'icon_width' => $c['icon_width'] ?? '88',
                 'eyebrow' => $c['eyebrow'] ?? '',
                 'title' => BlockDefaults::cleanText($c['title'] ?? ''),
                 'text' => $c['text'] ?? '',
+                'cta_text' => $c['cta_text'] ?? '',
+                'cta_url' => $c['cta_url'] ?? '',
+                'emphasis' => ! empty($c['emphasis']) && $c['emphasis'] !== '0',
             ], $cards),
         ];
     }
@@ -77,6 +86,11 @@ class ImageCardGridBlock extends Block
                 'label' => 'Columns',
                 'choices' => [4 => '4 across', 3 => '3 across'],
                 'default_value' => 4,
+            ])
+            ->addSelect('align', [
+                'label' => 'Header alignment',
+                'choices' => ['left' => 'Left (default)', 'center' => 'Centred'],
+                'default_value' => 'left',
             ])
             ->addSelect('card_title_size', [
                 'label' => 'Card Title Size',
@@ -105,6 +119,12 @@ class ImageCardGridBlock extends Block
                 'ui' => 1,
                 'default_value' => 0,
             ])
+            ->addImage('icon', [
+                'label' => 'Card Icon',
+                'instructions' => 'Shown at its natural size when the card has no full-bleed image.',
+                'return_format' => 'url',
+            ])
+            ->addText('icon_width', ['label' => 'Icon width (px)', 'default_value' => '88'])
             ->endRepeater()
             ->addText('cta_text', [
                 'label' => 'Footer CTA Text',

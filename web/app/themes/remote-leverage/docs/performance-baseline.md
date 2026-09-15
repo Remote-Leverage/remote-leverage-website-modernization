@@ -474,9 +474,9 @@ the 5–10 s the explicitly-configured ones allow.
 | :--- | ---: | :--- |
 | **Step-1 partial capture, in-request p95** | **~7 ms** | ✅ **Measured** (Pass A) — unaffected by integrations |
 | Step-1 partial capture, after-response p95 | ~2.4–3.2 s | 7 ops × ~340–450 ms |
-| **Final booking submit, in-request p95 (as coded today)** | **~7–10 s** | Measured preflight 6.1 s p95 + createInvitee ~0.4–0.6 s + getScheduledEvent ~0.5–2.0 s |
-| Final booking submit, in-request p50 (as coded today) | ~5 s | Measured preflight 4.1 s p50 + ~1 s for the two writes |
-| Final booking submit, in-request p95 (optimistic AWS RTT) | **~4.5–5 s** | 11 sequential calls × ~400 ms p95 |
+| ~~**Final booking submit, in-request p95 (as coded today)**~~ → **~2–4 s** | ~~**~7–10 s**~~ | ~~preflight 6.1 s p95~~ → measured preflight **1.16 s p95** (Pass D) + createInvitee ~0.4–0.6 s + getScheduledEvent ~0.5–2.0 s |
+| ~~Final booking submit, in-request p50 (as coded today)~~ → **~1.5 s** | ~~~5 s~~ | ~~preflight 4.1 s p50~~ → measured preflight **0.52 s p50** (Pass D) + ~1 s for the two writes |
+| Final booking submit, in-request p95 (optimistic AWS RTT) | ~~**~4.5–5 s**~~ → **~1.6 s** | ~~11~~ → 4 sequential calls × ~400 ms p95 |
 | Final booking submit, after-response p95 | ~3.5–4.5 s | 9 ops × ~400 ms |
 
 ## Verdict on the `~800 ms` decision rule
@@ -493,12 +493,18 @@ nicety."*
 switched on, because all seven of its outbound calls are already deferred past the response flush.
 For this path the rule is satisfied and a queue worker is **not** a launch blocker.
 
-### 2. Final booking submit — 🔴 **breaches the threshold by roughly 6–8×**
+### 2. Final booking submit — 🔴 ~~**breaches the threshold by roughly 6–8×**~~ → ⚠️ **the breach was a bug, and it is fixed**
 
 `HandleLeadCreatedForBooking` runs synchronously inside `CaptureLeadAction::execute()`. The
-duplicate-booking preflight **alone** is a **measured 4 057 ms p50 / 6 144 ms p95** — before the
-booking is created and before the Meet link is resolved. Against an 800 ms threshold that is not
+duplicate-booking preflight **alone** was a **measured 4 057 ms p50 / 6 144 ms p95** — before the
+booking is created and before the Meet link is resolved. Against an 800 ms threshold that was not
 marginal.
+
+**Since fixed (2026-09-15).** The preflight now measures **521 ms p50 / 1 159 ms p95** — see
+Pass D. This path is still synchronous and still makes up to four sequential third-party calls, so
+it will not sit under 800 ms end to end while `createInvitee` and the Meet-link lookup remain in the
+request; but the 6–8× breach was one avoidable bug, not a structural property of the design, and
+removing it did not need a queue worker.
 
 ### 3. …but a queue worker is the wrong remedy for the path that fails
 
@@ -508,15 +514,22 @@ five notification integrations were still in-request. **The user is waiting on t
 activity log to render the confirmation screen. Move that listener to a queue and the user gets a
 spinner and no confirmation, not a fast response. The latency has to be removed, not relocated.
 
-Where it plausibly comes out (**diagnosis only — out of scope here, and none of it was changed**):
+Where it came out (diagnosed here on 2026-09-15, **and acted on the same day** — measurements in
+Pass D):
 
-- `findExistingInvitee` issues `users/me` **on every submission for every one of the 4 tokens**. That
-  response is effectively static per token and is not cached. Caching it removes 4 of the 8
-  preflight round-trips.
-- The loop walks all four accounts even after the query returns cleanly. Most leads have no prior
-  booking, so the common case pays the maximum cost.
-- Each of the 4 pooled tokens is a separate Calendly account, so the pool exists for rate-limit
-  failover on *writes*; it is not obvious the read preflight needs to query all four.
+- ✅ `findExistingInvitee` issued `users/me` **on every submission for every one of the 4 tokens**.
+  That response is effectively static per token and was not cached. It is now cached for 12 h,
+  removing 4 of the 8 preflight round-trips.
+- ✅ The loop walked all four accounts even after the query returned cleanly. Most leads have no
+  prior booking, so the common case paid the maximum cost. It now stops at the first account that
+  answers, which removes the remaining 3.
+- ✅ Each of the 4 pooled tokens is a separate Calendly account, so the pool exists for rate-limit
+  failover on *writes*; the read preflight does not need to query all four. It now uses the pool as
+  a failover — rotating only on 429/401/403/404 — which is also the account `createInvitee` would
+  book through.
+- ✅ Every preflight call inherited a 15 s timeout with no overall ceiling, so a degraded Calendly
+  could hold the booking submit open for a minute. Now 5 s per request under an 8 s whole-preflight
+  budget, failing open.
 
 ### 4. What the queue worker *is* still worth
 
@@ -530,10 +543,11 @@ Not latency — **throughput and reliability**:
   logged and lost. A real queue gives retries and a failed-jobs table.
 - Four of the deferred calls have **no timeout configured at all**.
 
-**Recommendation for the cutover gate:** record the rule as **breached on the booking-submit path,
-with the remedy reassigned** — fix the synchronous Calendly preflight, and keep WR-106 (queue
-worker) as a throughput/reliability item rather than a latency blocker. And **update
-`known-issues.md`**, whose premise the code has already moved past.
+**Recommendation for the cutover gate — acted on 2026-09-15:** the rule was recorded as breached on
+the booking-submit path **with the remedy reassigned**. The Calendly preflight was fixed (Pass D),
+WR-106 was reclassified in [`known-issues.md`](known-issues.md) and
+[`adr-status.md`](adr-status.md) as a throughput/reliability item rather than a latency blocker, and
+**provisioning the queue worker stays deliberately deferred**.
 
 ---
 
@@ -542,7 +556,8 @@ worker) as a throughput/reliability item rather than a latency blocker. And **up
 | Not measured | Why |
 | :--- | :--- |
 | Real p95 with **HubSpot, Slack, PostHog, the lead webhook and SMTP** live | No credentials configured in this environment. An unconfigured gateway returns before it opens a socket, so measuring it produces a number that means nothing. Section (c) estimates it and says so. |
-| `CalendlyClient::createInvitee` | Calling it books a real meeting on the live Calendly account. |
+| `CalendlyClient::createInvitee` | Calling it books a real meeting on the live Calendly account. Unchanged for Pass D: the preflight fix was measured read-only, so the *end-to-end* booking-submit latency remains an estimate. |
+| The **429 rate-limit failover** against the live API | It cannot be provoked without deliberately exhausting a production Calendly account's quota. It is covered by `tests/Unit/CalendlyPreflightTest.php` against a faked transport instead. |
 | The **Google Calendar fallback path** | Only runs when the Calendly path returns nothing; `GOOGLE_CALENDAR_REFRESH_TOKEN` is empty. |
 | End-to-end **HTTP** latency of the Livewire submit | `CaptureLeadAction` was timed in-process via WP-CLI. Livewire request overhead (snapshot hydration, component render, response) is **not** included in the Pass A number. |
 | That `afterResponse` really does flush first **over HTTP** | Verified by reading `Bootable.php` (`fastcgi_finish_request()` before `$kernel->terminate()`), not by timing a live request. It is a code-level verification, not a measurement. |

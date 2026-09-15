@@ -29,8 +29,10 @@ use App\Support\BlockDefaults;
  *    list of topic names; the videos themselves live on /vaonboardingguide/ (six Vimeo
  *    embeds), which this page only links out to.
  *
- * 3. The mobile-only stack carries two stock photographs. Since that stack is not reproduced,
- *    the page needs no art at all — hence no resources/images/pages/services/.
+ * 3. The two stock photographs in the guarantee and performance cards ARE reproduced — they
+ *    are on the desktop stack too, sitting between the pill and the price. They read as empty
+ *    white space in a screenshot that scrolls the page and then returns to the top, because
+ *    Elementor's entrance animation re-hides them; capture without scrolling back.
  */
 
 $onboardingBody = <<<'HTML'
@@ -46,7 +48,7 @@ $onboardingBody = <<<'HTML'
 <li>Phone Systems for your VA</li>
 <li>Incentivizing Your Virtual Assistant with Bonuses</li>
 </ul>
-<p><strong>Here is the link: <a href="https://remoteleverage.com/vaonboardingguide" target="_blank" rel="noopener">https://remoteleverage.com/VAOnboardingGuide</a></strong></p>
+<p><strong>Here is the link: https://remoteleverage.com/VAOnboardingGuide</strong></p>
 HTML;
 
 $bundleBody = <<<'HTML'
@@ -107,6 +109,7 @@ echo BlockDefaults::renderOfferStack([
         'pills' => [
             ['text' => '12-Month Guarantee, Fast Replacements'],
         ],
+        'image' => BlockDefaults::pageImg('services', 'extended-guarantee.jpeg'),
         'footnote' => '<p>$2,000 One time payment</p>',
         'cta_text' => 'Get Started',
         'cta_url' => 'https://form.jotform.com/252415499863166',
@@ -118,6 +121,7 @@ echo BlockDefaults::renderOfferStack([
         'pills' => [
             ['text' => "Screen-Verified Hours, HR + Fast Replacements,\nPayments Done-For-You"],
         ],
+        'image' => BlockDefaults::pageImg('services', 'performance-package.jpeg'),
         'footnote' => $performanceFootnote,
         'cta_text' => 'Get Started',
         'cta_url' => 'https://form.jotform.com/260197622868165',

@@ -675,8 +675,8 @@ include get_theme_file_path('resources/patterns/sales-playbook-nav.php');
             ],
             'tabs' => $deposit,
         ];
-        include get_theme_file_path('resources/patterns/sales-playbook-deposit.php');
-        ?>
+include get_theme_file_path('resources/patterns/sales-playbook-deposit.php');
+?>
     </div>
 </section>
 <!-- /wp:html -->

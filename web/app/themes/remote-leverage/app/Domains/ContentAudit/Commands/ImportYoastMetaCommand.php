@@ -149,7 +149,7 @@ class ImportYoastMetaCommand extends Command
                     $crossType++;
                 }
 
-                $desired = $mapper->map($item['head'], $item['title'], $slug);
+                $desired = $this->asStored($mapper->map($item['head'], $item['title'], $slug));
                 $diff = $this->diff((int) $post->ID, $desired);
 
                 if ($diff === []) {
@@ -325,6 +325,36 @@ class ImportYoastMetaCommand extends Command
         ]);
 
         return $posts;
+    }
+
+    /**
+     * Puts the mapped values through the same sanitisation `update_post_meta()`
+     * will apply, so a comparison against what is already stored is a
+     * comparison of like with like.
+     *
+     * Yoast registers a sanitise callback on its own meta keys, and the
+     * canonical goes through `esc_url_raw()`, which percent-encodes non-ASCII
+     * characters. One production canonical contains a Hawaiian ʻokina, so
+     * without this the stored value could never equal the mapped one: every run
+     * reported that row as changed, rewrote it, and the next run did it again.
+     * The importer has to be idempotent, so it compares the value that will
+     * actually land in the database, not the one it started with.
+     *
+     * With Yoast inactive nothing is registered for these keys and
+     * `sanitize_meta()` returns the value untouched — which is still correct,
+     * because then nothing transforms it on write either.
+     *
+     * @param  array<string,string>  $desired
+     * @return array<string,string>
+     */
+    private function asStored(array $desired): array
+    {
+        foreach ($desired as $key => $value) {
+            $stored = sanitize_meta($key, $value, 'post');
+            $desired[$key] = is_string($stored) ? $stored : $value;
+        }
+
+        return $desired;
     }
 
     /**

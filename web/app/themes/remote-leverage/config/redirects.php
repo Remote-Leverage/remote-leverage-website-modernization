@@ -79,7 +79,6 @@ return [
     'wp-content/plugins/rl-social-kit/assets/x.png' => 'app/themes/remote-leverage/public/images/social-media-kit/brand/x.png',
     'wp-content/plugins/rl-social-kit/assets/yt.png' => 'app/themes/remote-leverage/public/images/social-media-kit/brand/yt.png',
 
-
     /*
     |--------------------------------------------------------------------------
     | Cutover map for the discarded production pages (ADR-0006 cutover gate)
@@ -126,9 +125,13 @@ return [
     // serves the "Virtual Assistant Roles" landing template (same as /hire-va-isolated-form/),
     // not the homepage. The client reopened scope for it on 2026-09-15 and it is now built at
     // patterns/hire-va.php, so the key is removed — leaving it would 301 the live page to /.
-    'hire-va-2' => '',
-    'hire-va-3' => '',
-    'hire-va-t' => '',
+    // Exact template twins of /hire-va/ (same chassis, only the advertised price differs).
+    // They pointed at the front page until /hire-va/ was itself rebuilt; sending them to the
+    // page they are variants of keeps the original intent rather than dumping the visitor
+    // on the homepage.
+    'hire-va-2' => 'hire-va',
+    'hire-va-3' => 'hire-va',
+    'hire-va-t' => 'hire-va',
     'home' => '',
     'home-eu' => '',
     'home-tasks-variation' => '',
@@ -201,7 +204,6 @@ return [
     'real-estate-virtual-assistants' => 'hire-va-4',
     'sales-landing-page' => 'hire-va-4',
     'sales-new-2026' => 'hire-va-4',
-    'sales-talents' => 'hire-va-4',
     'sales-virtual-assistants' => 'hire-va-4',
     'sales-virtual-assistants-2' => 'hire-va-4',
     'sales-virtual-assistants-from-latin-america' => 'hire-va-4',
@@ -307,7 +309,6 @@ return [
     'guides' => 'blog',
     'how-to-increase-your-virtual-assistants-productivity-with-bonuses' => 'blog',
     'how-to-train-your-virtual-assistant' => 'blog',
-    'onboardingguide' => 'blog',
     'vaguides' => 'blog',
     'vaonboardingguide' => 'blog',
     'vaonboardingguide2' => 'blog',
@@ -339,7 +340,6 @@ return [
     // Internal collateral, admin-gated tools, retired generators, one-off event pages and
     // build-time test pages. None of these has anything in v2 to point at, so they fall back to
     // the homepage rather than inventing a target.
-    'hmchecklists' => '',
     'job-description-generator' => '',
     'job-description-generator-2' => '',
     'job-posting-template-generator' => '',
@@ -347,9 +347,7 @@ return [
     'live-session-10x-revenue-with-ai' => '',
     'live-session-build-ai-tools-for-businesses' => '',
     'marketing-email-generator' => '',
-    'recruiterchecklists' => '',
     'resume' => '',
-    'saleschecklists' => '',
     'test-landing-page-26' => '',
     'test-landing-page-26-2' => '',
     'text-optimizer' => '',

@@ -19,6 +19,13 @@ use App\Support\BlockDefaults;
     <p class="has-text-muted-color has-text-color" style="font-size:0.95rem;margin-bottom:3rem">Don't just take our word for it, hear from business owners who've hired through Remote Leverage. See why quality makes all the difference!</p>
     <!-- /wp:paragraph -->
 
-    <?= BlockDefaults::renderHireVa4Testimonials([], BlockDefaults::hireVa4FeaturedTestimonials()) ?>
+    <?php /* Production's wall here is the full 15 reviews collapsed to 6, with a SHOW MORE pill
+             that expands in place — the same set and order as BlockDefaults::testimonials().
+             Feeding only the 6 featured rows (as this did until 2026-09-15) left the block with
+             nothing to reveal, so it correctly suppressed the control. */ ?>
+    <?= BlockDefaults::renderHireVa4Testimonials(
+        BlockDefaults::withFieldKeys('testimonials_block', ['show_more' => 1, 'visible_count' => 6, 'tone' => 'light']),
+        BlockDefaults::testimonials(),
+    ) ?>
 </div>
 <!-- /wp:group -->

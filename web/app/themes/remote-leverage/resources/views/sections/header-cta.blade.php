@@ -10,17 +10,18 @@
 <header class="absolute inset-x-0 top-0 z-30 w-full">
   <div class="w-full px-4 sm:px-6 lg:px-8">
     <div class="rl-container">
-      <div class="flex items-center justify-between h-[90px]">
+      <div class="flex items-center justify-between gap-3 h-[90px]">
         <a href="{{ home_url('/') }}"
-           class="inline-flex items-center gap-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0 rounded-sm"
+           class="inline-flex min-w-0 items-center gap-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0 rounded-sm"
            aria-label="{{ get_bloginfo('name', 'display') ?: 'Remote Leverage' }}">
           <img src="{{ Vite::asset('resources/images/logo.svg') }}"
                alt="{{ get_bloginfo('name', 'display') ?: 'Remote Leverage' }}"
-               class="h-6 sm:h-7 w-auto brightness-0 invert transition-opacity group-hover:opacity-90" />
+               width="154" height="18"
+               class="h-6 sm:h-7 w-auto max-w-full object-contain object-left brightness-0 invert transition-opacity group-hover:opacity-90" />
         </a>
 
         <a href="#booking-footer"
-           class="inline-flex items-center justify-center px-6 sm:px-7 py-2.5 sm:py-3 rounded-full bg-[#F90066] hover:bg-[#d60057] text-white text-xs sm:text-sm font-bold tracking-wider uppercase shadow-md transition-all duration-150">
+           class="inline-flex shrink-0 items-center justify-center px-6 sm:px-7 py-2.5 sm:py-3 rounded-full bg-[#F90066] hover:bg-[#d60057] text-white text-xs sm:text-sm font-bold tracking-wider uppercase shadow-md transition-all duration-150">
           {{ __('Get Started', 'remote-leverage') }}
         </a>
       </div>

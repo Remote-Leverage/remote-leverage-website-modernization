@@ -10,11 +10,15 @@
               $isFull = ($layout ?? 'split') === 'full';
             @endphp
             <div @class([
-                'grid grid-cols-1 gap-10 lg:gap-14 lg:items-center',
-                'lg:grid-cols-[420px_1fr]' => ! $isFull,
+                'grid grid-cols-1 gap-10 lg:gap-14',
+                'lg:grid-cols-[420px_1fr] lg:items-center' => ! $isFull,
             ])>
 
-                <div @class(['flex flex-col', 'hidden' => $isFull])>
+                {{-- In `full` layout the copy column is dropped but the heading is NOT: the
+                     intent (see the note at the top of this file) is a full-width carousel
+                     running under its own heading. Hiding both made the caller re-render the
+                     heading from a wrapper. --}}
+                <div @class(['flex flex-col', 'hidden' => $isFull && empty($headline)])>
                     @if ($headline)
                         <h2 class="font-display font-semibold text-black text-3xl sm:text-4xl lg:text-[48px] lg:leading-[0.95] tracking-[-1.44px] mb-6 lg:mb-[30px]">
                             {!! $headline !!}

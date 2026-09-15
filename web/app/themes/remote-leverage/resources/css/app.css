@@ -8,18 +8,50 @@
 
 @import "./blog.css";
 
-/* Inter Display font matching production 1:1 */
+/* "Inter Display" is not a separate typeface: `InterVariable.ttf` reported its own
+   family name as "Inter Variable" (Inter 4.000) with axes opsz 14-32 and wght 100-900.
+   What the name buys us is the `opsz` axis — nothing in this theme sets
+   `font-optical-sizing`, so the browser default (`auto`) is live and every element on
+   `--font-display` renders at opsz = its own px size. The `*-wght-*.woff2` files below
+   are axis-subsetted to wght only, pinning opsz at 14, so they are NOT interchangeable
+   with these: swapping headings onto them would restyle every display-size heading.
+
+   So the face is kept and the 843 KB unsubsetted TTF is not. These two woff2 files are
+   `pyftsubset` output from that exact TTF (same 4.000 outlines, same vertical metrics,
+   both axes intact, kern/mark/mkmk/calt/ccmp/locl intact) restricted to the same
+   unicode ranges as Inter Variable below, plus the arrows/ticks the blog templates
+   actually render in this face. Verified: 0 advance-width and 0 outline differences
+   against the TTF across six (opsz, wght) instances. ~844 KB -> ~69 KB per page.
+
+   To regenerate after an Inter upgrade: take `InterVariable.ttf` from the rsms/inter
+   release (v4.000 produced the files here — it is deliberately not kept in the repo,
+   that 843 KB is what this change removed) and run, once per face below
+   (pyftsubset ships with fonttools):
+     pyftsubset InterVariable.ttf --flavor=woff2 \
+       --unicodes='<the unicode-range of that face, without the U+ commas>' \
+       --output-file=resources/fonts/inter-display-<range>.woff2 */
 @font-face {
   font-family: "Inter Display";
   font-style: normal;
   font-display: swap;
   font-weight: 100 900;
-  src: url("../fonts/InterVariable.ttf") format("truetype");
+  src: url("../fonts/inter-display-latin.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2190-2199, U+2212, U+2215, U+2264-2265, U+2713, U+2717, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../fonts/inter-display-latin-ext.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 /* Latin (+ latin-ext) Inter variable from @fontsource-variable/inter.
-   League Spartan and Poppins were unused; Inter Display is the same
-   outline with optical sizing, which we turn off on headings below. */
+   League Spartan and Poppins were unused. These are the same outline as
+   "Inter Display" above but axis-subsetted to wght only, so optical sizing
+   is pinned at opsz 14 here and live on --font-display. */
 @font-face {
   font-family: "Inter Variable";
   font-style: normal;

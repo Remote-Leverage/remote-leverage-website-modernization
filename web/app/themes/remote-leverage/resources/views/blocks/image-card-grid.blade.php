@@ -5,12 +5,18 @@
     $isLarge = ($titleSize ?? 'small') === 'large';
 @endphp
 
+@php
+    // Production centres this band on the ecommerce page and left-aligns it on the comparison
+    // pages, so the header alignment is an option rather than a fixed 660px left column.
+    $isCentred = ($align ?? 'left') === 'center';
+@endphp
+
 <section class="w-full bg-bg-light py-14 lg:py-20">
     <div class="w-full px-4 sm:px-6 lg:px-8">
         <div class="rl-container">
 
             @if ($headline || $subheadline)
-                <div class="mb-10 max-w-[660px]">
+                <div @class(['mb-10', 'max-w-[660px]' => ! $isCentred, 'max-w-[860px] mx-auto text-center' => $isCentred])>
                     @if ($headline)
                         <h2 class="font-display font-bold text-black text-3xl sm:text-4xl lg:text-section">{!! $headline !!}</h2>
                     @endif
@@ -37,6 +43,15 @@
                         @if (! empty($card['image']))
                             <img src="{{ $card['image'] }}" alt="" loading="lazy" decoding="async"
                                  class="w-full object-cover {{ $isThree ? 'h-[168px]' : 'h-[212px]' }}">
+                        @elseif (! empty($card['icon']))
+                            {{-- An icon sits at its natural size rather than filling the card top.
+                                 Production's pricing cards use ~88px and ~146px marks; painting
+                                 those full-bleed would blow them up to the full card width. --}}
+                            <div class="flex justify-center pt-[30px]">
+                                <img src="{{ $card['icon'] }}" alt="" loading="lazy" decoding="async"
+                                     style="width:{{ $card['icon_width'] ?? 88 }}px"
+                                     class="h-auto max-w-full object-contain">
+                            </div>
                         @endif
 
                         <div class="flex flex-col gap-2.5 {{ $isLarge ? 'px-[30px] pt-2.5 pb-5' : 'px-5 py-4' }}">

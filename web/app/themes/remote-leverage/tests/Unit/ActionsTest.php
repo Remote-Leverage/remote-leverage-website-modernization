@@ -7,7 +7,6 @@ use App\Domains\Tracking\Gateways\PostHogClient;
 
 describe('Domain Actions', function () {
 
-
     test('EvaluateVariantAction queries PostHog client with user distinct ID', function () {
         $mockClient = $this->createMock(PostHogClient::class);
         $mockClient->expects($this->once())

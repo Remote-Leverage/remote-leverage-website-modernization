@@ -43,9 +43,24 @@ class RolesPricingGridBlock extends Block
         return [
             'variant' => get_field('variant') ?: 'stacked',
             'columns' => get_field('columns') ?: '4',
-            'headline' => BlockDefaults::cleanText(get_field('headline') ?: 'Virtual Assistant Roles'),
+            // An explicitly blank headline means "render no heading". Only an unset field
+            // falls back to the default — a plain `?:` made a headless section impossible,
+            // and the ecommerce pattern had to hide the injected <h2> with an sr-only span.
+            'headline' => self::resolveHeadline(get_field('headline')),
             'cards' => $this->cards(),
         ];
+    }
+
+    /**
+     * Resolve the section heading, treating a blank value as a deliberate "no heading".
+     */
+    public static function resolveHeadline(mixed $value): string
+    {
+        if ($value === null || $value === false) {
+            return BlockDefaults::cleanText('Virtual Assistant Roles');
+        }
+
+        return BlockDefaults::cleanText(trim((string) $value));
     }
 
     public function fields(): array

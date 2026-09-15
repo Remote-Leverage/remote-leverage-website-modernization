@@ -3379,13 +3379,9 @@ Google Ads',
      */
     public static function renderOfferStack(array $cards, array $overrides = []): string
     {
-        return self::renderBlockWithRepeater(
-            'offer-stack',
-            'cards',
-            'field_offer_stack_block_cards',
-            $cards,
-            $overrides,
-            ['align' => 'full'],
-        );
+        $data = [];
+        self::encodeRepeater('cards', 'field_offer_stack_block_cards', $cards, $data);
+
+        return self::patternBlock('offer-stack', array_merge($data, $overrides), ['align' => 'full']);
     }
 }
