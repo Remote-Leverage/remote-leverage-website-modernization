@@ -46,6 +46,12 @@ Never paste expanded block markup into `post_content` — it drifts from the pat
 on a database refresh. Shared partials that are *not* patterns go in `resources/patterns/`
 (WordPress scans `patterns/` recursively and rejects headerless files there).
 
+**The one exception** is a page created through the MCP `app/clone-page` ability, which writes
+expanded markup on purpose so marketing can ship a campaign page without a deploy. Those pages
+are database-resident and *will* be lost on a refresh — that is the accepted trade, not a bug.
+When one earns a permanent place, promote it back into a pattern. See
+[`docs/ai-mcp-and-sync.md`](web/app/themes/remote-leverage/docs/ai-mcp-and-sync.md).
+
 ## Rendering blocks from a pattern
 
 Use the `BlockDefaults::render*` helpers. Repeater data must be ACF-encoded — passing a raw

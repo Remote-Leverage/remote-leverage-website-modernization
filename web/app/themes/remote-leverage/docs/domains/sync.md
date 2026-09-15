@@ -147,6 +147,20 @@ STAGING_SYNC_APP_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
 
 Same shape for `PRODUCTION_SYNC_*`, which exists so gate 3 has something to compare against — not so production can be synced. These are read locally to call *out*; do not add them to `scripts/seed-staging-secrets.sh`, which pushes values in the opposite direction.
 
+### The body-credential bridge — TEMPORARY
+
+```
+STAGING_SYNC_BODY_AUTH=true
+```
+
+CloudFront removes the `Authorization` header before it reaches the origin unless a cache or origin request policy carries it, and this distribution does not. Every Application Password request therefore arrives unauthenticated and the sync screen cannot reach staging at all. WordPress's own Site Health REST check fails on staging for the same reason, which suggests the block editor is affected too.
+
+With this flag on, `SyncClient` sends the credential **as well as** the header, in a `_rl_sync_auth` field beside the `input` envelope. On the receiving side `web/app/mu-plugins/rl-sync-body-auth.php` copies it into `PHP_AUTH_USER` / `PHP_AUTH_PW` before `determine_current_user` runs.
+
+The bridge verifies nothing itself. `wp_authenticate_application_password()` still performs the lookup, the hash comparison, the rate limiting and the failure hook, so a caller without a valid credential gains nothing it would not have gained from a header. The mu-plugin refuses unless all of: the environment is one sync may run in, the method is POST, the request is HTTPS, the path is the abilities endpoint, the content type is JSON, and no real credential arrived. `SyncClient` refuses to attach it when either side is production.
+
+**This is a workaround for an infrastructure defect, not a design.** The correct fix is a `/wp-json/wp-abilities/*` cache behavior with `CachingDisabled` and an origin request policy that forwards `Authorization`. Once that lands, set the flag to false and delete both halves. Target for removal: **2026-10-15**. It is the second workaround for this same misconfiguration; the first is the `X-Livewire` header hack in `docker/nginx.conf`, still marked temporary.
+
 ## Tests
 
-Fourteen files, the largest test group in the suite: `SyncTransferPusherTest`, `SyncTransferPullerTest`, `SyncContentExporterTest`, `SyncContentImporterTest`, `SyncAttachmentRemapTest`, `SyncMediaFileTest`, `SyncUploadPathTest`, `SyncUndoLogTest`, `SyncSessionTest`, `SyncJobProgressTest`, `SyncDatasetsTest`, `SyncPurgeTest`, `SyncEnvironmentTest`.
+Sixteen files, the largest test group in the suite: `SyncTransferPusherTest`, `SyncTransferPullerTest`, `SyncContentExporterTest`, `SyncContentImporterTest`, `SyncAttachmentRemapTest`, `SyncMediaFileTest`, `SyncUploadPathTest`, `SyncUndoLogTest`, `SyncSessionTest`, `SyncJobProgressTest`, `SyncDatasetsTest`, `SyncPurgeTest`, `SyncEnvironmentTest`, `SyncBodyAuthTest`, `SyncClientBodyAuthTest`.

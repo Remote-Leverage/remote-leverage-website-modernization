@@ -38,6 +38,12 @@ return [
     | remote environment (see docs/ai-mcp-and-sync.md). Never the same
     | credentials used by the MCP content-agent user.
     |
+    | "body_auth" additionally sends the credential as a request body field,
+    | for a remote sitting behind a CDN that strips the Authorization header.
+    | TEMPORARY, paired with web/app/mu-plugins/rl-sync-body-auth.php, and off
+    | unless an environment opts in. Turn it off the day CloudFront forwards
+    | the header. Never available for production.
+    |
     */
 
     'environments' => [
@@ -45,11 +51,13 @@ return [
             'url' => env('STAGING_SYNC_URL'),
             'user' => env('STAGING_SYNC_USER'),
             'app_password' => env('STAGING_SYNC_APP_PASSWORD'),
+            'body_auth' => env('STAGING_SYNC_BODY_AUTH', false),
         ],
         'production' => [
             'url' => env('PRODUCTION_SYNC_URL'),
             'user' => env('PRODUCTION_SYNC_USER'),
             'app_password' => env('PRODUCTION_SYNC_APP_PASSWORD'),
+            'body_auth' => false,
         ],
     ],
 

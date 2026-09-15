@@ -682,3 +682,87 @@ if (! function_exists('sanitize_title')) {
         return trim($title, '-');
     }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Gutenberg block parsing
+|--------------------------------------------------------------------------
+|
+| PageSectionEditor rewrites real block markup, so these load WordPress's own
+| parser out of web/wp rather than approximating it. A hand-rolled parser here
+| would only ever prove the tests agree with themselves — the whole value of
+| the round-trip assertions is that they run through the same code the site
+| does. The four wrappers below are copies of the WordPress implementations
+| (wp-includes/blocks.php), which depend on nothing but the parser class.
+|
+*/
+
+if (! class_exists('WP_Block_Parser')) {
+    $wpIncludes = dirname(__DIR__, 4).'/wp/wp-includes/';
+
+    require_once $wpIncludes.'class-wp-block-parser-block.php';
+    require_once $wpIncludes.'class-wp-block-parser-frame.php';
+    require_once $wpIncludes.'class-wp-block-parser.php';
+}
+
+if (! function_exists('parse_blocks')) {
+    function parse_blocks($content)
+    {
+        return (new WP_Block_Parser)->parse($content);
+    }
+}
+
+if (! function_exists('serialize_block_attributes')) {
+    function serialize_block_attributes($block_attributes)
+    {
+        $encoded = json_encode($block_attributes, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        return strtr($encoded, [
+            '\\\\' => '\\u005c',
+            '--' => '\\u002d\\u002d',
+            '<' => '\\u003c',
+            '>' => '\\u003e',
+            '&' => '\\u0026',
+            '\\"' => '\\u0022',
+        ]);
+    }
+}
+
+if (! function_exists('serialize_block')) {
+    function serialize_block($block)
+    {
+        $content = '';
+        $index = 0;
+
+        foreach ($block['innerContent'] as $chunk) {
+            $content .= is_string($chunk) ? $chunk : serialize_block($block['innerBlocks'][$index++]);
+        }
+
+        if (! is_array($block['attrs'])) {
+            $block['attrs'] = [];
+        }
+
+        if ($block['blockName'] === null) {
+            return $content;
+        }
+
+        $name = str_starts_with($block['blockName'], 'core/')
+            ? substr($block['blockName'], 5)
+            : $block['blockName'];
+
+        $attrs = empty($block['attrs']) ? '' : serialize_block_attributes($block['attrs']).' ';
+
+        if (empty($content)) {
+            return sprintf('<!-- wp:%s %s/-->', $name, $attrs);
+        }
+
+        return sprintf('<!-- wp:%s %s-->%s<!-- /wp:%s -->', $name, $attrs, $content, $name);
+    }
+}
+
+if (! function_exists('serialize_blocks')) {
+    function serialize_blocks($blocks)
+    {
+        return implode('', array_map('serialize_block', $blocks));
+    }
+}

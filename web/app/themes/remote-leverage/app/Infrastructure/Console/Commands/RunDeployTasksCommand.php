@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Console\Commands;
 
+use App\Ai\Provisioning\ContentAgentProvisioner;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +35,8 @@ class RunDeployTasksCommand extends Command
     /**
      * @var string
      */
-    protected $description = 'Run post-deploy database tasks (migrations, rewrite rules) under a cross-container lock.';
+    protected $description = 'Run post-deploy database tasks (migrations, rewrite rules, MCP content-agent '.
+        'reconciliation) under a cross-container lock.';
 
     private const LOCK_NAME = 'rl_deploy_tasks';
 
@@ -72,10 +74,63 @@ class RunDeployTasksCommand extends Command
         }
 
         $this->flushRewriteRules();
+        $this->provisionContentAgent();
 
         $this->info('Deploy tasks complete.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Keep the MCP content-agent user in step with config/ai-wordpress.php.
+     *
+     * Reconciliation only — this never mints an application password, because
+     * a deploy writes its output to CloudWatch and a credential printed there
+     * is a credential leaked. Issuing one stays a deliberate act:
+     * `wp acorn rl:ai:agent --rotate`.
+     *
+     * Running it on every deploy is what makes the capability flags meaningful:
+     * tightening AI_AGENT_CAN_PUBLISH in the task definition actually takes the
+     * capability away on the next release, rather than leaving whatever was
+     * granted by hand months ago.
+     */
+    private function provisionContentAgent(): void
+    {
+        if (! config('ai-wordpress.content_agent.provision_on_deploy', true)) {
+            $this->info('Content agent provisioning is disabled on this environment; skipping.');
+
+            return;
+        }
+
+        if (! function_exists('wp_insert_user')) {
+            $this->warn('WordPress not loaded; skipped content agent provisioning.');
+
+            return;
+        }
+
+        $this->info('Reconciling the MCP content agent...');
+
+        try {
+            $result = app(ContentAgentProvisioner::class)->ensure();
+        } catch (Throwable $e) {
+            // A missing agent user is not worth failing a release over — the
+            // site serves fine without it, and `rl:ai:agent` can fix it after.
+            $this->warn('Could not provision the content agent: '.$e->getMessage());
+
+            return;
+        }
+
+        if ($result['created']) {
+            $this->info('  created the content agent user.');
+        }
+
+        foreach ($result['granted'] as $capability) {
+            $this->line("  granted  {$capability}");
+        }
+
+        foreach ($result['revoked'] as $capability) {
+            $this->line("  revoked  {$capability}");
+        }
     }
 
     /**

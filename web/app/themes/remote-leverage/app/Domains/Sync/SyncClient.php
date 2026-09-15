@@ -33,9 +33,24 @@ class SyncClient
 
         // The wp-abilities/v1 run endpoint expects the ability's own input
         // wrapped in an "input" envelope, not passed as the raw POST body.
+        $payload = ['input' => $input];
+
+        // A sibling of "input", never inside it: the endpoint reads only the
+        // envelope it registered, so an extra top-level key passes through
+        // untouched instead of being schema-validated as ability input.
+        if ($this->bodyAuthEnabled()) {
+            $payload['_rl_sync_auth'] = [
+                'user' => $this->user(),
+                'password' => $this->appPassword(),
+            ];
+        }
+
+        // The header is still sent regardless. The body copy is a fallback for
+        // a CDN that strips it, not a replacement, so this keeps working
+        // unchanged the moment the header starts arriving again.
         $response = Http::withBasicAuth($this->user(), $this->appPassword())
             ->acceptJson()
-            ->post($url, ['input' => $input]);
+            ->post($url, $payload);
 
         if ($response->failed()) {
             throw new RuntimeException(
@@ -44,6 +59,26 @@ class SyncClient
         }
 
         return $response->json();
+    }
+
+    /**
+     * Whether to also carry the credential in the request body.
+     *
+     * TEMPORARY, and opt-in per environment — see config/rl-sync.php and
+     * web/app/mu-plugins/rl-sync-body-auth.php. Refused outright for
+     * production so the opposite half of the bridge can never be reached
+     * there even if someone sets the env var.
+     */
+    private function bodyAuthEnabled(): bool
+    {
+        if ($this->env === SyncEnvironment::PRODUCTION || SyncEnvironment::isProduction()) {
+            return false;
+        }
+
+        return filter_var(
+            config("rl-sync.environments.{$this->env}.body_auth", false),
+            FILTER_VALIDATE_BOOLEAN,
+        );
     }
 
     private function baseUrl(): string
