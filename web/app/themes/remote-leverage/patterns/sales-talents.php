@@ -197,7 +197,7 @@ $whatYouGet = [
 // passed explicitly so the migrated page reads exactly like the live one.
 $faqs = [
     ['What countries do you hire from?', '<p>We focus on four key regions:</p><ul class="list-disc pl-5 mt-2 space-y-1"><li>Latin America and The Caribbean</li><li>The Philippines</li><li>South Africa</li><li>Egypt</li></ul><p class="mt-3">Our Latin American Virtual Assistants are especially popular with US businesses, thanks to their:</p><ul class="list-disc pl-5 mt-2 space-y-1"><li>Exceptional English fluency with minimal accents</li><li>Strong cultural alignment with US business practices</li><li>Convenient time zone overlap with North America</li></ul><p class="mt-3">We’ll guide you on which region best suits your specific needs, but the final choice is always yours.</p>'],
-    ['How do taxes &amp; payroll work when hiring Virtual Assistants?', '<p>Our partner company takes care of all payroll and compliance requirements for your Virtual Assistant.</p><p class="mt-2">This means you can focus on growing your business while they handle:</p><ul class="list-disc pl-5 mt-2 space-y-1"><li>Tax compliance</li><li>Payroll processing</li><li>Legal requirements</li><li>International payment regulations</li></ul><p class="mt-3">It’s a simple, worry-free solution that ensures everything is managed properly and legally.</p>'],
+    ['How do taxes & payroll work when hiring Virtual Assistants?', '<p>Our partner company takes care of all payroll and compliance requirements for your Virtual Assistant.</p><p class="mt-2">This means you can focus on growing your business while they handle:</p><ul class="list-disc pl-5 mt-2 space-y-1"><li>Tax compliance</li><li>Payroll processing</li><li>Legal requirements</li><li>International payment regulations</li></ul><p class="mt-3">It’s a simple, worry-free solution that ensures everything is managed properly and legally.</p>'],
     ['How do you get paid?', '<p>It’s simple – we charge a one-time flat fee, but only after you’ve found your perfect match.</p><p class="mt-2">Whatever hourly pay you decide to pay goes directly to the Virtual Assistant you hire.</p>'],
     ['What\'s the difference between Staffing and Recruiting Agencies?', '<p>Staffing agencies charge monthly fees but only pay a small portion to Virtual Assistants. This often results in lower quality talent, as skilled VAs avoid arrangements where agencies keep a large chunk of their earnings.</p><p class="mt-2">At Remote Leverage, we charge just one flat fee after you hire. Your Virtual Assistant receives 100% of what you pay them directly. This attracts higher-quality talent and eliminates ongoing middleman costs, saving you money while getting better results.</p>'],
     ['What if I have questions and need help after hiring?', '<p>After hiring your Virtual Assistant, you’ll have access to a dedicated Customer Success Manager who will help ensure your success.</p><p class="mt-2">They’re here to assist with:</p><ul class="list-disc pl-5 mt-2 space-y-1"><li>Reviewing performance</li><li>Monitoring progress</li><li>Training guidance</li></ul><p class="mt-3">Any other questions or requests</p>'],
@@ -283,7 +283,7 @@ $footerNote = '<span class="mt-7 block max-w-[619px] space-y-2.5">'
 
 <!-- ============ §1b TRUSTED BY ============ -->
 <!-- wp:group {"align":"full","backgroundColor":"bg-light","layout":{"type":"constrained","contentSize":"1380px"}} -->
-<div class="wp-block-group alignfull has-bg-light-background-color has-background pb-10 lg:pb-14" style="background-color:var(--color-bg-light);">
+<div class="wp-block-group alignfull has-bg-light-background-color has-background pb-2" style="background-color:var(--color-bg-light);">
     <div class="<?= $wrap ?>">
         <p class="mb-5 text-center text-[11.4px] leading-[17px] tracking-[-0.342px] text-black">TRUSTED BY SCALING TEAMS GLOBALLY</p>
     </div>
@@ -300,8 +300,8 @@ $footerNote = '<span class="mt-7 block max-w-[619px] space-y-2.5">'
     </div>
 
     <?php // The heading above is production's centred 48px lockup; the block's own left-aligned
-          // header slot stays empty so only its carousel chrome renders. ?>
-    <div class="[&>section]:py-0 [&>section]:pt-8">
+          // header slot stays empty so only its carousel chrome renders.?>
+    <div class="[&>section]:py-0 [&>section]:pt-8 [&_.justify-between]:justify-end">
         <?= BlockDefaults::renderEcom('talent-dossier-carousel', $dossier, [
             'headline' => '',
             'layout' => 'carousel',
@@ -330,7 +330,7 @@ $footerNote = '<span class="mt-7 block max-w-[619px] space-y-2.5">'
     <div class="<?= $wrap ?>">
         <div class="overflow-hidden rounded-[32px] bg-[#F2F1ED] pt-[45px] pb-10">
             <div class="px-6 sm:px-10">
-                <?php // Production paints both of these WHITE on #F2F1ED. Kept verbatim — see the header note. ?>
+                <?php // Production paints both of these WHITE on #F2F1ED. Kept verbatim — see the header note.?>
                 <h2 class="font-display font-bold text-[32px] leading-[38px] sm:text-[42px] sm:leading-[48px] tracking-[-1.44px] text-center text-white">Hire Appointment Setters Who Already Know Your Stack</h2>
                 <p class="mt-4 text-center text-[18px] leading-[26px] text-white">Every candidate we place has hands-on experience with the tools and platforms you use.</p>
                 <div class="mt-7 text-center">
@@ -342,7 +342,7 @@ $footerNote = '<span class="mt-7 block max-w-[619px] space-y-2.5">'
                   // bare logo strip — no label beside each mark, no per-row track, no pill chrome.
                   // These four rows are labelled tool pills scrolling in alternate directions, so
                   // there is no block to reuse; the shared animate-marquee-left/right utilities and
-                  // the --mask-marquee-fade token carry the motion and the edge fade. ?>
+                  // the --mask-marquee-fade token carry the motion and the edge fade.?>
             <div class="mt-[30px] space-y-3.5 [mask-image:var(--mask-marquee-fade)] [-webkit-mask-image:var(--mask-marquee-fade)]">
                 <?php foreach ($stackRows as $rowIndex => $row) { ?>
                     <div class="overflow-hidden">

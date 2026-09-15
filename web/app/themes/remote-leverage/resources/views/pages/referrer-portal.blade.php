@@ -9,7 +9,7 @@
           <span class="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-purple-100 text-brand-purple text-2xs font-bold uppercase tracking-wider mb-2">
             Strategic Referral Network
           </span>
-          <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-slate-900 tracking-tight">
+          <h1 class="text-2xl sm:text-3xl font-bold font-display text-slate-900 tracking-tight">
             Referrer Portal Dashboard
           </h1>
           <p class="mt-1 text-sm text-slate-600">

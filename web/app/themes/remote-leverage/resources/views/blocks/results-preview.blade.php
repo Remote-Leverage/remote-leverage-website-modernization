@@ -68,7 +68,7 @@
 
                     {{-- Right Quote --}}
                     <div class="lg:col-span-6 flex gap-4 items-start">
-                        <span class="text-[#250D4A] text-4xl sm:text-5xl font-serif font-black leading-none flex-shrink-0 select-none">
+                        <span class="text-[#250D4A] text-4xl sm:text-5xl font-serif font-bold leading-none flex-shrink-0 select-none">
                             “
                         </span>
                         <div>

@@ -14,7 +14,7 @@
       <span>Exclusive Partner Network Benefit</span>
     </div>
 
-    <h1 class="font-display text-3xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
+    <h1 class="font-display text-3xl md:text-5xl font-bold tracking-tight text-white leading-tight">
       Welcome! We've Partnered to Give Your Team <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-amber-300">VIP Hiring Access</span>
     </h1>
 

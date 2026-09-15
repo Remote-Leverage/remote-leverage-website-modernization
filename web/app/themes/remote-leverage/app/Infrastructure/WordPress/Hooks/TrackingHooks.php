@@ -37,31 +37,46 @@ HTML;
     }
 
     /**
-     * Inject Customer.io JavaScript snippet in footer.
+     * Inject Customer.io's CDP (Data Pipelines) snippet in the footer.
+     *
+     * This is `window.cioanalytics` — the analytics.js-style CDP snippet production serves,
+     * verified against https://remoteleverage.com/ on 2026-09-15 (SNIPPET_VERSION 4.15.3).
+     * It is also what the legacy payment widget called and what `resources/js/payment-gateway.js`
+     * dispatches to, so the client telemetry now lands on the same SDK in every environment.
+     *
+     * **It takes a CDP write key, not the Track API site id.** Those are different credentials
+     * from different Customer.io products: `CUSTOMERIO_SITE_ID` / `CUSTOMERIO_API_KEY` stay
+     * server-side for `CustomerIOClient`, which talks to the v1 Track API. Pointing this
+     * snippet at a site id would 404 on the CDP asset URL and silently queue every event
+     * forever, so the write key is its own variable and its own guard.
+     *
+     * Two things production's copy does that are deliberately NOT ported:
+     *  - an `addSourceMiddleware` that mirrors every event to `POST /wp-json/behavioral/v1/event`.
+     *    That is the legacy plugin's unauthenticated write endpoint; v2 records behavioural
+     *    events server-side through `RecordBehaviorEventAction` instead.
+     *  - a `cio_id` / `cio_form` query-param "identity bridge" for Customer.io-hosted forms.
+     *    v2 has no Customer.io-hosted forms; it is a separate feature, not part of the snippet.
      */
     public function injectCustomerIOSnippet(): void
     {
-        $siteId = config('services.customer_io.site_id');
-        if (! $siteId) {
+        $writeKey = config('services.customer_io.cdp_write_key');
+
+        if (! $writeKey) {
             return;
         }
 
+        // wp_json_encode(), not esc_js(): esc_js() escapes for a quoted HTML *attribute*
+        // (it turns " into &quot;), which would corrupt a string literal inside <script>.
+        // This emits the quotes itself, so the load() call below has none of its own.
+        $writeKey = wp_json_encode((string) $writeKey);
+
         echo <<<HTML
-<!-- Customer.io Analytics -->
+<!-- Customer.io CDP -->
 <script type="text/javascript">
-var _cio = _cio || [];
-(function() {
-  var a,b,c; a = function(f) { return function() { _cio.push([f].concat(Array.prototype.slice.call(arguments,0))) } };
-  b = ["load","identify","sidentify","track","page"];
-  for (c=0; c<b.length; c++) { _cio[b[c]] = a(b[c]); }
-  var t = document.createElement('script'),
-      s = document.getElementsByTagName('script')[0];
-  t.async = true;
-  t.id    = 'cio-tracker';
-  t.setAttribute('data-site-id', '{$siteId}');
-  t.src = 'https://assets.customer.io/assets/track.js';
-  s.parentNode.insertBefore(t, s);
-})();
+!function(){var i="cioanalytics",analytics=(window[i]=window[i]||[]);if(!analytics.initialize){if(analytics.invoked){window.console&&console.error&&console.error("Snippet included twice.");}else{analytics.invoked=!0;analytics.methods=["trackSubmit","trackClick","trackLink","trackForm","pageview","identify","reset","group","track","ready","alias","debug","page","once","off","on","addSourceMiddleware","addIntegrationMiddleware","setAnonymousId","addDestinationMiddleware"];analytics.factory=function(e){return function(){var t=Array.prototype.slice.call(arguments);t.unshift(e);analytics.push(t);return analytics}};for(var e=0;e<analytics.methods.length;e++){var key=analytics.methods[e];analytics[key]=analytics.factory(key)}analytics.load=function(key,e){var t=document.createElement("script");t.type="text/javascript";t.async=!0;t.setAttribute("data-global-customerio-analytics-key",i);t.src="https://cdp.customer.io/v1/analytics-js/snippet/"+key+"/analytics.min.js";var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(t,n);analytics._writeKey=key;analytics._loadOptions=e};analytics.SNIPPET_VERSION="4.15.3";
+analytics.load({$writeKey});
+analytics.page();
+}}}();
 </script>
 HTML;
     }

@@ -22,9 +22,10 @@
  * Event names live in FUNNEL below and MUST stay in step with the PHP enum
  * App\Domains\Payment\Data\CheckoutFunnelStep — tests/Unit/PaymentCheckoutTelemetryTest.php
  * reads this file and fails if the two drift. Dispatch is direct to the PostHog and
- * Customer.io browser SDKs that TrackingHooks already injects; there is no request to our own
- * server, so none of this can add latency to a payment. Both SDKs are absent whenever their
- * credentials are unset (which is the normal local state), and every call site guards for that.
+ * Customer.io CDP (`cioanalytics`) browser SDKs that TrackingHooks already injects; there is
+ * no request to our own server, so none of this can add latency to a payment. Both SDKs are
+ * absent whenever their credentials are unset (which is the normal local state), and every
+ * call site guards for that.
  *
  * The amount is NOT sent from here. The server re-derives it from the block on the page
  * (post_id + block_index); this script only posts who the customer is.
@@ -140,8 +141,11 @@ function createTelemetry({ blockId, postId }) {
     }
 
     try {
-      // Production runs the CDP snippet (`cioanalytics`), which is what the legacy widget
-      // called. TrackingHooks injects the classic tracker (`_cio`). Support whichever is there.
+      // `cioanalytics` is the CDP snippet TrackingHooks injects and the one production
+      // serves, so it is the expected path everywhere. The `_cio` branch is now purely
+      // defensive — nothing in v2 defines it — and is kept because the classic tracker can
+      // still arrive via the GTM container, and because a staged cutover may serve some
+      // pages from the legacy stack. Note the two SDKs disagree on identify()'s signature.
       if (window.cioanalytics && typeof window.cioanalytics.track === 'function') {
         window.cioanalytics.track(eventName, payload);
       } else if (window._cio && typeof window._cio.track === 'function') {
@@ -171,6 +175,8 @@ function createTelemetry({ blockId, postId }) {
       }
 
       try {
+        // Same preference and the same defensive `_cio` branch as capture() above; note
+        // the classic tracker takes one object, the CDP snippet takes (userId, traits).
         if (window.cioanalytics && typeof window.cioanalytics.identify === 'function') {
           window.cioanalytics.identify(email, { email });
         } else if (window._cio && typeof window._cio.identify === 'function') {

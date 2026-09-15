@@ -42,7 +42,7 @@ $poster = BlockDefaults::homeImg('magnific_EqBRpqJuuO-1-1.png');
 
             <!-- Right Column: Client Quote -->
             <div class="lg:col-span-6 flex flex-col justify-center gap-4">
-                <span class="text-[#250D4A] text-4xl sm:text-5xl font-serif font-black leading-none select-none">“</span>
+                <span class="text-[#250D4A] text-4xl sm:text-5xl font-serif font-bold leading-none select-none">“</span>
                 <blockquote class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-black leading-snug">
                     “It wasn’t about paying less for an employee – it was really about finding someone with work ethic.”
                 </blockquote>

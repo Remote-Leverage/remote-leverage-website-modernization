@@ -24,7 +24,7 @@
                     height="36" class="w-9 h-9 rounded-full border-2 border-white object-cover"
                     loading="lazy" decoding="async">
             </div>
-            <span class="font-display font-extrabold text-base text-black ml-3">{{ $onboardedCount }}</span>
+            <span class="font-display font-bold text-base text-black ml-3">{{ $onboardedCount }}</span>
         </div>
     </div>
 
@@ -77,7 +77,7 @@
                         loading="lazy" decoding="async">
                 </div>
                 <span
-                    class="font-display font-extrabold text-sm sm:text-base text-black ml-2.5">{{ $countriesCount }}</span>
+                    class="font-display font-bold text-sm sm:text-base text-black ml-2.5">{{ $countriesCount }}</span>
             </div>
         </div>
 
@@ -96,7 +96,7 @@
             {{-- Amount & Timeline --}}
             <div class="flex items-baseline justify-between pt-0.5">
                 <span
-                    class="font-display font-extrabold text-2xl sm:text-[28px] lg:text-[30px] text-black tracking-tight">
+                    class="font-display font-bold text-2xl sm:text-[28px] lg:text-[30px] text-black tracking-tight">
                     {{ $economicImpact }}
                 </span>
                 <span class="text-[11px] sm:text-xs font-bold text-black leading-tight text-right whitespace-pre-line">

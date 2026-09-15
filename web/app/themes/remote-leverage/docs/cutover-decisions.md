@@ -45,6 +45,20 @@ PHP-FPM worker occupancy after the response, no retry, no dead-letter. Deferred 
 `STRIPE_KEY`/`STRIPE_SECRET` — the same pair serving Connect payouts to referrers. No second
 credential set. Still needs that account's webhook signing secret (decision 3).
 
+### 5b. Staging stays in Stripe test mode; production uses the live pair
+`deployment.md` said "Staging uses Stripe test keys" while decision 5 put the deposit on the
+live Connect pair — a contradiction with teeth now that the webhook **fails closed**: a
+test-mode event signed with a live-account secret is refused outright rather than logged.
+
+**Resolved:** staging keeps Stripe **test** keys and its own **test-mode** webhook signing
+secret; production uses the live Connect pair and its live secret. That means **two distinct
+`STRIPE_WEBHOOK_SECRET` values**, one per environment — Stripe issues a separate signing secret
+per webhook endpoint, so this is how it is meant to work, not a workaround.
+
+Consequence: staging can exercise the deposit flow end to end without moving real money, and a
+secret copied from the wrong environment fails loudly (403) instead of silently accepting
+unverified events.
+
 ### 6. Checkout telemetry is rebuilt, not dropped
 The legacy `rl_payment_gateway` widget's PostHog / Customer.io / internal-log calls were removed
 during the port. Sales and ops depend on that attribution, so the funnel is re-instrumented
@@ -89,6 +103,18 @@ stray "NEW SECTION" label — reproduced verbatim under the strict-fidelity rule
 it stays out of the index until someone writes it.
 
 ## Content
+
+### 10b. `/comparison/` stays database-resident, deliberately
+Page 323's `post_content` is **58KB of expanded block markup, not a pattern reference** — which
+`CLAUDE.md` forbids, because it drifts from the pattern and is lost on a database refresh. The
+`rl:noindex` marker had to go into the database beside it for the same reason.
+
+**Decision: leave it.** The page is still full of production's `[X]` placeholders and is a
+rewrite candidate, so converting it to a pattern would be work spent preserving content that is
+going to be replaced. **Known consequence: a database refresh loses this page and its noindex
+marker, and it will need rebuilding.** Recorded so that is a choice rather than a surprise.
+
+It is the only page in the repo in this state.
 
 ### 11. ADR-0005's review gate is satisfied by decision, not by queue
 The 119 posts came in through `content:import-posts` rather than the audit/convert/review

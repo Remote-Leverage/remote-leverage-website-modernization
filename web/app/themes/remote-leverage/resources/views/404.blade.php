@@ -9,7 +9,7 @@
     <div class="relative max-w-2xl mx-auto text-center space-y-8">
       {{-- 404 Visual Indicator --}}
       <div class="relative inline-block">
-        <span class="text-8xl sm:text-9xl font-black font-display tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-pink-400 to-brand-magenta select-none">
+        <span class="text-8xl sm:text-9xl font-bold font-display tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-pink-400 to-brand-magenta select-none">
           404
         </span>
         <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-pill bg-white/10 backdrop-blur-md border border-white/20 text-2xs font-bold uppercase tracking-widest text-white">

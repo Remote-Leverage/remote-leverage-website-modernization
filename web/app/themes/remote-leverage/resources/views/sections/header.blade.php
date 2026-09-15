@@ -13,7 +13,7 @@
                         width="154" height="18"
                         class="h-6 sm:h-7 w-auto max-w-full object-contain object-left transition-transform group-hover:scale-[1.02]"
                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
-                    <span class="hidden text-2xl font-display font-extrabold text-brand-navy tracking-tight">
+                    <span class="hidden text-2xl font-display font-bold text-brand-navy tracking-tight">
                         Remote Leverage
                     </span>
                 </a>

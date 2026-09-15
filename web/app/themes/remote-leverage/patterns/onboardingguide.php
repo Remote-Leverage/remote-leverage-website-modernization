@@ -142,7 +142,7 @@ $parts = [
         <?php // @bespoke: acf/accordion-faq is the theme's only accordion and it is wrong here —
               // it lays out two balanced columns and emits Schema.org FAQPage structured data.
               // This is a single-column client-enablement list on a page that must not advertise
-              // itself to search as an FAQ, so the rows are plain <details>. No cards, no images. ?>
+              // itself to search as an FAQ, so the rows are plain <details>. No cards, no images.?>
         <div class="mt-5">
             <?php foreach ($faqs as $i => [$q, $a]) { ?>
                 <details class="<?= $accRow ?> <?= $i > 0 ? 'border-t-0' : '' ?>" <?= $i === 0 ? 'open' : '' ?>>

@@ -80,7 +80,7 @@ $presentationBefore = [
     'This protects you from contractor misclassification risk, which is one of the most common (and expensive) compliance issues US businesses face with remote workers.',
     'Besides compliance, we will also handle payment processing on your behalf. The way it works is your contractor would submit an invoice to us for payment through our system every two weeks, we email you the total amount for your review, and if you approve, we take money out of your account and pass it on to the contractor.',
     'Again you want that degree of separation to protect yourself legally.',
-    'Also, one other problem that happens all the time when you hire people that work remotely is they might bill you for hours where they&rsquo;re not actually working, or even if you pay a salary and you&rsquo;re expecting a set 7 or 8 hours of work done per day, they might be goofing off on social media or YouTube and biling you without actually working, so part of our onboarding process with contractors is we have them install a screen monitoring device on their computer. This allows us to do two things:',
+    'Also, one other problem that happens all the time when you hire people that work remotely is they might bill you for hours where they&rsquo;re not actually working, or even if you pay a salary and you&rsquo;re expecting a set 7 or 8 hours of work done per day, they might be goofing off on social media or YouTube and billing you without actually working, so part of our onboarding process with contractors is we have them install a screen monitoring device on their computer. This allows us to do two things:',
 ];
 
 $monitoringPoints = [

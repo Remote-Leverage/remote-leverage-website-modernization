@@ -57,7 +57,7 @@
                                         </div>
 
                                         <div class="px-2 py-4">
-                                            <h3 class="font-display text-[22px] font-extrabold text-black mb-1">{{ $profile['name'] }}</h3>
+                                            <h3 class="font-display text-[22px] font-bold text-black mb-1">{{ $profile['name'] }}</h3>
 
                                             @if (! empty($profile['role']))
                                                 <p class="text-[13px] text-[#888] mb-4">{{ $profile['role'] }}</p>

@@ -69,9 +69,24 @@ Content parity is not visual parity. Compare rendered screenshots against produc
 - Playwright + `channel: 'chrome'` at 1440px.
 - Force `img.loading = 'eager'` and scroll the full page before capturing — lazy images and
   lazy CSS backgrounds otherwise read as missing or broken.
+- **Do not scroll back to the top before shooting.** Returning to the top re-arms Elementor's
+  `.elementor-invisible` entrance animation, so images that had loaded read as blank space
+  again. Capture from where the scroll ended, or strip `.elementor-invisible` first. This is
+  not theoretical: it silently dropped two photos from a `/services/` capture, and a related
+  lazy-load miss produced two wrong conclusions on 2026-09-15 — a section reported "broken on
+  production" that merely had a lazy background, and images reported absent that were just
+  below the fold.
+- **Sanity-check the geometry, not just the picture.** The `/services/` miss was caught because
+  card heights (591px and 810px) could not be explained by ~325px of content — not because the
+  screenshot looked wrong. A blank area and a correctly-rendered white card are the same pixels.
 - Read design tokens off production with `getComputedStyle` rather than estimating.
 - Check a section is actually *visible* on production before reproducing it; some are
   `display:none` at every breakpoint.
+- Production is not self-consistent. Check for separate desktop and mobile Elementor stacks
+  (`elementor-hidden-mobile` / `elementor-hidden-desktop`) before assuming one responsive
+  layout — `/services/` ships two, and the mobile one carries **different prices** because
+  someone updated the desktop copy and forgot the other. Reproducing the wrong one ships wrong
+  numbers. Where they disagree, reproduce desktop and say so.
 
 ## Build & checks
 

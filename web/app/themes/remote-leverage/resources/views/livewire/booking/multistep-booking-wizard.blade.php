@@ -905,7 +905,7 @@
           <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-green-50 text-status-success text-2xs font-bold uppercase tracking-wider">
             Confirmed &amp; Scheduled
           </span>
-          <h3 class="text-2xl sm:text-3xl font-extrabold font-display text-brand-hero tracking-tight">
+          <h3 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight">
             You're All Set, {{ $name }}!
           </h3>
           <p class="text-xs sm:text-sm text-text-muted max-w-md mx-auto">

@@ -8,7 +8,7 @@
         <span class="inline-flex items-center gap-2 px-3.5 py-1 rounded-pill bg-purple-100 text-brand-purple text-xs font-bold uppercase tracking-wider mb-3">
           Join the Network
         </span>
-        <h1 class="text-3xl sm:text-4xl font-extrabold font-display text-slate-900 tracking-tight">
+        <h1 class="text-3xl sm:text-4xl font-bold font-display text-slate-900 tracking-tight">
           Referrer Registration
         </h1>
         <p class="mt-3 text-base text-slate-600">

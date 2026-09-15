@@ -63,14 +63,14 @@
               <img src="{{ Vite::asset('resources/images/avatar.png') }}" alt="Remote Leverage" class="w-full h-full object-cover" />
             </div>
             <div>
-              <span class="font-extrabold text-sm text-brand-hero block font-display">Remote Leverage</span>
+              <span class="font-bold text-sm text-brand-hero block font-display">Remote Leverage</span>
               <span class="text-2xs font-bold text-slate-400 tracking-wider uppercase block">YOUR PARTNER DASHBOARD</span>
             </div>
           </div>
 
           <!-- Greeting -->
           <div>
-            <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-brand-hero tracking-tight">
+            <h1 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight">
               Hi {{ $referrer->name }}
             </h1>
             <p class="text-xs sm:text-sm text-text-muted mt-1">
@@ -205,7 +205,7 @@
                   <polyline points="17 6 23 6 23 12"></polyline>
                 </svg>
               </div>
-              <div class="text-2xl sm:text-3xl font-black text-brand-hero font-display tracking-tight">{{ $reachCount }}</div>
+              <div class="text-2xl sm:text-3xl font-bold text-brand-hero font-display tracking-tight">{{ $reachCount }}</div>
               <div class="text-2xs font-bold text-slate-400 uppercase tracking-wider mt-1">REACH (CLICKS)</div>
             </div>
 
@@ -217,7 +217,7 @@
                   <circle cx="12" cy="7" r="4"></circle>
                 </svg>
               </div>
-              <div class="text-2xl sm:text-3xl font-black text-brand-hero font-display tracking-tight">{{ $recentReferralsCount }}</div>
+              <div class="text-2xl sm:text-3xl font-bold text-brand-hero font-display tracking-tight">{{ $recentReferralsCount }}</div>
               <div class="text-2xs font-bold text-slate-400 uppercase tracking-wider mt-1">RECENT REFERRALS</div>
             </div>
 
@@ -229,7 +229,7 @@
                   <polyline points="22 4 12 14.01 9 11.01"></polyline>
                 </svg>
               </div>
-              <div class="text-2xl sm:text-3xl font-black text-brand-hero font-display tracking-tight">{{ $dealsFulfilledCount }}</div>
+              <div class="text-2xl sm:text-3xl font-bold text-brand-hero font-display tracking-tight">{{ $dealsFulfilledCount }}</div>
               <div class="text-2xs font-bold text-slate-400 uppercase tracking-wider mt-1">DEALS FULFILLED</div>
             </div>
 

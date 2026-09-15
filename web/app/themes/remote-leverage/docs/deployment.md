@@ -97,7 +97,20 @@ APP_SECRET_ARN=arn:aws:secretsmanager:us-east-1:...:secret:/wordpress-staging/ap
 AWS_REGION=us-east-1 ./scripts/seed-staging-secrets.sh env
 ```
 
-It deliberately skips `DB_*`, `WP_HOME` and `WP_SITEURL` — those are environment-specific and set in the task definition. Staging uses Stripe test keys.
+It deliberately skips `DB_*`, `WP_HOME` and `WP_SITEURL` — those are environment-specific and set in the task definition.
+
+**Stripe, per environment (settled 2026-09-15).** Staging runs Stripe **test** keys with its own
+**test-mode** webhook signing secret; production runs the live Connect pair with its live secret.
+Stripe issues a separate signing secret per webhook endpoint, so `STRIPE_WEBHOOK_SECRET` is a
+genuinely different value in each environment — copying one between them produces a 403, not a
+subtle bug. This matters more than it used to: `/api/webhooks/stripe` and `/api/webhooks/calendly`
+now **fail closed**, returning 503 with no secret configured and 403 on a bad signature, so an
+environment missing its secret processes nothing at all rather than accepting unverified events.
+See [cutover-decisions.md](cutover-decisions.md) §5b and [known-issues.md](known-issues.md) #7.
+
+> **Note:** the secret is injected into the ECS **task definition**, so writing it into Secrets
+> Manager is not enough on its own — the service needs a new deployment (or a forced update)
+> before a running task sees it.
 
 **Do not add the `*_SYNC_*` keys to this script.** They point in the opposite direction: they are read *locally* so the sync commands can call out to a remote environment's REST API, and are never baked into a container. See [domains/sync.md](domains/sync.md#configuration).
 

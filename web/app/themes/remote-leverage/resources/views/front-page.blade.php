@@ -47,7 +47,7 @@
 
                         <div class="flex justify-center mb-14">
                             <a href="#booking-footer"
-                                class="inline-flex items-center gap-3 px-8 py-4 bg-brand-purple hover:bg-black text-white font-extrabold text-sm uppercase tracking-[0.06em] rounded-full transition-all duration-200 shadow-[0_10px_25px_rgba(138,43,226,0.3)] hover:scale-105">
+                                class="inline-flex items-center gap-3 px-8 py-4 bg-brand-purple hover:bg-black text-white font-bold text-sm uppercase tracking-[0.06em] rounded-full transition-all duration-200 shadow-[0_10px_25px_rgba(138,43,226,0.3)] hover:scale-105">
                                 <span>FIND MY NEXT HIRE</span>
                                 <svg class="w-5 h-5 text-white shrink-0" viewBox="0 0 24 24" fill="none"
                                     stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -405,7 +405,7 @@
                                                 class="w-9 h-9 rounded-full border-2 border-white object-cover"
                                                 loading="lazy" decoding="async">
                                         </div>
-                                        <span class="font-display font-extrabold text-base text-black ml-3">+2500</span>
+                                        <span class="font-display font-bold text-base text-black ml-3">+2500</span>
                                     </div>
                                 </div>
 
@@ -459,7 +459,7 @@
                                                     loading="lazy" decoding="async">
                                             </div>
                                             <span
-                                                class="font-display font-extrabold text-sm sm:text-base text-black ml-2.5">+50</span>
+                                                class="font-display font-bold text-sm sm:text-base text-black ml-2.5">+50</span>
                                         </div>
                                     </div>
 
@@ -479,7 +479,7 @@
                                         {{-- Amount & Timeline --}}
                                         <div class="flex items-baseline justify-between pt-0.5">
                                             <span
-                                                class="font-display font-extrabold text-2xl sm:text-[28px] lg:text-[30px] text-black tracking-tight">
+                                                class="font-display font-bold text-2xl sm:text-[28px] lg:text-[30px] text-black tracking-tight">
                                                 USD 41,920,000
                                             </span>
                                             <span

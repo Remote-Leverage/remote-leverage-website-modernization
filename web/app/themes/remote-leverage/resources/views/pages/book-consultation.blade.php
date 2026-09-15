@@ -18,7 +18,7 @@
         <span class="inline-flex items-center gap-2 px-3.5 py-1 rounded-pill bg-purple-100 text-brand-purple text-xs font-bold uppercase tracking-wider mb-3">
           Strategy Consultation
         </span>
-        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-display text-slate-900 tracking-tight">
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold font-display text-slate-900 tracking-tight">
           Book Your 15-Minute Alignment Call
         </h1>
         <p class="mt-4 text-base sm:text-lg text-slate-600">

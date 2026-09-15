@@ -12,7 +12,7 @@
     <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-purple bg-violet-50 px-3 py-1 rounded-full border border-violet-100 mb-3">
       Client Video Proof
     </span>
-    <h2 class="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-zinc-900">
+    <h2 class="font-display text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900">
       Real Founders. Real Scale. Zero Regrets.
     </h2>
     <p class="text-zinc-600 text-base mt-3">

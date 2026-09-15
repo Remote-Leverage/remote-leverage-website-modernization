@@ -96,6 +96,11 @@ seconds old — the same algorithm the legacy handler used, and what Stripe's ow
 > `transfer.paid`, `transfer.failed`) will be refused along with the payment events. Stripe
 > retries failed deliveries, so events during a brief gap are recoverable, but a long one is not.
 
+**Per environment:** staging uses Stripe **test** keys and a **test-mode** signing secret;
+production uses the live Connect pair and its live secret. Stripe issues one signing secret per
+endpoint, so these are different values — a secret copied from the other environment fails
+verification with a 403.
+
 The same verifier now serves the Calendly webhook, which had **no** signature verification at all:
 `App\Application\Http\Support\WebhookSignature`. Calendly signs with the identical scheme under
 the `Calendly-Webhook-Signature` header, keyed by `CALENDLY_WEBHOOK_SIGNING_KEY`.

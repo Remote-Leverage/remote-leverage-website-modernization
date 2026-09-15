@@ -62,9 +62,15 @@ return [
     ],
 
     'customer_io' => [
+        // Track API v1 — server side only, used by CustomerIOClient.
         'site_id' => env('CUSTOMERIO_SITE_ID'),
         'api_key' => env('CUSTOMERIO_API_KEY'),
         'app_api_key' => env('CUSTOMERIO_APP_API_KEY'),
+
+        // CDP (Data Pipelines) source write key — browser side only, used by the
+        // `window.cioanalytics` snippet TrackingHooks injects. A different product and a
+        // different credential from site_id above; they are not interchangeable.
+        'cdp_write_key' => env('CUSTOMERIO_CDP_WRITE_KEY'),
     ],
 
     'posthog' => [
