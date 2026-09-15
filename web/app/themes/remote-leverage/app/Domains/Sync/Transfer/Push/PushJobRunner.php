@@ -56,6 +56,7 @@ class PushJobRunner
             match ($job->phase) {
                 PushJob::PHASE_BEGIN => $this->begin($client, $job),
                 PushJob::PHASE_ROWS => $this->rows($client, $job),
+                PushJob::PHASE_SETTINGS => $this->settings($client, $job),
                 PushJob::PHASE_MEDIA_CHECK => $this->mediaCheck($client, $job),
                 PushJob::PHASE_MEDIA_FILES => $this->mediaFile($client, $job),
                 PushJob::PHASE_FINISH => $this->finish($client, $job),
@@ -139,9 +140,53 @@ class PushJobRunner
 
     private function afterRows(PushJob $job): string
     {
+        return $job->manifest->includes(DatasetRegistry::SETTINGS)
+            ? PushJob::PHASE_SETTINGS
+            : $this->afterSettings($job);
+    }
+
+    private function afterSettings(PushJob $job): string
+    {
         return $job->manifest->includes(DatasetRegistry::MEDIA)
             ? PushJob::PHASE_MEDIA_CHECK
             : PushJob::PHASE_FINISH;
+    }
+
+    /**
+     * Send the whitelisted wp_options in one bounded call.
+     *
+     * Settings reuse the settings ability rather than the row pipeline, because
+     * they are option rows, there are a handful of them, and that ability
+     * already re-checks every key against the target's own whitelist.
+     *
+     * A key the target refuses is a hard failure rather than a warning. It means
+     * the two environments are running different config, and finishing quietly
+     * would report a successful push while some settings never arrived — the
+     * exact failure mode this phase exists to end.
+     */
+    private function settings(SyncClient $client, PushJob $job): void
+    {
+        $values = $this->exporter->settingsValues();
+
+        if ($values === []) {
+            $job->phase = $this->afterSettings($job);
+
+            return;
+        }
+
+        $response = $client->run('app/import-syncable-settings', ['values' => $values]);
+        $rejected = array_values((array) ($response['rejected'] ?? []));
+
+        if ($rejected !== []) {
+            throw new RuntimeException(
+                'The target refused settings keys absent from its whitelist: '
+                .implode(', ', array_map('strval', $rejected))
+                .'. The two environments are on different config.'
+            );
+        }
+
+        $job->count('settings', count((array) ($response['updated'] ?? [])));
+        $job->phase = $this->afterSettings($job);
     }
 
     private function mediaCheck(SyncClient $client, PushJob $job): void

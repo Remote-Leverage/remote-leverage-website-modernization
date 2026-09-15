@@ -25,6 +25,12 @@ final class PushJob
 
     public const PHASE_ROWS = 'rows';
 
+    /**
+     * Settings do not travel as rows. They are wp_options values, sent in one
+     * bounded call through the settings ability rather than the row pipeline.
+     */
+    public const PHASE_SETTINGS = 'settings';
+
     public const PHASE_MEDIA_CHECK = 'media-check';
 
     public const PHASE_MEDIA_FILES = 'media-files';
@@ -87,6 +93,18 @@ final class PushJob
     public function count(string $kind, int $by = 1): void
     {
         $this->counters[$kind] = ($this->counters[$kind] ?? 0) + $by;
+    }
+
+    /**
+     * A counter that is always an int.
+     *
+     * fromArray() restores counters from whatever was persisted, so a job
+     * written before a counter existed comes back without that key. Reading one
+     * directly is how a resumed job could blow up on rendering its own label.
+     */
+    public function counter(string $kind): int
+    {
+        return (int) ($this->counters[$kind] ?? 0);
     }
 
     /**
@@ -157,12 +175,14 @@ final class PushJob
         return match ($this->phase) {
             self::PHASE_BEGIN => 'Opening a session on '.$this->target.'...',
             self::PHASE_ROWS => 'Sending '.($this->currentDataset() ?? 'rows').': '
-                .$this->counters['posts'].' posts, '.$this->counters['meta'].' meta',
+                .$this->counter('posts').' posts, '.$this->counter('meta').' meta',
+            self::PHASE_SETTINGS => 'Sending whitelisted settings...',
             self::PHASE_MEDIA_CHECK => 'Asking '.$this->target.' which media files it needs...',
             self::PHASE_MEDIA_FILES => 'Uploading media: '.$this->fileIndex.' of '.count($this->fileQueue),
             self::PHASE_FINISH => 'Closing the session...',
-            self::PHASE_DONE => 'Done: '.$this->counters['posts'].' posts, '
-                .$this->counters['meta'].' meta, '.$this->counters['files'].' files.',
+            self::PHASE_DONE => 'Done: '.$this->counter('posts').' posts, '
+                .$this->counter('meta').' meta, '.$this->counter('files').' files, '
+                .$this->counter('settings').' settings.',
             self::PHASE_FAILED => 'Failed: '.((string) $this->error),
             default => $this->phase,
         };

@@ -59,8 +59,20 @@ class PushTransferCommand extends Command
         $this->info('Pushing '.implode(', ', $manifest->datasets)." to {$target}...");
 
         try {
-            $result = $pusher->push($manifest, $target, function (string $dataset, array $sent) {
-                $this->line("  {$dataset}: {$sent['posts']} posts, {$sent['meta']} meta");
+            // The callback is handed the phase and the same status array the
+            // admin screen renders, not a counters map. Reading counters off it
+            // directly is what made every CLI push die on an undefined key, and
+            // die *inside the progress callback*, which replaced the real error
+            // with a confusing one.
+            $lastPhase = null;
+
+            $result = $pusher->push($manifest, $target, function (string $phase, array $status) use (&$lastPhase) {
+                if ($phase === $lastPhase) {
+                    return;
+                }
+
+                $lastPhase = $phase;
+                $this->line('  '.($status['label'] ?? $phase));
             });
         } catch (Throwable $e) {
             $this->error($e->getMessage());
@@ -68,8 +80,17 @@ class PushTransferCommand extends Command
             return self::FAILURE;
         }
 
-        $this->info("Done. Session {$result['session_id']} — {$result['sent']['posts']} posts, "
-            ."{$result['sent']['meta']} meta, {$result['undo_entries']} undo entries.");
+        $sent = (array) ($result['sent'] ?? []);
+
+        $this->info(sprintf(
+            'Done. Session %s — %d posts, %d meta, %d files, %d settings, %d undo entries.',
+            $result['session_id'],
+            (int) ($sent['posts'] ?? 0),
+            (int) ($sent['meta'] ?? 0),
+            (int) ($sent['files'] ?? 0),
+            (int) ($sent['settings'] ?? 0),
+            (int) ($result['undo_entries'] ?? 0),
+        ));
         $this->line("Roll back with: wp acorn rl:sync:rollback {$result['session_id']} --target={$target}");
 
         return self::SUCCESS;
@@ -82,7 +103,14 @@ class PushTransferCommand extends Command
         $this->info("Dry run — nothing sent to {$target}.");
 
         foreach ($registry->importOrder($manifest->datasets) as $dataset) {
-            $this->line(sprintf('  %-10s %d posts', $dataset, $exporter->count($manifest, $dataset)));
+            // Settings own no posts, so counting them in posts would report the
+            // content total under the settings label and read as though a
+            // settings push were about to ship the whole site.
+            [$count, $unit] = $dataset === DatasetRegistry::SETTINGS
+                ? [count($exporter->settingsValues()), 'settings']
+                : [$exporter->count($manifest, $dataset), 'posts'];
+
+            $this->line(sprintf('  %-10s %d %s', $dataset, $count, $unit));
         }
 
         return self::SUCCESS;

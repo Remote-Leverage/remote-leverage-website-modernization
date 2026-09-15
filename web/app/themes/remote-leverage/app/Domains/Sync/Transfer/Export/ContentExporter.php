@@ -100,6 +100,26 @@ class ContentExporter
     }
 
     /**
+     * The whitelisted wp_options values this environment would send.
+     *
+     * Deliberately driven by the local whitelist and re-checked against the
+     * target's own in ImportSyncableSettingsAbility, so neither side has to
+     * trust the other's idea of what is syncable.
+     *
+     * @return array<string, mixed>
+     */
+    public function settingsValues(): array
+    {
+        $values = [];
+
+        foreach ((array) config('rl-sync.options', []) as $key) {
+            $values[(string) $key] = get_option((string) $key, null);
+        }
+
+        return $values;
+    }
+
+    /**
      * The query describing every post in scope for this dataset.
      *
      * Content and media partition wp_posts between them: media is exactly the
@@ -110,6 +130,14 @@ class ContentExporter
     private function postQuery(TransferManifest $manifest, string $dataset): Builder
     {
         $query = DB::table('posts')->whereNotIn('post_type', self::ALWAYS_EXCLUDED_TYPES);
+
+        // Settings are wp_options rows and own no posts at all. Without this the
+        // "everything that is not an attachment" branch below claims them, and a
+        // settings-only push silently ships the entire content set instead of
+        // seven option keys — the opposite of what the dataset promises.
+        if ($dataset === DatasetRegistry::SETTINGS) {
+            return $query->whereRaw('1 = 0');
+        }
 
         if ($dataset === DatasetRegistry::MEDIA) {
             $query->where('post_type', '=', 'attachment');

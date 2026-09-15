@@ -25,6 +25,9 @@ class FakeSyncClient extends SyncClient
     /** @var array<string, mixed> */
     public array $chunkResponse = ['ok' => true];
 
+    /** @var array<string, mixed> */
+    public array $settingsResponse = ['ok' => true, 'updated' => [], 'rejected' => []];
+
     public function __construct(public array $beginResponse = []) {}
 
     public function run(string $abilityName, array $input = []): array
@@ -34,6 +37,7 @@ class FakeSyncClient extends SyncClient
         return match ($abilityName) {
             'app/begin-transfer' => $this->beginResponse ?: ['ok' => true, 'session' => ['id' => 'sess-1']],
             'app/receive-transfer-chunk' => $this->chunkResponse,
+            'app/import-syncable-settings' => $this->settingsResponse,
             'app/finish-transfer' => ['ok' => true, 'session' => ['state' => 'complete'], 'undo_entries' => 4],
             'app/check-media-files' => ['ok' => true, 'missing' => []],
             default => ['ok' => true],
@@ -250,5 +254,89 @@ describe('the push conversation', function () {
 
         expect($result['session_id'])->toBe('sess-1')
             ->and($result['undo_entries'])->toBe(4);
+    });
+});
+
+/**
+ * Regression cover for a bug that shipped content under the settings label.
+ *
+ * ContentExporter partitions wp_posts with a single "is it an attachment?"
+ * question, so every dataset that was not media fell into the content branch —
+ * settings included. A settings-only push therefore counted, and would have
+ * sent, every non-attachment post on the site, while the dataset's own
+ * description promised "only the option keys whitelisted in config/rl-sync.php,
+ * never a wholesale wp_options copy".
+ *
+ * The first test here is the one that matters: it fails loudly if settings ever
+ * starts claiming post rows again.
+ */
+describe('the settings dataset', function () {
+    beforeEach(function () {
+        config(['rl-sync.options' => ['rl_lead_webhook_url', 'rl_slack_webhook_url']]);
+
+        $GLOBALS['_wp_mock_options'] = [
+            'rl_lead_webhook_url' => 'https://hooks.test/lead',
+            'rl_slack_webhook_url' => 'https://hooks.test/slack',
+        ];
+    });
+
+    it('sends no content rows, however much content exists', function () {
+        seedPost(1);
+        seedPost(2);
+        seedPost(3, 'case_study');
+
+        $this->pusher->push(pushManifest(['settings']), 'staging');
+
+        expect($this->client->chunks())->toBe([]);
+    });
+
+    it('counts no posts, so a dry run cannot report the content total', function () {
+        seedPost(1);
+        seedPost(2);
+
+        $exporter = new ContentExporter($this->registry);
+
+        expect($exporter->count(pushManifest(['settings']), 'settings'))->toBe(0)
+            ->and($exporter->count(pushManifest(['content']), 'content'))->toBe(2);
+    });
+
+    it('sends the whitelisted options through the settings ability', function () {
+        $this->pusher->push(pushManifest(['settings']), 'staging');
+
+        $calls = array_values(array_filter(
+            $this->client->calls,
+            fn (array $c) => $c['ability'] === 'app/import-syncable-settings',
+        ));
+
+        expect($calls)->toHaveCount(1)
+            ->and($calls[0]['input']['values'])->toBe([
+                'rl_lead_webhook_url' => 'https://hooks.test/lead',
+                'rl_slack_webhook_url' => 'https://hooks.test/slack',
+            ]);
+    });
+
+    it('still closes the session when settings are the only dataset', function () {
+        $result = $this->pusher->push(pushManifest(['settings']), 'staging');
+
+        expect($result['session_id'])->toBe('sess-1');
+    });
+
+    it('fails rather than quietly dropping a key the target will not accept', function () {
+        $this->client->settingsResponse = [
+            'ok' => true,
+            'updated' => ['rl_lead_webhook_url'],
+            'rejected' => ['rl_slack_webhook_url'],
+        ];
+
+        expect(fn () => $this->pusher->push(pushManifest(['settings']), 'staging'))
+            ->toThrow(RuntimeException::class, 'rl_slack_webhook_url');
+    });
+
+    it('does not disturb a content push', function () {
+        seedPost(1);
+
+        $this->pusher->push(pushManifest(['content']), 'staging');
+
+        expect($this->client->chunks())->toHaveCount(1);
     });
 });
