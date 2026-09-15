@@ -256,6 +256,30 @@ So the browser snippet is gated on a new `CUSTOMERIO_CDP_WRITE_KEY` rather than 
 `SITE_ID`/`API_KEY` remain server-side for `CustomerIOClient`'s Track API v1. **Blank today —
 someone must set it or the browser sends nothing.**
 
+### 24f. Blog image weight fixed in the media library, not the theme pipeline
+The 2.6MB/3.1MB pages were **entirely** WordPress media library (`web/app/uploads/`), not
+`resources/images/pages/` → `public/images/`. The `themeImages()` plugin, the
+`BlockDefaults::pageImg()` filename contract and `public/` were untouched.
+
+The worst offender was not the featured image but the **talent carousel**: five 771×1024 PNGs
+(197–666KB each) served untouched into a **220×265px card** — 2.48MB of one post's 3.06MB, on
+all 88 posts carrying it. WordPress had already generated `226x300` and `768x1020` subsizes of
+every one; nothing used them.
+
+| Page | Perf | LCP | Total weight |
+| :--- | :--- | :--- | :--- |
+| `/blog/` | 90 → **99** | 3.61s → **1.56s** | 2.74MB → **0.47MB** |
+| a single post | 79 → **99** | 4.71s → **2.10s** | 3.27MB → **0.59MB** |
+| `/case-study/` (control) | 100 → 100 | unmoved | unmoved |
+
+A real bug fixed alongside: `filterContentImgTag()` rewrote only `src`, but a matching `srcset`
+candidate always outranks `src` — so for any content image with a srcset, the WebP was **never
+requested**. Reasoned about but not measured: neither test post has in-content images.
+
+Still open: no registered size sits between 226px and 768px, so a 220px card at 2x asks for
+577px and gets 768px. Closing that needs `add_image_size` plus `wp media regenerate` across 119
+posts — a media migration, not a template change.
+
 ### 25. The Calendly preflight is fixed
 `findExistingInvitee()` cost a measured 4.0s p50 / 6.1s p95 **synchronously** inside booking
 submit: 2 sequential GETs per pooled token across 4 tokens, never short-circuiting when there was

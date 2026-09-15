@@ -79,6 +79,11 @@ Content parity is not visual parity. Compare rendered screenshots against produc
 - **Sanity-check the geometry, not just the picture.** The `/services/` miss was caught because
   card heights (591px and 810px) could not be explained by ~325px of content — not because the
   screenshot looked wrong. A blank area and a correctly-rendered white card are the same pixels.
+- **Await decode before capturing.** `decoding="async"` lets Chrome screenshot before images
+  rasterise, so a diff reports blank cards on a page that is fine. This produced a phantom "21%
+  different" on `/blog/` immediately after the image work — all 180 image URLs returned 200.
+  Force `decoding='sync'` and `await img.decode()`; that took the same diff to 0px. Expect this
+  on exactly the pages you just made faster.
 - Read design tokens off production with `getComputedStyle` rather than estimating.
 - Check a section is actually *visible* on production before reproducing it; some are
   `display:none` at every breakpoint.

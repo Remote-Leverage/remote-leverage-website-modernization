@@ -48,15 +48,15 @@ $prose = '[&_p]:mb-12 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-10 [&_ul]
 // acf/client-logos-marquee ships 28px logos at 90% on a pale band; production's strip is a
 // 50px pure-white lockup, 7 across. Overridden here at higher specificity rather than by
 // editing the block's CSS, which is shared with every other page that uses it.
+// 50px white lockup, 7 across: .rl-logo-marquee-lg carries the size (50px mark on a 60px row),
+// .rl-logo-marquee-dark the colour. Both are modifiers on the shared block's CSS as of
+// 2026-09-15 — this used to override the base rule at higher specificity from here, which is
+// how three separate templates ended up fighting the same declaration. Only the band's own
+// padding and the track gap stay page-local, because those are layout rather than mark size.
 $marqueeStrip = implode(' ', [
+    'rl-logo-marquee-dark rl-logo-marquee-lg',
     '[&_.rl-logo-marquee-wrapper]:py-0',
     '[&_.animate-marquee-logos]:gap-[72px]',
-    '[&_.rl-logo-marquee-item]:h-[60px]',
-    '[&_.rl-logo-marquee-item_img]:max-h-[50px]',
-    '[&_.rl-logo-marquee-item_img]:max-w-[176px]',
-    '[&_.rl-logo-marquee-item_img]:opacity-100',
-    '[&_.rl-logo-marquee-item_img]:brightness-0',
-    '[&_.rl-logo-marquee-item_img]:invert',
 ]);
 
 // --- Role cards --------------------------------------------------------------------------

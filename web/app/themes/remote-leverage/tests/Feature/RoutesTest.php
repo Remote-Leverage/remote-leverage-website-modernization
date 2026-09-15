@@ -120,19 +120,27 @@ describe('config/redirects.php targets resolve to something real', function () {
             ->map(fn ($route) => trim($route->uri(), '/'))
             ->all();
 
-        // A fourth valid target class: a static asset served straight off disk, which is how
-        // the retired rl-social-kit plugin's 29 downloads are preserved. Checking the file
-        // really exists is the point — a typo or a deleted asset fails here rather than
-        // 404ing for whoever clicked an old link.
+        // A fourth valid target class: a static asset served off disk, which is how the retired
+        // rl-social-kit plugin's 29 downloads are preserved.
+        //
+        // This resolves against the TRACKED SOURCE, not the built file. `public/` is gitignored
+        // and produced by `npm run build`, which CI runs in a separate job from Pest — checking
+        // the built path passed locally and failed every CI run. Checking the source is also the
+        // stronger assertion: it proves the asset is committed, where a built file could be
+        // stale output from a source that has since been deleted.
         $themeRoot = dirname(__DIR__, 2);
         $isStaticFile = static function (string $to) use ($themeRoot): bool {
-            $prefix = 'app/themes/remote-leverage/';
+            $prefix = 'app/themes/remote-leverage/public/images/';
 
             if (! str_starts_with($to, $prefix)) {
                 return false;
             }
 
-            return is_file($themeRoot.'/'.substr($to, strlen($prefix)));
+            // themeImages() publishes resources/images/pages/** to public/images/**,
+            // preserving directory structure and filenames exactly.
+            $relative = substr($to, strlen($prefix));
+
+            return is_file($themeRoot.'/resources/images/pages/'.$relative);
         };
 
         foreach ($config as $from => $to) {
