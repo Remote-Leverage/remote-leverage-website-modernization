@@ -449,6 +449,46 @@ no default are present and blank. Verified: `wp eval 'var_dump(env("LIVE_CALL_ME
 The Notion integration was deleted on 2026-09-15; `NOTION_API_KEY` /
 `NOTION_PARTNERS_DATABASE_ID` appear in neither file and should not return.
 
+### 21. A media push silently drops files `UploadPath` will not accept
+
+`UploadPath` requires every path segment to match `^[A-Za-z0-9._-]+$`, and
+`MediaFileExporter::manifest()` applies it as `array_filter($paths, UploadPath::isValid(...))`.
+A file whose name does not pass is removed from the manifest before the target is ever asked
+about it, so it is **never requested, never reported, and never missed** — the push still ends
+with "Done: … 1294 files" and a success exit code.
+
+WordPress produces such names routinely. On 2026-09-15 a completed mirror push left four blog
+images broken on staging, because their filenames contained an em dash (`—`), an en dash (`–`)
+and a curly quote — 28 files across 4 attachments, 1.7% of the uploads tree. Nothing in the
+push output distinguished that run from a complete one.
+
+The character rule is belt-and-braces, not the actual guard: absolute paths, null bytes, stream
+wrappers, `.`/`..` traversal and the extension allowlist are each checked separately and
+explicitly above it. It is the blanket allowlist alone that excludes ordinary filenames.
+
+**Resolved by renaming the data, not by widening the validator** (2026-09-15), so the trap is
+still live for anything uploaded later. To find offenders before a push:
+
+```bash
+find web/app/uploads -type f | python3 -c "
+import sys,re,os
+pat=re.compile(r'^[A-Za-z0-9._-]+\$')
+for l in sys.stdin:
+    rel=os.path.relpath(l.strip(),'web/app/uploads')
+    if not all(pat.match(s) for s in rel.split('/')): print(rel)
+"
+```
+
+Only rename what actually fails that test. A trailing dash is *allowed*, so normalising every
+name that merely differs from its tidied form churns files that transfer perfectly well — which
+is what a first pass at the fix did to `Nearshore-Alternatives-…-Staffing-` before being caught
+by a dry run.
+
+Two caveats found alongside it. Files with no attachment row (nine orphaned
+`Screenshot-…-722x1024.png` in `2025/03`) are not in the manifest at all, so renaming them
+achieves nothing. And `.webp` siblings of uploads are absent from `_wp_attachment_metadata`,
+so the manifest never carries them either — only the original and its registered sizes travel.
+
 ### 20. `Mcp-Session-Id` is still stripped, so MCP dies after `initialize`
 
 **Measured against staging 2026-09-15.** The `Authorization` half of the CloudFront problem is
