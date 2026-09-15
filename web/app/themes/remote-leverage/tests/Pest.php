@@ -1,6 +1,8 @@
 <?php
 
 declare(strict_types=1);
+use App\Application\Http\Support\WebhookSignature;
+use Illuminate\Http\Request;
 use Tests\TestCase;
 
 /*
@@ -40,3 +42,27 @@ expect()->extend('toBeOne', function () {
 | Here you can also define custom helper functions that can be used across your tests.
 |
 */
+
+/**
+ * Build a signed webhook request, the way Stripe and Calendly actually send one.
+ *
+ * Both providers sign the raw JSON body, so the payload has to go in as a JSON string with a
+ * JSON content type — passing it as form parameters leaves `getContent()` empty and would
+ * "verify" a signature over nothing.
+ *
+ * @param  array<string, mixed>  $payload
+ */
+function signedWebhookRequest(
+    string $uri,
+    array $payload,
+    string $secret,
+    string $headerName,
+    ?int $timestamp = null,
+): Request {
+    $body = json_encode($payload, JSON_THROW_ON_ERROR);
+
+    return Request::create($uri, 'POST', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_'.strtoupper(str_replace('-', '_', $headerName)) => WebhookSignature::sign($body, $secret, $timestamp),
+    ], $body);
+}

@@ -42,6 +42,19 @@ $app->singleton('log', function () {
         public function warning($msg, array $ctx = []): void {}
 
         public function debug($msg, array $ctx = []): void {}
+
+        // The rest of PSR-3. The stub previously stopped at debug, so the first caller to
+        // reach for a level it did not implement failed with "undefined method" inside a
+        // facade rather than anywhere near the code under test.
+        public function emergency($msg, array $ctx = []): void {}
+
+        public function alert($msg, array $ctx = []): void {}
+
+        public function critical($msg, array $ctx = []): void {}
+
+        public function notice($msg, array $ctx = []): void {}
+
+        public function log($level, $msg, array $ctx = []): void {}
     };
 });
 

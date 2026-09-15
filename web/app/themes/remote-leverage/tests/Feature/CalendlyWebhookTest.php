@@ -9,7 +9,6 @@ use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 
@@ -17,6 +16,8 @@ describe('CalendlyWebhookController', function () {
     beforeEach(function () {
         LeadActivityLog::truncate();
         Lead::truncate();
+
+        config(['services.calendly.webhook_signing_key' => 'calendly_test_key']);
     });
 
     test('handles invitee.created, updates lead to booked, logs activity, and dispatches LeadBookingCompleted', function () {
@@ -55,7 +56,7 @@ describe('CalendlyWebhookController', function () {
             ],
         ];
 
-        $request = Request::create('/api/webhooks/calendly', 'POST', $payload);
+        $request = signedWebhookRequest('/api/webhooks/calendly', $payload, 'calendly_test_key', 'Calendly-Webhook-Signature');
         $response = $controller->handle($request);
 
         expect($response->getStatusCode())->toBe(200)
@@ -96,7 +97,7 @@ describe('CalendlyWebhookController', function () {
             ],
         ];
 
-        $request = Request::create('/api/webhooks/calendly', 'POST', $payload);
+        $request = signedWebhookRequest('/api/webhooks/calendly', $payload, 'calendly_test_key', 'Calendly-Webhook-Signature');
         $response = $controller->handle($request);
 
         expect($response->getStatusCode())->toBe(200)
@@ -120,7 +121,7 @@ describe('CalendlyWebhookController', function () {
             'payload' => [],
         ];
 
-        $request = Request::create('/api/webhooks/calendly', 'POST', $payload);
+        $request = signedWebhookRequest('/api/webhooks/calendly', $payload, 'calendly_test_key', 'Calendly-Webhook-Signature');
         $response = $controller->handle($request);
 
         expect($response->getStatusCode())->toBe(200)

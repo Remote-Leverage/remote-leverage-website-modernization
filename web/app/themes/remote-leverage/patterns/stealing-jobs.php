@@ -17,7 +17,7 @@ $steal = [
     'cta_text' => 'Book my free 15-min call',
     'steps_cta_text' => 'Book a free consultation',
 
-    'hero_headline' => 'We&rsquo;re here <br>to steal your job',
+    'hero_headline' => 'We&#39;re here <br>to steal your job', // straight apostrophe, as production; the entity survives wptexturize, a raw ' does not
     'hero_sub' => 'Well… the parts you shouldn&rsquo;t be doing',
     'hero_note' => 'Don&rsquo;t worry. <br>You can keep the CEO title.',
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Http\Controllers;
 
+use App\Application\Http\Support\WebhookSignature;
 use App\Domains\Lead\Events\LeadBookingCanceled;
 use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Models\Lead;
@@ -24,9 +25,34 @@ class CalendlyWebhookController
 
     /**
      * Handle incoming Calendly webhook event per ADR-0008.
+     *
+     * Signature verification fails closed. This endpoint moves a lead to `booked` or
+     * `canceled` and dispatches the downstream booking events, so an unsigned payload is
+     * enough to falsify a booking: with no `CALENDLY_WEBHOOK_SIGNING_KEY` configured the
+     * endpoint refuses every request rather than accepting unverified ones.
      */
     public function handle(Request $request): JsonResponse
     {
+        $signingKey = (string) (config('services.calendly.webhook_signing_key') ?? '');
+
+        if ($signingKey === '') {
+            Log::critical('Calendly Webhook: refused, no signing key configured (CALENDLY_WEBHOOK_SIGNING_KEY).');
+
+            return response()->json(['error' => 'Webhook signing key is not configured.'], 503);
+        }
+
+        $error = WebhookSignature::verify(
+            $request->getContent(),
+            (string) $request->header('Calendly-Webhook-Signature', ''),
+            $signingKey,
+        );
+
+        if ($error !== null) {
+            Log::error('Calendly Webhook: signature verification failed', ['error' => $error]);
+
+            return response()->json(['error' => 'Signature verification failed.'], 403);
+        }
+
         $payload = $request->all();
         $event = $payload['event'] ?? 'unknown';
 

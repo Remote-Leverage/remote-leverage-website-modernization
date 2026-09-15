@@ -16,6 +16,13 @@ $page = [
     'hero_title_gradient' => 'Virtual Assistants<br />$6-$10 Per Hour.<br />First Month FREE!',
     'hero_cta_text' => 'Book a Consultation',
 
+    // Unlike /hire-va-isolated-form/, this page has no booking card in the hero. Production paints
+    // the band with Violet-Gradient-Header.jpg (background-size:cover, background-position:100% 50%),
+    // which carries the photographed assistant on the right-hand side, and keeps the headline at
+    // 64/70.4 because its fourth line would otherwise overflow the 768px copy column.
+    'hero_headline_size' => '64',
+    'hero_bg_image' => 'Violet-Gradient-Header.jpg',
+
     'hero_checks_left' => ['1st Month Salary Paid By Us', 'Interview Before You Hire', 'No Contracts'],
     'hero_checks_right' => ['30% Discount on Future Hires', 'Hire Direct &#45; No Middleman', 'Hire Within 72 Hours'],
 

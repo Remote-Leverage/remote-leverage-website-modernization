@@ -41,7 +41,6 @@
   ],
   "require": {
     "php": ">=8.3",
-    "wpengine/advanced-custom-fields-pro": "*",
     "composer/installers": "^2.0",
     "oscarotero/env": "^2.0",
     "roots/bedrock-autoloader": "^1.0",
@@ -51,7 +50,9 @@
     "vlucas/phpdotenv": "^5.0",
     "wordpress/mcp-adapter": "^0.6.1",
     "wp-plugin/google-site-kit": "^1.187",
-    "wp-theme/twentytwentyfive": "^1.0"
+    "wp-plugin/wordpress-seo": "^28.5",
+    "wp-theme/twentytwentyfive": "^1.0",
+    "wpengine/advanced-custom-fields-pro": "*"
   },
   "require-dev": {
     "laravel/pint": "^1.0",

@@ -12,6 +12,7 @@ use App\Domains\ContentAudit\Commands\AuditElementorCommand;
 use App\Domains\ContentAudit\Commands\BlockInventoryCommand;
 use App\Domains\ContentAudit\Commands\ConvertElementorCommand;
 use App\Domains\ContentAudit\Commands\ImportBlogPostsCommand;
+use App\Domains\ContentAudit\Commands\ImportYoastMetaCommand;
 use App\Domains\ContentAudit\Services\ElementorAuditService;
 use App\Domains\ContentAudit\Services\PrismAiAuditor;
 use Illuminate\Support\ServiceProvider;
@@ -33,6 +34,7 @@ class ContentAuditServiceProvider extends ServiceProvider
                 BlockInventoryCommand::class,
                 ConvertElementorCommand::class,
                 ImportBlogPostsCommand::class,
+                ImportYoastMetaCommand::class,
             ]);
         }
     }

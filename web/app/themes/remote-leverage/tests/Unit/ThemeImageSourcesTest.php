@@ -50,14 +50,33 @@ it('builds every file in public/images from a tracked source', function () use (
     }
 
     // Each source yields itself, and each raster additionally yields a sibling .webp.
+    $sources = $relativeFiles($theme.'/resources/images/pages');
+
+    // Mirror `hasStemCollision()` in vite/theme-images.js: two sources differing only by raster
+    // extension (Frame-76-5.jpg and Frame-76-5.png are both real, distinct cards on the
+    // ecommerce page) would otherwise both emit Frame-76-5.webp and one would silently win, so
+    // the plugin keeps the original extension in the name — Frame-76-5.jpg.webp. Without this
+    // rule here, the test reads the plugin's own correct output as an untracked orphan.
+    $stems = [];
+
+    foreach ($sources as $source) {
+        if (preg_match('/\.(png|jpe?g)$/i', $source) === 1) {
+            $stems[preg_replace('/\.[^.]+$/', '', $source)][] = $source;
+        }
+    }
+
     $expected = [];
 
-    foreach ($relativeFiles($theme.'/resources/images/pages') as $source) {
+    foreach ($sources as $source) {
         $expected[$source] = true;
 
-        if (preg_match('/\.(png|jpe?g)$/i', $source) === 1) {
-            $expected[preg_replace('/\.[^.]+$/', '.webp', $source)] = true;
+        if (preg_match('/\.(png|jpe?g)$/i', $source) !== 1) {
+            continue;
         }
+
+        $stem = preg_replace('/\.[^.]+$/', '', $source);
+
+        $expected[count($stems[$stem]) > 1 ? $source.'.webp' : $stem.'.webp'] = true;
     }
 
     $orphans = array_values(array_diff($built, array_keys($expected)));

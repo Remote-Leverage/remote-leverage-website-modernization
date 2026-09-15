@@ -11,17 +11,26 @@
  * Production leads with an <h2>, not an <h1> — there is no <h1> anywhere on the page. Reproduced
  * as-is rather than "fixed".
  *
- * Production also carries a "Talk to Sales Representative" instant-call panel and a "Book a Free
- * 15-Minute Consultation" form. Neither is part of the page flow: the first sits inside the
- * hidden .rl-jlc-modal-* subtree, and the second is an Elementor popup parked off-canvas at
- * x=1390 with a computed width of 0. Both are omitted per the "confirm a section is actually
- * visible before reproducing it" rule. The hero consequently has no visible CTA button on this
- * page — its "Meet a specialist now" trigger belongs to that hidden modal.
+ * Production also carries a "Talk to Sales Representative" instant-call panel, which sits inside
+ * the hidden .rl-jlc-modal-* subtree and is omitted per the "confirm a section is actually visible
+ * before reproducing it" rule. The hero consequently has no CTA button on this page — its "Meet a
+ * specialist now" trigger belongs to that hidden modal.
+ *
+ * The "Book a Free 15-Minute Consultation" card, however, IS part of the hero: it was previously
+ * read as an off-canvas popup because at 1440px production gives the hero's left column the full
+ * 1280px and the card overflows the viewport, clipped to a sliver. Measured at 1920px it is a
+ * 472px white card in the hero's right column. It is reproduced here.
  */
 $page = [
     'hero_title_lead' => 'Latin American',
     'hero_title_gradient' => 'Virtual Assistants<br />$6-$10 Per Hour',
     'hero_cta_text' => '',
+
+    // Production runs this page's headline at 80/88 and pairs the copy column with the white
+    // "Book a Free 15-Minute Consultation" card on the right (measured at 1920px, 2026-09-15).
+    'hero_headline_size' => '80',
+    'hero_card_title' => 'Book a Free 15-Minute Consultation',
+    'hero_card_button' => 'Find me an Assistant',
 
     'hero_checks_left' => ['Hire Direct', '30% Discount on Future Hires', 'Hire Within 72 Hours'],
     'hero_checks_right' => ['No Contracts', 'Interview Before You Hire', 'No Recurring Fees'],

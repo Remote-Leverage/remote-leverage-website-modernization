@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e9b00b20ac086ffaf16268f9a5ba680a",
+    "content-hash": "934b1690c7750a6b2d27f8e84139cdea",
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
@@ -1274,6 +1274,37 @@
                 "source": "https://plugins.svn.wordpress.org/google-site-kit"
             },
             "time": "2026-09-07T18:21:08+00:00"
+        },
+        {
+            "name": "wp-plugin/wordpress-seo",
+            "version": "28.5",
+            "source": {
+                "type": "svn",
+                "url": "https://plugins.svn.wordpress.org/wordpress-seo/",
+                "reference": "tags/28.5"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://downloads.wordpress.org/plugin/wordpress-seo.28.5.zip"
+            },
+            "require": {
+                "composer/installers": "~1.0|~2.0"
+            },
+            "type": "wordpress-plugin",
+            "notification-url": "https://wp-packages.org/downloads",
+            "authors": [
+                {
+                    "name": "Yoast"
+                }
+            ],
+            "description": "Real-time SEO guidance, schema, and AI built in. Help search engines and AI systems understand your content. All AI tools included, no hidden fees.",
+            "homepage": "https://yoa.st/1uj",
+            "support": {
+                "changelog": "https://wordpress.org/plugins/wordpress-seo/#developers",
+                "issues": "https://wordpress.org/support/plugin/wordpress-seo",
+                "source": "https://plugins.svn.wordpress.org/wordpress-seo"
+            },
+            "time": "2026-09-15T06:46:32+00:00"
         },
         {
             "name": "wp-theme/twentytwentyfive",

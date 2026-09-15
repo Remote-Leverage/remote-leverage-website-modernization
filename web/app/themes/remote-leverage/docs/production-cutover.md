@@ -8,9 +8,23 @@ Production-side figures come from the audit in [content-migration-checklist.md](
 
 ## The short version
 
-The platform is done. Posts, case studies and taxonomies are done; **pages are 15 of 233**. Roughly 107 of the ~218 remaining pages are blocked behind three business decisions, not behind engineering capacity.
+> **⚠️ Parts of this document predate scope closure (2026-09-14) and the 2026-09-15 work.**
+> The per-page counts below and "The three decisions" section were written when the plan was to
+> migrate all 235 production pages. **That is no longer the plan.** Scope is a closed 48-URL list;
+> the other 164 published pages are discarded and now carry 301s in `config/redirects.php`.
+> For per-URL state read [`PAGE-MIGRATION-STATUS.md`](../../../../../PAGE-MIGRATION-STATUS.md);
+> read this file for the **cutover gates**, which are current.
 
-The largest remaining workstream with neither a decision blocker nor a content dependency is **production infrastructure**, which has not started at all.
+The platform is done. Posts, case studies, taxonomies and partners are done. Migration scope is
+closed at 48 URLs and tracked per-URL elsewhere.
+
+Production infrastructure — the ECS service, the deploy pipeline, the DNS runbook and the rollback
+plan — is **owned outside this workstream** as of 2026-09-15. It remains a hard gate on the flip;
+it is simply not this document's work item.
+
+The media library is **not being ported** (2026-09-15). Page art is tracked as source in
+`resources/images/pages/` and generated at build time, so nothing about the cutover depends on
+reconciling production's library.
 
 ## Where each workstream stands
 
@@ -31,10 +45,10 @@ flowchart TB
         B1["15 of 233 pages"]
         B2["1 of 2 partners"]
         B3["ADR-0005 gate — no _elementor_data,<br/>but no review record either"]
+        B4["SEO parity — Yoast installed,<br/>meta importer built, not yet run"]
     end
 
     subgraph BLOCKED["🔴 Not started"]
-        C3["SEO parity — Yoast not installed"]
         C5["Performance baseline"]
         C6["Production infra · DNS · rollback"]
     end
@@ -62,11 +76,11 @@ Local counts queried 2026-09-14; production counts from the 2026-09-10 audit.
 | `rl_partner` | 2 | 1 | 1 |
 | Categories | 7 | 7 | 0 |
 | Tags | 8 | 8 | 0 |
-| `attachment` | not audited | 512 | unknown |
+| `attachment` | **not being ported** | 512 | — (see below) |
 
 Migrated pages: `home`, `about-us`, `reviews`, `vapricing`, `privacy-policy`, `terms-of-use`, `comparison`, `compare-athena`, `wing-assistant-vs-remote-leverage`, `comparison-wing-assistant-ads`, `affiliate-program`, `referral`, `vathankyou`, `hire-va-4`, `blog`. *(Updated 2026-09-14: `hire-va-4-preview` was deleted; `hire-va-4` migrated in its place. `referral` holds incorrect content and is out of scope — see PAGE-MIGRATION-STATUS.md §4a.)*
 
-Per-category post counts match production exactly — Business Growth 91, Outsourcing 95, Case Studies 13, Salary Guides 12, Real Estate Posts 9, News 2. The one discrepancy is **Live Sessions: 2 on production, 0 locally**; worth confirming those two posts were not dropped.
+Per-category post counts match production exactly — Business Growth 91, Outsourcing 95, Case Studies 13, Salary Guides 12, Real Estate Posts 9, News 2. The apparent **Live Sessions: 2 on production, 0 locally** discrepancy was **not real** (checked 2026-09-15): both items are `post_type=page`, not posts — production registers `category` on pages too, and a term count is not post-type-scoped. Nothing was dropped. Details in [content-migration-checklist.md](content-migration-checklist.md).
 
 The 218 remaining pages break down as:
 
@@ -111,33 +125,40 @@ All 119 posts are imported, with all 7 categories and 8 tags, and **zero posts c
 
 They came in through `wp acorn content:import-posts` (captured production JSON → `ElementorProseExtractor` → Gutenberg), not through the `content:audit-elementor` / `content:convert-elementor` / review-queue pipeline. That matters for the ADR-0005 gate: the *letter* of it is satisfied (no `_elementor_data` anywhere), but no post carries `_rl_conversion_status`, so nothing passed through `ContentAuditAdmin`'s editorial sign-off and there is no record of human review.
 
-**Still open:** settle `/guides/` vs `/blog/` as the canonical post archive before configuring Yoast, so it is not reconfigured twice. A local `blog` page now exists (ID 799). And confirm the two missing **Live Sessions** posts were dropped deliberately.
+**Still open:** settle `/guides/` vs `/blog/` as the canonical post archive before configuring Yoast, so it is not reconfigured twice. A local `blog` page now exists (ID 799). (The **Live Sessions** question is closed — those two items are pages, not posts; see the content table above.)
 
 ## Work that needs no sign-off
 
 Startable today, in parallel with chasing the decisions.
 
-1. **Install Yoast SEO.** Zero-risk and it *unblocks* later work. Matching production's plugin means `_yoast_wpseo_*` postmeta carries over directly instead of needing field-mapping into a different plugin's schema, and Premium's redirect manager is the mechanism every kill decision depends on. Doing this late forces a second pass over everything already migrated.
-2. **Case-study sub-nav tab bar.** Production shows a "CASE STUDIES / TALENT PROFILES / REVIEWS" tab bar above the case-study hero, shared site-wide with `/reviews/`. Confirmed absent. Build it once as a shared partial. Note the TALENT PROFILES destination does not exist in v2 yet — it needs a target before the tab can link anywhere real.
-3. **`booking-footer` headline regression sweep.** The `headline` ACF field was dead code until the affiliate-program review fixed it — the Blade view hardcoded its default and ignored the field. Any page that set a headline override before that fix was silently rendering the default. Re-check every page using the `booking-footer` / `hire-va-4-booking-footer` patterns.
-4. **Lexgo partner content.** Templates and admin UI are complete (WR-115 closed); only Oyster's content exists. Pure data entry against the restored field group.
-5. **Reconcile the trackers.** `PAGE-MIGRATION-STATUS.md` contradicts the checklist on five pages. One source of truth.
+1. ~~**Install Yoast SEO.**~~ Done 2026-09-15 — free 28.5 via `wp-plugin/wordpress-seo`, settings left unconfigured. `wp acorn content:import-seo --dry-run` reports 187 of 355 production items matching a local slug. Still open: running it for real, Premium's redirect manager (a purchase decision), and the `/guides/` vs `/blog/` archive canonical. See [seo-meta-migration.md](seo-meta-migration.md).
+2. ~~**Case-study sub-nav tab bar.**~~ ✅ **Done 2026-09-15.** Built as `App\Support\CaseStudySubnav` + `resources/views/partials/case-study-subnav.blade.php`, rendered once from `layouts.app` above `@yield('content')` so no template holds its own copy. TALENT PROFILES points at `/samples/` (page 1000005).
+
+   **Correction to the original entry, which was wrong about placement.** Production does *not* share this bar site-wide with `/reviews/`. Verified 2026-09-15 — the string "TALENT PROFILES" does not appear in the served HTML of `/reviews/` or of `/case-study/` (the archive), and a Playwright probe at 1440px finds no bar on either. Production renders it **only on single `case_study` posts**, as an Elementor library template (element `521f30f0`, template `34011`).
+
+   v2 also shows it on the `case_study` archive and on `/reviews/` — a deliberate extension beyond production, because a tab group whose tabs lead to pages that then drop the bar is broken wayfinding. Those two surfaces are entries in `CaseStudySubnav::surfaces()`; delete them to fall back to strict production parity. `/samples/` is deliberately *not* a surface (production does not show the bar there either), so the TALENT PROFILES tab still leads somewhere that loses the bar.
+
+   Measured off `/case-study/chick-fil-a/`: band `#330034` / 60px min-height; tabs Inter 16px/24px, idle `#FFFFFF` weight 300, active `#3DC53D` weight 500 underlined; row with 40px gap, stacking to a 10px-gap column below 768px. Pixel diff against production is 0.00% at 400px, and 0.00% at 1440px after allowing the 22px horizontal offset that comes from v2's case-study container being 1260px+`px-8` where production's is 1240px with no side padding.
+3. ~~**`booking-footer` headline regression sweep.**~~ ✅ **Done 2026-09-15 — no page was still broken.** The `headline` ACF field was dead code until the affiliate-program review fixed it; `BookingFooterBlock::with()` now reads `$this->block->data['headline']` before falling back to `get_field()`, which also sidesteps the deep-in-page `get_field()` miss. All fifteen pages that set an override were re-rendered through `do_blocks()` on their real `post_content` and every one emits its own headline: `/hire-va-4/`, `/comparison/`, `/samples/`, `/hire-for-less/`, `/hire-va-1st-month-free/`, `/hire-va-6/` (all six via `hire-va-4-booking-footer`), `/spanish/`, `/affiliate-program/`, `/ecommerce-virtual-assistant/`, `/contractor-management/`, `/contractor-payments/`, `/steal-back-your-time/`, `/stealing-jobs/`, `/stealing-jobs-lp/`. `/referral/` renders the default `Book a free consultation` correctly — it sets no override. Worth noting for future patterns: `contractor-management` and `contractor-payments` pass `headline`/`description` **without** the `_headline`/`_description` field-key pairs and still render, because the raw-`data` read does not need them — but `map_image` is still resolved through `get_field()` only, so that one does (see the scoped override in `resources/patterns/steal-campaign.php`).
+4. ~~**Lexgo partner content.**~~ ✅ **Done 2026-09-15.** All three entries (Oyster, Lexgo, Lano) render and appear in the directory. The real blocker was never content: `/partners/` read from an unconfigured Notion database rather than the CPT. Notion is deleted, the directory is CPT-backed, and partner content is seeded from `resources/partners/partners.php` (in git). What remains needs the partners, not code — intake forms for Lexgo and Lano, a referral destination for Oyster, logos for all three. See [domains/partner-hub.md](domains/partner-hub.md#known-gaps).
+5. ~~**Reconcile the trackers.**~~ ✅ **Done 2026-09-14.** Resolved by inverting the relationship rather than merging: `PAGE-MIGRATION-STATUS.md` is the source of truth for migration scope, and `content-migration-checklist.md` was demoted to a read-only inventory of what exists on production. They no longer track the same thing, so they can no longer contradict each other.
 
 ## Cutover gates
 
-These must all be green before DNS moves. One is green.
+These must all be green before DNS moves. One is green; the redirect gate closed on 2026-09-15.
 
 | Gate | Source | State |
 | :--- | :--- | :--- |
 | Zero posts carry `_elementor_data` | ADR-0005 | ✅ Verified 2026-09-14 — 0 posts across the whole install |
 | Every converted post human-approved | ADR-0005 amendment | 🔴 Queue exists (`ContentAuditAdmin`); no post carries `_rl_conversion_status`, so nothing went through it. Either run the 119 posts through the queue, or record an explicit decision that the import path made it unnecessary |
-| SEO parity — Yoast installed, meta carried, redirect map complete | §9 of the checklist | 🔴 Not started |
-| Every killed URL has a 301 | ADR-0006 | 🔴 `config/redirects.php` has 5 entries; the kill list will be ~56 |
-| Performance baseline met (mobile 96+, LCP < 1.2s, CLS 0.00) | `plan.md` Phase 8 | 🔴 Never measured |
-| Production infrastructure exists | — | 🔴 No ECS service, ECR repo, secret store or deploy workflow |
-| Rollback plan documented and rehearsed | — | 🔴 Does not exist |
-| Transactional email deliverability verified | `plan.md` Phase 8 | 🔴 Not started |
-| Error monitoring reporting | — | 🔴 Sentry has no DSN |
+| SEO parity — Yoast installed, meta carried, redirect map complete | §9 of the checklist | 🟡 Yoast 28.5 installed (inactive) and `content:import-seo` built 2026-09-15; redirect map complete. **Meta not yet written** — the import has only been dry-run. Two decisions gate the real run: the `/guides/` vs `/blog/` canonical, and whether `referral-program` and `ecommerce-virtual-assistant` should inherit production's `noindex` (they were rebuilt in v2, so probably not). See [seo-meta-migration.md](seo-meta-migration.md) |
+| Every killed URL has a 301 | ADR-0006 | ✅ **Closed 2026-09-15.** `config/redirects.php` holds 170 entries covering all 164 discarded production URLs, grouped by bucket with the rule stated per group. Every target verified to resolve 200; no 301 chains; no key shadows a live v2 page. Six assignments are flagged in the file header for review, and two (`/services/`, `/store/`) should be re-pointed at `/vapricing/` if the §4a keep/redirect/delete decision keeps it |
+| Performance baseline met (mobile 96+, LCP < 1.2s, CLS 0.00) | [performance-baseline.md](performance-baseline.md) | 🟡 Measured locally 2026-09-15 — **0 of 7 pages green on all three targets**; best LCP is 1.36s against a 1.2s target. Not yet measured on staging, which is what the gate asks for |
+| Production infrastructure exists | — | 🔴 **Owned outside this workstream** (2026-09-15). Still a hard gate; not tracked here |
+| Rollback plan documented and rehearsed | — | 🔴 **Owned outside this workstream** (2026-09-15). Still a hard gate; not tracked here |
+| Transactional email deliverability verified | [performance-baseline.md](performance-baseline.md) | 🔴 Not started — every `MAIL_*` value is empty |
+| Webhook signing secrets set in every environment | [known-issues.md](known-issues.md) #7 | 🔴 **New gate, 2026-09-15.** Both webhook endpoints now fail closed: with no secret they return 503 and process nothing. `STRIPE_WEBHOOK_SECRET` and `CALENDLY_WEBHOOK_SIGNING_KEY` are empty everywhere, so deploying as-is takes Stripe Connect payout events and Calendly booking events dark. Set both before this reaches staging |
+| Error monitoring reporting | — | 🔴 Sentry has no DSN. `SENTRY_LARAVEL_DSN` is now present and blank in `.env` / `.env.example` (2026-09-15) — the key exists, the value is still the gate |
 
 ## Recommended sequence
 
@@ -152,10 +173,9 @@ These must all be green before DNS moves. One is green.
 ## Gaps this plan does not cover
 
 - **Drafts, private and password-protected content were never audited on production.** The REST API only exposes published content without auth; an application password against wp-admin would allow `status=any`. A missed draft is invisible until someone asks for it.
-- **The media library has never been reconciled.** Local holds 512 attachments (1,599 files including generated size variants, ≈140MB). Production's library was never counted, so there is no way to know what is missing.
 - **Google Site Kit is installed but inactive**, so no GTM snippet is emitted and no tag inside the container fires. Activating it and connecting the container is admin work, but it is a prerequisite for any GTM-delivered tracking at cutover.
 - **`e-landing-page` CPT (2 entries)** has no equivalent post type in v2 and no recorded decision.
-- **`/remote-leverage-x-oyster/` and `/remote-leverage-x-lano/`** — unresolved whether they fold into the partner hub. "Lano" appears nowhere else in the audit; it may be a dead page or a missing partner record.
+- **Production's media library is deliberately not being ported** (decided 2026-09-15). Local holds 512 attachments; production's was never counted and will not be. Page art is tracked as source in `resources/images/pages/` and generated into `public/images/` at build time, so it does not depend on a library migration. This is a closed decision, not an open gap.
 - **`/comparison/` is a never-filled-in internal template on production** — literal `[X]` placeholders, "Text here Text here", a stray "NEW SECTION" label. It was reproduced verbatim under the strict-fidelity rule. Someone should decide whether it ships that way.
 
 ## SEO gates added 2026-09-14

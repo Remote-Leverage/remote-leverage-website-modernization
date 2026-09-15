@@ -3,8 +3,10 @@
      followed by a full-width photographic mockup of the publication. Used on
      /impact-report-2026/.
 
-     NOTE: the capture posts to `form_action`, which is empty until the Lead domain exposes an
-     endpoint — the fields render but submission is not wired. --}}
+     The capture posts to `form_action` (default /api/leads/gated-download, the Lead domain's
+     gated-download endpoint) which records the visitor as a Lead and then delivers the PDF.
+     `asset` is a slug into config/gated-assets.php, never a URL — the server decides which
+     file it resolves to. Replaces production's Gravity Forms form 33, retired by ADR-0008. --}}
 <section class="w-full" style="background-color:var(--color-lavender-tint);">
     <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-10 lg:pt-20 lg:pb-14">
 
@@ -31,6 +33,9 @@
                 </div>
 
                 <form method="post" action="{{ $formAction }}" class="space-y-5">
+                    <input type="hidden" name="asset" value="{{ $assetSlug }}">
+                    <input type="hidden" name="landing_url" value="{{ $landingUrl }}">
+
                     <div>
                         <label for="impact-report-name" class="block text-[13px] font-semibold mb-2">
                             Name <span class="font-normal text-white/70">(Required)</span>

@@ -38,26 +38,18 @@ class LivewireServiceProvider extends ServiceProvider
             // Defer remains a fallback if the template is flushed without that boot path.
             Livewire::useScriptTagAttributes(['defer' => true]);
 
+            // Namespaced names are canonical and are the only names registered. The bare
+            // aliases (`multistep-booking-wizard`, …) each component also carried were
+            // removed on 2026-09-15: nothing referenced them, and having two names meant a
+            // grep for usage found only half the call sites. Keep new registrations
+            // namespaced so `class_namespace` discovery and the explicit name agree.
             Livewire::component('booking.multistep-booking-wizard', MultistepBookingWizard::class);
-            Livewire::component('multistep-booking-wizard', MultistepBookingWizard::class);
-
             Livewire::component('scheduling.instant-live-call-button', InstantLiveCallButton::class);
-            Livewire::component('instant-live-call-button', InstantLiveCallButton::class);
-
             Livewire::component('referrer.referrer-portal-dashboard', ReferrerPortalDashboard::class);
-            Livewire::component('referrer-portal-dashboard', ReferrerPortalDashboard::class);
-
             Livewire::component('referrer.referrer-registration-form', ReferrerRegistrationForm::class);
-            Livewire::component('referrer-registration-form', ReferrerRegistrationForm::class);
-
             Livewire::component('partner.partner-directory-grid', PartnerDirectoryGrid::class);
-            Livewire::component('partner-directory-grid', PartnerDirectoryGrid::class);
-
             Livewire::component('utilities.email-signature-generator', EmailSignatureGenerator::class);
-            Livewire::component('email-signature-generator', EmailSignatureGenerator::class);
-
             Livewire::component('blog.guide-index-filter', GuideIndexFilter::class);
-            Livewire::component('guide-index-filter', GuideIndexFilter::class);
         }
     }
 }

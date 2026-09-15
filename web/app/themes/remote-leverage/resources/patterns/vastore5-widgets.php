@@ -8,13 +8,19 @@
  *  2. <job-description-widget> — a shadow-DOM custom element that POSTs to the
  *     REST route /wp-json/jobwidget/v1/chat to draft a job description. That route
  *     is supplied by a production-only plugin and does NOT exist in this install,
- *     so the Generate button will surface an error here. Markup, styling and
- *     behaviour are reproduced 1:1 so the section renders identically; wiring the
- *     endpoint up is a separate decision for the team.
+ *     so the Generate button surfaces an error here. That is a known, accepted
+ *     limitation: the markup and behaviour are kept as production has them and
+ *     wiring the endpoint up is a separate decision for the team.
  *
- * Both blobs keep production's own ids/classes and ship their own styles, so they
- * are intentionally not rewritten into Tailwind — restyling them would break the
- * 1:1 requirement and they are scoped tightly enough not to leak.
+ * 2026-09-15 redesign: visual parity with production was dropped by client direction, so
+ * both blobs are now skinned with the theme's own @theme custom properties (Tailwind emits
+ * them to :root under `theme(static)`, and custom properties inherit through a shadow
+ * boundary, so the generator picks them up inside its shadow root). Every element id, class,
+ * event listener, fetch call and parsing rule is untouched — this is presentation only.
+ *
+ * They keep their own <style> blocks rather than becoming Tailwind utilities because the
+ * generator's CSS lives inside a shadow root, which Tailwind cannot reach at all, and the
+ * timer is a fixed-position widget with drag/collapse state selectors.
  *
  * Not a block pattern: it has no pattern header and lives outside patterns/ so
  * WordPress does not try to register it.
@@ -38,20 +44,20 @@
 <style>
 /* ========= Remote Leverage theme ========= */
   #timerWidget.rl{
-    --rl-purple: #6D28D9;
-    --rl-purple-600:#5B21B6;
+    --rl-purple: var(--color-brand-purple, #8A2BE2);
+    --rl-purple-600: var(--color-brand-purple-deep, #6200A4);
     --rl-bg: #ffffff;
-    --rl-text: #111827;
-    --rl-muted:#6B7280;
-    --rl-border:#E5E7EB;
-    --shadow: 0 10px 30px rgba(17,24,39,0.12);
-    --radius: 12px;
+    --rl-text: var(--color-brand-midnight, #18112C);
+    --rl-muted:#6F6B85;
+    --rl-border: rgba(24,17,44,.10);
+    --shadow: 0 18px 44px rgba(24,17,44,.18);
+    --radius: var(--radius-card, 16px);
 
     position: fixed;             /* draggable container is fixed to viewport */
     bottom: 20px;                /* default position: bottom-right */
     right: 20px;
     z-index: 1000;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: var(--font-sans, "Inter Variable", "Inter", system-ui, -apple-system, sans-serif);
     color: var(--rl-text);
     touch-action: none;          /* smoother drag on touch */
   }
@@ -62,19 +68,21 @@
     border: 1px solid var(--rl-border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    padding: 16px 18px 14px;
-    min-width: 220px;
+    padding: 18px 20px 16px;
+    min-width: 224px;
     text-align: center;
     user-select: none;           /* avoids text selection while dragging */
   }
 
   /* Time */
   #timerWidget .time{
-    font-size: 2.2rem;
+    font-size: 2.35rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    letter-spacing: .5px;
-    margin: 6px 0 12px;
+    letter-spacing: -.02em;
+    line-height: 1.05;
+    color: var(--rl-text);
+    margin: 4px 0 14px;
   }
 
   /* Buttons */
@@ -85,20 +93,21 @@
   }
   #timerWidget .btn{
     appearance: none;
+    font-family: inherit;
     background: #fff;
     color: var(--rl-purple);
-    border: 1px solid var(--rl-purple);
+    border: 1px solid color-mix(in srgb, var(--rl-purple) 35%, transparent);
     border-radius: 999px;
-    padding: 8px 14px;
+    padding: 9px 15px;
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     cursor: pointer;
     transition: background .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease;
   }
   #timerWidget .btn:hover{
     background: var(--rl-purple);
     color: #fff;
-    box-shadow: 0 6px 16px rgba(109,40,217,0.28);
+    box-shadow: 0 6px 16px rgba(138,43,226,0.3);
     transform: translateY(-1px);
   }
   #timerWidget .btn:active{ transform: translateY(0); }
@@ -134,7 +143,7 @@
     background: var(--rl-purple);
     color: #fff;
   }
-  #timerWidget #toggleBtn:focus{ outline: 3px solid rgba(109,40,217,0.25); }
+  #timerWidget #toggleBtn:focus{ outline: 3px solid rgba(138,43,226,0.28); }
 
   /* Collapsed state -> compact, readable pill (never shrinks too small) */
   #timerWidget.collapsed .card{ display: none; }
@@ -333,45 +342,51 @@ class JobDescriptionWidget extends HTMLElement {
         this.attachShadow({ mode: 'open' });
         this.shadowRoot.innerHTML = `
           <style>
+            /* Skinned from the theme's :root tokens — custom properties inherit through the
+               shadow boundary, so --color-brand-* / --radius-card / --font-sans resolve here.
+               Literals are the token values, used only if app.css is ever absent. */
             :host{
-              --rl-blue:#007BFF;
-              --rl-purple:#6D28D9;
-              --rl-purple-dark:#5B21B6;
-              --rl-lavender:#F5F3FF;
-              --rl-text:#111827;
-              --rl-muted:#6B7280;
-              --rl-border:#E5E7EB;
-              --rl-shadow:0 6px 18px rgba(0,0,0,.08);
-              --rl-radius:10px;
+              --rl-blue: var(--color-brand-purple, #8A2BE2);
+              --rl-purple: var(--color-brand-purple, #8A2BE2);
+              --rl-purple-dark: var(--color-brand-purple-deep, #6200A4);
+              --rl-lavender: var(--color-lavender-surface, #FBF6FF);
+              --rl-text: var(--color-brand-midnight, #18112C);
+              --rl-muted:#6F6B85;
+              --rl-border: rgba(24,17,44,.10);
+              --rl-shadow: 0 6px 24px rgba(24,17,44,.06);
+              --rl-radius: var(--radius-card, 16px);
+              --rl-pill: var(--radius-pill, 100px);
             }
-            .widget-container{ width:100%; font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; color:var(--rl-text); margin:0 auto; }
-            .widget-header{ background:var(--rl-blue); color:#fff; padding:16px 20px; border-radius:var(--rl-radius) var(--rl-radius) 0 0; display:flex; align-items:center; justify-content:space-between; box-shadow:var(--rl-shadow); }
-            .widget-content{ background:#fff; border:1px solid var(--rl-border); border-top:none; border-radius:0 0 var(--rl-radius) var(--rl-radius); padding:24px; box-shadow:var(--rl-shadow); margin-bottom:20px; }
-            .custom-container{ background:#fff; border-radius:var(--rl-radius); padding:30px 20px; max-width:640px; width:100%; margin:10px auto 0; }
-            label{ display:block; margin-top:14px; font-weight:600; color:var(--rl-text); }
-            input,textarea{ width:100%; padding:12px; margin-top:8px; border:1px solid var(--rl-border); border-radius:8px; font-size:16px; box-sizing:border-box; background:#fff; }
-            input:focus,textarea:focus{ border-color:var(--rl-purple); outline:none; box-shadow:0 0 0 3px rgba(109,40,217,.2); }
-            button{ background:var(--rl-purple); color:#fff; border:none; padding:13px 20px; margin-top:22px; border-radius:10px; font-size:16px; font-weight:600; cursor:pointer; width:100%; transition:transform .15s, box-shadow .15s, background-color .15s; box-shadow:0 6px 14px rgba(109,40,217,.28); }
-            button:hover{ background:var(--rl-purple-dark); transform:translateY(-1px); box-shadow:0 8px 18px rgba(91,33,182,.34); }
-            button:active{ transform:translateY(0); box-shadow:0 6px 14px rgba(91,33,182,.28); }
+            .widget-container{ width:100%; font-family:var(--font-sans, "Inter Variable", "Inter", system-ui, -apple-system, sans-serif); color:var(--rl-text); margin:0 auto; }
+            .widget-header{ background:linear-gradient(135deg, var(--rl-purple) 0%, var(--rl-purple-dark) 100%); color:#fff; padding:18px 24px; border-radius:var(--rl-radius) var(--rl-radius) 0 0; display:flex; align-items:center; justify-content:space-between; letter-spacing:-.01em; }
+            .widget-content{ background:#fff; border:1px solid var(--rl-border); border-top:none; border-radius:0 0 var(--rl-radius) var(--rl-radius); padding:8px 24px 24px; box-shadow:var(--rl-shadow); margin-bottom:20px; }
+            .custom-container{ background:#fff; border-radius:var(--rl-radius); padding:16px 0 4px; max-width:640px; width:100%; margin:0 auto; }
+            label{ display:block; margin-top:18px; font-size:13.5px; font-weight:600; color:var(--rl-text); }
+            input,textarea{ width:100%; padding:13px 14px; margin-top:8px; border:1px solid var(--rl-border); border-radius:12px; font-family:inherit; font-size:15px; color:var(--rl-text); box-sizing:border-box; background:#fff; transition:border-color .15s ease, box-shadow .15s ease; }
+            textarea{ resize:vertical; line-height:1.55; }
+            input::placeholder,textarea::placeholder{ color:var(--rl-muted); opacity:.7; }
+            input:focus,textarea:focus{ border-color:var(--rl-purple); outline:none; box-shadow:0 0 0 3px rgba(138,43,226,.18); }
+            button{ background:var(--rl-purple); color:#fff; border:none; padding:14px 22px; margin-top:24px; border-radius:var(--rl-pill); font-family:inherit; font-size:16px; font-weight:700; cursor:pointer; width:100%; transition:transform .15s, box-shadow .15s, background-color .15s; box-shadow:0 8px 20px rgba(138,43,226,.3); }
+            button:hover{ background:var(--rl-purple-dark); transform:translateY(-1px); box-shadow:0 12px 26px rgba(98,0,164,.34); }
+            button:active{ transform:translateY(0); box-shadow:0 8px 20px rgba(98,0,164,.28); }
             button[disabled]{ opacity:.7; cursor:not-allowed; }
 
             /* Combined Result Box */
-            #result{ display:none; margin-top:22px; padding:0; border:1px solid var(--rl-purple); border-radius:10px; background:var(--rl-lavender); color:var(--rl-text); box-shadow:var(--rl-shadow); }
-            .result-inner{ padding:16px 16px 8px 16px; }
-            .result-title{ font-weight:800; margin-bottom:8px; }
-            .subhead{ font-weight:700; margin:8px 0 6px; color:#2d2d2d; }
+            #result{ display:none; margin-top:24px; padding:0; border:1px solid rgba(138,43,226,.28); border-radius:var(--rl-radius); background:var(--rl-lavender); color:var(--rl-text); box-shadow:var(--rl-shadow); }
+            .result-inner{ padding:20px 20px 10px 20px; }
+            .result-title{ font-size:18px; font-weight:700; letter-spacing:-.02em; margin-bottom:10px; }
+            .subhead{ font-size:13.5px; font-weight:700; margin:16px 0 8px; color:var(--rl-purple-dark); }
             .result-list{ margin:0; padding-left:20px; }
-            .result-list li{ margin:6px 0; line-height:1.45; }
+            .result-list li{ margin:6px 0; line-height:1.55; }
 
             /* Traits: two columns */
             .traits-list{ margin:0; padding-left:20px; column-count:2; column-gap:28px; }
             .traits-list li{ break-inside:avoid; -webkit-column-break-inside:avoid; page-break-inside:avoid; margin:6px 0; line-height:1.45; }
             @media (max-width:640px){ .traits-list{ column-count:1; } }
 
-            .result-footer{ display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:8px 12px 12px 12px; }
-            .copy-btn{ appearance:none; border:1px solid rgba(109,40,217,.35); background:#fff; color:var(--rl-purple); font-weight:600; font-size:12px; padding:6px 10px; border-radius:999px; cursor:pointer; }
-            .copy-btn:hover{ background:rgba(109,40,217,.08); }
+            .result-footer{ display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:8px 14px 14px 14px; }
+            .copy-btn{ appearance:none; border:1px solid rgba(138,43,226,.35); background:#fff; color:var(--rl-purple); font-family:inherit; font-weight:600; font-size:12px; padding:7px 14px; border-radius:var(--rl-pill); cursor:pointer; width:auto; margin-top:0; box-shadow:none; }
+            .copy-btn:hover{ background:rgba(138,43,226,.08); color:var(--rl-purple); transform:none; box-shadow:none; }
             .copied{ color:var(--rl-muted); font-size:12px; }
           </style>
 

@@ -70,6 +70,13 @@
       @endif
 
       <main id="main" class="main flex-1 w-full">
+        {{-- The case-study/talent/reviews tab bar sits between the header and the page's
+             own hero on production. Rendered here rather than from each template so the
+             archive, the single case-study view and /reviews/ share one copy of it;
+             App\Support\CaseStudySubnav decides whether this request is one of its
+             surfaces and which tab is current. --}}
+        @include('partials.case-study-subnav')
+
         @yield('content')
       </main>
 

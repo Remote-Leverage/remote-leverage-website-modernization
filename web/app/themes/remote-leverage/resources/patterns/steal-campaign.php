@@ -212,7 +212,16 @@ $chip = $isDark
     : 'inline-flex items-center rounded-full bg-black/5 px-[14px] py-[6px] text-[15px] leading-5 text-black/80';
 
 /* ---- type ---------------------------------------------------------------------- */
-$wrap = 'w-full max-w-[1320px] mx-auto px-5 sm:px-6';
+/* Production's container is a 1440 box with a 60px gutter, NOT a 1320 box with inner
+   padding: every left-aligned heading on all three pages starts at x=60 at a 1440 viewport
+   and every centred one is centred on 60..1380. Measuring it as max-w-[1320px] + px-6 put
+   the whole page 24px to the right of production. Re-measured 2026-09-15.
+   The `!` is load-bearing: these bands are `wp:group` blocks with a constrained layout, and
+   core's `.wp-container-… > *` rule (specificity 0,2,0) otherwise clamps this div to 1320px
+   and the 60px gutter then eats INTO the content instead of sitting outside it — which put
+   every band below the hero at x=120. The hero band is the one group core does not emit a
+   container class for, which is why it alone looked right without this. */
+$wrap = 'w-full max-w-[1440px]! mx-auto px-5 lg:px-[60px]';
 $h1 = 'font-display font-bold text-[34px] leading-[42px] sm:text-[46px] sm:leading-[63px] tracking-[-1.89px] text-bg-light';
 $h2Split = 'font-display font-normal text-[34px] leading-[40px] sm:text-[48px] sm:leading-[53px] tracking-[-1.44px] [&_strong]:font-bold';
 $h2Mid = 'font-display font-bold text-[30px] leading-[36px] sm:text-[42px] sm:leading-[48px] tracking-[-1.44px]';
@@ -220,11 +229,16 @@ $h3Card = 'font-display font-medium text-[22px] leading-[26px] sm:text-[27px] sm
 $lead = 'text-[17px] leading-[28px] sm:text-[20px] sm:leading-[33px] tracking-[-0.6px] font-medium';
 
 /* ---- CTA pill ------------------------------------------------------------------ */
-$pill = 'group inline-flex items-center gap-2 rounded-full bg-brand-magenta hover:bg-brand-magenta-hover px-[18px] py-[15px] font-display text-[14px] leading-[22px] font-bold uppercase tracking-[-0.45px] text-white transition-colors';
-$arrow = '<svg class="w-[18px] h-[18px] shrink-0 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10.25" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 8.5l3.5 3.5-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+/* The pill carries a magenta bloom on production — box-shadow 0 0 29.9px rgba(249,0,102,.6),
+   measured with getComputedStyle. Without it the CTA reads as a flat sticker. The arrow is
+   22px and sits 14px after the label (label ends x=264, icon x=278, pill ends x=318 with
+   18px right padding). */
+$pill = 'group inline-flex items-center gap-[14px] rounded-full bg-brand-magenta hover:bg-brand-magenta-hover px-[18px] py-[15px] font-display text-[14px] leading-[22px] font-bold uppercase tracking-[-0.45px] text-white shadow-[0_0_29.9px_0_rgba(249,0,102,0.6)] transition-colors';
+$arrow = '<svg class="w-[22px] h-[22px] shrink-0 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10.25" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 8.5l3.5 3.5-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-/* Magenta tick used by the hero and closing checklists. */
-$tick = '<svg class="w-[18px] h-[18px] shrink-0 mt-[3px]" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#F90066"/><path d="M5.8 10.2l2.7 2.7 5.5-5.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+/* Magenta tick used by the hero and closing checklists. Production's hero rows are an 18px
+   icon against an 18px line box, so the icon is flush with the cap line, not nudged down. */
+$tick = '<svg class="w-[18px] h-[18px] shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#F90066"/><path d="M5.8 10.2l2.7 2.7 5.5-5.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 $cta = $steal['cta_url'];
 
@@ -281,43 +295,89 @@ $orbit = [
     <span class="pointer-events-none absolute -z-10 left-[-200px] top-[-445px] w-[864px] h-[578px] rounded-full bg-brand-purple blur-[198px]" aria-hidden="true"></span>
     <span class="pointer-events-none absolute -z-10 right-[-200px] top-[-110px] w-[864px] h-[578px] rounded-full bg-brand-purple blur-[198px]" aria-hidden="true"></span>
 
+    <?php /* The band is 639px tall on all three pages (the portrait's own height) and the
+             copy column is CENTRED in it, not bottom-aligned: production leaves 91px above
+             and below on /stealing-jobs/ and 43px on /steal-back-your-time/, i.e. exactly
+             half the slack in each case. The two columns are 625px each with a 70px gutter
+             (625+70+625 = 1320), and the portrait is centred in its own column at x=799,
+             not flush to the container edge. */ ?>
     <div class="<?= $wrap ?> relative pt-[110px]">
-        <div class="grid grid-cols-1 lg:grid-cols-[625px_1fr] gap-10 lg:gap-0 lg:items-end">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-x-[70px] lg:gap-y-0 lg:items-center">
 
-            <div class="pb-10 lg:pb-[70px]">
+            <div class="pb-10 lg:pb-0">
                 <h1 class="<?= $h1 ?>"><?= $steal['hero_headline'] ?></h1>
 
-                <p class="<?= $lead ?> text-[#E6DEF4] font-semibold mt-6"><?= $steal['hero_sub'] ?></p>
+                <p class="<?= $lead ?> text-[#E6DEF4] font-semibold mt-5"><?= $steal['hero_sub'] ?></p>
 
-                <ul class="mt-10 space-y-[7px]">
+                <?php /* 15px/18px, 500, #E6DEF4 with a 14px row gap — a 32px row pitch and a
+                         146px list, matching production. An 18px icon on an 18px line box
+                         needs no vertical nudge, and the icon gap is 10px (icon x=60,
+                         label x=88). */ ?>
+                <ul class="mt-10 space-y-[14px]">
                     <?php foreach ($steal['hero_checklist'] as $item) { ?>
-                        <li class="flex items-start gap-3 text-[15px] leading-[25px] text-white">
+                        <li class="flex items-start gap-[10px] text-[15px] leading-[18px] font-medium text-[#E6DEF4]">
                             <?= $tick ?><span><?= $item ?></span>
                         </li>
                     <?php } ?>
                 </ul>
 
-                <div class="mt-10 flex flex-wrap items-center gap-6">
+                <?php /* The note sits to the RIGHT of the pill on all three pages, 20px after
+                         it, taking the rest of the 625px column. /steal-back-your-time/ has a
+                         two-line note long enough to wrap the whole paragraph onto its own row
+                         without the flex-1 basis, which is what broke that page's hero. */ ?>
+                <?php /* z-3 so the band's upward bloom (z-2, below) does not wash over the
+                         pill and its note — production lifts exactly this row the same way,
+                         and leaves the checklist above it inside the bloom. */ ?>
+                <div class="relative z-[3] mt-10 flex flex-wrap items-center gap-5">
                     <a href="<?= esc_url($cta) ?>" class="<?= $pill ?>">
                         <span><?= $steal['cta_text'] ?></span><?= $arrow ?>
                     </a>
-                    <p class="text-[15px] leading-[18px] font-medium text-[#E6DEF4]"><?= $steal['hero_note'] ?></p>
+                    <p class="flex-1 basis-[200px] text-[15px] leading-[18px] font-medium text-[#E6DEF4]"><?= $steal['hero_note'] ?></p>
                 </div>
             </div>
 
-            <div class="hidden lg:flex justify-end items-end relative">
+            <?php /* The portrait is a 537x639 cut-out served at its natural size, and
+                     production puts no fade over it — the photo's own ground carries the
+                     dissolve. The overlay this markup used to carry spanned the whole 1fr
+                     column, which painted a visible dark rectangle out over the purple
+                     gradient to the left of the subject. */ ?>
+            <div class="hidden lg:flex justify-center items-end">
                 <img src="<?= $img($steal['hero_image']) ?>" alt="" width="537" height="639"
-                     loading="eager" decoding="async" class="w-[537px] h-[639px] object-cover object-bottom">
-                <?php /* Production's .shadow-gradientt — the portrait dissolves into the band
-                         rather than ending on a hard edge. */ ?>
-                <span class="pointer-events-none absolute inset-x-0 bottom-0 h-[280px]"
-                      style="background:linear-gradient(180deg, <?= $isDark ? 'rgba(13,13,13,0)' : 'rgba(61,26,93,0)' ?> 0.28%, <?= $heroBg ?> 74.68%);" aria-hidden="true"></span>
+                     loading="eager" decoding="async" class="w-[537px] h-[639px] object-fill">
             </div>
 
         </div>
     </div>
 
-    <div class="<?= $isDark ? 'bg-[#0D0D0D]' : 'bg-[#3D1A5D]' ?> py-8 [&_img]:h-[35px] [&_img]:w-auto [&_img]:object-contain [&_img]:brightness-0 [&_img]:invert [&_img]:opacity-70">
+    <?php /* The strip is transparent so the right-hand blob's bloom carries down through it
+             the way it does on production; the band behind it is already $heroBg. Logos are
+             sized on WIDTH (104px, height auto) — production keeps each mark's own aspect,
+             so Bench sits tall and SETAERO wide. The whole rail is at 50% opacity and is NOT
+             inverted: the source PNGs are already white. */ ?>
+    <?php /* Production's `.shadow-gradientt0` band. It is not just a logo rail: it carries a
+             70% #0D0D0D scrim (57% #1E0C38 on the light variant) AND a box-shadow thrown 100px
+             upward with an 80px blur (50/70 on the light variant), which is what dissolves the
+             bottom of the portrait into the band. Measured with getComputedStyle on
+             2026-09-15 — without it the cut-out ends on a hard edge, which was the single
+             largest visual difference left in this hero. z-index 2 so the bloom lands over the
+             portrait, as it does on production. */ ?>
+    <?php /* The block's own CSS (.rl-logo-marquee-item img in resources/css/app.css) caps every
+             mark at max-height:28px and paints it with filter:brightness(0), which flattens
+             nine different logo shapes into one letterbox. Production sizes on WIDTH instead —
+             a 104px box with the mark at its natural size when it is narrower (Sivia Law stays
+             99px) — keeps each aspect, applies no filter because the source PNGs are already
+             white, and dims the whole rail to 50%. These overrides are scoped through
+             .rl-logo-marquee-item so they outrank that rule without touching the shared block
+             or the shared stylesheet. Production also runs the rail edge-to-edge with no fade
+             mask, so the wrapper's mask and max-width come off too. */ ?>
+    <div class="relative z-[2] py-[10px] <?= $isDark ? 'bg-[rgba(13,13,13,0.7)] shadow-[0_-100px_80px_0_#0D0D0D]' : 'bg-[rgba(30,12,56,0.57)] shadow-[0_-50px_70px_0_#1E0C38]' ?>
+                [&_.rl-logo-marquee-wrapper]:max-w-none [&_.rl-logo-marquee-wrapper]:px-0
+                [&_.rl-logo-marquee-wrapper]:[mask-image:none] [&_.rl-logo-marquee-wrapper]:[-webkit-mask-image:none]
+                [&_.animate-marquee-logos]:gap-[60px] [&_.animate-marquee-logos]:opacity-50
+                [&_.rl-logo-marquee-item_img]:max-h-none [&_.rl-logo-marquee-item_img]:max-w-[104px]
+                [&_.rl-logo-marquee-item_img]:w-auto [&_.rl-logo-marquee-item_img]:h-auto
+                [&_.rl-logo-marquee-item_img]:object-contain [&_.rl-logo-marquee-item_img]:filter-none
+                [&_.rl-logo-marquee-item_img]:opacity-100">
         <?= BlockDefaults::renderClientLogosMarquee($logoData) ?>
     </div>
 </div>
@@ -627,7 +687,10 @@ $reviewTone = $isDark
    reassurance list rides along with the paragraph rather than needing a block change. */
 $closingBody = $steal['closing_body'].'<span class="mt-8 flex flex-col gap-[7px]">';
 foreach ($steal['closing_checklist'] as $item) {
-    $closingBody .= '<span class="flex items-start gap-3 text-[15px] leading-[25px] text-white">'.$tick.'<span>'.$item.'</span></span>';
+    /* This list keeps the 25px line box, so the tick needs the 3px nudge the hero's
+       18px rows do not. */
+    $closingTick = str_replace('shrink-0', 'shrink-0 mt-[3px]', $tick);
+    $closingBody .= '<span class="flex items-start gap-3 text-[15px] leading-[25px] text-white">'.$closingTick.'<span>'.$item.'</span></span>';
 }
 $closingBody .= '</span>';
 ?>

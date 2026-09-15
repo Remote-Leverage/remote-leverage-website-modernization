@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
+import fsSync from 'node:fs'
 import { globSync } from 'tinyglobby'
 
 /**
@@ -64,6 +65,20 @@ async function write(file, contents) {
   await fs.writeFile(file, contents)
 }
 
+/**
+ * Whether another source in the same directory shares this file's stem but has a different
+ * raster extension, which would make both emit the same `.webp` name.
+ */
+function hasStemCollision(relative) {
+  const dir = path.dirname(relative)
+  const stem = path.basename(relative, path.extname(relative))
+  const ext = path.extname(relative).toLowerCase()
+
+  return ['.png', '.jpg', '.jpeg']
+    .filter((candidate) => candidate !== ext)
+    .some((candidate) => fsSync.existsSync(path.join(SOURCE_DIR, dir, `${stem}${candidate}`)))
+}
+
 async function processFile({ sharp, optimize }, relative) {
   const source = path.join(SOURCE_DIR, relative)
   const target = path.join(OUT_DIR, relative)
@@ -111,7 +126,14 @@ async function processFile({ sharp, optimize }, relative) {
   // logos — and lossy WebP shreds those (the country flags came back at ~17dB). Encode PNG
   // sources losslessly, and only drop to lossy for the handful of photographs that happen to
   // have been saved as PNG, which is exactly the case where lossless comes out oversized.
-  const webpTarget = target.replace(/\.(png|jpe?g)$/i, '.webp')
+  // Two sources that differ only by extension (Frame-76-5.jpg and Frame-76-5.png are both
+  // real, distinct images on the ecommerce page) would otherwise both write Frame-76-5.webp,
+  // and whichever ran second silently won — one card then rendered the other card's picture.
+  // On a collision, keep the original extension in the name: Frame-76-5.jpg.webp.
+  // BlockDefaults::preferWebp() looks for that appended form before the swapped one.
+  const webpTarget = hasStemCollision(relative)
+    ? `${target}.webp`
+    : target.replace(/\.(png|jpe?g)$/i, '.webp')
   let webp = ext === '.png'
     ? await pipeline.clone().webp({ lossless: true, effort: 5 }).toBuffer()
     : await pipeline.clone().webp({ quality: 82, effort: 5 }).toBuffer()

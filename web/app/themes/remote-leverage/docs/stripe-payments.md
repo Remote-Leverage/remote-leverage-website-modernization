@@ -84,10 +84,21 @@ Signature verification is HMAC-SHA256 over `"{timestamp}.{raw body}"` against
 `STRIPE_WEBHOOK_SECRET`, compared with `hash_equals`, rejecting anything more than 300
 seconds old — the same algorithm the legacy handler used, and what Stripe's own libraries do.
 
-> **Fail-open caveat, carried over from the legacy plugin:** when `STRIPE_WEBHOOK_SECRET` is
-> empty the controller logs a warning and processes the event anyway. That is legacy parity,
-> not a recommendation. Set the secret in every environment; an unsigned endpoint that
-> forwards its input to an onboarding automation can be driven by anyone who knows the URL.
+> **Fails closed as of 2026-09-15.** The legacy plugin logged a warning and processed the event
+> anyway when `STRIPE_WEBHOOK_SECRET` was empty; that parity was dropped, because an unsigned
+> endpoint that forwards its input to an onboarding automation can be driven by anyone who knows
+> the URL. The controller now returns **503** with no secret configured and **403** on a bad
+> signature, and acts on neither.
+>
+> **Deployment consequence:** an environment without `STRIPE_WEBHOOK_SECRET` set no longer
+> processes Stripe events at all — it goes dark rather than going open. Set the secret in every
+> environment *before* deploying this, or Connect payout events (`account.updated`,
+> `transfer.paid`, `transfer.failed`) will be refused along with the payment events. Stripe
+> retries failed deliveries, so events during a brief gap are recoverable, but a long one is not.
+
+The same verifier now serves the Calendly webhook, which had **no** signature verification at all:
+`App\Application\Http\Support\WebhookSignature`. Calendly signs with the identical scheme under
+the `Calendly-Webhook-Signature` header, keyed by `CALENDLY_WEBHOOK_SIGNING_KEY`.
 
 The forwarded payload keys are the legacy set verbatim:
 

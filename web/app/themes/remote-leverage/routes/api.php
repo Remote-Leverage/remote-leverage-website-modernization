@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Application\Http\Controllers\CalendlyWebhookController;
+use App\Application\Http\Controllers\GatedDownloadController;
 use App\Application\Http\Controllers\PaymentIntentController;
 use App\Application\Http\Controllers\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,16 @@ Route::prefix('webhooks')->group(function () {
  */
 Route::prefix('payments')->group(function () {
     Route::post('intent', [PaymentIntentController::class, 'store'])->name('api.payments.intent');
+});
+
+/*
+ * Gated file downloads (acf/impact-report-hero). Name + email in, a Lead row and the usual
+ * LeadCreated fan-out out, then the file. Replaces Gravity Forms form 33 on
+ * /impact-report-2026/, retired by ADR-0008. Which file is served is decided server-side
+ * from the posted slug against config/gated-assets.php — the browser never names a URL.
+ */
+Route::prefix('leads')->group(function () {
+    Route::post('gated-download', [GatedDownloadController::class, 'store'])->name('api.leads.gated-download');
 });
 
 Route::get('health', function () {

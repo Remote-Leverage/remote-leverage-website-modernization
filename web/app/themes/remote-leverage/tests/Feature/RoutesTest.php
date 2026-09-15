@@ -8,11 +8,20 @@ use Illuminate\Support\Facades\Route;
 describe('Application Routes', function () {
     beforeEach(function () {
         $baseDir = dirname(__DIR__, 2);
+        // Guard each route file on a name it actually defines. A single shared sentinel
+        // is order-dependent: GatedDownloadTest registers api.php alone behind the same
+        // `api.health` check, so when it ran first this block short-circuited and web.php
+        // never loaded — every web-route assertion then failed, while the file still
+        // passed in isolation. That made the suite intermittently red.
         if (! Route::has('api.health')) {
             Route::prefix('api')->group($baseDir.'/routes/api.php');
-            Route::middleware([])->group($baseDir.'/routes/web.php');
-            Route::getRoutes()->refreshNameLookups();
         }
+
+        if (! Route::has('funnel.book-consultation')) {
+            Route::middleware([])->group($baseDir.'/routes/web.php');
+        }
+
+        Route::getRoutes()->refreshNameLookups();
     });
 
     test('api routes are registered', function () {
@@ -60,6 +69,24 @@ describe('config/redirects.php targets resolve to something real', function () {
     $wordPressPageTargets = [
         'vathankyou' => 'page ID 126, page-vathankyou.blade.php — verified 2026-09-14',
         'hire-va-4' => 'page ID 1000000, renders patterns/hire-va-4-full.php — created and verified 2026-09-14',
+
+        // Targets of the ADR-0006 cutover map (the 164 discarded production URLs added to
+        // config/redirects.php). All verified against `wp post list --post_type=page
+        // --post_status=publish` on 2026-09-15.
+        '' => 'the site root — front page, page ID 7 (slug "home"), front-page.blade.php — verified 2026-09-15',
+        'blog' => 'page ID 799 — verified 2026-09-15',
+        'reviews' => 'page ID 292 — verified 2026-09-15',
+        'vacalendar' => 'page ID 1000002 — verified 2026-09-15',
+        'samples' => 'page ID 1000005 — verified 2026-09-15',
+        'contractor-management' => 'page ID 1000006 — verified 2026-09-15',
+        'contractor-payments' => 'page ID 1000007 — verified 2026-09-15',
+        'hire-for-less' => 'page ID 1000031 — verified 2026-09-15',
+        'vaonboardingform' => 'page ID 1000033 — verified 2026-09-15',
+        'hire-va-6' => 'page ID 1000041 — verified 2026-09-15',
+        'hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant-b' => 'page ID 1000047 — verified 2026-09-15',
+        'vastore5' => 'page ID 1000050 — verified 2026-09-15',
+        '1monthonus' => 'page ID 1000052 — verified 2026-09-15',
+        'hire-va-isolated-form' => 'page ID 1000053 — verified 2026-09-15',
     ];
 
     /*

@@ -109,11 +109,11 @@ Every other `SENTRY_*` key in `config/sentry.php` is the package's own default s
 
 **These are vendor defaults, not project configuration.** Set only the provider you actually use. The config's declared defaults are `openai` generally and `gemini` for images.
 
-## Keys in `.env` that nothing reads
+## Keys removed from `.env` because nothing reads them — done 2026-09-15
 
-Verified by grepping the whole theme (`app/`, `config/`, `resources/`). Each of these appears in the current `.env` and in the archived README's environment reference, and is read by no code:
+Verified by grepping `app/`, `config/`, `resources/`, `routes/` and the Bedrock `config/` before deleting each one. All seven were in the archived README's environment reference as though they were live, which is how they survived:
 
-| Variable | Why it is dead |
+| Variable | Why it was dead |
 | :--- | :--- |
 | `ZEROBOUNCE_API_KEY` | No email-validation integration exists |
 | `REFERRAL_WEBHOOK_SECRET` | The code reads `REFERRAL_WEBHOOK_URL` |
@@ -122,12 +122,31 @@ Verified by grepping the whole theme (`app/`, `config/`, `resources/`). Each of 
 | `PRISM_SERVER_ENABLED` | `PrismAiAuditor` does not read it |
 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | The code reads `GOOGLE_CALENDAR_CLIENT_ID`/`_SECRET` |
 
-Also in `.env` and unread by the theme: `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` — WordPress mail is not configured through Laravel's mailer here, so these only matter if an SMTP plugin or `wp_mail` filter is added.
+`STRIPE_TEST_KEY` / `STRIPE_TEST_SECRET` were on the same kill list in an earlier draft of [known-issues.md](known-issues.md) and **were kept** — see the Referral table above: the embedded card checkout reads them through `services.stripe.test_publishable_key` / `test_secret_key`.
 
-Proposed cleanup in [known-issues.md](known-issues.md).
+Also in `.env` and unread by the theme: `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` — WordPress mail is not configured through Laravel's mailer here, so these only matter if an SMTP plugin or `wp_mail` filter is added. They were left in place.
 
-## `.env.example` is incomplete
+Notion was deleted on 2026-09-15: `NOTION_API_KEY` and `NOTION_PARTNERS_DATABASE_ID` are in neither file and should not reappear.
 
-It covers only the Bedrock core set — database, environment, salts, `APP_KEY`, `ACF_PRO_KEY`, Redis. None of the ~30 integration keys the application actually reads are in it, so a fresh clone boots WordPress but has no working Calendly, HubSpot, Stripe, PostHog, Customer.io or sync.
+## `.env.example` — regenerated 2026-09-15
 
-Proposed fix: regenerate `.env.example` from the tables above, with every key present and empty, grouped by domain, and a one-line comment saying which feature degrades when it is blank.
+It used to cover only the Bedrock core set — database, environment, salts, `APP_KEY`, `ACF_PRO_KEY`, Redis — so a fresh clone booted WordPress with no working Calendly, HubSpot, Stripe, PostHog, Customer.io or sync.
+
+It is now generated from the tables above: every key the code reads, grouped by domain, each with a one-line note on what degrades when it is blank.
+
+**`env()` does not fall back over an empty value.** `KEY=` sets the value to `''`, which *overrides* the default in `env('KEY', 'default')` rather than falling back to it. Confirmed with `wp eval 'var_dump(env("LIVE_CALL_MEET_URL", "DEFAULT-KEPT"));'` → `string(0) ""`. So in both `.env` and `.env.example`:
+
+- a key with **no** code default is present and blank (`CALENDLY_WEBHOOK_SIGNING_KEY=`);
+- a key **with** a working code default is commented out with the default shown (`# GOOGLE_CALENDAR_ID='primary'`), so copying the template does not silently blank it.
+
+The keys that fall in the second group: `DB_HOST`, `DB_PREFIX`, `CALENDLY_DEFAULT_EVENT_TYPE`, `CALENDLY_T10_EVENT_TYPE`, `CALENDLY_T0_EVENT_TYPE`, `GOOGLE_CALENDAR_ID`, `LIVE_CALL_MEET_URL`, `STRATEGY_CONSULTANT_EMAIL`, `POSTHOG_HOST`, `STRIPE_TEST_MODE`, `REFERRAL_DEFAULT_REWARD_AMOUNT`, and every `AI_AGENT_*`.
+
+## AI content agent
+
+`config/ai-wordpress.php`. All defaulted; see [ai-mcp-and-sync.md](ai-mcp-and-sync.md).
+
+| Variable | Read by |
+| :--- | :--- |
+| `AI_AGENT_LOGIN`, `AI_AGENT_EMAIL`, `AI_AGENT_ROLE` | The provisioned agent user (`ai-content-agent`, `…@remoteleverage.com`, `editor`) |
+| `AI_AGENT_CAN_PUBLISH`, `AI_AGENT_CAN_EDIT_PUBLISHED`, `AI_AGENT_CAN_READ_LEADS` | Capability grants; all default `false` |
+| `AI_AGENT_PROVISION_ON_DEPLOY` | Default `true`; set `false` to skip reconciliation |

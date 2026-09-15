@@ -14,7 +14,6 @@ web/app/themes/remote-leverage/public
 *.log
 *.md
 doc
-plan.md
 .github
 *.sql
 docker-compose.yml

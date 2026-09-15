@@ -66,8 +66,7 @@ remoteleverage-v2/
 ├── scripts/                    seed-staging-secrets.sh (local .env → AWS Secrets Manager)
 ├── Dockerfile                  PHP-FPM + nginx image used by staging and docker-compose
 ├── docker-compose.yml          Local preview of the staging image (MySQL + Redis + app)
-├── plan.md                     Original 8-phase roadmap — PROGRESS FIGURES ARE STALE
-├── PAGE-MIGRATION-STATUS.md    Superseded by the content-migration checklist
+├── PAGE-MIGRATION-STATUS.md    Source of truth for migration scope and per-URL state
 └── web/app/themes/remote-leverage/
     ├── app/                    240 PHP files — the application (see below)
     ├── config/                 services, redirects, post-types, rl-sync, ai, sentry
@@ -197,8 +196,8 @@ flowchart LR
         V3["✅ Design system<br/>38 blocks · 53 patterns"]
         V4["✅ CI + staging deploy<br/>GitHub Actions → ECR → ECS"]
         V5["🟡 Content<br/>14 of 48 in-scope URLs<br/>119 posts + 23 case studies done"]
-        V6["🔴 SEO parity<br/>Yoast not installed<br/>191 discarded pages need redirects"]
-        V7["🔴 Cutover ops<br/>no prod DB ingest · no perf baseline · no DNS plan"]
+        V6["🟡 SEO parity<br/>Yoast 28.5 installed (inactive)<br/>164 discarded URLs redirected<br/>meta import built, not yet run"]
+        V7["🔴 Cutover ops<br/>owned elsewhere<br/>perf measured locally, not on staging"]
     end
 
     PROD -.->|"must carry over"| V2
@@ -209,7 +208,7 @@ flowchart LR
     style V3 fill:#d1fae5,stroke:#059669,color:#064e3b
     style V4 fill:#d1fae5,stroke:#059669,color:#064e3b
     style V5 fill:#fef3c7,stroke:#d97706,color:#78350f
-    style V6 fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    style V6 fill:#fef3c7,stroke:#d97706,color:#78350f
     style V7 fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
     style GO fill:#e0e7ff,stroke:#4f46e5,color:#312e81
 ```
@@ -220,7 +219,7 @@ flowchart LR
 | :--- | :--- | :--- |
 | Platform & infrastructure | ✅ Done | — |
 | Domain logic (8 plugins → 7 contexts) | ✅ Done | Real-time live-call availability is a cache flag, not a calendar (WR-104, on hold) |
-| Block & pattern library | ✅ Done | Case-study sub-nav tab bar still missing |
+| Block & pattern library | ✅ Done | Case-study sub-nav tab bar built 2026-09-15 (0.00% pixel diff vs production at 1440px and 400px) |
 | Test suite + CI | ✅ Done | No visual-regression suite (WR-103, deliberately not built) |
 | Staging deploy pipeline | ✅ Done | Production target does not exist yet |
 | Environment sync | ✅ Done | Production is gated off by design, in four independent places |
@@ -228,12 +227,12 @@ flowchart LR
 | **Case studies** | ✅ 23 of 23 | Migrated to a real `case_study` CPT |
 | **Blog posts** | ✅ 119 of 119 | Imported clean; category counts match production |
 | **Taxonomies** | ✅ 7 of 7 categories, 8 of 8 tags | `Live Sessions` is empty locally (2 on production) |
-| **Media** | 🟡 512 attachments | Not audited against production's library |
-| **Partners** | 🟡 0 of 3 usable | Oyster exists but is a 66-char stub; Lano and Lexgo missing. Hub + 2 standalone landing pages both in scope |
-| **SEO parity** | 🟡 Partly | Done: `robots.txt`, real 404s for unresolved paths, non-production `noindex`. Remaining: install Yoast, carry `_yoast_wpseo_*` meta, build the redirect map for 191 discarded pages |
+| **Media** | ✅ Out of scope | **Production's media library is not being ported** (decided 2026-09-15). No reconciliation against production is planned; local art is sourced from `resources/images/pages/` and built by the `themeImages()` Vite plugin |
+| **Partners** | ✅ 3 of 3 | Rebuilt CPT-backed 2026-09-15; content seeded from `resources/partners/partners.php` (in git). Three gaps remain that only the partners can fill: intake forms for Lexgo and Lano, a referral destination for Oyster, logos for all three |
+| **SEO parity** | 🟡 Mechanism done, not yet run | Done: `robots.txt`, real 404s, non-production `noindex`; **Yoast 28.5 installed** (inactive — activating opens the config wizard); **`wp acorn content:import-seo`** built, dry-run matches 187 items by slug; **redirect map now 170 entries** covering the 164 discarded URLs. Remaining: activate Yoast, settle `/guides/` vs `/blog/` canonical, run the import for real |
 | **Elementor retirement gate** | 🟡 Partially met | Zero local posts carry `_elementor_data` — but nothing has `_rl_conversion_status` either, so the ADR-0005 human sign-off gate has no record |
-| **Performance baseline** | 🔴 Not started | Target: mobile 96+, LCP < 1.2s, CLS 0.00 |
-| **Production cutover** | 🔴 Not started | No production environment, no DNS runbook, no rollback plan |
+| **Performance baseline** | 🟡 Measured locally | [performance-baseline.md](web/app/themes/remote-leverage/docs/performance-baseline.md), 2026-09-15. **0 of 7 pages green on all three targets**; best LCP 1.36s vs a 1.2s target. Dominant cost is one 843KB unsubsetted `InterVariable.ttf` on every page. Staging numbers — what the gate actually asks for — not yet taken |
+| **Production cutover** | 🔴 Not started | **Owned elsewhere** (2026-09-15) — the production deploy pipeline, DNS runbook and rollback plan are being handled outside this workstream |
 
 ### What actually remains
 
@@ -290,10 +289,8 @@ Everything lives under [`web/app/themes/remote-leverage/docs/`](web/app/themes/r
 
 A short list of things that are wrong right now and are worth knowing before you touch the code. Detail and proposed fixes in [`docs/known-issues.md`](web/app/themes/remote-leverage/docs/known-issues.md).
 
-- **Eight `.env` keys are read by nothing** (`ZEROBOUNCE_API_KEY`, `REFERRAL_WEBHOOK_SECRET`, `BARBA_ENABLED`, `LOCOMOTIVE_ENABLED`, `PRISM_SERVER_ENABLED`, `STRIPE_TEST_KEY`/`_SECRET`, `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`) — all documented in the old README as if live.
-- **Calendly webhook signatures are unverified locally** — `CALENDLY_WEBHOOK_SIGNING_KEY` is in `config/services.php` but absent from `.env`.
+- **Both webhook endpoints now fail closed, and neither secret is set.** As of 2026-09-15 `/api/webhooks/stripe` and `/api/webhooks/calendly` return **503** with no signing secret configured, rather than processing unverified payloads. `STRIPE_WEBHOOK_SECRET` and `CALENDLY_WEBHOOK_SIGNING_KEY` are empty in every environment, so **both endpoints are dark until someone sets them** — Stripe Connect payout events included. Set them before this reaches staging.
 - **Sentry is configured but has no DSN**, so nothing is reported.
-- **`plan.md` claims Phases 3–8 are `0% Completed`.** Phases 3–6 are essentially done. Anyone reading it for status gets a badly wrong picture.
 - **`/referral/` holds the wrong content** — it renders the `hire-va-4` landing page. Production's `/referral/` is a homepage variant. Out of scope, so the call is redirect-or-delete rather than rework.
 - **`/robots.txt` and `/favicon.ico` report 404 locally** while serving correct content. A Herd/nginx artifact affecting only those two filenames; production returns 200. Do not chase it.
 

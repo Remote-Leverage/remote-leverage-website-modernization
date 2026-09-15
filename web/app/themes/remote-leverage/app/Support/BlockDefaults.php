@@ -138,8 +138,17 @@ class BlockDefaults
             return $url;
         }
 
-        $webpPath = preg_replace('/\.'.preg_quote($ext, '/').'$/i', '.webp', $path);
-        $webpUrl = preg_replace('/\.'.preg_quote($ext, '/').'$/i', '.webp', $url);
+        // Two sources differing only by extension emit an appended webp name
+        // (Frame-76-5.jpg.webp) rather than a swapped one, because the swapped form would
+        // collide — see the hasStemCollision() note in vite/theme-images.js. Prefer the
+        // appended file when it exists so each source keeps its own conversion.
+        if (is_file($path.'.webp')) {
+            $webpPath = $path.'.webp';
+            $webpUrl = $url.'.webp';
+        } else {
+            $webpPath = preg_replace('/\.'.preg_quote($ext, '/').'$/i', '.webp', $path);
+            $webpUrl = preg_replace('/\.'.preg_quote($ext, '/').'$/i', '.webp', $url);
+        }
 
         // A zero-byte file means an earlier conversion failed part-way. Treat it as absent
         // and retry, otherwise every later request serves the broken empty image.
@@ -240,6 +249,15 @@ class BlockDefaults
         $parsedPath = parse_url($value, PHP_URL_PATH) ?? '';
         $ext = strtolower(pathinfo($parsedPath, PATHINFO_EXTENSION));
         if (! in_array($ext, ['webp', 'png', 'jpg', 'jpeg', 'svg', 'gif'], true)) {
+            return $value;
+        }
+
+        // Theme-hosted page art (public/images/**) has no media-library counterpart, so it
+        // must never be resolved through the attachment map. The map is keyed on basename
+        // alone, and filenames collide readily — an unrelated Frame-76.png in uploads was
+        // shadowing this page's Frame-76.png and serving a completely different picture,
+        // with nothing to indicate it had happened.
+        if (str_contains($parsedPath, '/themes/')) {
             return $value;
         }
 

@@ -121,7 +121,11 @@ class PartnerHeroBlock extends Block
     {
         $show = function_exists('get_field') ? get_field('show_talent') : null;
 
-        if ($show === false) {
+        // An unset field means "show" (the partner pages rely on that default), but any
+        // falsy value must hide the row. This was a strict `=== false`, which missed the
+        // string '0' that block `data` attributes carry — so a pattern asking for no talent
+        // row still got one, silently.
+        if ($show !== null && $show !== '' && ! filter_var($show, FILTER_VALIDATE_BOOLEAN)) {
             return '';
         }
 

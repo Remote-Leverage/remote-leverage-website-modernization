@@ -1,3 +1,22 @@
+> # ⚠️ ARCHIVED — do not use this for status
+>
+> Archived **2026-09-15**. This lived at the repository root. It was a hand-maintained percentage tracker and it drifted badly:
+> Phases 3–8 all read `0% Completed` while design tokens, Livewire, the 38-block library and the
+> Blade templates were essentially finished and CI was running. It also still listed *"Verify
+> Customer.io lead identification upon Gravity Forms submission"* — Gravity Forms was retired by
+> ADR-0008.
+>
+> Kept only for the Phase 8 launch targets it originated, which now live in
+> [`../performance-baseline.md`](../performance-baseline.md) alongside real measurements.
+>
+> **For current status, read:**
+> - [`../../../../../../PAGE-MIGRATION-STATUS.md`](../../../../../../PAGE-MIGRATION-STATUS.md) — migration scope and per-URL state
+> - [`../production-cutover.md`](../production-cutover.md) — the cutover gates
+> - the root `README.md` — workstream status
+>
+> A hand-maintained percentage drifts by default; the gate tables do not, because they are
+> derived from verifiable facts.
+
 # Remote Leverage Modernization Plan & Execution Tracker
 
 Phased execution roadmap for the **Remote Leverage Website Modernization** project based on the [Architecture Proposal & Strategic Roadmap](https://github.com/Remote-Leverage/remote-leverage-website-modernization).

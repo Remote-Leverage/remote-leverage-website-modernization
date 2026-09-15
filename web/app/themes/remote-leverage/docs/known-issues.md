@@ -150,11 +150,25 @@ Not fixed: the behaviour is load-bearing for pages whose media is genuinely in t
 knowing when a block renders an image you did not expect — check the rendered `src`, not the
 value you passed.
 
-### 7. Calendly webhook signatures are unverified
+### ~~7. Calendly webhook signatures are unverified~~ — ✅ **FIXED 2026-09-15** (both webhooks now fail closed)
 
-`config/services.php` reads `CALENDLY_WEBHOOK_SIGNING_KEY`, but the key is absent from `.env` and from `.env.example`. With no key configured, `/api/webhooks/calendly` accepts unsigned payloads — anyone who can reach the endpoint can flip a lead to `booked` or `canceled`.
+`/api/webhooks/calendly` had **no signature verification at all**, so anyone who could reach the endpoint could flip a lead to `booked` or `canceled`. `/api/webhooks/stripe` verified signatures but fell through to processing when `STRIPE_WEBHOOK_SECRET` was empty — legacy parity with `rl-elementor-blocks`, and fail-open.
 
-**Proposed fix:** set the key in every environment, and make `CalendlyWebhookController` reject requests when no signing key is configured rather than falling through to accept.
+Both now refuse rather than accept. Verification moved into one shared verifier, `App\Application\Http\Support\WebhookSignature`, since Calendly and Stripe sign identically — HMAC-SHA256 over `"{timestamp}.{raw body}"`, presented as `t=…,v1=…`, compared with `hash_equals`, rejecting anything more than 300 seconds old.
+
+| Condition | Before | After |
+| :--- | :--- | :--- |
+| No secret configured | Stripe: warn + process. Calendly: process | **503**, event not acted on |
+| Bad or missing signature | Stripe: 403. Calendly: process | **403**, event not acted on |
+| Replayed event outside 300s | Stripe: 403. Calendly: process | **403** |
+
+Note the verifier *also* returns an error for an empty secret, so a future caller that forgets the configuration guard still fails closed rather than comparing against an empty key.
+
+**Deployment consequence, and the reason this needs a human before it ships:** neither `STRIPE_WEBHOOK_SECRET` nor `CALENDLY_WEBHOOK_SIGNING_KEY` is currently set in any environment. Deploying this as-is takes both endpoints dark — Stripe Connect payout events and Calendly booking events will be refused, not processed. **Set both secrets in every environment before this reaches staging or production.** Stripe and Calendly both retry failed deliveries, so a short gap is recoverable; a long one loses events.
+
+**Regression guards:** `tests/Unit/WebhookSignatureTest.php` (7 tests — tamper, wrong key, replay, malformed header, empty secret) and `tests/Feature/WebhookFailClosedTest.php` (4 tests asserting a forged `payment_intent.succeeded` is rejected and a forged Calendly booking leaves the lead's status untouched). The existing webhook feature tests were converted to send properly signed JSON bodies via a `signedWebhookRequest()` helper in `tests/Pest.php` — they previously posted form parameters, which leaves the raw body empty and would have "verified" a signature over nothing.
+
+Unrelated bycatch, fixed in passing: the test suite's `log` stub implemented only `info`/`error`/`warning`/`debug`, so the first caller to use any other PSR-3 level failed with `undefined method` inside a facade rather than anywhere near the code under test. It now implements all of PSR-3.
 
 ### 8. Sentry is installed but silent
 
@@ -206,9 +220,18 @@ and treat a shared partial's optional keys as optional (`$x['k'] ?? []`). It is 
 easy to miss when several people work the same checkout, because the breakage appears on
 someone else's page.
 
-## Dead configuration
+## ~~Dead configuration~~ — ✅ **FIXED 2026-09-15**
 
-Eight keys sit in `.env` and are read by nothing. All eight are documented in the archived README's environment reference as though they were live, which is how they survived.
+Eight keys were listed here as read by nothing. **Seven were; the eighth was not.**
+`STRIPE_TEST_KEY` / `STRIPE_TEST_SECRET` went live when the embedded card checkout was
+ported from `rl-elementor-blocks` — `config/services.php` reads them as
+`stripe.test_publishable_key` / `stripe.test_secret_key`, and
+`StripePaymentIntentGateway` uses them whenever `STRIPE_TEST_MODE` is on.
+[configuration.md](configuration.md) had this right and this file did not. **They were
+kept.**
+
+The seven genuinely dead keys were deleted from `.env`, each verified unreferenced across
+`app/`, `config/`, `resources/`, `routes/` and the Bedrock `config/` first:
 
 | Key | Reality |
 | :--- | :--- |
@@ -217,28 +240,43 @@ Eight keys sit in `.env` and are read by nothing. All eight are documented in th
 | `BARBA_ENABLED` | No Barba.js anywhere |
 | `LOCOMOTIVE_ENABLED` | No Locomotive Scroll anywhere |
 | `PRISM_SERVER_ENABLED` | `PrismAiAuditor` does not read it |
-| `STRIPE_TEST_KEY`, `STRIPE_TEST_SECRET` | Test mode comes from using test values in `STRIPE_KEY`/`STRIPE_SECRET` |
 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | The code reads `GOOGLE_CALENDAR_CLIENT_ID`/`_SECRET` |
 
-Conversely, five keys the code *does* read appear in no `.env` and no `.env.example`:
+Conversely, six keys the code *does* read appeared in no `.env` and no `.env.example`:
+`HUBSPOT_ACCESS_TOKEN`, `HUBSPOT_PORTAL_ID`, `CALENDLY_WEBHOOK_SIGNING_KEY`,
+`CALENDLY_LIVE_CALL_EVENT_TYPE`, `LIVE_CALL_MEET_URL`, `STRATEGY_CONSULTANT_EMAIL`. All
+six were added, along with `SENTRY_LARAVEL_DSN` (issue 8 below, and a cutover gate).
 
-`HUBSPOT_ACCESS_TOKEN`, `HUBSPOT_PORTAL_ID`, `CALENDLY_WEBHOOK_SIGNING_KEY`, `CALENDLY_LIVE_CALL_EVENT_TYPE`, `LIVE_CALL_MEET_URL`, `STRATEGY_CONSULTANT_EMAIL`.
+HubSpot was the consequential one: with neither an environment token nor an
+admin-configured one, `HubSpotGateway` silently no-ops. A lead is captured, the audit log
+records the dispatch, and no CRM contact is ever created.
 
-HubSpot is the consequential one: with neither an environment token nor an admin-configured one, `HubSpotGateway` silently no-ops. A lead is captured, the audit log records the dispatch, and no CRM contact is ever created.
+`.env.example` was regenerated from [configuration.md](configuration.md): every key the
+code reads, grouped by domain, with a one-line note on what degrades when it is blank.
 
-**Proposed fix:** delete the eight dead keys from `.env`, and regenerate `.env.example` from [configuration.md](configuration.md) so every key the code reads is present and empty, grouped by domain, each with a one-line note on what degrades when it is blank.
+**One trap worth knowing, found while doing this.** `env('KEY', 'default')` does *not*
+fall back when the key is present but empty — Dotenv sets it to `''` and the default is
+lost. So `LIVE_CALL_MEET_URL=` would have blanked
+`LiveCallAvailabilityRouter::DEFAULT_MEET_URL`, and `STRATEGY_CONSULTANT_EMAIL=` would
+have blanked the `team@remoteleverage.com` attendee. Every key with a working code default
+is therefore **commented out** in both files rather than present and empty; only keys with
+no default are present and blank. Verified: `wp eval 'var_dump(env("LIVE_CALL_MEET_URL",
+"DEFAULT-KEPT"));'` returns `string(0) ""` when the key is present and empty.
+
+The Notion integration was deleted on 2026-09-15; `NOTION_API_KEY` /
+`NOTION_PARTNERS_DATABASE_ID` appear in neither file and should not return.
 
 ## Stale documentation
 
 The user's instinct that the old README was "just a proposal" was right, and the drift was not limited to it.
 
-### `plan.md` (repo root) — worst offender
+### ~~`plan.md` (repo root) — worst offender~~ — ✅ **ARCHIVED 2026-09-15**
 
 Phases 3–8 all read `0% Completed`. In reality Phase 3 (design tokens), Phase 4 (Livewire), Phase 5 (38 blocks) and Phase 6 (Blade templates) are essentially complete, and Phase 7 (testing/CI) is done bar visual regression. Anyone reading `plan.md` for status gets a badly wrong picture.
 
 Phase 7 also still lists *"Verify Customer.io lead identification upon Gravity Forms submission"* — Gravity Forms was retired by ADR-0008.
 
-**Proposed fix:** either update the percentages and drop the Gravity Forms line, or retire `plan.md` into `docs/archive/` and let the README's status section be the single source. Recommendation: archive it. A hand-maintained percentage tracker drifts by default; the README's gate table does not, because it is derived from verifiable facts.
+**Done:** archived to [`archive/plan-root.md`](archive/plan-root.md) with a banner pointing at the live sources of truth. A hand-maintained percentage tracker drifts by default; the gate tables do not, because they are derived from verifiable facts. The Phase 8 launch targets it originated were carried into [`performance-baseline.md`](performance-baseline.md), which now holds them alongside real measurements.
 
 ### ~~`PAGE-MIGRATION-STATUS.md` (repo root)~~ — **resolved 2026-09-14**
 
@@ -246,17 +284,13 @@ Was listing the four comparison pages and `/referral/` as "🔧 Needs migration"
 
 **Resolved by inverting the relationship rather than archiving the file.** `PAGE-MIGRATION-STATUS.md` was rewritten against the live database and is now the **source of truth for the 44-URL migration scope**; `content-migration-checklist.md` was demoted to a read-only production inventory. The "two overlapping trackers" liability is gone because they no longer track the same thing — one is scope, the other is what exists on production.
 
-### `docs/adr-status.md`
+### ~~`docs/adr-status.md`~~ — ✅ **FIXED 2026-09-15**
 
-WR-105 says *"No `.github/workflows` directory anywhere in the repo. Not being worked for now."* Both `ci.yml` and `deploy-staging.yml` now exist and run. WR-105 is done, not on hold.
-
-**Proposed fix:** mark WR-105 done with the workflow files as evidence, and re-verify the other "on hold" rows on the same pass.
+WR-105 said *"No `.github/workflows` directory anywhere in the repo."* Both `ci.yml` and `deploy-staging.yml` exist and run; the row is now marked **Done** with the workflow files as evidence. The other "on hold" rows were left as they are — they were not re-verified on this pass, so treat them as unaudited rather than confirmed.
 
 ### `docs/content-migration-checklist.md`
 
-Refers to `App\Support\LegalDocument` with 9 Pest tests. The class is `App\Support\DocumentOutline` (renamed, tests in `tests/Unit/DocumentOutlineTest.php`).
-
-**Proposed fix:** one-line correction. Low value now — the document was demoted to a read-only production inventory on 2026-09-14 and no longer drives work.
+~~Refers to `App\Support\LegalDocument` with 9 Pest tests.~~ ✅ **Corrected 2026-09-15** to `App\Support\DocumentOutline` (`tests/Unit/DocumentOutlineTest.php`).
 
 **Separately, scope closure changed what this file is.** It was written as a "migrate everything" audit of 235 production pages; 191 of those are now discarded. A banner marks every unticked box void and flags §§2, 3, 4, 5, 7 as out of scope. Anyone reading it for work items will otherwise be badly misled.
 
@@ -288,11 +322,15 @@ No listener implements `ShouldQueue` and no queue worker is deployed (WR-106, on
 
 **Proposal:** before cutover, measure the p95 of `CaptureLeadAction` end to end with all integrations live. If it exceeds ~800ms, provisioning a queue worker becomes a launch blocker rather than a deferred nicety.
 
-### Livewire components are registered under two names each
+### ~~Livewire components are registered under two names each~~ — ✅ **FIXED 2026-09-15**
 
-`LivewireServiceProvider` registers all seven components twice — `booking.multistep-booking-wizard` and `multistep-booking-wizard`, and so on. That is presumably backwards compatibility for existing templates, but it means there is no single canonical name, and a grep for usage misses half the call sites.
+`LivewireServiceProvider` registered all seven components twice — `booking.multistep-booking-wizard` and `multistep-booking-wizard`, and so on — so there was no canonical name and a grep for usage found only half the call sites.
 
-**Proposal:** pick the namespaced form as canonical, migrate the templates, and drop the bare aliases.
+The namespaced form is now canonical and the only one registered. **No migration was needed:** every call site already used the namespaced form. A grep over Blade views, `patterns/`, `resources/patterns/`, PHP, JS and `wp_posts.post_content` found zero references to any bare alias, so all seven were removed outright.
+
+**Regression guard:** `tests/Unit/LivewireComponentNamesTest.php` — every registered name must be namespaced and unique, and every `<livewire:…>` tag in the theme must resolve to a registered name (the failure message names the offending template).
+
+**Verified:** `/hire-va-4/`, `/partners/`, `/tools/signature-generator` and `/referrer-register/` all still return 200 with a hydrated `wire:snapshot` island.
 
 ### The documentation tree is split across two directories
 
@@ -302,12 +340,12 @@ Merging them was deliberately **not** done in this pass: about ten source files 
 
 **Proposal:** if this is worth tidying, move `doc/adr/` → `web/app/themes/remote-leverage/docs/adr/` (the smaller move, and ADRs have no inbound code references), rather than moving the larger tree.
 
-### `web/app/themes/remote-leverage/plan.md` is a second stale plan
+### ~~`web/app/themes/remote-leverage/plan.md` is a second stale plan~~ — ✅ **ARCHIVED 2026-09-15**
 
-The theme carries its own `plan.md` alongside the root one. Same drift problem, doubled.
+The theme carried its own near-duplicate `plan.md` alongside the root one — same drift, doubled. Both are now in `docs/archive/` (`plan-root.md`, `plan-theme.md`).
 
-**Proposal:** archive both.
+### ~~A stray SQL file sits in the theme root~~ — ✅ **RESOLVED 2026-09-15**
 
-### A stray SQL file sits in the theme root
+`remoteleveragev2-2026-09-14-a2d62b7.sql` — zero bytes, presumably an interrupted `wp db export`. It is correctly gitignored (`*.sql`, theme `.gitignore:7`), so this was housekeeping rather than a repository problem.
 
-`remoteleveragev2-2026-09-14-a2d62b7.sql` — zero bytes, presumably an interrupted `wp db export`. It is correctly gitignored (`*.sql`, theme `.gitignore:7`), so this is housekeeping rather than a repository problem — just delete it.
+Gone as of 2026-09-15: `find . -iname '*.sql'` across the whole checkout (outside `vendor/` and `node_modules/`) returns nothing.

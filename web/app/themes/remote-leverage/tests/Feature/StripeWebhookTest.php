@@ -5,12 +5,13 @@ declare(strict_types=1);
 use App\Application\Http\Controllers\StripeWebhookController;
 use App\Domains\Referral\Models\Payout;
 use App\Domains\Referral\Models\Referrer;
-use Illuminate\Http\Request;
 
 describe('StripeWebhookController', function () {
     beforeEach(function () {
         Referrer::truncate();
         Payout::truncate();
+
+        config(['services.stripe.webhook_secret' => 'whsec_test_secret']);
     });
 
     test('account.updated enables referrer when payouts_enabled is true', function () {
@@ -34,7 +35,7 @@ describe('StripeWebhookController', function () {
             ],
         ];
 
-        $request = Request::create('/api/webhooks/stripe', 'POST', $payload);
+        $request = signedWebhookRequest('/api/webhooks/stripe', $payload, 'whsec_test_secret', 'Stripe-Signature');
         $response = $controller->handle($request);
 
         expect($response->getStatusCode())->toBe(200);
@@ -65,7 +66,7 @@ describe('StripeWebhookController', function () {
             ],
         ];
 
-        $request = Request::create('/api/webhooks/stripe', 'POST', $payload);
+        $request = signedWebhookRequest('/api/webhooks/stripe', $payload, 'whsec_test_secret', 'Stripe-Signature');
         $response = $controller->handle($request);
 
         expect($response->getStatusCode())->toBe(200);
@@ -100,7 +101,7 @@ describe('StripeWebhookController', function () {
             ],
         ];
 
-        $request = Request::create('/api/webhooks/stripe', 'POST', $payload);
+        $request = signedWebhookRequest('/api/webhooks/stripe', $payload, 'whsec_test_secret', 'Stripe-Signature');
         $response = $controller->handle($request);
 
         expect($response->getStatusCode())->toBe(200);
@@ -136,7 +137,7 @@ describe('StripeWebhookController', function () {
             ],
         ];
 
-        $request = Request::create('/api/webhooks/stripe', 'POST', $payload);
+        $request = signedWebhookRequest('/api/webhooks/stripe', $payload, 'whsec_test_secret', 'Stripe-Signature');
         $response = $controller->handle($request);
 
         expect($response->getStatusCode())->toBe(200);
@@ -154,7 +155,7 @@ describe('StripeWebhookController', function () {
             'data' => ['object' => ['id' => 'ch_123']],
         ];
 
-        $request = Request::create('/api/webhooks/stripe', 'POST', $payload);
+        $request = signedWebhookRequest('/api/webhooks/stripe', $payload, 'whsec_test_secret', 'Stripe-Signature');
         $response = $controller->handle($request);
 
         expect($response->getStatusCode())->toBe(200);

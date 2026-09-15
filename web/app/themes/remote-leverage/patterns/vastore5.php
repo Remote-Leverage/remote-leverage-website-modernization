@@ -10,36 +10,66 @@ use App\Support\BlockDefaults;
  *   marketing landing page: probing/discovery scripts, the one-time and bundle pricing
  *   breakdowns, deposit payment routes and objection handling. Production serves it
  *   noindex,nofollow.
+ *
+ *   2026-09-15: visual parity with production was deliberately dropped at the client's request
+ *   ("the original design looked hideous"). Production remains the CONTENT and BEHAVIOUR spec —
+ *   every price, word and interaction is unchanged — but the presentation is rebuilt on this
+ *   theme's tokens. See the @bespoke note below for the block-reuse ladder that was re-walked
+ *   under the new, parity-free constraints.
  */
 
 /*
- * @bespoke: every section below is hand-written because no shipped block renders it, and the
- * one near-miss cannot be reused without editing a shared file this agent may not touch.
+ * @bespoke: the shipped blocks were re-checked against the redesign (not against production's
+ * Elementor layout), because with parity dropped a block that was the wrong *shape* before could
+ * now be the right answer. Each one below was ruled out on a concrete, reproducible defect rather
+ * than "it looks different".
  *
- *   Hourly-rate + bundle price rows  - checked acf/data-table (a feature/tick-cross matrix,
- *       not label-to-price rows), acf/cost-comparison (two side-by-side light tables with
- *       coloured header bars; production is one 700px centred column of blue price chips on a
- *       #6200A4 band), acf/roles-pricing-grid (per-role photo cards with tasks/tools).
- *   Recruitment pricing card         - checked acf/media-copy (image beside text, pale band,
- *       black pill CTA; production is image-on-top inside one white 800px card on purple with
- *       a full-width orange button), acf/guarantee-card, acf/image-card-grid,
- *       acf/split-compare-cards (all multi-card grids).
- *   Objections accordion             - checked acf/accordion-faq. It is the right component but
- *       renders two balanced columns and emits Schema.org FAQPage markup; production is a
- *       single full-width column, and FAQPage structured data does not belong on internal
- *       sales collateral. Fixing that means adding a `columns` + `schema` option to the block,
- *       which is out of scope for this agent (see report).
+ *   Objections accordion  - acf/accordion-faq is the closest component and was the strongest
+ *       candidate. Three blocking defects, all in resources/views/blocks/accordion-faq.blade.php,
+ *       none fixable without editing a shared block this agent may not touch:
+ *         (a) it hard-splits the rows into two balanced columns (`faqsLeft`/`faqsRight` in
+ *             AccordionFaqBlock::with()). A rep works down 13 objections live on a call; a
+ *             zig-zag two-column scan is the wrong reading order for that.
+ *         (b) AccordionFaqBlock::generateSchemaJson() always emits Schema.org FAQPage
+ *             structured data. This page is internal collateral served noindex,nofollow —
+ *             publishing customer-facing FAQ markup from it is wrong regardless of indexing.
+ *         (c) the answer slot is `text-[15px] leading-relaxed` with no list styling, and the
+ *             theme has no global `ul{list-style}` rule (Tailwind preflight strips markers;
+ *             only .rl-legal-doc re-adds them). Three of the 13 objection bodies carry <ul>/<ol>
+ *             ("Interviewing other companies", "I need to talk to partner/team", "I don't want
+ *             to pay upfront") and would silently lose their bullets and their 1-4 numbering.
+ *   Hourly-rate + bundle price rows
+ *                         - acf/data-table hard-renders a red cross and a green tick on every
+ *       row (it is a feature matrix, not a price list) — "$6/hr ✗ ... $4992 ✓" is nonsense.
+ *       acf/cost-comparison is label/value rows, which fits, but it is locked to two side-by-side
+ *       tables with a single shared CTA and fixed red/green header bars, while this page needs two
+ *       separately-captioned tables with two different JotForm links; its value type is 17px,
+ *       which is too light for the numbers that are the point of the section.
+ *       acf/roles-pricing-grid is per-role photo cards with tasks/tools.
+ *   Recruitment pricing card
+ *                         - acf/media-copy is exactly the image + heading + rich copy + CTA
+ *       shape and was adopted on paper, then rejected: its body slot is hard-coded
+ *       `text-card text-black`, so `tone: dark` renders black body copy on the #25104A band and
+ *       is unusable, and the block is a full-width <section>, not a card that can sit inside the
+ *       pricing band. acf/guarantee-card, acf/image-card-grid and acf/split-compare-cards are all
+ *       multi-card grids with no single-card mode.
+ *   Discovery / cannot-hire lists
+ *                         - acf/feature-cards is the theme's card grid and renders a bare <div>
+ *       (the caller supplies the container), so it drops in cleanly. Ruled out because every card
+ *       emits its description paragraph unconditionally: these sections are titles with no body,
+ *       so the grid would ship 7 (and 8) empty <p> elements, and the card title style
+ *       (22px bold) is wrong for a 45-word rule such as the "very different job categories" one.
  *   Probing / deposit tab cards, role directory, call timer, JD generator
- *                                    - interactive one-off sales tools; nothing comparable in
+ *                         - interactive one-off sales tools; nothing comparable in
  *       docs/block-inventory.md.
- *   Calendly embed                   - checked acf/booking and acf/vacalendar-hero. Both render
- *       the Livewire booking wizard, not Calendly, and vacalendar-hero hard-codes a #250D4A
- *       band plus an h1. Swapping the scheduler would be a redesign.
+ *   Calendly embed        - acf/booking and acf/vacalendar-hero both render the Livewire booking
+ *       wizard, not Calendly. Swapping the scheduler changes behaviour, which is out of scope.
  *
- * Production's own CSS is reproduced as a scoped stylesheet rather than Tailwind utilities:
- * the section is dense with exact Elementor values (#6200A4 bands, #4AB8F8 chips, 28/35/36px
- * headings) and it has to survive Tailwind preflight, which strips list markers from every
- * <ul>/<ol> on the page.
+ * The page therefore keeps one scoped stylesheet, but it is now built from the theme's own
+ * `@theme` custom properties (--color-brand-*, --radius-card, --shadow-card, --font-sans,
+ * --width-container), which Tailwind emits to :root under `theme(static)`. Scoped CSS rather than
+ * utilities because this page must re-add list markers that Tailwind preflight strips, and
+ * because the tab/accordion/dropdown state selectors have no utility equivalent.
  */
 
 $img = BlockDefaults::preferWebp(BlockDefaults::pageImg('vastore5', 'qtq80-BFjDqk-1024x683.jpeg'));
@@ -52,11 +82,13 @@ $rateRows = [
     ['$10/hr', '$8320'],
 ];
 
+/* [label, headline figure, per-VA note] — split only so the figure can carry the type weight.
+   Both spans stay inline, so the rendered line is still "$12,000 ($4k Per VA)". */
 $bundleRows = [
-    ['3 VAs:', '$12,000 ($4k Per VA)'],
-    ['5 VAs:', '$17,500 ($3.5k Per VA)'],
-    ['7 VAs:', '$23,000 ($3.28k Per VA)'],
-    ['10 VAs:', '$30,000 ($3k Per VA)'],
+    ['3 VAs:', '$12,000', '($4k Per VA)'],
+    ['5 VAs:', '$17,500', '($3.5k Per VA)'],
+    ['7 VAs:', '$23,000', '($3.28k Per VA)'],
+    ['10 VAs:', '$30,000', '($3k Per VA)'],
 ];
 
 $probing = [
@@ -379,215 +411,448 @@ $roleCategories = [
     ],
 ];
 
-$iconPlus = '<svg class="v5-acc__icon" viewBox="0 0 448 512" aria-hidden="true"><path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"/></svg>';
-$iconMinus = '<svg class="v5-acc__icon" viewBox="0 0 448 512" aria-hidden="true"><path d="M416 208H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h384c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"/></svg>';
+$iconPlus = '<svg class="v5-acc__icon v5-acc__icon--plus" viewBox="0 0 448 512" aria-hidden="true"><path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"/></svg>';
+$iconMinus = '<svg class="v5-acc__icon v5-acc__icon--minus" viewBox="0 0 448 512" aria-hidden="true"><path d="M416 208H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h384c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"/></svg>';
+
+/* Jump-nav targets. Labels are the sections' own headings verbatim; "Roles" is the one
+   coined label, because the role catalogue carries no heading of its own. */
+$navItems = [
+    ['v5-s-probing', 'Probing Questions'],
+    ['v5-s-discovery', 'Discovery'],
+    ['v5-s-presentation', 'Presentation'],
+    ['v5-s-pricing', 'Pricing'],
+    ['v5-s-booking', 'Deposit &amp; Payment Options'],
+    ['v5-s-bundles', 'Bundle Pricing Packages'],
+    ['v5-s-objections', 'Objections'],
+    ['v5-s-roles', 'Roles'],
+];
 
 ?>
 <!-- rl:noindex — internal sales collateral. App\Support\PageRobots reads this marker and
      emits noindex, nofollow, matching production. The page stays published and reachable;
      this keeps it out of search results only, it is NOT access control. -->
 <!-- wp:html -->
-<section class="vastore5 v5-band v5-tools" style="padding:10px 0">
-    <style>
-    /* ------------------------------------------------------------------
-       /vastore5/ — scoped reproduction of production's computed styles.
-       Every value here was read off https://remoteleverage.com/vastore5/
-       with getComputedStyle at 1440px, not estimated.
-       ------------------------------------------------------------------ */
-    .vastore5 {
-        --v5-purple: #6200A4;
-        --v5-chip: #4AB8F8;
-        --v5-orange: #FB7501;
-        --v5-card-ink: #342567;
-        --v5-blue: #007BFF;
-        --v5-amber: #F59E0B;
-        --v5-violet: #6D28D9;
-        color: #333;
-        font-size: 16px;
-        line-height: 1.5;
-        font-family: "Inter Variable", "Inter", system-ui, -apple-system, Helvetica, Arial, sans-serif;
+<style>
+/* ------------------------------------------------------------------------------
+   /vastore5/ — internal sales playbook.
+   Built from the theme's own @theme custom properties (Tailwind emits them to
+   :root under `theme(static)`), so this page shares the sitewide palette, radii,
+   shadows and type face. Fallback literals are the token values, so the page
+   still renders correctly if it is ever viewed without app.css.
+   ------------------------------------------------------------------------------ */
+.vastore5 {
+    --v5-ink: var(--color-brand-midnight, #18112C);
+    --v5-body: #4A4560;
+    --v5-muted: #6F6B85;
+    --v5-line: rgba(24, 17, 44, .10);
+    --v5-purple: var(--color-brand-purple, #8A2BE2);
+    --v5-deep: var(--color-brand-purple-deep, #6200A4);
+    --v5-violet: var(--color-brand-dark-violet, #25104A);
+    --v5-orange: var(--color-brand-orange, #FB7501);
+    --v5-alert: var(--color-status-alert, #D94900);
+    --v5-ground: var(--color-bg-light, #F4F6FC);
+    --v5-r: var(--radius-card, 16px);
+    --v5-r-sm: 12px;
+    --v5-pill: var(--radius-pill, 100px);
+    --v5-shadow: 0 6px 24px rgba(24, 17, 44, .06);
+    --v5-shadow-lg: 0 24px 60px rgba(24, 17, 44, .13);
+
+    font-family: var(--font-sans, "Inter Variable", "Inter", system-ui, -apple-system, sans-serif);
+    color: var(--v5-body);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+}
+.vastore5 *, .vastore5 *::before, .vastore5 *::after { box-sizing: border-box; }
+.vastore5 h2, .vastore5 h3, .vastore5 h4 { margin: 0; font-weight: 700; color: var(--v5-ink); letter-spacing: -.02em; }
+.vastore5 p { margin: 0 0 14px; }
+.vastore5 p:last-child { margin-bottom: 0; }
+.vastore5 a { color: var(--v5-purple); }
+.vastore5 strong, .vastore5 b { font-weight: 700; }
+.vastore5 em { font-style: italic; }
+
+.vastore5 .v5-inner { width: 100%; max-width: var(--width-container, 1380px); margin-inline: auto;
+    padding-inline: clamp(16px, 3vw, 32px); }
+.vastore5 .v5-section { padding-block: clamp(32px, 3.4vw, 56px); }
+.vastore5 .v5-section--tight { padding-block: clamp(20px, 2.4vw, 32px); }
+.vastore5 [id^="v5-s-"] { scroll-margin-top: calc(var(--v5-navtop, 80px) + 72px); }
+
+/* bands */
+.vastore5.v5-band { background: transparent; }
+.vastore5.v5-band--white { background: #fff; }
+.vastore5.v5-band--deep {
+    background:
+        radial-gradient(1100px 520px at 12% -10%, rgba(138, 43, 226, .55) 0%, rgba(138, 43, 226, 0) 62%),
+        linear-gradient(158deg, var(--v5-violet) 0%, var(--v5-deep) 100%);
+    color: rgba(255, 255, 255, .84);
+}
+/* Only the band's own furniture turns white — anything inside a white card on the band
+   (the recruitment price card, the deposit tab card) keeps the light-surface ink. */
+.vastore5.v5-band--deep > .v5-inner > .v5-head h2,
+.vastore5.v5-band--deep > .v5-inner > .v5-bundle-intro { color: #fff; }
+
+/* section headings */
+.vastore5 .v5-head { margin: 0 0 clamp(20px, 2vw, 30px); }
+.vastore5 .v5-head h2 { font-size: clamp(25px, 2.5vw, 34px); line-height: 1.14; }
+.vastore5 .v5-head--center { text-align: center; max-width: 860px; margin-inline: auto; }
+
+/* generic card */
+.vastore5 .v5-card { background: #fff; border: 1px solid var(--v5-line); border-radius: var(--v5-r);
+    box-shadow: var(--v5-shadow); color: var(--v5-body); }
+.vastore5 .v5-card--pad { padding: clamp(22px, 2.4vw, 36px); }
+
+/* ---------------------------------------------------------------- jump nav -- */
+.vastore5.v5-nav { position: sticky; top: var(--v5-navtop, 80px); z-index: 30;
+    background: color-mix(in srgb, var(--v5-ground) 88%, transparent);
+    -webkit-backdrop-filter: blur(12px) saturate(150%); backdrop-filter: blur(12px) saturate(150%);
+    border-bottom: 1px solid var(--v5-line); }
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+    .vastore5.v5-nav { background: rgba(244, 246, 252, .92); }
+}
+.vastore5 .v5-nav__inner { display: flex; align-items: center; gap: 4px; overflow-x: auto;
+    scrollbar-width: none; padding-block: 10px; }
+.vastore5 .v5-nav__inner::-webkit-scrollbar { display: none; }
+.vastore5 .v5-nav__inner a { flex: none; font-size: 13.5px; font-weight: 600; line-height: 1;
+    color: var(--v5-muted); text-decoration: none; padding: 9px 14px; border-radius: var(--v5-pill);
+    white-space: nowrap; transition: background-color .15s ease, color .15s ease; }
+.vastore5 .v5-nav__inner a:hover { background: rgba(138, 43, 226, .09); color: var(--v5-deep); }
+.vastore5 .v5-nav__inner a.is-current { background: var(--v5-purple); color: #fff; }
+
+/* ------------------------------------------------------------------- tools -- */
+.vastore5 .v5-tools { max-width: 760px; margin-inline: auto; }
+
+/* --------------------------------------------------- tabbed question cards -- */
+.vastore5 .v5-tabcard { overflow: hidden; max-width: 1100px; margin-inline: auto; }
+.vastore5 .v5-tabcard__head { padding: clamp(20px, 2vw, 26px) clamp(20px, 2.2vw, 30px) 0; }
+.vastore5 .v5-tabcard__head h2 { font-size: 21px; line-height: 1.2; }
+.vastore5 .v5-tabcard__tabs { display: flex; flex-wrap: wrap; gap: 5px; padding: 5px;
+    margin: 16px clamp(20px, 2.2vw, 30px) 0; background: var(--v5-ground); border-radius: var(--v5-pill); }
+.vastore5 .v5-tabcard__tabs button { flex: 1 1 140px; min-width: 0; appearance: none; border: 0;
+    background: transparent; color: var(--v5-ink); font: inherit; font-size: 13.5px; font-weight: 600;
+    line-height: 1.25; padding: 11px 12px; border-radius: var(--v5-pill); cursor: pointer;
+    transition: background-color .15s ease, color .15s ease, box-shadow .15s ease; }
+.vastore5 .v5-tabcard__tabs button:hover { background: rgba(24, 17, 44, .05); }
+.vastore5 .v5-tabcard__tabs button.is-active { background: var(--v5-purple); color: #fff;
+    box-shadow: 0 4px 14px rgba(138, 43, 226, .3); }
+.vastore5 .v5-subtabs { display: inline-flex; gap: 4px; padding: 4px; margin: 10px clamp(20px, 2.2vw, 30px) 0;
+    background: var(--v5-ground); border-radius: var(--v5-pill); }
+.vastore5 .v5-subtabs button { appearance: none; border: 0; background: transparent; color: var(--v5-muted);
+    font: inherit; font-size: 12.5px; font-weight: 600; line-height: 1; padding: 9px 20px;
+    border-radius: var(--v5-pill); cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+.vastore5 .v5-subtabs button:hover { color: var(--v5-ink); }
+.vastore5 .v5-subtabs button.is-active { background: var(--v5-violet); color: #fff; }
+.vastore5 .v5-tabcard__body { padding: 18px clamp(20px, 2.2vw, 30px) clamp(22px, 2.2vw, 30px); }
+/* Production copy — styled as a label, but never case-transformed. */
+.vastore5 .v5-tabcard__body h4 { font-size: 13.5px; font-weight: 700; letter-spacing: .01em;
+    color: var(--v5-deep); margin: 24px 0 10px; padding-bottom: 8px;
+    border-bottom: 1px solid rgba(138, 43, 226, .16); }
+.vastore5 .v5-tabcard__body h4:first-child { margin-top: 4px; }
+.vastore5 .v5-tabcard__body ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.vastore5 .v5-tabcard__body li { position: relative; padding-left: 20px; font-size: 15.5px;
+    line-height: 1.55; color: var(--v5-body); }
+.vastore5 .v5-tabcard__body li::before { content: ""; position: absolute; left: 3px; top: 10px;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--v5-purple); opacity: .5; }
+.vastore5 .v5-tabcard__body a { color: var(--v5-deep); font-weight: 600; text-decoration: underline;
+    text-underline-offset: 2px; word-break: break-word; }
+
+/* ----------------------------------------------------------- discovery grid -- */
+.vastore5 .v5-qgrid { list-style: none; margin: 0; padding: 0; counter-reset: v5q;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.vastore5 .v5-qgrid li { counter-increment: v5q; position: relative; background: #fff;
+    border: 1px solid var(--v5-line); border-radius: var(--v5-r-sm); box-shadow: var(--v5-shadow);
+    padding: 18px 22px 18px 60px; font-size: 16px; line-height: 1.45; color: var(--v5-ink); }
+.vastore5 .v5-qgrid li::before { content: counter(v5q); position: absolute; left: 18px; top: 16px;
+    width: 28px; height: 28px; border-radius: 50%; background: rgba(138, 43, 226, .1);
+    color: var(--v5-purple); font-size: 12.5px; font-weight: 700; line-height: 28px; text-align: center; }
+.vastore5 .v5-qgrid li strong { font-weight: 600; }
+
+/* ------------------------------------------------------------ long-form prose -- */
+.vastore5 .v5-prose { font-size: 16px; line-height: 1.7; color: var(--v5-body); }
+.vastore5 .v5-prose > ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 13px; }
+.vastore5 .v5-prose > ul > li { position: relative; padding-left: 26px; }
+.vastore5 .v5-prose > ul > li::before { content: ""; position: absolute; left: 6px; top: 11px;
+    width: 7px; height: 7px; border-radius: 50%; background: var(--v5-purple); }
+.vastore5 .v5-prose ul ul { list-style: none; margin: 12px 0 0; padding: 0 0 0 20px; display: grid; gap: 9px;
+    border-left: 2px solid rgba(138, 43, 226, .2); }
+.vastore5 .v5-prose ul ul li { position: relative; padding-left: 18px; font-size: 15px; color: var(--v5-muted); }
+.vastore5 .v5-prose ul ul li::before { content: ""; position: absolute; left: 0; top: 10px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--v5-purple); opacity: .45; }
+.vastore5 .v5-callout { margin-top: 26px; border-left: 4px solid var(--v5-purple); border-radius: var(--v5-r-sm);
+    background: linear-gradient(90deg, rgba(138, 43, 226, .11), rgba(138, 43, 226, 0));
+    padding: 16px 20px; font-size: 17px; font-weight: 700; color: var(--v5-ink); }
+
+/* ------------------------------------------------------- cannot-hire-for list -- */
+.vastore5 .v5-warn { border-left: 5px solid var(--v5-alert); }
+.vastore5 .v5-warn__title { display: flex; align-items: flex-start; gap: 11px; margin: 0 0 20px;
+    font-size: 17px; font-weight: 700; font-style: italic; color: var(--v5-alert); }
+.vastore5 .v5-warn__title svg { width: 21px; height: 21px; flex: none; margin-top: 2px; fill: var(--v5-alert); }
+.vastore5 .v5-warn ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.vastore5 .v5-warn li { position: relative; padding: 14px 16px 14px 42px; background: #FFF8F4;
+    border: 1px solid rgba(217, 73, 0, .16); border-radius: var(--v5-r-sm); font-size: 15px;
+    line-height: 1.55; color: var(--v5-body); }
+.vastore5 .v5-warn li::before { content: "\2715"; position: absolute; left: 17px; top: 13px;
+    font-size: 12px; font-weight: 700; color: var(--v5-alert); }
+.vastore5 .v5-warn .v5-small { font-size: 14px; color: var(--v5-muted); }
+
+/* --------------------------------------------------------------- rate table -- */
+.vastore5 .v5-glass { background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .17);
+    border-radius: var(--v5-r); }
+.vastore5 .v5-rates { max-width: 840px; margin-inline: auto; padding: 8px clamp(18px, 2.5vw, 34px); }
+.vastore5 .v5-rate { display: grid; grid-template-columns: 130px minmax(0, 1fr) 160px; align-items: center;
+    gap: 18px; padding: 18px 0; border-bottom: 1px solid rgba(255, 255, 255, .13); }
+.vastore5 .v5-rate:last-child { border-bottom: 0; }
+.vastore5 .v5-rate__label { font-size: 23px; font-weight: 600; letter-spacing: -.01em;
+    color: rgba(255, 255, 255, .78); font-variant-numeric: tabular-nums; }
+.vastore5 .v5-rate__lead { overflow: hidden; white-space: nowrap; text-align: center; font-size: 13px;
+    letter-spacing: 4px; color: rgba(255, 255, 255, .22); }
+.vastore5 .v5-rate__value { text-align: right; font-size: 32px; line-height: 1.1; font-weight: 700;
+    letter-spacing: -.025em; color: #fff; font-variant-numeric: tabular-nums; }
+.vastore5 .v5-note-pill { display: block; width: fit-content; margin: 22px auto 0; padding: 11px 24px;
+    border-radius: var(--v5-pill); background: rgba(255, 255, 255, .12);
+    border: 1px solid rgba(255, 255, 255, .2); font-size: 15px; font-weight: 600; color: #fff; }
+
+/* --------------------------------------------------------- bundle price grid -- */
+.vastore5 .v5-bundle-intro { max-width: 900px; margin: 0 auto clamp(24px, 2.6vw, 36px); text-align: center;
+    font-size: 16px; line-height: 1.65; font-weight: 400; color: rgba(255, 255, 255, .8); }
+.vastore5 .v5-bundles { max-width: 1180px; margin-inline: auto; display: grid; gap: 14px;
+    grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.vastore5 .v5-bundle { padding: 24px 22px; }
+.vastore5 .v5-bundle__label { font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, .62); }
+.vastore5 .v5-bundle__value { margin-top: 8px; font-size: 14px; color: rgba(255, 255, 255, .62); }
+.vastore5 .v5-bundle__value strong { font-size: 31px; font-weight: 700; letter-spacing: -.025em;
+    color: #fff; font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------ recruitment price card -- */
+.vastore5 .v5-pricecard { max-width: 1000px; margin-inline: auto; background: #fff;
+    border-radius: var(--v5-r); box-shadow: var(--v5-shadow-lg); overflow: hidden; color: var(--v5-body); }
+.vastore5 .v5-pricecard__head { padding: clamp(24px, 2.6vw, 34px) clamp(24px, 2.6vw, 36px) 0; }
+.vastore5 .v5-pricecard__title { font-size: clamp(22px, 2.1vw, 28px); line-height: 1.2; }
+.vastore5 .v5-pricecard__grid { display: grid; grid-template-columns: 380px minmax(0, 1fr);
+    gap: clamp(20px, 2.6vw, 34px); padding: clamp(20px, 2.2vw, 28px) clamp(24px, 2.6vw, 36px) clamp(24px, 2.6vw, 36px);
+    align-items: start; }
+.vastore5 .v5-pricecard__media img { display: block; width: 100%; height: 300px; object-fit: cover;
+    border-radius: var(--v5-r-sm); }
+.vastore5 .v5-pricecard__sub { font-size: clamp(18px, 1.6vw, 21px); line-height: 1.3; color: var(--v5-deep);
+    background: linear-gradient(90deg, rgba(138, 43, 226, .12), rgba(138, 43, 226, .02));
+    border-left: 4px solid var(--v5-purple); border-radius: var(--v5-r-sm); padding: 15px 18px; margin-bottom: 20px; }
+.vastore5 .v5-facts { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 9px; }
+.vastore5 .v5-facts li { position: relative; padding-left: 26px; font-size: 15px; line-height: 1.55; }
+.vastore5 .v5-facts li::before { content: ""; position: absolute; left: 0; top: 4px; width: 16px; height: 16px;
+    border-radius: 50%; background: rgba(138, 43, 226, .12); }
+.vastore5 .v5-facts li::after { content: ""; position: absolute; left: 5px; top: 8px; width: 6px; height: 3px;
+    border-left: 2px solid var(--v5-purple); border-bottom: 2px solid var(--v5-purple); transform: rotate(-45deg); }
+.vastore5 .v5-pricecard__note { border-top: 1px dashed var(--v5-line); padding-top: 16px; margin-bottom: 22px;
+    font-size: 14px; line-height: 1.6; color: var(--v5-muted); }
+.vastore5 .v5-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    background: var(--v5-orange); color: #fff; font-size: 17px; font-weight: 700; line-height: 1.2;
+    padding: 16px 34px; border-radius: var(--v5-pill); text-decoration: none;
+    box-shadow: 0 10px 24px rgba(251, 117, 1, .3);
+    transition: transform .15s ease, box-shadow .15s ease, background-color .15s ease; }
+.vastore5 .v5-btn:hover { background: #E56A00; transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(251, 117, 1, .38); }
+.vastore5 .v5-btn--block { display: flex; width: 100%; }
+.vastore5 .v5-btn-row { display: flex; justify-content: center; margin-top: clamp(24px, 2.6vw, 34px); }
+
+/* ------------------------------------------------------- calendly + failsafe -- */
+.vastore5 .v5-calwrap { max-width: 1180px; margin-inline: auto; background: #fff; border-radius: var(--v5-r);
+    overflow: hidden; box-shadow: var(--v5-shadow-lg); }
+.vastore5 .v5-calwrap .calendly-inline-widget { min-width: 320px; height: 700px; }
+.vastore5 .v5-failsafe { max-width: 760px; margin: 20px auto 0; text-align: center; }
+.vastore5 .v5-failsafe__toggle { cursor: pointer; background: rgba(255, 255, 255, .12);
+    border: 1px solid rgba(255, 255, 255, .28); color: #fff; border-radius: var(--v5-pill);
+    padding: 12px 26px; font: inherit; font-size: 15px; font-weight: 600;
+    transition: background-color .15s ease; }
+.vastore5 .v5-failsafe__toggle:hover { background: rgba(255, 255, 255, .2); }
+.vastore5 .v5-failsafe__panel { display: none; margin-top: 14px; }
+.vastore5 .v5-failsafe__panel.is-open { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.vastore5 .v5-failsafe__btn { display: inline-block; padding: 12px 24px; background: #fff;
+    color: var(--v5-deep); border-radius: var(--v5-pill); font-size: 15px; font-weight: 700;
+    text-decoration: none; transition: transform .15s ease; }
+.vastore5 .v5-failsafe__btn:hover { transform: translateY(-1px); }
+
+/* -------------------------------------------------------------- objections -- */
+.vastore5 .v5-obj { max-width: 1040px; margin-inline: auto; }
+.vastore5 .v5-obj__intro { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px; margin-bottom: clamp(24px, 2.6vw, 34px); align-items: start; }
+.vastore5 .v5-obj__panel { padding: clamp(20px, 2.2vw, 28px); }
+.vastore5 .v5-obj__lead { font-size: 15px; font-weight: 700; color: var(--v5-ink); margin: 0 0 14px; }
+.vastore5 .v5-obj__steps { display: grid; gap: 10px; }
+.vastore5 .v5-obj__steps p { margin: 0; padding: 12px 15px; background: var(--v5-ground);
+    border-radius: 10px; font-size: 14.5px; line-height: 1.55; }
+.vastore5 .v5-obj__steps p b { color: var(--v5-deep); }
+.vastore5 .v5-obj__script { display: grid; gap: 8px; }
+.vastore5 .v5-obj__script p { margin: 0; font-size: 14.5px; line-height: 1.6; }
+.vastore5 .v5-obj__script p.is-client { padding: 10px 14px; border-radius: 10px;
+    background: rgba(217, 73, 0, .07); color: #8A4A21; font-weight: 600; }
+.vastore5 .v5-obj__script p.is-rep { padding: 10px 14px; border-radius: 10px;
+    background: rgba(138, 43, 226, .07); color: var(--v5-ink); }
+.vastore5 .v5-sep { margin: 4px 0; font-size: 11px; line-height: 1; letter-spacing: -1px;
+    color: rgba(24, 17, 44, .16); overflow: hidden; white-space: nowrap; }
+.vastore5 .v5-acc { display: grid; gap: 9px; }
+.vastore5 .v5-acc details { background: #fff; border: 1px solid var(--v5-line); border-radius: var(--v5-r-sm);
+    overflow: hidden; transition: box-shadow .15s ease, border-color .15s ease; }
+.vastore5 .v5-acc details:hover { border-color: rgba(138, 43, 226, .3); }
+.vastore5 .v5-acc details[open] { box-shadow: var(--v5-shadow); border-color: rgba(138, 43, 226, .3); }
+.vastore5 .v5-acc summary { display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 17px 20px; font-size: 16px; font-weight: 600; color: var(--v5-ink); cursor: pointer;
+    list-style: none; }
+.vastore5 .v5-acc summary::-webkit-details-marker { display: none; }
+.vastore5 .v5-acc__ico { display: flex; align-items: center; justify-content: center; flex: none;
+    width: 30px; height: 30px; border-radius: 50%; background: rgba(138, 43, 226, .1);
+    transition: background-color .15s ease; }
+.vastore5 .v5-acc details[open] .v5-acc__ico { background: var(--v5-purple); }
+.vastore5 .v5-acc__icon { width: 12px; height: 12px; fill: var(--v5-purple); }
+.vastore5 .v5-acc details[open] .v5-acc__icon { fill: #fff; }
+.vastore5 .v5-acc summary .v5-acc__icon--minus { display: none; }
+.vastore5 .v5-acc details[open] summary .v5-acc__icon--minus { display: block; }
+.vastore5 .v5-acc details[open] summary .v5-acc__icon--plus { display: none; }
+.vastore5 .v5-acc__body { padding: 18px 20px 22px; border-top: 1px solid var(--v5-line);
+    font-size: 15.5px; line-height: 1.7; }
+.vastore5 .v5-acc__body p { margin: 0 0 12px; }
+.vastore5 .v5-acc__body ul { list-style: disc; margin: 0 0 14px; padding-left: 22px; }
+.vastore5 .v5-acc__body ol { list-style: decimal; margin: 0 0 14px; padding-left: 22px; }
+.vastore5 .v5-acc__body li { margin: 0 0 7px; }
+.vastore5 .v5-acc__body strong { font-weight: 700; color: var(--v5-ink); }
+
+/* ---------------------------------------------------------- role catalogue -- */
+.vastore5 .v5-roles { max-width: 1180px; margin-inline: auto; display: grid; gap: 9px; }
+.vastore5 .v5-dd { background: #fff; border: 1px solid var(--v5-line); border-radius: var(--v5-r-sm);
+    overflow: hidden; transition: border-color .15s ease; }
+.vastore5 .v5-dd:hover { border-color: rgba(138, 43, 226, .3); }
+.vastore5 .v5-dd > input[type="checkbox"] { position: absolute; width: 1px; height: 1px; opacity: 0;
+    pointer-events: none; }
+.vastore5 .v5-dd__btn { display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 17px 22px; font-size: 16.5px; font-weight: 700; color: var(--v5-ink); cursor: pointer;
+    transition: background-color .15s ease, color .15s ease; }
+.vastore5 .v5-dd__btn:hover { background: var(--v5-ground); }
+.vastore5 .v5-dd__btn::after { content: ""; flex: none; width: 9px; height: 9px; margin-right: 4px;
+    border-right: 2px solid var(--v5-purple); border-bottom: 2px solid var(--v5-purple);
+    transform: rotate(45deg) translate(-2px, -2px); transition: transform .2s ease; }
+.vastore5 .v5-dd > input[type="checkbox"]:focus-visible + .v5-dd__btn { outline: 2px solid var(--v5-purple);
+    outline-offset: -2px; }
+.vastore5 .v5-dd > input[type="checkbox"]:checked + .v5-dd__btn { color: var(--v5-deep);
+    background: linear-gradient(90deg, rgba(138, 43, 226, .1), rgba(138, 43, 226, .02)); }
+.vastore5 .v5-dd > input[type="checkbox"]:checked + .v5-dd__btn::after {
+    transform: rotate(-135deg) translate(-2px, -2px); }
+.vastore5 .v5-dd__content { display: none; }
+.vastore5 .v5-dd > input[type="checkbox"]:checked ~ .v5-dd__content { display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 18px 22px 22px;
+    border-top: 1px solid var(--v5-line); }
+.vastore5 .v5-role { padding: 14px 16px; background: var(--v5-ground); border-radius: 10px; }
+.vastore5 .v5-role__title { font-size: 15px; font-weight: 700; color: var(--v5-ink); margin-bottom: 3px; }
+.vastore5 .v5-role__desc { font-size: 14px; line-height: 1.55; color: var(--v5-muted); }
+
+/* ------------------------------------------------------------- breakpoints -- */
+@media (max-width: 980px) {
+    .vastore5 .v5-qgrid,
+    .vastore5 .v5-warn ul,
+    .vastore5 .v5-obj__intro,
+    .vastore5 .v5-dd > input[type="checkbox"]:checked ~ .v5-dd__content { grid-template-columns: 1fr; }
+    .vastore5 .v5-bundles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .vastore5 .v5-pricecard__grid { grid-template-columns: 1fr; }
+    .vastore5 .v5-pricecard__media img { height: 260px; }
+}
+@media (max-width: 640px) {
+    .vastore5 .v5-bundles { grid-template-columns: 1fr; }
+    .vastore5 .v5-rate { grid-template-columns: 1fr auto; gap: 10px; }
+    .vastore5 .v5-rate__lead { display: none; }
+    .vastore5 .v5-rate__value { font-size: 26px; }
+    .vastore5 .v5-tabcard__tabs button { flex: 1 1 100%; }
+}
+</style>
+<!-- /wp:html -->
+
+<!-- wp:html -->
+<nav class="vastore5 v5-nav" aria-label="Playbook sections">
+    <div class="v5-inner v5-nav__inner">
+        <?php foreach ($navItems as $item) { ?>
+            <a href="#<?= esc_attr($item[0]) ?>" data-v5-nav="<?= esc_attr($item[0]) ?>"><?= $item[1] ?></a>
+        <?php } ?>
+    </div>
+</nav>
+<script>
+(function () {
+    var nav = document.querySelector('.v5-nav');
+    if (!nav) { return; }
+
+    /* The site header is sticky at top:0; park this bar directly beneath it. */
+    function place() {
+        var header = document.querySelector('#app > header');
+        var h = header ? Math.round(header.getBoundingClientRect().height) : 80;
+        document.documentElement.style.setProperty('--v5-navtop', h + 'px');
     }
-    .vastore5 *, .vastore5 *::before, .vastore5 *::after { box-sizing: border-box; }
-    .vastore5 h2, .vastore5 h3, .vastore5 h4 { margin: 0; font-weight: 700; }
-    .vastore5 p { margin: 0 0 14.4px; }
-    .vastore5 p:last-child { margin-bottom: 0; }
-    .vastore5 a { color: inherit; }
+    place();
+    window.addEventListener('resize', place);
 
-    .vastore5 .v5-inner { width: 100%; max-width: 1170px; margin-inline: auto; }
-    @media (max-width: 1210px) { .vastore5 .v5-inner { padding-inline: 20px; } }
+    var links = Array.prototype.slice.call(nav.querySelectorAll('[data-v5-nav]'));
 
-    /* production's body is white; this theme's is #F4F6FC, so the untinted bands say so. */
-    .vastore5.v5-band { background: #fff; }
-    .vastore5.v5-band--purple { background: var(--v5-purple); color: #fff; }
-    .vastore5.v5-band--grey { background: #FAFAFA; }
+    /* The sections are further down the document than this inline script, so the
+       targets are resolved once the parser has finished — looking them up now
+       would find nothing and silently disable the scroll-spy. */
+    function start() {
+        var targets = links
+            .map(function (a) { return document.getElementById(a.getAttribute('data-v5-nav')); })
+            .filter(Boolean);
+        if (!targets.length) { return; }
 
-    /* --- long-form call script (Discovery / Presentation / cannot-hire) --- */
-    .vastore5 .v5-prose { max-width: 690px; margin-inline: auto; line-height: 24px; }
-    .vastore5 .v5-prose--wide { max-width: 702px; }
-    .vastore5 .v5-prose--lh32 { line-height: 32px; }
-    .vastore5 .v5-prose--lh38 { line-height: 38px; }
-    .vastore5 .v5-prose ol { list-style: decimal; padding-left: 40px; margin: 0; }
-    .vastore5 .v5-prose ul { list-style: disc; padding-left: 40px; margin: 0; }
-    .vastore5 .v5-prose ul ul { list-style: circle; line-height: 24px; }
-    .vastore5 .v5-prose li { margin: 0; }
-    .vastore5 .v5-prose strong, .vastore5 .v5-prose b { font-weight: 700; }
-    .vastore5 .v5-prose em { font-style: italic; }
-    .vastore5 .v5-prose .v5-small { font-size: 14px; color: #000; }
-
-    /* --- tabbed question cards (Probing Questions / Deposit options) --- */
-    .vastore5 .v5-tabcard { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(17, 24, 39, .10); overflow: hidden; margin: 16px 0; color: #111827; }
-    .vastore5 .v5-tabcard__head { background: var(--v5-blue); color: #fff; font-weight: 700; padding: 12px 16px; }
-    .vastore5 .v5-tabcard__tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 10px 12px 6px; }
-    .vastore5 .v5-tabcard__tabs button { appearance: none; cursor: pointer; text-align: center; border: 0;
-        border-radius: 6px; background: var(--v5-purple); color: #fff; font-weight: 700; font-size: 17px;
-        line-height: 17px; padding: 22px 35px; font-family: inherit;
-        transition: box-shadow .12s ease, transform .12s ease; }
-    .vastore5 .v5-tabcard__tabs button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(17, 24, 39, .08); }
-    .vastore5 .v5-tabcard__tabs button.is-active { background: var(--v5-amber); }
-    .vastore5 .v5-subtabs { grid-column: 1 / span 1; grid-row: 2; display: grid;
-        grid-template-columns: 1fr 1fr; gap: 6px; margin: 2px 0 6px; }
-    .vastore5 .v5-subtabs button { padding: 0 10px; height: 44px; }
-    .vastore5 .v5-tabcard__body { padding: 8px 16px 16px;
-        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
-    .vastore5 .v5-tabcard__body h4 { margin: 10px 0 6px; font-size: 15.68px; font-weight: 500;
-        line-height: 18.816px; color: #000; font-family: "Inter Variable", "Inter", system-ui, sans-serif; }
-    .vastore5 .v5-tabcard__body ul { list-style: disc; margin: 0; padding-left: 18px; }
-    .vastore5 .v5-tabcard__body li { margin: 6px 0; line-height: 24px; }
-    .vastore5 .v5-tabcard__body a { color: var(--v5-blue); font-weight: 600; text-decoration: none; }
-    /* margin-top lives on the section instead, so it cannot collapse through it. */
-    .vastore5 .v5-tabcard--deposit { margin-top: 0; margin-bottom: 16px; }
-    .vastore5 .v5-tabcard--deposit .v5-tabcard__tabs { grid-template-columns: repeat(5, 1fr); }
-    .vastore5 .v5-tabcard--deposit .v5-tabcard__tabs button { background: #fff; color: var(--v5-violet);
-        border: 1px solid var(--v5-violet); border-radius: 999px; font-size: 14.4px; line-height: 16.56px;
-        padding: 10px 8px; min-height: 40px; white-space: nowrap; }
-    .vastore5 .v5-tabcard--deposit .v5-tabcard__tabs button.is-active { background: var(--v5-amber);
-        border-color: var(--v5-amber); color: #fff; }
-    @media (max-width: 900px) {
-        .vastore5 .v5-tabcard__tabs { grid-template-columns: repeat(2, 1fr); }
-        .vastore5 .v5-subtabs { grid-column: auto; grid-row: auto; }
-        .vastore5 .v5-tabcard--deposit .v5-tabcard__tabs button { white-space: normal; }
-    }
-    @media (max-width: 520px) { .vastore5 .v5-tabcard__tabs { grid-template-columns: 1fr; } }
-
-    /* --- price rows: label / dotted leader / blue chip --- */
-    .vastore5 .v5-heading-36 { font-size: 36px; line-height: 36px; color: #fff; text-align: center; margin: 0 0 40px; }
-    .vastore5 .v5-heading-35 { font-size: 35px; line-height: 35px; color: #fff; text-align: center; margin: 0 0 20px; }
-    .vastore5 .v5-rates { width: 700px; max-width: 100%; margin-inline: auto;
-        display: flex; flex-direction: column; gap: 15px; }
-    .vastore5 .v5-rate { display: flex; align-items: center; justify-content: center; }
-    .vastore5 .v5-rate__label { width: 175px; display: flex; justify-content: flex-end; }
-    /* production right-aligns a fixed 100px heading box inside the label column, so the
-       label text stops ~28px short of the leader — reproduce the box, not just the align. */
-    .vastore5 .v5-rate__label h2 { width: 100px; font-size: 28px; line-height: 28px; color: #fff; text-align: left; white-space: nowrap; }
-    /* 26 literal hyphens, as production stores them. League Spartan renders the run at 275px;
-       Inter is wider, so it is tracked back to the same measured width. */
-    .vastore5 .v5-rate__lead { width: 350px; font-size: 28px; line-height: 28px; font-weight: 700;
-        color: #fff; text-align: center; overflow: hidden; white-space: nowrap; letter-spacing: -2.5px; }
-    .vastore5 .v5-rate__value { width: 175px; }
-    .vastore5 .v5-chip { width: 140px; background: var(--v5-chip); border-radius: 10px; padding: 10px 0; }
-    .vastore5 .v5-chip h2 { font-size: 28px; line-height: 28px; color: #fff; text-align: center; white-space: nowrap; }
-    .vastore5 .v5-rates--bundle { width: 100%; max-width: none; gap: 20px; }
-    .vastore5 .v5-rates--bundle .v5-rate__label { width: 360px; }
-    .vastore5 .v5-rates--bundle .v5-rate__value,
-    .vastore5 .v5-rates--bundle .v5-chip { width: 339px; }
-    /* the widest bundle label runs 305px in League Spartan and 343px in Inter; track it back
-       so it sits inside the chip the way production does. */
-    .vastore5 .v5-rates--bundle .v5-chip h2 { letter-spacing: -1.6px; }
-    .vastore5 .v5-bundle-intro { max-width: 979px; margin: 0 auto 40px; font-size: 24px; line-height: 24px;
-        font-weight: 400; color: #fff; text-align: center; }
-    @media (max-width: 760px) {
-        .vastore5 .v5-rate__lead { display: none; }
-        .vastore5 .v5-rate { gap: 16px; }
-        .vastore5 .v5-rate__label, .vastore5 .v5-rate__value,
-        .vastore5 .v5-rates--bundle .v5-rate__label, .vastore5 .v5-rates--bundle .v5-rate__value { width: 50%; }
-        .vastore5 .v5-chip, .vastore5 .v5-rates--bundle .v5-chip { width: 100%; }
+        var queued = false;
+        function spy() {
+            queued = false;
+            var line = (window.pageYOffset || 0) + nav.getBoundingClientRect().bottom + 90;
+            var current = targets[0].id;
+            targets.forEach(function (t) {
+                if ((window.pageYOffset || 0) + t.getBoundingClientRect().top <= line) { current = t.id; }
+            });
+            links.forEach(function (a) {
+                a.classList.toggle('is-current', a.getAttribute('data-v5-nav') === current);
+            });
+        }
+        function queue() {
+            if (queued) { return; }
+            queued = true;
+            window.requestAnimationFrame(spy);
+        }
+        spy();
+        window.addEventListener('scroll', queue, { passive: true });
+        window.addEventListener('resize', queue);
     }
 
-    /* --- recruitment pricing card --- */
-    .vastore5 .v5-pricecard { width: 800px; max-width: 100%; margin-inline: auto; background: #fff;
-        border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
-    .vastore5 .v5-pricecard h2 { color: var(--v5-card-ink); text-align: center; }
-    .vastore5 .v5-pricecard__title { font-size: 32px; line-height: 32px; }
-    .vastore5 .v5-pricecard__sub { font-size: 26px; line-height: 26px; }
-    .vastore5 .v5-pricecard img { display: block; width: 400px; height: 280px; object-fit: cover; margin-inline: auto; max-width: 100%; }
-    .vastore5 .v5-pricecard__body { max-width: 690px; font-size: 16px; line-height: 32px; color: #333; }
-    .vastore5 .v5-pricecard__note { font-size: 16px; line-height: 32px; color: #333; text-align: center; }
-    .vastore5 .v5-pricecard__body p, .vastore5 .v5-pricecard__note p { margin-bottom: 14.4px; }
-    .vastore5 .v5-btn { display: block; width: 100%; background: var(--v5-orange); color: #fff;
-        font-size: 24px; line-height: 24px; font-weight: 700; text-align: center; padding: 16px 40px;
-        border-radius: 5px; text-decoration: none; }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
+    }
+})();
+</script>
+<!-- /wp:html -->
 
-    /* --- calendly + booking failsafe --- */
-    .vastore5 .v5-calendly { padding: 10px; }
-    .vastore5 .v5-calendly .calendly-inline-widget { min-width: 320px; height: 700px; }
-    .vastore5 .v5-failsafe { max-width: 720px; margin: 12px auto 0; padding: 0 16px; text-align: center; }
-    .vastore5 .v5-failsafe__toggle { cursor: pointer; background: var(--v5-purple); color: #fff; border: 0;
-        border-radius: 6px; padding: 22px 35px; font-size: 17px; line-height: 17px; font-weight: 700;
-        font-family: inherit; }
-    .vastore5 .v5-failsafe__panel { display: none; margin-top: 12px; }
-    .vastore5 .v5-failsafe__panel.is-open { display: block; }
-    .vastore5 .v5-failsafe__btn { display: inline-block; margin: 6px; padding: 12px 20px; background: #fff;
-        color: var(--v5-purple); border-radius: 6px; font-weight: 700; text-decoration: none; }
-
-    /* --- objections --- */
-    .vastore5 .v5-obj { max-width: 899px; margin-inline: auto; }
-    .vastore5 .v5-obj__title { font-size: 32px; line-height: 32px; font-weight: 500; color: #000;
-        text-align: center; margin: 0 0 20px; }
-    .vastore5 .v5-obj__intro { font-size: 16px; line-height: 16px; color: #333; margin: 0 0 20px; padding-bottom: 32px; }
-    .vastore5 .v5-obj__intro p { margin: 0 0 32px; }
-    .vastore5 .v5-obj__intro p:last-child { margin-bottom: 0; }
-    .vastore5 .v5-obj__intro b { font-weight: 700; }
-    .vastore5 .v5-acc details > summary { display: flex; align-items: center; justify-content: space-between;
-        gap: 10px; padding: 14px 20px; font-size: 16px; font-weight: 600; color: #1F2124;
-        border-bottom: 2px solid #eee; cursor: pointer; list-style: none; }
-    .vastore5 .v5-acc details > summary::-webkit-details-marker { display: none; }
-    .vastore5 .v5-acc__icon { width: 14px; height: 16px; fill: var(--v5-purple); flex: none; }
-    .vastore5 .v5-acc details > summary .v5-acc__icon--minus { display: none; }
-    .vastore5 .v5-acc details[open] > summary .v5-acc__icon--minus { display: block; }
-    .vastore5 .v5-acc details[open] > summary .v5-acc__icon--plus { display: none; }
-    .vastore5 .v5-acc__body { padding: 16px 20px; border-bottom: 2px solid #eee; }
-    .vastore5 .v5-acc__body p { margin: 0 0 14.4px; }
-    .vastore5 .v5-acc__body ul { list-style: disc; padding-left: 40px; margin: 0 0 14.4px; }
-    .vastore5 .v5-acc__body strong { font-weight: 700; }
-
-    /* --- role catalogue --- */
-    .vastore5 .v5-roles { width: 100%; font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #333; }
-    .vastore5 .v5-dd { width: 100%; margin-bottom: 2px; }
-    .vastore5 .v5-dd > input[type="checkbox"] { display: none; }
-    .vastore5 .v5-dd__btn { display: flex; align-items: center; justify-content: space-between;
-        width: 100%; min-height: 50px; padding: 15px; background: #2C5282; color: #fff;
-        font-size: 17.6px; line-height: 17.6px; font-weight: 700; cursor: pointer; }
-    .vastore5 .v5-dd__btn::after { content: '+'; font-size: 20px; font-weight: 700; margin-left: 10px; }
-    .vastore5 .v5-dd > input[type="checkbox"]:checked + .v5-dd__btn::after { content: '-'; }
-    .vastore5 .v5-dd__content { display: none; width: 100%; border: 1px solid #eee; background: #fff; }
-    .vastore5 .v5-dd > input[type="checkbox"]:checked ~ .v5-dd__content { display: block; }
-    .vastore5 .v5-role { padding: 15px; border-bottom: 1px solid #eee; }
-    .vastore5 .v5-role:last-child { border-bottom: none; }
-    .vastore5 .v5-role__title { font-weight: 700; color: #2D3748; margin-bottom: 5px; }
-    .vastore5 .v5-role__desc { color: #4A5568; }
-    </style>
-
+<!-- wp:html -->
+<section class="vastore5 v5-band v5-section v5-section--tight" id="v5-s-tools">
     <div class="v5-inner">
-        <?php include get_theme_file_path('resources/patterns/vastore5-widgets.php'); ?>
+        <div class="v5-tools">
+            <?php include get_theme_file_path('resources/patterns/vastore5-widgets.php'); ?>
+        </div>
     </div>
 </section>
 <!-- /wp:html -->
 
 <!-- wp:html -->
-<section class="vastore5 v5-band v5-probing" style="padding:10px 0">
+<section class="vastore5 v5-band v5-section v5-section--tight" id="v5-s-probing">
     <div class="v5-inner">
-        <div class="v5-tabcard" id="v5-probing">
-            <div class="v5-tabcard__head">Probing Questions</div>
+        <div class="v5-card v5-tabcard" id="v5-probing">
+            <div class="v5-tabcard__head">
+                <h2>Probing Questions</h2>
+            </div>
             <div class="v5-tabcard__tabs" role="tablist" aria-label="Customer profile">
                 <button type="button" class="is-active" data-tab="hadVA" role="tab" aria-selected="true">Had VA</button>
                 <button type="button" data-tab="firstTimer" role="tab" aria-selected="false">Hasn&rsquo;t had VA</button>
                 <button type="button" data-tab="hiredDirect" role="tab" aria-selected="false">Hired via Other Platform</button>
                 <button type="button" data-tab="hasBPO" role="tab" aria-selected="false">Has Call Center</button>
-                <div class="v5-subtabs" role="tablist" aria-label="Past VA type">
-                    <button type="button" class="is-active" data-sub="agency" role="tab" aria-selected="true">Agency</button>
-                    <button type="button" data-sub="direct" role="tab" aria-selected="false">Direct</button>
-                </div>
+            </div>
+            <div class="v5-subtabs" role="tablist" aria-label="Past VA type">
+                <button type="button" class="is-active" data-sub="agency" role="tab" aria-selected="true">Agency</button>
+                <button type="button" data-sub="direct" role="tab" aria-selected="false">Direct</button>
             </div>
             <div class="v5-tabcard__body" id="v5-probing-body" aria-live="polite"></div>
         </div>
@@ -645,59 +910,66 @@ $iconMinus = '<svg class="v5-acc__icon" viewBox="0 0 448 512" aria-hidden="true"
 <!-- /wp:html -->
 
 <!-- wp:html -->
-<section class="vastore5 v5-band" style="padding:20px 0">
+<section class="vastore5 v5-band v5-section" id="v5-s-discovery">
     <div class="v5-inner">
-        <div class="v5-prose v5-prose--lh38">
-            <p><strong>Discovery:</strong></p>
-            <ol>
-                <li><strong>&nbsp;Can you tell me more about the role and some of the tasks you want someone to do?</strong></li>
-                <li><strong>&nbsp;Do you have an hourly budget in mind?</strong></li>
-                <li><strong>&nbsp;Do they have to speak Spanish or is just English ok?</strong></li>
-                <li><strong>&nbsp;Is this going to be a full time or a part time role?</strong></li>
-                <li><strong>&nbsp;Have you hired Virtual Assistants before?</strong></li>
-                <li><strong>&nbsp;How soon do you want to hire someone for this role?</strong></li>
-                <li><strong>Are you looking for someone long term or short term?</strong></li>
-            </ol>
+        <div class="v5-head">
+            <h2>Discovery:</h2>
+        </div>
+        <ol class="v5-qgrid">
+            <li><strong>&nbsp;Can you tell me more about the role and some of the tasks you want someone to do?</strong></li>
+            <li><strong>&nbsp;Do you have an hourly budget in mind?</strong></li>
+            <li><strong>&nbsp;Do they have to speak Spanish or is just English ok?</strong></li>
+            <li><strong>&nbsp;Is this going to be a full time or a part time role?</strong></li>
+            <li><strong>&nbsp;Have you hired Virtual Assistants before?</strong></li>
+            <li><strong>&nbsp;How soon do you want to hire someone for this role?</strong></li>
+            <li><strong>Are you looking for someone long term or short term?</strong></li>
+        </ol>
+    </div>
+</section>
+<!-- /wp:html -->
+
+<!-- wp:html -->
+<section class="vastore5 v5-band v5-section" id="v5-s-presentation">
+    <div class="v5-inner">
+        <div class="v5-head">
+            <h2>Presentation:</h2>
+        </div>
+        <div class="v5-card v5-card--pad">
+            <div class="v5-prose">
+                <ul>
+                    <li>Recruiting firm specializing in hiring Virtual Assistants from Latin America, the Philippines, and Europe.</li>
+                    <li>Receive 2,000&ndash;3,000 applications every day. What this means is, instead of you choosing from a few applicants, we can choose the exact best ones from thousands of applicants that we receive every month and really get you the perfect match.</li>
+                    <li>Vetting Process:
+                        <ul>
+                            <li>Voice recording to make sure they speak fluent English with little to no accent.</li>
+                            <li>If they sound good with little to no accent, we move them to a 1-on-1 interview.</li>
+                            <li>If they pass our 1-on-1 interview, we get them to then take a skills assessment to make sure they&rsquo;re competent.</li>
+                            <li>The target is to find you 4&ndash;6 applicants that fit all your criteria.</li>
+                        </ul>
+                    </li>
+                    <li>Once we have 4&ndash;6 qualified applicants, we&rsquo;ll have you interview them on Zoom alongside our hiring manager.</li>
+                    <li>After you&rsquo;re done with the interviews, choose your top applicants, and then you can have a second round of interviews to get to know them better before hiring.</li>
+                    <li>Once you choose someone, we&rsquo;ll help negotiate the hourly rate and schedule.</li>
+                    <li>To be fully transparent, 100% of the hourly rate goes directly to the Virtual Assistant. That&rsquo;s actually why we get very high-quality Virtual Assistants, because we don&rsquo;t take a cut out of their pay like other agencies, where they usually only get paid 30% of what the clients pay. So they don&rsquo;t even apply to work with those companies, and the clients there get stuck dealing with low-quality Virtual Assistants.</li>
+                    <li>And then, after you choose who you want to hire, we&rsquo;ll help you with onboarding and payroll setup. We work with a company that can handle payroll and everything for you, or we can just teach you how to do payroll yourself. It&rsquo;s pretty easy.</li>
+                    <li>Whoever you end up hiring through us, we&rsquo;ll give you a twelve-month replacement guarantee. If they don&rsquo;t turn out to be a good fit, we can replace them for free.</li>
+                    <li>We will also give you back-end support for six months, so if you need help with training, payroll setup, setting up monitoring, or whatever, we can help you with back-end things.</li>
+                </ul>
+                <div class="v5-callout"><b>What do you think about our proposal so far?</b></div>
+            </div>
         </div>
     </div>
 </section>
 <!-- /wp:html -->
 
 <!-- wp:html -->
-<section class="vastore5 v5-band" style="padding:20px 0 60px">
+<section class="vastore5 v5-band v5-section" id="v5-s-cannot">
     <div class="v5-inner">
-        <div class="v5-prose">
-            <p><strong>Presentation:</strong></p>
-            <ul>
-                <li>Recruiting firm specializing in hiring Virtual Assistants from Latin America, the Philippines, and Europe.</li>
-                <li>Receive 2,000&ndash;3,000 applications every day. What this means is, instead of you choosing from a few applicants, we can choose the exact best ones from thousands of applicants that we receive every month and really get you the perfect match.</li>
-                <li>Vetting Process:
-                    <ul>
-                        <li>Voice recording to make sure they speak fluent English with little to no accent.</li>
-                        <li>If they sound good with little to no accent, we move them to a 1-on-1 interview.</li>
-                        <li>If they pass our 1-on-1 interview, we get them to then take a skills assessment to make sure they&rsquo;re competent.</li>
-                        <li>The target is to find you 4&ndash;6 applicants that fit all your criteria.</li>
-                    </ul>
-                </li>
-                <li>Once we have 4&ndash;6 qualified applicants, we&rsquo;ll have you interview them on Zoom alongside our hiring manager.</li>
-                <li>After you&rsquo;re done with the interviews, choose your top applicants, and then you can have a second round of interviews to get to know them better before hiring.</li>
-                <li>Once you choose someone, we&rsquo;ll help negotiate the hourly rate and schedule.</li>
-                <li>To be fully transparent, 100% of the hourly rate goes directly to the Virtual Assistant. That&rsquo;s actually why we get very high-quality Virtual Assistants, because we don&rsquo;t take a cut out of their pay like other agencies, where they usually only get paid 30% of what the clients pay. So they don&rsquo;t even apply to work with those companies, and the clients there get stuck dealing with low-quality Virtual Assistants.</li>
-                <li>And then, after you choose who you want to hire, we&rsquo;ll help you with onboarding and payroll setup. We work with a company that can handle payroll and everything for you, or we can just teach you how to do payroll yourself. It&rsquo;s pretty easy.</li>
-                <li>Whoever you end up hiring through us, we&rsquo;ll give you a twelve-month replacement guarantee. If they don&rsquo;t turn out to be a good fit, we can replace them for free.</li>
-                <li>We will also give you back-end support for six months, so if you need help with training, payroll setup, setting up monitoring, or whatever, we can help you with back-end things.</li>
-            </ul>
-            <div><b>What do you think about our proposal so far?</b></div>
-        </div>
-    </div>
-</section>
-<!-- /wp:html -->
-
-<!-- wp:html -->
-<section class="vastore5 v5-band v5-band--grey" style="padding:40px 0">
-    <div class="v5-inner">
-        <div class="v5-prose v5-prose--wide v5-prose--lh32">
-            <p><strong><em>Optional if a client says something we&nbsp;CANNOT Hire for:&nbsp;</em></strong></p>
+        <div class="v5-card v5-card--pad v5-warn">
+            <p class="v5-warn__title">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1 21h22L12 2Zm1 14h-2v2h2v-2Zm0-7h-2v5h2V9Z"/></svg>
+                <span><strong><em>Optional if a client says something we&nbsp;CANNOT Hire for:&nbsp;</em></strong></span>
+            </p>
             <ul>
                 <li>US Licensed individuals</li>
                 <li>Less than 20 hours per week (has to be part time or full time)&nbsp;</li>
@@ -714,53 +986,85 @@ $iconMinus = '<svg class="v5-acc__icon" viewBox="0 0 448 512" aria-hidden="true"
 <!-- /wp:html -->
 
 <!-- wp:html -->
-<section class="vastore5 v5-band v5-band--purple" style="padding:60px 0">
+<section class="vastore5 v5-band v5-band--deep v5-section" id="v5-s-pricing">
     <div class="v5-inner">
-        <h2 class="v5-heading-36">One Time Payment - Breakdown by Hourly Rate</h2>
-
-        <div class="v5-rates">
-            <?php foreach ($rateRows as $row) { ?>
-                <div class="v5-rate">
-                    <div class="v5-rate__label"><h2><?= esc_html($row[0]) ?></h2></div>
-                    <div class="v5-rate__lead" aria-hidden="true">--------------------------</div>
-                    <div class="v5-rate__value">
-                        <div class="v5-chip"><h2><?= esc_html($row[1]) ?></h2></div>
-                    </div>
-                </div>
-            <?php } ?>
-            <h2 class="v5-heading-35">Monthly Payment Plans Available</h2>
+        <div class="v5-head v5-head--center">
+            <h2>One Time Payment - Breakdown by Hourly Rate</h2>
         </div>
 
-        <div style="height:60px"></div>
+        <div class="v5-glass v5-rates">
+            <?php foreach ($rateRows as $row) { ?>
+                <div class="v5-rate">
+                    <div class="v5-rate__label"><?= esc_html($row[0]) ?></div>
+                    <div class="v5-rate__lead" aria-hidden="true">--------------------------</div>
+                    <div class="v5-rate__value"><?= esc_html($row[1]) ?></div>
+                </div>
+            <?php } ?>
+        </div>
+        <p class="v5-note-pill">Monthly Payment Plans Available</p>
 
-        <h2 class="v5-heading-36">Pricing</h2>
+        <div class="v5-head v5-head--center" style="margin-top:clamp(40px,4vw,64px)">
+            <h2>Pricing</h2>
+        </div>
 
         <div class="v5-pricecard">
-            <h2 class="v5-pricecard__title">Recruitment - One Time Payment<br>(Payment Plans Available)</h2>
-            <img src="<?= esc_url($img) ?>" width="400" height="280" alt="" loading="lazy" decoding="async">
-            <h2 class="v5-pricecard__sub">40% of Annual Full Time Salary - One Time Payment</h2>
-            <div class="v5-pricecard__body">
-                <p>After you interview and choose to hire an applicant, we get paid a 1 time payment.<br>Calculated as 40% of Annual Full Time Salary of Applicant.<br>No Hourly, Monthly or Recurring charges to us.<br>Whatever you pay goes direct to Virtual Assistant.<br>VA Salary: Paid hourly based on the amount of hours you want (Part Time or Full Time).<br>12 Month Replacement Guarantee + Back End Support.<br>Scaling? 30% Discount on future placements within 12 months.</p>
+            <div class="v5-pricecard__head">
+                <h2 class="v5-pricecard__title">Recruitment - One Time Payment<br>(Payment Plans Available)</h2>
             </div>
-            <div class="v5-pricecard__note">
-                <p>$100 refundable deposit to begin the recruitment process.<br>The deposit will be deducted from the final hiring invoice.</p>
+            <div class="v5-pricecard__grid">
+                <div class="v5-pricecard__media">
+                    <img src="<?= esc_url($img) ?>" width="400" height="280" alt="" loading="lazy" decoding="async">
+                </div>
+                <div class="v5-pricecard__copy">
+                    <h3 class="v5-pricecard__sub">40% of Annual Full Time Salary - One Time Payment</h3>
+                    <ul class="v5-facts">
+                        <li>After you interview and choose to hire an applicant, we get paid a 1 time payment.</li>
+                        <li>Calculated as 40% of Annual Full Time Salary of Applicant.</li>
+                        <li>No Hourly, Monthly or Recurring charges to us.</li>
+                        <li>Whatever you pay goes direct to Virtual Assistant.</li>
+                        <li>VA Salary: Paid hourly based on the amount of hours you want (Part Time or Full Time).</li>
+                        <li>12 Month Replacement Guarantee + Back End Support.</li>
+                        <li>Scaling? 30% Discount on future placements within 12 months.</li>
+                    </ul>
+                    <div class="v5-pricecard__note">
+                        <p>$100 refundable deposit to begin the recruitment process.<br>The deposit will be deducted from the final hiring invoice.</p>
+                    </div>
+                    <a class="v5-btn v5-btn--block" href="http://jotform.com/form/252276995438170?utm_source=google">Get Started</a>
+                </div>
             </div>
-            <a class="v5-btn" href="http://jotform.com/form/252276995438170?utm_source=google">Get Started</a>
         </div>
     </div>
 </section>
 <!-- /wp:html -->
 
 <!-- wp:html -->
-<section class="vastore5 v5-band v5-band--purple v5-calendly">
-    <div class="calendly-inline-widget" data-url="https://calendly.com/d/dtkp-63s-2qv?hide_gdpr_banner=1" style="min-width:320px;height:700px;"></div>
-    <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
+<section class="vastore5 v5-band v5-band--deep v5-section v5-section--tight" id="v5-s-booking">
+    <div class="v5-inner">
+        <div class="v5-calwrap">
+            <div class="calendly-inline-widget" data-url="https://calendly.com/d/dtkp-63s-2qv?hide_gdpr_banner=1" style="min-width:320px;height:700px;"></div>
+        </div>
+        <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
 
-    <div class="v5-failsafe">
-        <button type="button" class="v5-failsafe__toggle" aria-expanded="false">Having trouble booking above?</button>
-        <div class="v5-failsafe__panel">
-            <a class="v5-failsafe__btn" href="https://buy.stripe.com/9AQbKAcnC6NP2ukaFh" target="_blank" rel="noopener">Stripe Payment</a>
-            <a class="v5-failsafe__btn" href="<?= esc_url($calendlyBooking) ?>" target="_blank" rel="noopener">Book Meeting</a>
+        <div class="v5-failsafe">
+            <button type="button" class="v5-failsafe__toggle" aria-expanded="false">Having trouble booking above?</button>
+            <div class="v5-failsafe__panel">
+                <a class="v5-failsafe__btn" href="https://buy.stripe.com/9AQbKAcnC6NP2ukaFh" target="_blank" rel="noopener">Stripe Payment</a>
+                <a class="v5-failsafe__btn" href="<?= esc_url($calendlyBooking) ?>" target="_blank" rel="noopener">Book Meeting</a>
+            </div>
+        </div>
+
+        <div class="v5-card v5-tabcard" id="v5-deposit" style="margin-top:clamp(28px,3vw,44px)">
+            <div class="v5-tabcard__head">
+                <h2>Deposit &amp; Payment Options</h2>
+            </div>
+            <div class="v5-tabcard__tabs" role="tablist" aria-label="Deposit options">
+                <?php $first = true;
+foreach ($deposit as $key => $group) { ?>
+                    <button type="button"<?= $first ? ' class="is-active"' : '' ?> data-tab="<?= esc_attr($key) ?>" role="tab" aria-selected="<?= $first ? 'true' : 'false' ?>"><?= $group[0] ?></button>
+                <?php $first = false;
+} ?>
+            </div>
+            <div class="v5-tabcard__body" id="v5-deposit-body" aria-live="polite"></div>
         </div>
     </div>
     <script>
@@ -774,24 +1078,6 @@ $iconMinus = '<svg class="v5-acc__icon" viewBox="0 0 448 512" aria-hidden="true"
             });
         });
     })();
-    </script>
-</section>
-<!-- /wp:html -->
-
-<!-- wp:html -->
-<section class="vastore5 v5-band v5-band--purple" style="padding:16px 0 60px">
-    <div class="v5-tabcard v5-tabcard--deposit" id="v5-deposit">
-        <div class="v5-tabcard__head">Deposit &amp; Payment Options</div>
-        <div class="v5-tabcard__tabs" role="tablist" aria-label="Deposit options">
-            <?php $first = true;
-foreach ($deposit as $key => $group) { ?>
-                <button type="button"<?= $first ? ' class="is-active"' : '' ?> data-tab="<?= esc_attr($key) ?>" role="tab" aria-selected="<?= $first ? 'true' : 'false' ?>"><?= $group[0] ?></button>
-            <?php $first = false;
-} ?>
-        </div>
-        <div class="v5-tabcard__body" id="v5-deposit-body" aria-live="polite"></div>
-    </div>
-    <script>
     (function () {
         var Q = <?= wp_json_encode($deposit) ?>;
         var root = document.getElementById('v5-deposit');
@@ -820,67 +1106,82 @@ foreach ($deposit as $key => $group) { ?>
 <!-- /wp:html -->
 
 <!-- wp:html -->
-<section class="vastore5 v5-band v5-band--purple" style="padding:0 0 60px">
-    <h2 class="v5-heading-36">Bundle Pricing Packages</h2>
-    <h2 class="v5-bundle-intro">Fixed price regardless of hourly rate. <br>Price Match Guarantee: If your total cost was to be cheaper on a one time package, we will refund the difference to match the pricing of the one time packages, but typically the bundles are significantly cheaper. </h2>
-
-    <div class="v5-rates v5-rates--bundle">
-        <?php foreach ($bundleRows as $row) { ?>
-            <div class="v5-rate">
-                <div class="v5-rate__label"><h2><?= esc_html($row[0]) ?></h2></div>
-                <div class="v5-rate__value">
-                    <div class="v5-chip"><h2><?= esc_html($row[1]) ?></h2></div>
-                </div>
-            </div>
-        <?php } ?>
-    </div>
-
-    <div style="margin-top:20px">
-        <a class="v5-btn" href="https://pci.jotform.com/form/252324903849159">Get Started</a>
-    </div>
-</section>
-<!-- /wp:html -->
-
-<!-- wp:html -->
-<section class="vastore5 v5-band" style="margin-top:44px">
-    <div class="v5-obj">
-        <h2 class="v5-obj__title">Objections</h2>
-
-        <div class="v5-obj__intro">
-            <p>When confronted with an objection:</p>
-            <p>1. Make sure to agree with their concern</p>
-            <p>2. Isolate the objection by asking if that's the only thing holding them back or if there are other things they'll want to think about</p>
-            <p>3. Handle those objections one by one</p>
-            <p>4. <b>CLOSE AGAIN</b> after handling the objection, using an assumptive close, as if they now already agree with moving forward.</p>
-            <p>_______________________</p>
-            <p><b>For Example:</b></p>
-            <p>"I want to think it over"</p>
-            <p>Yea of course think it over first, i'm curious though, if you think it over and decide to no proceed, what would the reason be?</p>
-            <p>"Well the price is too high?" Oh ok, is there anything else besides price?</p>
-            <p>"No just the price"</p>
-            <p>"Got it, yea I understand [ HANDLE OBJECTION HERE]</p>
-            <p>So cool, the next step is to do X</p>
-            <p>Then proceed to X as if they just agreed to do whatever it is you want.</p>
-            <p>________________________________</p>
+<section class="vastore5 v5-band v5-band--deep v5-section" id="v5-s-bundles">
+    <div class="v5-inner">
+        <div class="v5-head v5-head--center">
+            <h2>Bundle Pricing Packages</h2>
         </div>
+        <p class="v5-bundle-intro">Fixed price regardless of hourly rate. <br>Price Match Guarantee: If your total cost was to be cheaper on a one time package, we will refund the difference to match the pricing of the one time packages, but typically the bundles are significantly cheaper. </p>
 
-        <div class="v5-acc">
-            <?php foreach ($objections as $item) { ?>
-                <details>
-                    <summary>
-                        <span><?= esc_html($item['q']) ?></span>
-                        <span style="display:flex"><?= $iconPlus ?><?= str_replace('v5-acc__icon', 'v5-acc__icon v5-acc__icon--minus', $iconMinus) ?></span>
-                    </summary>
-                    <div class="v5-acc__body"><?= $item['a'] ?></div>
-                </details>
+        <div class="v5-bundles">
+            <?php foreach ($bundleRows as $row) { ?>
+                <div class="v5-glass v5-bundle">
+                    <div class="v5-bundle__label"><?= esc_html($row[0]) ?></div>
+                    <div class="v5-bundle__value"><strong><?= esc_html($row[1]) ?></strong> <?= esc_html($row[2]) ?></div>
+                </div>
             <?php } ?>
         </div>
+
+        <div class="v5-btn-row">
+            <a class="v5-btn" href="https://pci.jotform.com/form/252324903849159">Get Started</a>
+        </div>
     </div>
 </section>
 <!-- /wp:html -->
 
 <!-- wp:html -->
-<section class="vastore5 v5-band v5-band--grey" style="padding:40px 20px">
+<section class="vastore5 v5-band v5-section" id="v5-s-objections">
+    <div class="v5-inner">
+        <div class="v5-obj">
+            <div class="v5-head v5-head--center">
+                <h2>Objections</h2>
+            </div>
+
+            <div class="v5-obj__intro">
+                <div class="v5-card v5-obj__panel">
+                    <p class="v5-obj__lead">When confronted with an objection:</p>
+                    <div class="v5-obj__steps">
+                        <p>1. Make sure to agree with their concern</p>
+                        <p>2. Isolate the objection by asking if that's the only thing holding them back or if there are other things they'll want to think about</p>
+                        <p>3. Handle those objections one by one</p>
+                        <p>4. <b>CLOSE AGAIN</b> after handling the objection, using an assumptive close, as if they now already agree with moving forward.</p>
+                    </div>
+                    <p class="v5-sep">_______________________</p>
+                </div>
+
+                <div class="v5-card v5-obj__panel">
+                    <p class="v5-obj__lead"><b>For Example:</b></p>
+                    <div class="v5-obj__script">
+                        <p class="is-client">"I want to think it over"</p>
+                        <p class="is-rep">Yea of course think it over first, i'm curious though, if you think it over and decide to no proceed, what would the reason be?</p>
+                        <p class="is-client">"Well the price is too high?" Oh ok, is there anything else besides price?</p>
+                        <p class="is-client">"No just the price"</p>
+                        <p class="is-rep">"Got it, yea I understand [ HANDLE OBJECTION HERE]</p>
+                        <p class="is-rep">So cool, the next step is to do X</p>
+                        <p>Then proceed to X as if they just agreed to do whatever it is you want.</p>
+                    </div>
+                    <p class="v5-sep">________________________________</p>
+                </div>
+            </div>
+
+            <div class="v5-acc">
+                <?php foreach ($objections as $item) { ?>
+                    <details>
+                        <summary>
+                            <span><?= esc_html($item['q']) ?></span>
+                            <span class="v5-acc__ico"><?= $iconPlus ?><?= $iconMinus ?></span>
+                        </summary>
+                        <div class="v5-acc__body"><?= $item['a'] ?></div>
+                    </details>
+                <?php } ?>
+            </div>
+        </div>
+    </div>
+</section>
+<!-- /wp:html -->
+
+<!-- wp:html -->
+<section class="vastore5 v5-band v5-section" id="v5-s-roles">
     <div class="v5-inner">
         <div class="v5-roles">
             <?php foreach ($roleCategories as $cat) { ?>

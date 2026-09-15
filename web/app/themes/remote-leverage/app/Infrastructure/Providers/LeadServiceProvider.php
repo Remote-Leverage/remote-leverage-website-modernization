@@ -15,6 +15,7 @@ use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Listeners\HandleLeadEventsForEmailNotification;
 use App\Domains\Lead\Listeners\HandleLeadEventsForSlack;
 use App\Domains\Lead\Listeners\HandleLeadEventsForWebhook;
+use App\Domains\Lead\Services\GatedAssetResolver;
 use App\Domains\Lead\Services\HubSpotGateway;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\LeadSettingsService;
@@ -35,6 +36,7 @@ class LeadServiceProvider extends ServiceProvider
         $this->app->singleton(PhoneValidationService::class, fn () => new PhoneValidationService);
         $this->app->singleton(LeadSettingsService::class, fn () => new LeadSettingsService);
         $this->app->singleton(HubSpotGateway::class);
+        $this->app->singleton(GatedAssetResolver::class, fn () => new GatedAssetResolver);
         $this->app->singleton(LeadActivityLogger::class, fn () => new LeadActivityLogger);
         $this->app->singleton(HandleLeadEventsForSlack::class);
         $this->app->singleton(HandleLeadEventsForWebhook::class);

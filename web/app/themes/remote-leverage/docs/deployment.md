@@ -118,7 +118,7 @@ Everything below is unbuilt. It is the infrastructure half of the cutover gap in
 
 - No production ECS service, ECR repository, secret store or `deploy-production.yml`.
 - No DNS cutover runbook and no rollback plan.
-- No performance baseline against the targets in `plan.md` (mobile 96+, LCP < 1.2s, CLS 0.00).
+- No performance baseline **on staging**. A local baseline was measured 2026-09-15 — see [performance-baseline.md](performance-baseline.md); the targets are mobile 96+, LCP < 1.2s, CLS 0.00.
 - No SSL/redirect/transactional-email validation checklist.
 - No queue worker (WR-106, on hold) — which is consistent, since no listener queues.
 - No Sentry DSN configured anywhere, so errors in staging are currently unreported.

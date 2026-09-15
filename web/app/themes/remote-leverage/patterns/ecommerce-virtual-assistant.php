@@ -25,6 +25,7 @@ $img = fn (string $file): string => BlockDefaults::ecomImg($file);
 $wrap = 'w-full max-w-[1380px] mx-auto px-5 sm:px-6 lg:px-8';
 $h2 = 'font-display font-bold text-[32px] leading-[38px] sm:text-[42px] sm:leading-[48px] tracking-[-1.26px]';
 $h2Big = 'font-display font-bold text-[34px] leading-[40px] sm:text-[48px] sm:leading-[53px] tracking-[-0.03em]';
+$h3 = 'font-display font-bold text-[22px] leading-[30px] sm:text-[27px] sm:leading-[41px] tracking-[-0.03em]';
 $lead = 'text-[16px] leading-[26px] sm:text-[20px] sm:leading-[30px] tracking-[-0.03em]';
 $pill = 'mt-2.5 flex w-full items-center justify-center rounded-pill bg-brand-purple hover:bg-brand-purple-deep px-8 py-5 text-center font-bold uppercase text-white text-[20px] leading-[30px] transition-colors';
 
@@ -181,10 +182,18 @@ $tableRows = array_map(fn (array $r): array => ['feature' => $r[0], 'diy' => $r[
 
 // ── §9a pricing cards ────────────────────────────────────────────────────────
 // Card 3's label says "Medical VA Average" on an ecommerce page. Production's copy.
+//
+// No `image` here on purpose. Production's markup points these cards at pricing/green-1.png
+// and pricing/green.png, but both are broken on the live page — the <img> reports
+// naturalWidth 0 and complete=false, so the card top renders blank. image-card-grid paints
+// a card image full-bleed at h-[168px], so wiring the (downloaded, intact) files in would
+// stamp a 433px green coin on each card that production never shows. Matching what
+// production *renders* means leaving them out. The files stay under pricing/ for whenever
+// the live page is fixed.
 $pricingCards = [
-    ['image' => $img('pricing/green-1.png'), 'title' => '$6 – 10 hr', 'text' => 'Experienced Professionals', 'cta_text' => 'FIND MY NEXT HIRE', 'cta_url' => '#booking-footer'],
-    ['image' => $img('pricing/green.png'), 'title' => '$11 – 15 hr', 'text' => 'Senior Level Support', 'cta_text' => 'FIND MY NEXT HIRE', 'cta_url' => '#booking-footer', 'emphasis' => 1],
-    ['image' => $img('pricing/green-1.png'), 'title' => '$9.21 hr', 'text' => 'Remote Leverage Medical VA Average', 'cta_text' => 'FIND MY NEXT HIRE', 'cta_url' => '#booking-footer'],
+    ['title' => '$6 – 10 hr', 'text' => 'Experienced Professionals', 'cta_text' => 'FIND MY NEXT HIRE', 'cta_url' => '#booking-footer'],
+    ['title' => '$11 – 15 hr', 'text' => 'Senior Level Support', 'cta_text' => 'FIND MY NEXT HIRE', 'cta_url' => '#booking-footer', 'emphasis' => 1],
+    ['title' => '$9.21 hr', 'text' => 'Remote Leverage Medical VA Average', 'cta_text' => 'FIND MY NEXT HIRE', 'cta_url' => '#booking-footer'],
 ];
 
 // ── §9b talent carousel ──────────────────────────────────────────────────────
@@ -302,8 +311,8 @@ $posts = array_map(fn (array $p): array => ['image' => $img('cards/'.$p[0]), 'ti
 <!-- wp:group {"align":"full","backgroundColor":"bg-light","layout":{"type":"constrained","contentSize":"1380px"}} -->
 <div class="wp-block-group alignfull has-bg-light-background-color has-background py-14 lg:py-20" style="background-color:var(--color-bg-light);">
     <div class="<?= $wrap ?>">
-        <h2 class="<?= $h2 ?> text-black mb-4 max-w-[900px]">World&rsquo;s Best Ecommerce Talent, Hired Directly for You</h2>
-        <p class="<?= $lead ?> text-black mb-10 max-w-[1100px]">You hire talent directly into your business. No subscriptions, no monthly fees, and no markups on salary. Just deep-vetted professionals who know online retail workflows and support your store with the precision and reliability that drives repeat orders.</p>
+        <h2 class="<?= $h2 ?> text-black text-center mx-auto mb-4 max-w-[620px]">World’s Best Ecommerce Talent, Hired Directly for You</h2>
+        <p class="<?= $lead ?> text-black text-center mx-auto mb-10 max-w-[620px]">You hire talent directly into your business. No subscriptions, no monthly fees, and no markups on salary. Just deep-vetted professionals who know online retail workflows and support your store with the precision and reliability that drives repeat orders.</p>
 
         <?= BlockDefaults::renderFeatureCards('3', [], $talentCards, '411/157') ?>
     </div>
@@ -314,12 +323,19 @@ $posts = array_map(fn (array $p): array => ['image' => $img('cards/'.$p[0]), 'ti
 <!-- wp:group {"align":"full","layout":{"type":"constrained","contentSize":"1380px"}} -->
 <div class="wp-block-group alignfull py-14 lg:py-20" style="background-color:#DDE2F6;">
     <div class="<?= $wrap ?>">
-        <h2 class="<?= $h2Big ?> text-black mb-4">Scale your brand<br>smarter, faster</h2>
-        <p class="<?= $lead ?> text-black mb-10 max-w-[1100px]">Ecommerce Virtual Assistant&rdquo; covers a wide range of tasks that can help your brand grow. Tell us which of these looks like your open role and we will shortlist against it specifically.</p>
+        <h2 class="<?= $h2Big ?> text-black text-center mx-auto mb-4">Scale your brand<br>smarter, faster</h2>
+        <p class="<?= $lead ?> text-black text-center mx-auto mb-10 max-w-[700px]">Ecommerce Virtual Assistant” covers a wide range of tasks that can help your brand grow. Tell us which of these looks like your open role and we will shortlist against it specifically.</p>
     </div>
 
+    <?php
+    // roles-pricing-grid's with() falls back to its own "Virtual Assistant Roles" headline
+    // whenever the field is falsy, so an empty headline is impossible and the block would
+    // add a heading production does not have. An empty span suppresses the text; the real
+    // (48px, centred) heading is rendered above. The block wants a "no headline" option.
+    $s3Suppress = '<span class="sr-only"></span>';
+?>
     <?= BlockDefaults::renderEcom('roles-pricing-grid', $roleCards, [
-        'headline' => '',
+        'headline' => $s3Suppress,
         'variant' => 'split-chip',
         'columns' => '2',
     ]) ?>
@@ -343,8 +359,8 @@ $posts = array_map(fn (array $p): array => ['image' => $img('cards/'.$p[0]), 'ti
 <!-- wp:group {"align":"full","backgroundColor":"bg-light","layout":{"type":"constrained","contentSize":"1380px"}} -->
 <div class="wp-block-group alignfull has-bg-light-background-color has-background py-14 lg:py-20" style="background-color:var(--color-bg-light);">
     <div class="<?= $wrap ?>">
-        <h2 class="<?= $h2 ?> text-black mb-4">Built to help you grow</h2>
-        <p class="<?= $lead ?> text-black mb-10 max-w-[1100px]">Giving someone the keys to your store is the real hesitation, not the hourly rate. Every candidate in our ecommerce talent pool comes prepared to work inside your platforms with the right permissions and the right habits.<br><strong>We&rsquo;ve helped thousands of businesses scale faster.</strong></p>
+        <h2 class="<?= $h2 ?> text-black text-center mx-auto mb-4">Built to help you grow</h2>
+        <p class="<?= $lead ?> text-black text-center mx-auto mb-10 max-w-[620px]">Giving someone the keys to your store is the real hesitation, not the hourly rate. Every candidate in our ecommerce talent pool comes prepared to work inside your platforms with the right permissions and the right habits.<br><strong>We’ve helped thousands of businesses scale faster.</strong></p>
 
         <?= BlockDefaults::renderFeatureCards('2', [], $growCards, '', 'flush') ?>
     </div>
@@ -377,16 +393,24 @@ $posts = array_map(fn (array $p): array => ['image' => $img('cards/'.$p[0]), 'ti
 
 <!-- ============ §9a THE MATH BEHIND 70% SAVINGS ============ -->
 <?php
-// image-card-grid carries one headline and one subheadline. Production runs an <h3>
-// ("Hourly Rates for Medical and Healthcare VAs") between the subheadline and the grid,
-// which the block has no field for, so it rides along inside the subheadline as a styled
-// block-level span. Reported to the coordinator rather than patched into the block.
-$mathSub = 'Hire the same talent, with the same experience &ndash; at 70% the cost of a US hire. No recurring fees, no contracts. 100% of the agreed-upon wage goes to your hire.'
-    .'<span class="block font-display font-bold text-black text-[22px] leading-[30px] sm:text-[27px] sm:leading-[41px] tracking-[-0.03em] mt-8">Hourly Rates for Medical and Healthcare VAs</span>';
+// Production centres this heading trio and puts a real <h3> between the intro and the
+// grid. image-card-grid renders its headline/subheadline left-aligned in a 660px column
+// and has no field for a sub-heading, so the copy is rendered here and the block is left
+// to draw the cards alone. The block wants an alignment option and a sub-heading field.
 ?>
+<!-- wp:group {"align":"full","backgroundColor":"bg-light","layout":{"type":"constrained","contentSize":"1380px"}} -->
+<div class="wp-block-group alignfull has-bg-light-background-color has-background pt-14 lg:pt-20" style="background-color:var(--color-bg-light);">
+    <div class="<?= $wrap ?>">
+        <h2 class="<?= $h2Big ?> text-black text-center mx-auto mb-4 max-w-[680px]">The math behind 70% savings</h2>
+        <p class="<?= $lead ?> text-black text-center mx-auto max-w-[800px]">Hire the same talent, with the same experience &ndash; at 70% the cost of a US hire. No recurring fees, no contracts. 100% of the agreed-upon wage goes to your hire.</p>
+        <h3 class="<?= $h3 ?> text-black text-center mx-auto mt-10 max-w-[620px]">Hourly Rates for Medical and Healthcare VAs</h3>
+    </div>
+</div>
+<!-- /wp:group -->
+
 <?= BlockDefaults::renderEcom('image-card-grid', $pricingCards, [
-    'headline' => 'The math behind 70% savings',
-    'subheadline' => $mathSub,
+    'headline' => '',
+    'subheadline' => '',
     'columns' => 3,
     'card_title_size' => 'large',
     'cta_text' => '',
@@ -396,8 +420,8 @@ $mathSub = 'Hire the same talent, with the same experience &ndash; at 70% the co
 <!-- wp:group {"align":"full","backgroundColor":"bg-light","layout":{"type":"constrained","contentSize":"1380px"}} -->
 <div class="wp-block-group alignfull has-bg-light-background-color has-background pb-6" style="background-color:var(--color-bg-light);">
     <div class="<?= $wrap ?>">
-        <p class="text-[15px] leading-[24px] text-black mb-8 max-w-[1100px]">For comparison, an in-house ecommerce specialist in the U.S. averages $19.84 an hour before payroll taxes, benefits, and overhead push the real number 25% to 40% higher.</p>
-        <p class="<?= $lead ?> text-black max-w-[1100px]">Remote Leverage provides professionals with highly competitive salaries that domestic markets simply can&rsquo;t match</p>
+        <p class="text-[15px] leading-[24px] text-black mb-8">For comparison, an in-house ecommerce specialist in the U.S. averages $19.84 an hour before payroll taxes, benefits, and overhead push the real number 25% to 40% higher.</p>
+        <p class="<?= $lead ?> text-black">Remote Leverage provides professionals with highly competitive salaries that domestic markets simply can&rsquo;t match</p>
     </div>
 </div>
 <!-- /wp:group -->
@@ -413,7 +437,7 @@ $mathSub = 'Hire the same talent, with the same experience &ndash; at 70% the co
 
 <!-- ============ §10 COMMITTED TO HELPING BUSINESSES GROW ============ -->
 <?= BlockDefaults::renderCtaBanner([
-    'headline' => 'We&rsquo;re committed to helping businesses and professionals grow &ndash; wherever they are in the world.',
+    'headline' => 'We’re committed to helping businesses and professionals grow – wherever they are in the world.',
     'subheadline' => '',
     'cta_text' => 'FIND MY NEXT HIRE',
     'cta_url' => '#booking-footer',
@@ -439,7 +463,7 @@ $mathSub = 'Hire the same talent, with the same experience &ndash; at 70% the co
 
 <!-- ============ §12b VIDEO TESTIMONIAL ============ -->
 <?= BlockDefaults::renderMediaCopy([
-    'headline' => '&ldquo;It wasn&rsquo;t about paying less for an employee &ndash; it was really about finding someone with work ethic.&rdquo;',
+    'headline' => '“It wasn’t about paying less for an employee – it was really about finding someone with work ethic.”',
     'body' => '<p>Stacy Do, Indoor Air Programs, Cincinnati, Ohio</p>',
     'video_url' => 'https://remoteleverage.com/wp-content/uploads/2026/08/5-minute-VSL_Horizontal_V01.mp4',
     'image' => '',
@@ -467,8 +491,8 @@ $mathSub = 'Hire the same talent, with the same experience &ndash; at 70% the co
 <!-- wp:group {"align":"full","layout":{"type":"constrained","contentSize":"1380px"}} -->
 <div class="wp-block-group alignfull pt-14 lg:pt-20" style="background-color:var(--color-bg-light);">
     <div class="<?= $wrap ?>">
-        <h2 class="<?= $h2 ?> text-black mb-4">Meet Our Talent</h2>
-        <p class="<?= $lead ?> text-black max-w-[1100px]">All of our talent is rigorously vetted, particularly for English fluency. Hear real recordings of Remote Leverage talent.</p>
+        <h2 class="<?= $h2 ?> text-black text-center mx-auto mb-4">Meet Our Talent</h2>
+        <p class="<?= $lead ?> text-black text-center mx-auto max-w-[620px]">All of our talent is rigorously vetted, particularly for English fluency. Hear real recordings of Remote Leverage talent.</p>
     </div>
 </div>
 <!-- /wp:group -->

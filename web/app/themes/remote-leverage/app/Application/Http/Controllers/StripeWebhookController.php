@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Http\Controllers;
 
+use App\Application\Http\Support\WebhookSignature;
 use App\Domains\Referral\Models\Payout;
 use App\Domains\Referral\Models\Referrer;
 use Illuminate\Http\JsonResponse;
@@ -20,15 +21,12 @@ use Illuminate\Support\Facades\Log;
  * the downstream automations (n8n / Customer.io) expect, and forwarded to
  * `services.stripe.webhook_forward_url`.
  *
- * Signature verification is also ported from that handler. It did not exist here before, and
- * it is not optional now that this endpoint forwards its input to an external system: without
- * it anyone who knows the URL can post a fabricated "payment succeeded" and drive onboarding.
+ * Signature verification is mandatory and fails closed: without a configured signing secret the
+ * endpoint refuses every request rather than processing it. This endpoint forwards its input to
+ * an external system, so an unverified "payment succeeded" would drive real onboarding.
  */
 class StripeWebhookController
 {
-    /** Reject events older than this, as Stripe's own libraries do. */
-    protected const SIGNATURE_TOLERANCE = 300;
-
     /**
      * Handle incoming Stripe webhook payload.
      */
@@ -36,23 +34,26 @@ class StripeWebhookController
     {
         $webhookSecret = (string) (config('services.stripe.webhook_secret') ?? '');
 
-        if ($webhookSecret !== '') {
-            $error = $this->verifyStripeSignature(
-                $request->getContent(),
-                (string) $request->header('Stripe-Signature', ''),
-                $webhookSecret,
-            );
+        if ($webhookSecret === '') {
+            // Fail closed. The legacy rl-elementor-blocks handler logged a warning and processed
+            // anyway, which meant anyone who knew the URL could post a fabricated
+            // `payment_intent.succeeded` and drive onboarding. An unconfigured environment now
+            // goes dark instead of going open: set STRIPE_WEBHOOK_SECRET everywhere.
+            Log::critical('Stripe Webhook: refused, no signing secret configured (STRIPE_WEBHOOK_SECRET).');
 
-            if ($error !== null) {
-                Log::error('Stripe Webhook: signature verification failed', ['error' => $error]);
+            return response()->json(['error' => 'Webhook signing secret is not configured.'], 503);
+        }
 
-                return response()->json(['error' => 'Signature verification failed.'], 403);
-            }
-        } else {
-            // Legacy parity: rl-elementor-blocks logged a warning and processed anyway when no
-            // signing secret was configured. Kept so an environment mid-migration keeps working,
-            // but this is fail-open — set STRIPE_WEBHOOK_SECRET in every environment.
-            Log::warning('Stripe Webhook: no signing secret configured, processing without verification.');
+        $error = WebhookSignature::verify(
+            $request->getContent(),
+            (string) $request->header('Stripe-Signature', ''),
+            $webhookSecret,
+        );
+
+        if ($error !== null) {
+            Log::error('Stripe Webhook: signature verification failed', ['error' => $error]);
+
+            return response()->json(['error' => 'Signature verification failed.'], 403);
         }
 
         $payload = $request->all();
@@ -151,50 +152,6 @@ class StripeWebhookController
         }
 
         $this->forwardToExternal($forwardUrl, $enriched);
-    }
-
-    /**
-     * Verify the Stripe webhook signature (HMAC-SHA256).
-     *
-     * Ported verbatim in behaviour from StripeWebhookHandler::verify_stripe_signature().
-     *
-     * @return string|null Null when the signature is valid; otherwise the reason it is not.
-     */
-    protected function verifyStripeSignature(string $payload, string $signatureHeader, string $secret): ?string
-    {
-        if ($signatureHeader === '') {
-            return 'Missing Stripe-Signature header.';
-        }
-
-        $parts = [];
-
-        foreach (explode(',', $signatureHeader) as $part) {
-            $kv = explode('=', $part, 2);
-
-            if (count($kv) === 2) {
-                $parts[trim($kv[0])] = trim($kv[1]);
-            }
-        }
-
-        $timestamp = $parts['t'] ?? '';
-        $signature = $parts['v1'] ?? '';
-
-        if ($timestamp === '' || $signature === '') {
-            return 'Invalid Stripe-Signature format.';
-        }
-
-        if (abs(time() - (int) $timestamp) > self::SIGNATURE_TOLERANCE) {
-            return 'Webhook timestamp outside tolerance window.';
-        }
-
-        $expected = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
-
-        // Constant-time: a timing-variant compare leaks the expected digest byte by byte.
-        if (! hash_equals($expected, $signature)) {
-            return 'Webhook signature does not match.';
-        }
-
-        return null;
     }
 
     /**

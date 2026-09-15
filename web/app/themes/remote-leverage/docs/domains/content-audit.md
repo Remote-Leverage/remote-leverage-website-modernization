@@ -70,6 +70,7 @@ live-call behaviour in v2 is the `/live-call/connect` route, not a block, so a h
 | `ConvertElementorPostAction` | AST → Gutenberg block comments (pure; does not write) |
 | `ApplyElementorConversionAction` | Persists the conversion and the review status; `approve()` archives `_elementor_data` |
 | `ElementorProseExtractor` | Pulls readable prose out of *rendered* Elementor HTML — `extract()`, `summary()`, `faqs()`. Used by the blog import, where the source is scraped HTML rather than an AST. |
+| `YoastMetaMapper` | Pure. Production's `yoast_head_json` → `_yoast_wpseo_*` postmeta, with canonical rewriting and Search Appearance template detection — see [seo-meta-migration.md](../seo-meta-migration.md) |
 | `PrismAiAuditor` | AI-assisted content review over markdown |
 | `AuditMarkdownContentAction` | Wraps the auditor |
 | `GenerateSignatureHtmlAction` | Email-signature HTML (below) |
@@ -87,6 +88,11 @@ wp acorn content:convert-elementor --post_id=123
 
 # Import blog posts from captured production JSON
 wp acorn content:import-posts
+
+# Carry production's Yoast SEO meta onto local content, matched by slug.
+# Canonicals are rewritten off the production host — see docs/seo-meta-migration.md.
+wp acorn content:import-seo --dry-run
+wp acorn content:import-seo
 
 # Regenerate docs/block-inventory.md — the "what already exists" index that page authors
 # read before writing markup. --check fails if the committed file is stale (CI-friendly).
@@ -123,4 +129,4 @@ wp acorn tinker --execute="echo app(\App\Domains\ContentAudit\Actions\GenerateSi
 
 ## Tests
 
-`tests/Unit/ElementorAuditTest.php` (AST traversal, unmapped flagging, block-comment validity) and `tests/Unit/ElementorProseExtractorTest.php`.
+`tests/Unit/ElementorAuditTest.php` (AST traversal, unmapped flagging, block-comment validity), `tests/Unit/ElementorProseExtractorTest.php`, and `tests/Unit/YoastMetaMapperTest.php` (canonical rewriting, meta extraction, site-template detection).
