@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Domains\Sync\Abilities\PurgeTransferLogsAbility;
 use App\Domains\Sync\Datasets\DatasetRegistry;
 use App\Domains\Sync\SyncNotPermittedException;
+use App\Domains\Sync\Transfer\Pull\PullJobStore;
+use App\Domains\Sync\Transfer\Push\PushJobStore;
 use App\Domains\Sync\Transfer\SessionStore;
 use App\Domains\Sync\Transfer\TransferLogPurger;
 use App\Domains\Sync\Transfer\TransferManifest;
@@ -31,7 +33,14 @@ beforeEach(function () {
     $this->registry = new DatasetRegistry;
     $this->sessions = new SessionStore($this->registry);
     $this->undoLogs = new UndoLogFactory;
-    $this->purger = new TransferLogPurger($this->sessions, $this->undoLogs);
+    $this->pushJobs = new PushJobStore($this->registry);
+    $this->pullJobs = new PullJobStore($this->registry);
+    $this->purger = new TransferLogPurger(
+        $this->sessions,
+        $this->undoLogs,
+        $this->pushJobs,
+        $this->pullJobs,
+    );
 });
 
 afterEach(function () {
@@ -141,5 +150,66 @@ describe('the ability wrapper', function () {
 
         expect($result['ok'])->toBeFalse()
             ->and($result['error'])->toContain('still');
+    });
+});
+
+/**
+ * Jobs are the other half of "the transfer logs", and the half that lives on
+ * the *sending* side. Clearing only sessions left the push history behind on
+ * local, which is precisely the list the admin screen shows you.
+ */
+describe('job records', function () {
+    it('clears push and pull history too', function () {
+        $manifest = TransferManifest::fromArray([
+            'direction' => 'push',
+            'datasets' => ['content'],
+        ], $this->registry);
+
+        $push = $this->pushJobs->create($manifest, 'staging');
+        $push->phase = 'done';
+        $this->pushJobs->save($push);
+
+        $pull = $this->pullJobs->create(TransferManifest::fromArray([
+            'direction' => 'pull',
+            'datasets' => ['content'],
+        ], $this->registry), 'staging');
+        $pull->phase = 'done';
+        $this->pullJobs->save($pull);
+
+        $result = $this->purger->purge();
+
+        expect($result['push_jobs'])->toBe(1)
+            ->and($result['pull_jobs'])->toBe(1)
+            ->and($this->pushJobs->ids())->toBe([])
+            ->and($this->pullJobs->ids())->toBe([]);
+    });
+
+    it('refuses while a push is still in progress', function () {
+        $this->pushJobs->create(TransferManifest::fromArray([
+            'direction' => 'push',
+            'datasets' => ['content'],
+        ], $this->registry), 'staging');
+
+        expect(fn () => $this->purger->purge())
+            ->toThrow(RuntimeException::class, 'push is still in progress');
+
+        expect($this->pushJobs->ids())->toHaveCount(1);
+    });
+
+    it('leaves the session history alone when it refuses', function () {
+        purgeSession($this->sessions, $this->registry);
+
+        $this->pushJobs->create(TransferManifest::fromArray([
+            'direction' => 'push',
+            'datasets' => ['content'],
+        ], $this->registry), 'staging');
+
+        try {
+            $this->purger->purge();
+        } catch (RuntimeException) {
+            // expected
+        }
+
+        expect($this->sessions->ids())->toHaveCount(1);
     });
 });

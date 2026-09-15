@@ -112,6 +112,26 @@ class PushJobStore
         return is_array($index) ? array_values(array_filter($index, 'is_string')) : [];
     }
 
+    /**
+     * Delete every job record, returning how many were removed.
+     *
+     * History only. Unlike a session's undo log, a job holds nothing that can
+     * restore anything — it is the sending side's bookmark through a
+     * conversation that has already ended.
+     */
+    public function purgeAll(): int
+    {
+        $ids = $this->ids();
+
+        foreach ($ids as $id) {
+            delete_option(self::OPTION_PREFIX.$id);
+        }
+
+        $this->writeIndex([]);
+
+        return count($ids);
+    }
+
     private function prune(): void
     {
         $ids = $this->ids();

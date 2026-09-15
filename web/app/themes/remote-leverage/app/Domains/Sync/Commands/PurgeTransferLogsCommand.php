@@ -102,9 +102,11 @@ class PurgeTransferLogsCommand extends Command
     private function report(array $result): void
     {
         $this->info(sprintf(
-            'Deleted %d session record(s) and %d undo log(s).',
+            'Deleted %d session record(s), %d undo log(s), %d push job(s), %d pull job(s).',
             (int) ($result['sessions'] ?? 0),
             (int) ($result['undo_logs'] ?? 0),
+            (int) ($result['push_jobs'] ?? 0),
+            (int) ($result['pull_jobs'] ?? 0),
         ));
     }
 }

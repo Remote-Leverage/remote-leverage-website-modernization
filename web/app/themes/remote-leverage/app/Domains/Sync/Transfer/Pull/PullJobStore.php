@@ -112,6 +112,26 @@ class PullJobStore
         return is_array($index) ? array_values(array_filter($index, 'is_string')) : [];
     }
 
+    /**
+     * Delete every job record, returning how many were removed.
+     *
+     * History only — see the note on PushJobStore::purgeAll(). The undo log for
+     * a pull is a separate thing, held here because this side did the importing,
+     * and it is cleared by TransferLogPurger alongside the session.
+     */
+    public function purgeAll(): int
+    {
+        $ids = $this->ids();
+
+        foreach ($ids as $id) {
+            delete_option(self::OPTION_PREFIX.$id);
+        }
+
+        $this->writeIndex([]);
+
+        return count($ids);
+    }
+
     private function prune(): void
     {
         $ids = $this->ids();
