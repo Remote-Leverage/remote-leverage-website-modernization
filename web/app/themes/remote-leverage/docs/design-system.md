@@ -34,6 +34,26 @@ Tailwind v4 — everything is declared with `@theme` in `resources/css/app.css`.
 
 Surfaces (`--color-bg-light` `#F4F6FC`, `--color-bg-map` `#E4ECFC`, `--color-bg-benefits` `#FFF5FD`, `--color-roles-surface` `#250D4A`), semantic table colours (`--color-table-leverage` `#00D982`, `--color-table-competitor` `#D94900`), check/cross (`#94DB49` / `#DB4437`), and a set of glassmorphism alpha tokens round it out.
 
+### Blocks extended for the ecommerce page (2026-09-15)
+
+Seven existing blocks gained options rather than being forked, each defaulting to its previous
+behaviour so no other page moved. Reach for these before building anything new:
+
+| Block | Option added |
+| :--- | :--- |
+| `acf/feature-cards` | `columns: 2`; the card image is now optional (text-only cards) |
+| `acf/image-card-grid` | per-card `cta_text` / `cta_url`, and `emphasis` for a black-outlined featured card |
+| `acf/partner-hero` | `tone: light`, plus a `badges` repeater for the checked pill grid |
+| `acf/roles-pricing-grid` | `variant: split-chip` and `columns: 2`, with per-card chip fields |
+| `acf/talent-carousel` | `layout: full` — drops the left copy column |
+| `acf/cta-banner` | `tone: light`, overridable `gradient_start` / `gradient_end`, `align: split` |
+| `acf/guarantee-card` | `background: flat-midnight`, and a toggle for the three reassurance items |
+| `acf/media-copy` | optional `video_url` — the media slot becomes a player, the image its poster |
+
+Two extensions in the original plan turned out to be unnecessary: a trusted-by eyebrow and a
+"Meet Our Talent" subheadline can both come from the pattern, because those blocks render no
+heading of their own. Check that before widening a block.
+
 ### Two stat surfaces, deliberately
 
 `acf/trust-stats` and `acf/stats-band` carry the same three company figures. They are not

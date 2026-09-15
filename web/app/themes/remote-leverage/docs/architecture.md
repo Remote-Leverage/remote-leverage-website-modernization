@@ -219,8 +219,33 @@ WP-Cron, registered in the providers. There is no queue worker and no system cro
 - **Livewire's script tag is deferred and lazily cloned.** `resources/js/app.js` clones `livewire.min.js` from a `<template id="rl-livewire-scripts">` when a Livewire island approaches the viewport; `defer` is the fallback. This is why Livewire does not cost anything on pages that have no components.
 - Core block library CSS (`wp-block-library`, `classic-theme-styles`, `global-styles`) is dequeued on the front end, and `should_load_separate_core_block_assets` is forced off.
 
+### Pages that describe their own chrome
+
+Two page-level decisions are made by the page rather than by a template assignment or a slug list,
+because page content here is a single `wp:pattern` reference and the thing being decided lives
+inside the pattern. Both work by walking the pattern registry from `post_content`
+(`PageChrome::contentHasMarker()`, capped at four levels of pattern reference).
+
+| Decision | Declared by | Resolved by |
+| :--- | :--- | :--- |
+| Drop the site nav for a conversion page | `acf/hire-va-hero` or `acf/consult-landing-hero` in the page, **or** the marker `rl:cta-only-header` | `App\Support\PageChrome::usesCtaOnlyHeader()` → `layouts/app.blade.php` picks `sections.header-cta` over `sections.header` |
+| Keep a page out of search results | the marker `rl:noindex` | `App\Support\PageRobots::filter()` on `wp_robots` (registered in `app/setup.php`) |
+
+The marker form exists for pages whose hero is hand-written rather than a block — the P4 campaign
+families in `resources/patterns/steal-campaign.php` and `va-roles-landing.php` emit
+`rl:cta-only-header` inside their opening banner comment. A block-backed page needs no marker;
+listing its block in `PageChrome::CTA_ONLY_HEADER_BLOCKS` is enough.
+
+**`rl:noindex` has no visible effect locally.** Bedrock's `bedrock-disallow-indexing` mu-plugin
+already noindexes every non-production environment, so a local page looks correctly excluded
+whether or not the filter runs. It exists so the exclusion survives into production, where that
+mu-plugin stops applying. Verify it with
+`wp eval '…PageRobots::currentPageIsNoindex()'` rather than by reading the local `<meta>` tag.
+It controls indexing only — a noindex page is still served to anyone holding the URL, so it is
+**not** access control. `/vastore5/` is the current user (internal sales collateral).
+
 ## 8. Testing
 
-422 Pest tests, 1368 assertions, in `tests/Unit` and `tests/Feature`. `tests/stubs.php` and `tests/bootstrap.php` provide WordPress function stubs so the suite runs with **no WordPress and no database** — which is why it is fast (~8s) and why it can gate every PR in CI.
+672 Pest tests, 2525 assertions, in `tests/Unit` and `tests/Feature` (2026-09-15). `tests/stubs.php` and `tests/bootstrap.php` provide WordPress function stubs so the suite runs with **no WordPress and no database** — which is why it is fast (~8s) and why it can gate every PR in CI.
 
 That also bounds what it can prove: it verifies domain logic, DTOs, attribution, block/pattern grammar and sync mechanics, not real WordPress integration. There is no browser or visual-regression layer (WR-103, deliberately not built — see [adr-status.md](adr-status.md)).

@@ -39,15 +39,23 @@ Local DB totals at verification: **22 pages, 119 posts, 23 case studies, 3 partn
 > The one exception is a genuine duplicate slug serving identical content, which is
 > handled by a codebase redirect rather than a rebuilt page (see §2).
 
-**Score: 47 of 48 migrated (98%). 1 remaining.**
+**Score: 48 of 48 built (100%). 1 page cannot go live yet.**
 
-_P4's 14 campaign pages were added 2026-09-15. The count was 33 when that edit landed; if a
-P2/P3 row closed concurrently this line may lag by one — the per-priority sections below are
-authoritative._
+Every priority section below is closed: P0 cleared, P1 cleared, P2 built, P3 complete, P4
+cleared. The one outstanding item is not an unbuilt page —
+`/virtual-assistant-hiring-manager-refundable-deposit/` is visually complete but **cannot take
+a payment until Stripe credentials are moved** (see P2). Nothing else is waiting on
+engineering.
+
+_Reconciled 2026-09-15 after P3 and P4 closed concurrently and the running total briefly
+disagreed with the sections. The per-priority sections are authoritative; §1's table counts
+table rows (34), not URLs, because several rows cover many URLs — `/blog/` carries 119 posts,
+one row carries all 23 case studies, and P4's 14 campaign pages are listed in their own
+section._
 
 ---
 
-## 1. ✅ Migrated (33)
+## 1. ✅ Migrated (34)
 
 | # | Production URL | v2 implementation |
 |---|---|---|
@@ -70,6 +78,7 @@ authoritative._
 | — | `/spanish/` | page ID 1000038 → `patterns/spanish-full.php` |
 | — | `/hire-for-less/` | page ID 1000031 → `patterns/hire-for-less-full.php` |
 | — | `/social-media-kit/` | Laravel route, `routes/web.php` → `pages/social-media-kit.blade.php` |
+| — | `/ecommerce-virtual-assistant/` | page ID 1000064 → `patterns/ecommerce-virtual-assistant.php` |
 | — | `/hire-va-4/` | page ID 1000000 → `patterns/hire-va-4-full.php` (migrated 2026-09-14) |
 | — | `/vacalendar/` | page ID 1000002 → `patterns/vacalendar-full.php` |
 | — | `/samples/` | page ID 1000005 → `patterns/samples-content.php` |
@@ -253,14 +262,14 @@ things need a human decision before this page goes live:
 
 Nothing was verified against Stripe end to end, because no key was available.
 
-### P3 — Marketing / content pages — 3 of 4 done 2026-09-15
+### P3 — Marketing / content pages — ✅ COMPLETE 2026-09-15
 
 | Page | State |
 |---|---|
 | `/spanish/` | ✅ page ID 1000038 → `patterns/spanish-full.php` |
 | `/hire-for-less/` | ✅ page ID 1000031 → `patterns/hire-for-less-full.php` |
 | `/social-media-kit/` | ✅ **a route**, not a page — see below |
-| `/ecommerce-virtual-assistant/` | ❌ remaining |
+| `/ecommerce-virtual-assistant/` | ✅ page ID 1000064 → `patterns/ecommerce-virtual-assistant.php` |
 
 **`/spanish/`** is the homepage funnel in Spanish (minus the client-logo strip and the
 trust-and-impact band). Nine `spanish-*.php` patterns, no new blocks — every section reuses
@@ -278,12 +287,41 @@ See [docs/social-media-kit.md](web/app/themes/remote-leverage/docs/social-media-
 WordPress page with that slug would shadow the route; the one created during the build was
 trashed.
 
-**`/ecommerce-virtual-assistant/`** is the one left. A full section-by-section spec exists
-(17 sections; 8 straight block reuses, 9 block extensions, 3 new blocks). Direction as of
-2026-09-15 is **copy production as-is**, including its content bugs — the page's `<title>`
-says "Hire Power Dialers from LATAM", the Featured Content block renders telehealth posts, the
-talent cards show medical software logos, and a pricing card reads "Remote Leverage Medical VA
-Average". These are reproduced, not corrected.
+**`/ecommerce-virtual-assistant/`** — 17 sections, **96% of production height** (16,780 vs
+17,449px), 147 images with none broken, no horizontal overflow. Built from 7 block extensions
+and 3 new blocks (`acf/talent-dossier-carousel`, `acf/stats-band`, `acf/featured-posts`); every
+extension defaults to today's behaviour, and 14 pages using those blocks were swept for
+regressions.
+
+Direction as of 2026-09-15 is **copy production as-is, content bugs included** — this
+supersedes an earlier call to fix the title and repoint the blog feed. Reproduced verbatim and
+individually verified in the rendered page: the `<title>` "Hire Power Dialers from LATAM", the
+"Hourly Rates for Medical and Healthcare VAs" heading, the "Remote Leverage Medical VA Average"
+pricing card, medical software logos on all 8 talent dossiers, four telehealth Featured Content
+posts, the malformed `41,920,00` / "Economic Impact Create", the "Montly" misspelling, and the
+duplicated card descriptions in §2 and §3. **Do not "fix" these in passing.**
+
+One deliberate departure: §9a's pricing cards ship with **no images**. Production references
+`green.png` / `green-1.png` but both are broken on the live page (`naturalWidth 0`), so those
+card tops render blank. The block paints card images full-bleed at 168px, so wiring the intact
+files in would have stamped a large green coin on each card that production never shows.
+Matching what production *renders* meant leaving them out; the files are on disk and the
+reasoning is commented in the pattern.
+
+#### Block gaps this page worked around — worth revisiting
+
+Logged rather than papered over, because each is a real limitation the next migration will hit:
+
+- **`acf/roles-pricing-grid` cannot render without a headline.** `with()` does
+  `get_field('headline') ?: 'Virtual Assistant Roles'`, so an empty value is impossible and the
+  block injects a heading production lacks. The pattern suppresses it with an empty `sr-only`
+  span, which leaves an empty `<h2>` in the DOM. Wants a real "no headline" option.
+- **`acf/image-card-grid` has no alignment option**, no slot for the `<h3>` production puts
+  between the subheadline and the grid, and no trailing-copy field. The pattern renders all
+  three around the block instead.
+- **`acf/talent-carousel`'s `layout=full` hides the headline** along with the copy column,
+  contradicting the view's own comment that the intent was a full-width carousel *under its own
+  heading*. The pattern supplies the heading from a wrapper.
 
 #### `/hire-va-4/` corrected alongside (§1 row, was drifted)
 
@@ -325,20 +363,23 @@ config. Adding a sixth variant of any family is a config file, not a rebuild.
 
 | Production URL | ID | Pattern | Shared template | vs prod height |
 |---|---|---|---|---|
-| `/1monthonus-flp/` | 1000044 | `patterns/1monthonus-flp.php` | `consultation-landing.php` | 99.7% |
-| `/hire-va-email/` | 1000045 | `patterns/hire-va-email.php` | `consultation-landing.php` | 99.6% |
-| `/hire-virtual-assistants-…-variant/` | 1000046 | `patterns/…-variant.php` | `consultation-landing.php` | 99.8% |
-| `/hire-virtual-assistants-…-variant-b/` | 1000047 | `patterns/…-variant-b.php` | `consultation-landing.php` | 99.5% |
-| `/hire-virtual-assistants-…-variant-c/` | 1000048 | `patterns/…-variant-c.php` | `consultation-landing.php` | 99.2% |
-| `/hire-real-estate-virtual-assistants-flp/` | 1000049 | `patterns/hire-real-estate-virtual-assistants-flp.php` | `consultation-landing.php` | 99.6% |
-| `/hire-va-1st-month-free/` | 1000040 | `patterns/hire-va-1st-month-free.php` | `hire-va-campaign.php` | 110% |
-| `/hire-va-6/` | 1000041 | `patterns/hire-va-6.php` | `hire-va-campaign.php` | 107% |
-| `/1monthonus/` | 1000052 | `patterns/1monthonus.php` | `va-roles-landing.php` | 101.4% |
-| `/hire-va-isolated-form/` | 1000053 | `patterns/hire-va-isolated-form.php` | `va-roles-landing.php` | 101.2% |
-| `/stealing-jobs/` | 1000056 | `patterns/stealing-jobs.php` | `steal-campaign.php` | 103.3% |
-| `/stealing-jobs-lp/` | 1000058 | `patterns/stealing-jobs-lp.php` | `steal-campaign.php` | 104.2% |
-| `/steal-back-your-time/` | 1000060 | `patterns/steal-back-your-time.php` | `steal-campaign.php` | 103.8% |
-| `/vastore5/` | 1000050 | `patterns/vastore5.php` | — (one-off) | 105.1% (content 100%) |
+| `/1monthonus-flp/` | 1000044 | `patterns/1monthonus-flp.php` | `consultation-landing.php` | 99.0% |
+| `/hire-va-email/` | 1000045 | `patterns/hire-va-email.php` | `consultation-landing.php` | 98.9% |
+| `/hire-virtual-assistants-…-variant/` | 1000046 | `patterns/…-variant.php` | `consultation-landing.php` | 99.1% |
+| `/hire-virtual-assistants-…-variant-b/` | 1000047 | `patterns/…-variant-b.php` | `consultation-landing.php` | 98.8% |
+| `/hire-virtual-assistants-…-variant-c/` | 1000048 | `patterns/…-variant-c.php` | `consultation-landing.php` | 98.5% |
+| `/hire-real-estate-virtual-assistants-flp/` | 1000049 | `patterns/hire-real-estate-virtual-assistants-flp.php` | `consultation-landing.php` | 98.9% |
+| `/hire-va-1st-month-free/` | 1000040 | `patterns/hire-va-1st-month-free.php` | `hire-va-campaign.php` | 108.9% |
+| `/hire-va-6/` | 1000041 | `patterns/hire-va-6.php` | `hire-va-campaign.php` | 105.7% |
+| `/1monthonus/` | 1000052 | `patterns/1monthonus.php` | `va-roles-landing.php` | 99.4% |
+| `/hire-va-isolated-form/` | 1000053 | `patterns/hire-va-isolated-form.php` | `va-roles-landing.php` | 99.2% |
+| `/stealing-jobs/` | 1000056 | `patterns/stealing-jobs.php` | `steal-campaign.php` | 102.4% |
+| `/stealing-jobs-lp/` | 1000058 | `patterns/stealing-jobs-lp.php` | `steal-campaign.php` | 103.3% |
+| `/steal-back-your-time/` | 1000060 | `patterns/steal-back-your-time.php` | `steal-campaign.php` | 102.4% |
+| `/vastore5/` | 1000050 | `patterns/vastore5.php` | — (one-off) | **redesigned, parity N/A** |
+
+Ratios re-measured 2026-09-15 after the review round below; the residual on the two
+`hire-va-campaign` pages is the hero, see "Known gaps".
 
 One new block: `acf/consult-landing-hero`. Everything else reuses existing blocks.
 
@@ -347,15 +388,54 @@ other.** They are word-for-word identical but production *inverts the whole pale
 body `#0D0D0D` → `#F4F6FC`, hero `#0D0D0D` → `#3D1A5D`, roles `#0D0D0D` → `#13132F`. Confirmed
 against both live pages. This family is near-black, **not** the brand `#250D4A`.
 
+#### Review round — 2026-09-15
+
+Six items came back from client review after the initial build. All six are done.
+
+| # | Item | Resolution |
+|---|---|---|
+| 1 | Booking form's avatar card + 3-step progress rail unwanted | Removed **site-wide**: `MultistepBookingWizard::$hideProfileHeader`/`$hideProgressBar` now default `true` (property and `mount()`). A caller can still pass `false` |
+| 2 | "We've helped more than 2,000…" should be 2 columns | Production only switches above **1500px**; the original build measured at 1440 and reproduced the stacked state. Both states now reproduced — verified matching production at 1440/1600/1920 |
+| 3 | `GuaranteeCardBlock` fatal | Already fixed by the P3 session while adding its `background`/`show_reassurance_items` options; the fatal was a transient mid-edit state |
+| 4 | `/hire-va-isolated-form/` hero wrong | Rebuilt. **The two `va-roles-landing` pages do not share a hero treatment** — `hire-va-isolated-form` has the white 472px booking card, `1monthonus` has a photographed gradient band and no card. Now driven by per-page keys |
+| 5 | Hero + header wrong on the three steal pages | Header: all P4 families now take the CTA-only header (see below). Hero: the gradient was already correct to within 1–2/255 — the real faults were container width, copy-column alignment, a missing CTA glow, a fade overlay painting over the gradient, and a missing logo-rail scrim |
+| 6 | `/vastore5/` design | Redesigned on the theme's own `@theme` tokens; parity with production deliberately abandoned. Content and behaviour unchanged — 325 production lines with 0 removed, every `$…` token identical, 35/35 interaction smoke tests passing |
+
+Two mechanisms were added centrally rather than per page, both documented in
+[architecture.md § Pages that describe their own chrome](web/app/themes/remote-leverage/docs/architecture.md):
+
+- **CTA-only header.** Production serves every P4 page with no site nav — just a logo and one
+  pink pill — but families A, C and D were rendering the full 24-link menu. The theme already had
+  `App\Support\PageChrome` + `sections/header-cta` for the hire-va pages, so it was extended
+  rather than duplicated: `acf/consult-landing-hero` joined its block list, and an
+  `rl:cta-only-header` marker covers the two families whose heroes are hand-written.
+- **Per-page `noindex`.** `App\Support\PageRobots` on the `wp_robots` filter, driven by an
+  `rl:noindex` marker. See decision 1 below.
+
+One deliberate divergence from production, **open for a call**: the trust band keeps production's
+1500px breakpoint (exact parity, still stacks at 1440), but the `va-roles-landing` hero uses 1280px
+instead, because production at 1440 is genuinely broken — the booking card overflows off-screen to
+an unreadable sliver. Reproducing that faithfully would have re-shipped the complaint.
+
 #### Decisions this raised
 
 1. **`/vastore5/` is internal sales collateral, not a landing page, and it publishes payment
-   details.** It is the only P4 page production serves `noindex, nofollow`, it is absent from
-   the sitemap, and nothing links to it. It carries a rep's call scripts plus a deposit panel
-   exposing Zelle `Abbas@RemoteLeverage.com`, Venmo `@RemoteLeverage`, and a live Stripe link
-   (`buy.stripe.com/9AQbKAcnC6NP2ukaFh`) — all reachable by anyone with the URL, on production
-   today. `noindex` is not access control. Built per the scope directive and mirrored 1:1, but
-   it should probably not be `publish` in v2. **Needs a call.**
+   details.** — **decided 2026-09-15: stays `publish`, made genuinely `noindex, nofollow`.**
+   It is the only P4 page production serves `noindex, nofollow`, it is absent from the sitemap,
+   and nothing links to it. It carries a rep's call scripts plus a deposit panel exposing Zelle
+   `Abbas@RemoteLeverage.com`, Venmo `@RemoteLeverage`, and a live Stripe link
+   (`buy.stripe.com/9AQbKAcnC6NP2ukaFh`).
+
+   The page **looked** correctly excluded locally, but only because Bedrock's
+   `bedrock-disallow-indexing` mu-plugin noindexes every non-production environment — that
+   protection disappears in production, and the theme had no page-level robots handling at all.
+   Now real: the pattern emits an `rl:noindex` marker that `App\Support\PageRobots` resolves on
+   the `wp_robots` filter. See [architecture.md § Pages that describe their own chrome](web/app/themes/remote-leverage/docs/architecture.md).
+
+   **Still open, and worth being blunt about: this keeps the page out of search results, it is
+   not access control.** Those payment details remain readable by anyone holding the URL — on
+   production today, and in v2. If that is not intended, the fix is auth or unpublishing, not
+   robots meta.
 2. **The roles section on `/stealing-jobs/` and `/stealing-jobs-lp/` repeats "Customer Support"
    as its fifth card** (same title, same chips). `/steal-back-your-time/` has a real fifth role
    there. Reproduced as-is; looks like a production content bug worth fixing on the live pages.
@@ -368,7 +448,10 @@ against both live pages. This family is near-black, **not** the brand `#250D4A`.
   than production's 688px/863px. Same defect on the signed-off `/hire-va-4/`. Fix per CLAUDE.md
   is a `height_mode` option defaulted to current behaviour, not a second block.
 - `acf/testimonials` has no "SHOW MORE" control; production has one wherever it uses that wall.
-  Also missing on `/hire-va-4/`.
+  Verified 2026-09-15: production emits it on both `/hire-va-6/` and `/stealing-jobs/`; locally
+  `/hire-va-6/`, `/1monthonus/` and the signed-off `/hire-va-4/` have none. The steal family is
+  the exception — it supplies its own from `steal-campaign.php`, which is the workaround the
+  block should make unnecessary.
 - `acf/accordion-faq` hard-renders two columns and unconditionally emits Schema.org `FAQPage`.
   Two pages needed a single-column accordion and inlined it, losing the structured data.
   A `columns` + `schema` option would let both fold back into the block.

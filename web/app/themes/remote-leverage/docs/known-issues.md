@@ -138,17 +138,19 @@ convert. The on-demand path still exists for images that live in `uploads/` (EFS
 where the remaining risk sits. Build-time conversion is lossless for PNG sources and q82 for
 JPEG — a worked comparison is in the plugin's comments.
 
-### 6. Image URLs are silently swapped for same-named media-library attachments
+### ~~6. Image URLs are silently swapped for same-named media-library attachments~~ — ✅ **FIXED 2026-09-15**
 
 `BlockDefaults::encodeRepeater()` runs every subfield value through `getAttachmentId()`, which
-matches on basename. A theme-file image URL passed to a block therefore resolves to whatever
-attachment shares that filename — a different image, if one exists. This is how a
+matches on basename. A theme-file image URL passed to a block therefore resolved to whatever
+attachment shared that filename — a different image, if one existed. This is how a
 `public/images/contractor-management/Frame-115.jpg` reference ended up rendering
-`uploads/2026/09/Frame-115.webp`.
+`uploads/2026/09/Frame-115.webp`, and how the ecommerce page's 3KB `Frame-76.png` was
+replaced by an unrelated 46KB upload of the same name.
 
-Not fixed: the behaviour is load-bearing for pages whose media is genuinely in the library. Worth
-knowing when a block renders an image you did not expect — check the rendered `src`, not the
-value you passed.
+`getAttachmentId()` now returns the URL untouched when the path contains `/themes/`. Theme
+page art has no media-library counterpart, so there was never a legitimate match to make; the
+mapping stays intact for genuine uploads, which is what it exists for. Silent, so it only
+surfaced by eyeballing a rendered card against production.
 
 ### ~~7. Calendly webhook signatures are unverified~~ — ✅ **FIXED 2026-09-15** (both webhooks now fail closed)
 
@@ -219,6 +221,42 @@ Not a bug to fix so much as a working habit: **`php -l` a pattern or block befor
 and treat a shared partial's optional keys as optional (`$x['k'] ?? []`). It is especially
 easy to miss when several people work the same checkout, because the breakage appears on
 someone else's page.
+
+### ~~11. Two images differing only by extension overwrote each other's WebP~~ — ✅ **FIXED 2026-09-15**
+
+`vite/theme-images.js` derived the WebP name by swapping the extension, so `Frame-76-5.jpg`
+and `Frame-76-5.png` — both real, distinct images used side by side on
+`/ecommerce-virtual-assistant/` — both emitted `Frame-76-5.webp`. Whichever the build
+processed second won, and `preferWebp()` then served that one file for both references, so one
+card rendered the other card's picture with no error anywhere.
+
+The build now detects a stem collision within a directory and emits the appended form
+(`Frame-76-5.jpg.webp`, `Frame-76-5.png.webp`); `preferWebp()` prefers that form when it
+exists and otherwise falls back to the swapped name, so every non-colliding file is unchanged.
+
+### ~~12. A test suite that was red or green depending on run order~~ — ✅ **FIXED 2026-09-15**
+
+`RoutesTest` and `GatedDownloadTest` both guarded route registration on `Route::has('api.health')`,
+but `GatedDownloadTest` registers **only** `routes/api.php` behind it. When it ran first,
+`RoutesTest`'s guard short-circuited, `routes/web.php` never loaded, and five web-route
+assertions failed — while the file still passed in isolation. Identical code produced a red run
+and a green run back to back.
+
+Each guard now checks a route name its own file defines (`api.health` for the API file,
+`funnel.book-consultation` for the web file). **The lesson generalises: a shared sentinel for
+"has this fixture been set up" is only safe when every writer sets up the same thing.**
+
+### 13. `=== false` against a block field will not do what you want
+
+ACF true/false values arrive as `true`/`false` from `get_field()` but as the **string** `'0'`
+or `'1'` when they come through a block's `data` attributes, which is how every pattern passes
+them. `PartnerHeroBlock` guarded its talent row with `if ($show === false)`, so a pattern
+passing `'show_talent' => '0'` still got the row — a 410px grid of 24 portraits the page was
+explicitly asking not to render.
+
+Compare loosely, or coerce (`filter_var($v, FILTER_VALIDATE_BOOLEAN)`), and keep `null`
+distinct from `false` when an unset field is supposed to mean "on". Fixed for that block; the
+pattern is worth checking wherever a block reads a boolean.
 
 ## ~~Dead configuration~~ — ✅ **FIXED 2026-09-15**
 

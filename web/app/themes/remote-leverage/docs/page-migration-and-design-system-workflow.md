@@ -274,6 +274,27 @@ When patterns contain empty block comments (`<!-- wp:acf/sample {"data":{}} /-->
    return '<!-- wp:acf/' . $slug . ' ' . json_encode($blockAttrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ' /-->';
    ```
 6. **`filterLoadValue()` Hook**: Pre-fills repeater rows in Gutenberg's sidebar form when a block is inserted directly from the block inserter. If an editor intentionally deletes all rows and saves, ACF sets metadata to `'0'`—`filterLoadValue` detects this and respects the deletion.
+7. **`renderBlockWithRepeater(string $slug, string $fieldName, string $fieldKey, array $rows, array $overrides, array $attrs)`** and its thin wrapper **`renderEcom(string $slug, array $rows, array $overrides, array $attrs)`**: render any block with one repeater encoded, without needing a bespoke `render*` helper per block. `renderEcom()` looks the repeater's field name and key up in the **`REPEATER_KEYS`** map so a pattern names the block rather than its ACF key:
+   ```php
+   BlockDefaults::renderEcom('image-card-grid', $cards, ['columns' => 3, 'card_title_size' => 'large']);
+   ```
+   Add a row to `REPEATER_KEYS` when a new block needs this. Most existing blocks still have a dedicated `render*` helper; either is fine.
+8. **`ecomImg(string $file)`**: page art for `/ecommerce-virtual-assistant/`, e.g. `ecomImg('talent/Andres-M.jpg')`. The generic form is `pageImg(string $page, string $file)`.
+
+### `encodeRepeater()` handles nested repeaters
+
+A sub-field whose value is a **list of arrays** is encoded as its own repeater under the composed name — needed by `acf/talent-dossier-carousel`, whose cards each carry a `tools` logo strip:
+
+```php
+['name' => 'Andrés Molina', 'tools' => [['src' => '…/epic.png', 'alt' => 'Epic']]]
+// → cards_0_tools = 1
+//   _cards_0_tools = field_…_cards_tools
+//   cards_0_tools_0_src / _cards_0_tools_0_src = field_…_cards_tools_src
+```
+
+Before this, a nested list was passed to `getAttachmentId()` as a raw array, ACF loaded nothing, and the strip rendered empty **with no error**. An ACF image array is associative rather than a list, so it is never mistaken for nested rows; flat rows encode exactly as before. Both cases are pinned by tests in `tests/Unit/GutenbergBlocksAndPatternsTest.php`.
+
+> **The failure mode to watch for.** Every mistake in this area is silent. A raw array passed as a plain override, a nested repeater the encoder cannot see, a boolean compared with `===` — none of them error. The page renders, looks wired up, and shows the wrong content. Diff a rendered section against production rather than trusting that the data you passed is the data that arrived.
 
 ---
 
