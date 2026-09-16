@@ -152,7 +152,8 @@ describe('external targets cannot be turned into an open redirect', function () 
     test('every external host the map can reach is one the map itself declares', function () {
         $config = require dirname(__DIR__, 2).'/config/redirects.php';
 
-        expect(LegacyRedirectMiddleware::externalHosts($config))->toBe(['anyshore.ai']);
+        // buy.stripe.com added 2026-09-16: production 301s /deposit/ to a Stripe payment link.
+        expect(LegacyRedirectMiddleware::externalHosts($config))->toBe(['anyshore.ai', 'buy.stripe.com']);
     });
 });
 

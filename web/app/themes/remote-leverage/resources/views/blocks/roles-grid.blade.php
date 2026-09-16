@@ -3,15 +3,23 @@
 @php
   use App\Support\BlockDefaults;
 
+  // The eight cards are eight bespoke slots, not a loop: each has its own surface colour, its
+  // own height and its own image treatment, and the mosaic only works because they differ.
+  // What the slots are NOT is fixed content — the block has always declared a `cards` repeater,
+  // and until 2026-09-16 the view ignored it and hard-coded all eight titles, so filling the
+  // repeater did nothing. Slot order matches BlockDefaults::rolesGridCards(), which carries the
+  // same copy the view used to hold, so every page already shipping this block is unchanged.
+  //
+  //   0 tall purple photo card   3 social media        6 customer support (tall, man cutout)
+  //   1 lead generation          4 marketing           7 custom role
+  //   2 blue horizontal card     5 graphic design
+  //
+  // The 2026 homepage swaps slots 0 and 2 to put Sales (SDR) on the photo card; see
+  // patterns/homepage-roles.php.
+  $cards = array_values(is_array($cards ?? null) && $cards !== [] ? $cards : BlockDefaults::rolesGridCards());
+  $slot = fn (int $i, string $key, string $fallback = '') => $cards[$i][$key] ?? $fallback;
+
   $eyebrowImg = BlockDefaults::hireVaImg('Group-207.png');
-  $womanImg = BlockDefaults::hireVaImg('Woman_looking_camera_smiling_2K_202607171433-1.png');
-  $manImg = BlockDefaults::hireVaImg('man-dressed-casual-wearing-glasses-studio-shot-copy-space-2.png');
-  $leadGenImg = BlockDefaults::hireVaImg('Frame-1092.png');
-  $salesImg = BlockDefaults::hireVaImg('Screenshot-2026-07-17-at-2.03.18-p.m.-1.png');
-  $marketingImg = BlockDefaults::hireVaImg('Frame-1092-1.png');
-  $designImg = BlockDefaults::hireVaImg('Screenshot-2026-07-17-at-2.01.07-p.m.-1.png');
-  $socialImg = BlockDefaults::hireVaImg('Screenshot-2026-07-17-at-2.02.42-p.m.-1.png');
-  $customImg = BlockDefaults::hireVaImg('Frame-216.png');
 
   // Administrative card tint. 'dark' is production's treatment on every page that ships this
   // block today (/hire-va-4/, /hire-va-6/, /hire-va-1st-month-free/ all compute
@@ -53,39 +61,39 @@
              production page shipping this block renders; `admin_tint` can flip it to lavender. --}}
         <div class="relative overflow-hidden {{ $adminSurface }} rounded-card p-6 sm:p-8 border flex flex-col justify-between min-h-[440px] group">
           <div>
-            <h3 class="text-2xl sm:text-3xl font-bold font-display {{ $adminTitle }} tracking-tight">Administrative</h3>
+            <h3 class="text-2xl sm:text-3xl font-bold font-display {{ $adminTitle }} tracking-tight">{{ $slot(0, 'title') }}</h3>
             <p class="text-sm sm:text-base {{ $adminBody }} mt-2 max-w-[280px] leading-relaxed">
-              Inbox, calendar, invoices, data entry. The daily upkeep taken off your plate.
+              {{ $slot(0, 'desc') }}
             </p>
           </div>
           <div class="mt-6 flex justify-center -mb-8 pointer-events-none">
-            <img src="{{ $womanImg }}" alt="Administrative Specialist" loading="lazy" decoding="async" class="h-64 sm:h-72 w-auto object-contain object-bottom transition-transform duration-500 group-hover:scale-105">
+            <img src="{{ $slot(0, 'img') }}" alt="{{ $slot(0, 'title') }}" loading="lazy" decoding="async" class="h-64 sm:h-72 w-auto object-contain object-bottom transition-transform duration-500 group-hover:scale-105">
           </div>
         </div>
 
         {{-- Card 2: Marketing (Lavender, Horizontal Layout) --}}
         <div class="bg-roles-violet rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
           <div class="flex-1">
-            <h3 class="text-xl font-bold font-display text-brand-hero">Marketing</h3>
+            <h3 class="text-xl font-bold font-display text-brand-hero">{{ $slot(4, 'title') }}</h3>
             <p class="text-xs sm:text-sm text-text-muted mt-1.5 leading-relaxed max-w-[220px]">
-              Runs and optimizes your paid campaigns across Meta, Google, and LinkedIn.
+              {{ $slot(4, 'desc') }}
             </p>
           </div>
           <div class="shrink-0">
-            <img src="{{ $marketingImg }}" alt="Marketing" loading="lazy" decoding="async" class="w-28 sm:w-32 h-auto object-contain">
+            <img src="{{ $slot(4, 'img') }}" alt="{{ $slot(4, 'title') }}" loading="lazy" decoding="async" class="w-28 sm:w-32 h-auto object-contain">
           </div>
         </div>
 
         {{-- Card 3: Graphic Design (Soft Blue, Horizontal Layout) --}}
         <div class="bg-roles-blue rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
           <div class="flex-1">
-            <h3 class="text-xl font-bold font-display text-brand-hero">Graphic Design</h3>
+            <h3 class="text-xl font-bold font-display text-brand-hero">{{ $slot(5, 'title') }}</h3>
             <p class="text-xs sm:text-sm text-text-muted mt-1.5 leading-relaxed max-w-[220px]">
-              Social creative, decks, and brand assets that look like an in-house hire made them.
+              {{ $slot(5, 'desc') }}
             </p>
           </div>
           <div class="shrink-0">
-            <img src="{{ $designImg }}" alt="Graphic Design" loading="lazy" decoding="async" class="w-24 sm:w-28 h-auto object-contain">
+            <img src="{{ $slot(5, 'img') }}" alt="{{ $slot(5, 'title') }}" loading="lazy" decoding="async" class="w-24 sm:w-28 h-auto object-contain">
           </div>
         </div>
       </div>
@@ -95,39 +103,39 @@
         {{-- Card 4: Lead Generation (Lavender, Horizontal Layout) --}}
         <div class="bg-roles-lavender rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
           <div class="flex-1">
-            <h3 class="text-xl font-bold font-display text-brand-hero">Lead Generation</h3>
+            <h3 class="text-xl font-bold font-display text-brand-hero">{{ $slot(1, 'title') }}</h3>
             <p class="text-xs sm:text-sm text-text-muted mt-1.5 leading-relaxed max-w-[220px]">
-              Outreach calls, emails, texting, and follow-up that keeps your pipeline full.
+              {{ $slot(1, 'desc') }}
             </p>
           </div>
           <div class="shrink-0">
-            <img src="{{ $leadGenImg }}" alt="Lead Gen" loading="lazy" decoding="async" class="w-28 sm:w-32 h-auto object-contain">
+            <img src="{{ $slot(1, 'img') }}" alt="{{ $slot(1, 'title') }}" loading="lazy" decoding="async" class="w-28 sm:w-32 h-auto object-contain">
           </div>
         </div>
 
         {{-- Card 5: Sales (SDR) (Soft Blue, Horizontal Layout) --}}
         <div class="bg-roles-blue rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
           <div class="flex-1">
-            <h3 class="text-xl font-bold font-display text-brand-hero">Sales (SDR)</h3>
+            <h3 class="text-xl font-bold font-display text-brand-hero">{{ $slot(2, 'title') }}</h3>
             <p class="text-xs sm:text-sm text-text-muted mt-1.5 leading-relaxed max-w-[220px]">
-              Qualifies leads, runs demos, and follows through until it's a closed deal.
+              {{ $slot(2, 'desc') }}
             </p>
           </div>
           <div class="shrink-0">
-            <img src="{{ $salesImg }}" alt="Sales SDR" loading="lazy" decoding="async" class="w-28 sm:w-32 h-auto object-contain">
+            <img src="{{ $slot(2, 'img') }}" alt="{{ $slot(2, 'title') }}" loading="lazy" decoding="async" class="w-28 sm:w-32 h-auto object-contain">
           </div>
         </div>
 
         {{-- Card 6: Customer Support (Tall, light lavender, man cutout) — light on production --}}
         <div class="relative overflow-hidden bg-roles-lavender rounded-card p-6 sm:p-8 border border-black/5 shadow-xs flex flex-col justify-between min-h-[440px] flex-1 group">
           <div>
-            <h3 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight">Customer Support</h3>
+            <h3 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight">{{ $slot(6, 'title') }}</h3>
             <p class="text-sm sm:text-base text-text-muted mt-2 max-w-[280px] leading-relaxed">
-              Tickets, questions, and vendor calls handled so your customers stay happy.
+              {{ $slot(6, 'desc') }}
             </p>
           </div>
           <div class="mt-6 flex justify-center -mb-8 pointer-events-none">
-            <img src="{{ $manImg }}" alt="Customer Support" loading="lazy" decoding="async" class="h-64 sm:h-72 w-auto object-contain object-bottom transition-transform duration-500 group-hover:scale-105">
+            <img src="{{ $slot(6, 'img') }}" alt="{{ $slot(6, 'title') }}" loading="lazy" decoding="async" class="h-64 sm:h-72 w-auto object-contain object-bottom transition-transform duration-500 group-hover:scale-105">
           </div>
         </div>
       </div>
@@ -137,27 +145,27 @@
         {{-- Card 7: Social Media (Soft Grey/Blue Surface, Post Mockup) --}}
         <div class="bg-roles-sky rounded-card p-6 sm:p-8 border border-black/5 shadow-xs flex flex-col justify-between min-h-[360px]">
           <div>
-            <h3 class="text-2xl font-bold font-display text-brand-hero tracking-tight">Social Media</h3>
+            <h3 class="text-2xl font-bold font-display text-brand-hero tracking-tight">{{ $slot(3, 'title') }}</h3>
             <p class="text-sm text-text-muted mt-2 leading-relaxed max-w-[300px]">
-              Posts, replies, and community management that keeps your brand active.
+              {{ $slot(3, 'desc') }}
             </p>
           </div>
           <div class="mt-6 flex justify-center">
-            <img src="{{ $socialImg }}" alt="Social Media Mockup" loading="lazy" decoding="async" class="max-h-52 w-auto object-contain">
+            <img src="{{ $slot(3, 'img') }}" alt="{{ $slot(3, 'title') }}" loading="lazy" decoding="async" class="max-h-52 w-auto object-contain">
           </div>
         </div>
 
         {{-- Card 8: Custom Role (Clean White Card, Orbital Graphic) --}}
         <div class="bg-white rounded-card p-6 sm:p-8 border border-black/5 shadow-xs flex flex-col justify-between min-h-[400px] flex-1">
           <div>
-            <h3 class="text-2xl font-bold font-display text-brand-hero tracking-tight">Custom Role</h3>
+            <h3 class="text-2xl font-bold font-display text-brand-hero tracking-tight">{{ $slot(7, 'title') }}</h3>
             <p class="text-sm text-text-muted mt-2 leading-relaxed max-w-[300px]">
-              Something specific in mind? Tell us the role — we’ve likely filled it before.
+              {{ $slot(7, 'desc') }}
             </p>
           </div>
           
           <div class="mt-6 flex justify-center items-center">
-            <img src="{{ $customImg }}" alt="Custom Role Network" loading="lazy" decoding="async" class="w-full max-w-[280px] h-auto object-contain">
+            <img src="{{ $slot(7, 'img') }}" alt="{{ $slot(7, 'title') }}" loading="lazy" decoding="async" class="w-full max-w-[280px] h-auto object-contain">
           </div>
         </div>
       </div>
@@ -170,12 +178,18 @@
          is already production's "BOOK A FREE CONSULTATION"; the hard-coded string that used to
          live here is why the pages rendered the longer 15-minute wording. --}}
     <div class="mt-14 sm:mt-18 flex justify-center">
-      <a href="{{ $ctaUrl ?? '#booking-footer' }}" class="inline-flex items-center gap-3 px-8 py-4 rounded-full bg-brand-magenta hover:bg-[#d40057] text-white font-bold text-sm tracking-[-0.45px] uppercase transition-all duration-200 hover:scale-[1.02]">
-        <span>{{ $ctaText ?? 'BOOK A FREE CONSULTATION' }}</span>
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-        </svg>
-      </a>
+      @if (($ctaStyle ?? 'production') === 'pill')
+        {{-- The 2026 homepage's pill: larger label, circled chevron, outline ring. Opt-in, so
+             the production pages above keep the arrow they were measured against. --}}
+        @include('blocks.partials.cta-pill', ['text' => $ctaText ?? 'BOOK A CONSULTATION', 'url' => $ctaUrl ?? '#booking-footer'])
+      @else
+        <a href="{{ $ctaUrl ?? '#booking-footer' }}" class="inline-flex items-center gap-3 px-8 py-4 rounded-full bg-brand-magenta hover:bg-[#d40057] text-white font-bold text-sm tracking-[-0.45px] uppercase transition-all duration-200 hover:scale-[1.02]">
+          <span>{{ $ctaText ?? 'BOOK A FREE CONSULTATION' }}</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+          </svg>
+        </a>
+      @endif
     </div>
 
   </div>

@@ -43,6 +43,19 @@ describe('mediaUrl resolves legacy uploads paths', function () {
         expect(BlockDefaults::mediaUrl('/app/uploads/2099/01/nope.png'))->toBe('');
     });
 
+    test('a -scaled registration maps back to the original filename', function () {
+        // WordPress registers an image past the big-image threshold as
+        // "name-scaled.ext" and leaves "name.ext" untouched on disk. The presets
+        // reference the original, so without this alias the lookup misses and the
+        // asset resolves only on the machine the upload happened on — which is how
+        // three CV screenshots served locally and 404'd on staging.
+        expect(BlockDefaults::unscaledName('Emma-M.-Resume-scaled.png'))->toBe('Emma-M.-Resume.png')
+            ->and(BlockDefaults::unscaledName('a-b.c-scaled.jpeg'))->toBe('a-b.c.jpeg')
+            ->and(BlockDefaults::unscaledName('Victor-Mexico.mp3'))->toBeNull()
+            ->and(BlockDefaults::unscaledName('scaled.png'))->toBeNull()
+            ->and(BlockDefaults::unscaledName('name-scaled'))->toBeNull();
+    });
+
     test('both sample templates route their media through the resolver', function () {
         foreach (['sample-applicant-audio', 'sample-applicant-videos'] as $view) {
             $blade = file_get_contents(__DIR__."/../../resources/views/blocks/{$view}.blade.php");

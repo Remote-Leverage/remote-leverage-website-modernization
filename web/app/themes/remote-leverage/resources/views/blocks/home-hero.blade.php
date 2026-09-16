@@ -5,36 +5,50 @@
      2026-09-15. Container stays the canonical max-w-[1380px] — per docs/design-system.md rule 1
      the container is the one thing not taken from the comp.
 
-     Desktop and mobile are genuinely different compositions here, not one layout reflowing:
+     Desktop and mobile differ only in what is present, not in how anything is styled:
        · mobile drops the rating row and both card pairs entirely
-       · mobile prints the accent line in brand purple (#8A2BE2); desktop keeps it black
-       · mobile checks are brand magenta on the bare ground; desktop checks are #0EBC67 inside
-         a 548x120 white card
-     Both are driven by one content list — see HomeHeroBlock::checklist() for why the order of
+       · desktop sets the checklist in two columns, mobile in one
+     Everything else is shared. Per direction on 2026-09-16 the comp's two desktop-only
+     treatments were dropped in favour of the mobile ones — the accent line is brand purple at
+     every width, and the checklist ticks are brand magenta on the bare ground with no white
+     card behind them. The headline is always three lines.
+
+     One content list drives both columns — see HomeHeroBlock::checklist() for why the order of
      the six items makes the desktop two-column grid and the mobile single column agree. --}}
 @php
-  use App\Support\BlockDefaults;
-
   $leftCards = array_values(array_filter($cards, fn ($c) => ($c['side'] ?? 'left') === 'left'));
   $rightCards = array_values(array_filter($cards, fn ($c) => ($c['side'] ?? 'left') === 'right'));
 
-  // Back card sits deeper and paler; the front card overlaps it down and inward. Spelled out
-  // per side rather than computed so Tailwind can see every class as a literal.
+  // Back card sits deeper and paler; the front card overlaps it down and inward.
+  //
+  // Placement is measured, not eyeballed. Card boxes on Homepage V3.png at 1366px, read off
+  // horizontal and vertical colour-run scans, with y relative to the section top (header
+  // bottom, 68px):
+  //     André   #DDE2F6  centre (176, 232)  ~-3deg
+  //     Luana   #EBEBFF  centre (166, 340)  ~-9deg
+  //     Mariana #DDE2F6  centre (1220, 320) ~+7deg
+  //     Bruno   #EBEBFF  centre (1161, 384) ~+5deg
+  // Cards are 180x255. Every offset below is that centre minus half the card, expressed from
+  // the group anchor. Spelled out as literals per slot rather than computed, because Tailwind
+  // scans source text and never sees a class built by concatenation.
   $cardSkin = [
     ['surface' => 'bg-lavender-tint', 'z' => 'z-10'],
     ['surface' => 'bg-[#EBEBFF]', 'z' => 'z-20'],
   ];
 @endphp
 
-<section class="relative overflow-hidden bg-bg-light pt-10 pb-10 lg:pt-[72px] lg:pb-8">
+{{-- flex-1 + justify-center: the pattern wraps this in a min-h-dvh column with the logo strip
+     pinned under it, so the hero takes the slack and centres in whatever is left. --}}
+<section class="relative flex flex-1 flex-col justify-center overflow-hidden bg-bg-light pt-10 pb-10 lg:pt-[72px] lg:pb-8">
   <div class="relative w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
 
-    {{-- Floating talent cards. Absolutely positioned from lg up, where there is room beside the
-         centred column; hidden below that because the mobile comp has no cards at all. --}}
+    {{-- Floating talent cards. Shown from xl up only: they need ~215px per side beside the
+         720px text column, which a 1024px viewport does not have, and the mobile comp has no
+         cards at all — so there is nothing to serve between those two. --}}
     @if ($leftCards)
-      <div class="pointer-events-none absolute left-0 top-4 hidden w-[240px] lg:block xl:w-[260px]" aria-hidden="true">
+      <div class="pointer-events-none absolute left-[60px] top-0 hidden h-[470px] w-[216px] xl:block" aria-hidden="true">
         @foreach ($leftCards as $i => $card)
-          <div class="absolute {{ $cardSkin[$i % 2]['z'] }} {{ $i === 0 ? 'left-6 top-0 -rotate-[5deg]' : 'left-0 top-[92px] -rotate-[8deg]' }}">
+          <div class="absolute {{ $cardSkin[$i % 2]['z'] }} {{ $i === 0 ? 'left-[26px] top-[105px] -rotate-3' : 'left-4 top-[213px] -rotate-[9deg]' }}">
             @include('blocks.partials.home-hero-card', ['card' => $card, 'surface' => $cardSkin[$i % 2]['surface']])
           </div>
         @endforeach
@@ -42,9 +56,9 @@
     @endif
 
     @if ($rightCards)
-      <div class="pointer-events-none absolute right-0 top-[84px] hidden w-[240px] lg:block xl:w-[260px]" aria-hidden="true">
+      <div class="pointer-events-none absolute right-[56px] top-0 hidden h-[520px] w-[240px] xl:block" aria-hidden="true">
         @foreach ($rightCards as $i => $card)
-          <div class="absolute {{ $cardSkin[$i % 2]['z'] }} {{ $i === 0 ? 'right-0 top-0 rotate-[6deg]' : 'right-[70px] top-[66px] rotate-[8deg]' }}">
+          <div class="absolute {{ $cardSkin[$i % 2]['z'] }} {{ $i === 0 ? 'right-0 top-[192px] rotate-[7deg]' : 'right-[59px] top-[256px] rotate-[5deg]' }}">
             @include('blocks.partials.home-hero-card', ['card' => $card, 'surface' => $cardSkin[$i % 2]['surface']])
           </div>
         @endforeach
@@ -68,28 +82,38 @@
         </div>
       @endif
 
+      {{-- Always three lines: the two headline lines come from the field's own line breaks, the
+           accent line is its own field. Left to wrap on its own the desktop headline sets on
+           two lines, which is not what the page is meant to say. --}}
       <h1 class="font-display font-bold tracking-[-0.02em] text-brand-hero text-[34px] leading-[1.14] sm:text-[42px] lg:text-[48px] lg:leading-[1.1]">
-        {{ $headline }}<br>
-        <span class="text-brand-purple lg:text-brand-hero">{{ $headlineAccent }}</span>
+        {!! nl2br(e($headline)) !!}<br>
+        <span class="text-brand-purple">{{ $headlineAccent }}</span>
       </h1>
 
-      <p class="mt-5 max-w-[660px] font-display text-[17px] leading-[1.5] text-brand-hero sm:text-lg lg:mt-6 lg:text-[20px] lg:leading-[30px]">
+      <p class="mt-5 max-w-[640px] font-display text-[17px] leading-[1.5] text-brand-hero sm:text-lg lg:mt-[18px] lg:text-[20px] lg:leading-[30px]">
         {!! $subtitle !!}
       </p>
 
-      {{-- Checklist. One list, two treatments: a white card with #0EBC67 ticks in two columns
-           on desktop, bare magenta ticks in one column on mobile. --}}
+      {{-- Checklist: magenta ticks on the bare ground at every width, one column on mobile and
+           two on desktop. The comp put the desktop pair inside a 548x120 white card with green
+           ticks; dropped on 2026-09-16 in favour of the mobile treatment everywhere.
+
+           The desktop columns are `max-content` and pushed apart rather than a 1fr/1fr split,
+           which keeps the comp's column positions (left 427..663, right 713..937 within a
+           548px block). They cannot be `auto`: an auto track absorbs free space before
+           justify-content gets a look in, so the columns butt together and the longer items
+           wrap. --}}
       @if ($checklist)
-        <ul class="mt-8 grid w-full max-w-[548px] grid-cols-1 gap-x-12 gap-y-[18px] text-left lg:mt-7 lg:gap-y-[18px] lg:grid-cols-2 lg:rounded-2xl lg:bg-white lg:px-[18px] lg:py-5">
+        <ul class="mt-8 grid w-full max-w-[548px] grid-cols-1 gap-y-[18px] text-left lg:mt-7 lg:grid-cols-[max-content_max-content] lg:justify-between lg:gap-y-[14px]">
           @foreach ($checklist as $item)
             <li class="flex items-center gap-3">
-              <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-magenta lg:h-4 lg:w-4 lg:bg-[#0EBC67]">
+              <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-magenta">
                 <svg class="h-2.5 w-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               </span>
-              <span class="font-display text-[15px] leading-tight text-brand-hero lg:text-base">{{ $item }}</span>
+              <span class="font-display text-[15px] leading-tight text-brand-hero">{{ $item }}</span>
             </li>
           @endforeach
         </ul>

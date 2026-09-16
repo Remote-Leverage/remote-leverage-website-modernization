@@ -96,13 +96,18 @@
 
         {{-- CTA Button --}}
         <div>
-          <a href="{{ $ctaUrl }}"
-             class="inline-flex items-center gap-3 px-8 py-4 rounded-full bg-[#8A2BE2] hover:bg-[#7b20d4] text-white font-bold text-sm tracking-wider uppercase shadow-[0_4px_20px_rgba(138,43,226,0.5)] transition-all duration-300 hover:scale-[1.02]">
-            <span>{{ $ctaText }}</span>
-            <svg class="w-4 h-4 fill-none stroke-current" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-            </svg>
-          </a>
+          @if (($ctaStyle ?? 'production') === 'pill')
+            {{-- The homepage comp puts the shared magenta pill here; production's is purple. --}}
+            @include('blocks.partials.cta-pill', ['text' => $ctaText, 'url' => $ctaUrl])
+          @else
+            <a href="{{ $ctaUrl }}"
+               class="inline-flex items-center gap-3 px-8 py-4 rounded-full bg-[#8A2BE2] hover:bg-[#7b20d4] text-white font-bold text-sm tracking-wider uppercase shadow-[0_4px_20px_rgba(138,43,226,0.5)] transition-all duration-300 hover:scale-[1.02]">
+              <span>{{ $ctaText }}</span>
+              <svg class="w-4 h-4 fill-none stroke-current" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+              </svg>
+            </a>
+          @endif
         </div>
       </div>
 

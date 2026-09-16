@@ -1,5 +1,8 @@
+{{-- min-h ties the header to --rl-header-h, which .rl-screen subtracts from 100dvh for the
+     homepage's full-viewport bands. The value is the height this header already had; pinning it
+     just stops the two drifting apart. --}}
 <header
-    class="sticky top-0 z-40 w-full bg-bg-light border-b border-slate-200/60 transition-all duration-200">
+    class="sticky top-0 z-40 w-full min-h-[var(--rl-header-h)] bg-bg-light border-b border-slate-200/60 transition-all duration-200">
     <div class="w-full px-4 sm:px-6 lg:px-8">
         <div class="rl-container">
         <div class="relative flex items-center justify-end lg:justify-between gap-3 h-20">

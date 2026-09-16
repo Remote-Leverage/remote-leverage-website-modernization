@@ -91,13 +91,17 @@
 
     {{-- CTA --}}
     <div class="flex justify-center">
-      <a href="{{ $ctaUrl }}" class="inline-flex items-center gap-3 px-8 py-4 rounded-full bg-[#F90066] hover:bg-[#d60057] text-white font-bold text-sm tracking-wider uppercase shadow-[0_4px_20px_rgba(249,0,102,0.35)] transition-all duration-200 hover:scale-[1.02]">
-        <span>{{ $ctaText }}</span>
-        <svg class="w-[22px] h-[22px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M10 8l4 4-4 4"/>
-        </svg>
-      </a>
+      @if (($ctaStyle ?? 'production') === 'pill')
+        @include('blocks.partials.cta-pill', ['text' => $ctaText, 'url' => $ctaUrl])
+      @else
+        <a href="{{ $ctaUrl }}" class="inline-flex items-center gap-3 px-8 py-4 rounded-full bg-[#F90066] hover:bg-[#d60057] text-white font-bold text-sm tracking-wider uppercase shadow-[0_4px_20px_rgba(249,0,102,0.35)] transition-all duration-200 hover:scale-[1.02]">
+          <span>{{ $ctaText }}</span>
+          <svg class="w-[22px] h-[22px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M10 8l4 4-4 4"/>
+          </svg>
+        </a>
+      @endif
     </div>
 
   </div>

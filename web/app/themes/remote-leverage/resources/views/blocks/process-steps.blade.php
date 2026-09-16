@@ -1,7 +1,9 @@
 {{-- Numbered process timeline: a horizontal rule with a dot per step, an oversized numeral above
      each, and a centred title + description below. Production uses it for 3-step 'how it works'
      bands. --}}
-<div class="rl-process-container w-full">
+{{-- `variant` only changes the mobile presentation: 'cards' adds the modifier the 2026
+     homepage needs (left-aligned white cards under 769px). Desktop is identical either way. --}}
+<div class="rl-process-container w-full {{ ($variant ?? 'timeline') === 'cards' ? 'rl-process-container--cards' : '' }}">
     <div class="rl-process-line"></div>
     <div class="rl-process-grid" style="--rl-process-cols:{{ max(1, min(4, count($steps))) }}">
         @foreach ($steps as $step)

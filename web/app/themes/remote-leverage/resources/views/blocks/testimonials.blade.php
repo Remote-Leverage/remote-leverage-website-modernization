@@ -35,6 +35,9 @@
                 ? 'grid grid-cols-1 md:grid-cols-2 gap-5 '.$gridTail
                 : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 '.$gridTail;
         }
+        // Only meaningful alongside layout=plain: 'bare' is /signedup/'s centred glass button,
+        // 'player' is the 2026 homepage's play/duration/scrub overlay.
+        $plainChrome = ($plain_chrome ?? 'bare') === 'player' ? 'player' : 'bare';
         // Whole class strings so Tailwind's scanner sees them literally.
         $controlTone = ($tone ?? 'light') === 'dark'
             ? 'border-white text-white hover:text-white/90'
@@ -56,13 +59,34 @@
                     <img src="{{ $t['image'] }}" alt="{{ $t['company'] ?? '' }}" width="630" height="354"
                         loading="lazy" decoding="async"
                         class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
-                    <span class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <span class="w-14 h-14 rounded-full bg-white/45 backdrop-blur-xs flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110">
-                            <svg class="w-6 h-6 text-white translate-x-0.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    @if ($plainChrome === 'player')
+                        {{-- The 2026 homepage dresses each tile as a video player: a magenta play
+                             control in the bottom-left, the duration opposite it, and a scrub bar
+                             along the bottom edge. /signedup/ keeps the bare centred glass button,
+                             which is what `bare` renders. --}}
+                        <span class="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/45 to-transparent"></span>
+                        <span class="pointer-events-none absolute bottom-[26px] left-4 flex h-[30px] w-[30px] items-center justify-center rounded-full bg-brand-magenta shadow-md transition-transform duration-300 group-hover:scale-110">
+                            <svg class="h-3 w-3 translate-x-px text-white" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M8 5v14l11-7z" />
                             </svg>
                         </span>
-                    </span>
+                        @if (! empty($t['duration']))
+                            <span class="pointer-events-none absolute bottom-[30px] right-4 rounded bg-black/45 px-1.5 py-0.5 font-mono text-[10px] font-medium text-white backdrop-blur-xs">
+                                {{ $t['duration'] }}
+                            </span>
+                        @endif
+                        <span class="pointer-events-none absolute inset-x-4 bottom-[14px] h-[3px] overflow-hidden rounded-full bg-white/35">
+                            <span class="block h-full w-[28%] rounded-full bg-white"></span>
+                        </span>
+                    @else
+                        <span class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <span class="w-14 h-14 rounded-full bg-white/45 backdrop-blur-xs flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110">
+                                <svg class="w-6 h-6 text-white translate-x-0.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M8 5v14l11-7z" />
+                                </svg>
+                            </span>
+                        </span>
+                    @endif
                 </button>
             @else
                 <div @if ($hidden) x-show="expanded" style="display:none" @endif

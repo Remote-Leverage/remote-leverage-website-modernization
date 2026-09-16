@@ -10,7 +10,14 @@
             the_post();
         @endphp
         @if (has_blocks() || !empty(trim(get_the_content())))
-            <div class="entry-content w-full font-display text-text-body antialiased overflow-x-hidden">
+            {{-- Deliberately NOT .entry-content. That class carries
+                 `.entry-content h1,h2,h3,h4 { color: var(--color-text-body) !important }`, which
+                 outranks any `text-white` a block sets on its own heading — so every dark band
+                 the 2026 homepage ships (guarantee, booking footer) rendered black-on-purple
+                 here while the same blocks were correct on /hire-va-4/, which uses page.blade.php
+                 and never had the wrapper. Matching those pages is the fix; the homepage was the
+                 odd one out. --}}
+            <div class="rl-page-content w-full font-display text-text-body antialiased overflow-x-hidden">
                 @php
                     the_content();
                 @endphp

@@ -102,6 +102,7 @@ describe('config/redirects.php targets resolve to something real', function () {
      */
     $externalTargets = [
         'https://anyshore.ai/' => 'Anyshore spun out onto its own domain; no v2 equivalent — 2026-09-15',
+        'https://buy.stripe.com/cNi14nfrY18b7tX6DkfrW0E' => 'Production 301s /deposit/ to this Stripe payment link rather than serving a page; the /vastore5/ script uses it as the fallback deposit route — verified against production 2026-09-16',
     ];
 
     /*

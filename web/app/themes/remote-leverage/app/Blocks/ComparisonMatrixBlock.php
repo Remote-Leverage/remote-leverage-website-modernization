@@ -89,6 +89,7 @@ class ComparisonMatrixBlock extends Block
             'headline' => get_field('headline') ?: 'Skip the Hiring Headache',
             'subheadline' => get_field('subheadline') ?: '70% Lower Cost, Same Quality',
             'ctaText' => get_field('cta_text') ?: 'BOOK MY FREE 15-MIN CALL',
+            'ctaStyle' => (function_exists('get_field') ? get_field('cta_style') : null) ?: 'production',
             'ctaUrl' => get_field('cta_url') ?: '#booking-footer',
             'card1Pill' => get_field('card_1_pill') ?: '',
             'card1Title' => get_field('card_1_title') ?: 'Hiring on your own',
@@ -113,6 +114,18 @@ class ComparisonMatrixBlock extends Block
         $fields = new FieldsBuilder('comparison_matrix');
 
         $fields
+            ->addSelect('cta_style', [
+                'label' => 'CTA Button Style',
+                'instructions' => 'Production is the button this page was measured against. Pill is the 2026 homepage '
+                    .'button — magenta, larger label, circled chevron, outline ring — shared with the other CTAs '
+                    .'down that page.',
+                'choices' => [
+                    'production' => 'Production button (default)',
+                    'pill' => '2026 homepage pill',
+                ],
+                'default_value' => 'production',
+                'return_format' => 'value',
+            ])
             ->addText('headline', [
                 'label' => 'Headline',
                 'default_value' => 'Skip the Hiring Headache',

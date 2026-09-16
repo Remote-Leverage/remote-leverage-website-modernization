@@ -236,8 +236,40 @@
   --transition-transform: transform 0.5s ease;
 }
 
+:root {
+  /* Height of the sticky site header. sections/header.blade.php pins itself to this, and
+     .rl-screen subtracts it — change it in one place. */
+  --rl-header-h: 81px;
+}
+
+body.admin-bar {
+  --rl-admin-bar-h: 32px;
+}
+
+@media screen and (max-width: 782px) {
+  body.admin-bar {
+    --rl-admin-bar-h: 46px;
+  }
+}
+
 /* Global Component & Utility Presets */
 @layer components {
+  /*
+   * Full-viewport page screens (the 2026 homepage's first two bands).
+   *
+   * A plain 100dvh is wrong here: the site header is `sticky top-0` and so occupies real flow
+   * space above the section, and when an editor is logged in WordPress pushes the document down
+   * by the admin bar as well. Either one alone makes a "full screen" section overflow by its own
+   * height, which is how the hero's logo strip ended up below the fold.
+   *
+   * --rl-header-h is the authority for the header's height, and sections/header.blade.php sets
+   * its own min-height from the same variable so the two cannot drift apart. The admin-bar
+   * height is WordPress's own: 32px, and 46px at 782px and below.
+   */
+  .rl-screen {
+    min-height: calc(100dvh - var(--rl-header-h) - var(--rl-admin-bar-h, 0px));
+  }
+
   /* General Site Container (1380px) */
   .site-container,
   .rl-container {
@@ -1084,6 +1116,53 @@
   .rl-process-grid {
     grid-template-columns: 1fr;
     gap: 48px;
+  }
+
+  /* The 2026 homepage's mobile treatment, opted into per instance by the block's `variant`
+     field. Page_v1.2.png sets the three steps as left-aligned white cards, each with its own
+     short rule and dot beside the numeral, instead of the centred stack every other page gets.
+     Scoped to the modifier and to this breakpoint, so the eleven patterns already shipping
+     this block are untouched at every width. */
+  .rl-process-container--cards .rl-process-grid {
+    gap: 20px;
+  }
+  .rl-process-container--cards .rl-process-item {
+    align-items: flex-start;
+    text-align: left;
+    gap: 12px;
+    background-color: var(--color-surface-white);
+    border-radius: 20px;
+    padding: 28px 24px 36px;
+  }
+  .rl-process-container--cards .rl-process-marker {
+    justify-content: flex-start;
+    width: 100%;
+    height: 84px;
+  }
+  .rl-process-container--cards .rl-process-number {
+    font-size: 72px;
+  }
+  .rl-process-container--cards .rl-process-dot {
+    left: auto;
+    right: 0;
+    transform: translate(0, -50%);
+  }
+  /* The rule is per-card here rather than one line behind the row, so it is drawn from the
+     dot rather than from .rl-process-line, which is hidden at this width. */
+  .rl-process-container--cards .rl-process-dot::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    width: 42vw;
+    max-width: 210px;
+    height: 1.5px;
+    background-color: var(--color-brand-purple);
+    transform: translateY(-50%);
+  }
+  .rl-process-container--cards .rl-process-description {
+    margin: 0;
+    max-width: none;
   }
 }
 

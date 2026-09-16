@@ -38,6 +38,9 @@ class ProcessStepsBlock extends Block
     public function with(): array
     {
         return [
+            // Mobile-only: 'cards' is the 2026 homepage's stacked white cards under 769px.
+            // Desktop is the same timeline either way.
+            'variant' => (function_exists('get_field') ? get_field('variant') : null) ?: 'timeline',
             'steps' => $this->steps(),
         ];
     }
@@ -47,6 +50,17 @@ class ProcessStepsBlock extends Block
         $fields = Builder::make('process_steps_block');
 
         $fields
+            ->addSelect('variant', [
+                'label' => 'Mobile Treatment',
+                'instructions' => 'Timeline is the centred stack every page uses today. Cards is the 2026 homepage — '
+                    .'left-aligned white cards under 769px. Desktop renders identically either way.',
+                'choices' => [
+                    'timeline' => 'Centred stack (default)',
+                    'cards' => 'White cards (2026 homepage)',
+                ],
+                'default_value' => 'timeline',
+                'return_format' => 'value',
+            ])
             ->addRepeater('steps', [
                 'label' => 'Steps Timeline (Leave empty for default 3 steps)',
                 'layout' => 'block',

@@ -393,8 +393,11 @@ class BlockDefaults
             return '';
         }
 
-        // Paths are stored URL-encoded ("...at-4.40.37%20PM.png"); the media
-        // library stores the decoded filename.
+        // Decode before matching: a legacy path may still arrive percent-encoded,
+        // while the media library stores the decoded filename. (The CV screenshots
+        // that shipped with an encoded space were renamed on 2026-09-16 — the CDN
+        // would not serve them on staging or production — but the decode stays, as
+        // nothing stops an encoded path being passed in.)
         $relative = ltrim((string) (parse_url($path, PHP_URL_PATH) ?: $path), '/');
         $relative = preg_replace('#^(app|wp-content)/uploads/#', '', $relative) ?? $relative;
         $relative = rawurldecode($relative);
@@ -458,12 +461,38 @@ class BlockDefaults
 
             $id = (int) (is_object($row) ? ($row->post_id ?? 0) : ($row['post_id'] ?? 0));
 
+            $base = basename($file);
+
             // Lowest ID wins, so an original beats a later duplicate upload that
             // WordPress suffixed with -1, -2 and so on.
-            self::$attachmentsByFilename[basename($file)] ??= $id;
+            self::$attachmentsByFilename[$base] ??= $id;
+
+            // An image wider than the big-image threshold is registered as
+            // "name-scaled.ext" while the untouched original keeps "name.ext" on
+            // disk. Presets reference the original, so index both spellings at the
+            // same attachment — otherwise the lookup misses and the caller falls
+            // through to a file that only exists where the upload happened.
+            $unscaled = self::unscaledName($base);
+
+            if ($unscaled !== null) {
+                self::$attachmentsByFilename[$unscaled] ??= $id;
+            }
         }
 
         return self::$attachmentsByFilename;
+    }
+
+    /**
+     * The original filename behind a WordPress "-scaled" registration, or null.
+     *
+     * An image past the big-image threshold is stored as "name-scaled.ext" while
+     * the untouched original keeps "name.ext" on disk.
+     */
+    public static function unscaledName(string $basename): ?string
+    {
+        return preg_match('/^(.+)-scaled(\.[A-Za-z0-9]+)$/', $basename, $m) === 1
+            ? $m[1].$m[2]
+            : null;
     }
 
     /**
@@ -914,7 +943,7 @@ class BlockDefaults
      *                             would still win — so custom cards go here.
      * @param  string  $ratio  Optional card image aspect as "w/h" (e.g. '413/152').
      */
-    public static function renderFeatureCards(string $columns = '3', array $overrides = [], ?array $cards = null, string $ratio = '', string $variant = 'inset'): string
+    public static function renderFeatureCards(string $columns = '3', array $overrides = [], ?array $cards = null, string $ratio = '', string $variant = 'inset', string $surface = 'solid'): string
     {
         $data = [
             'columns' => $columns,
@@ -929,6 +958,11 @@ class BlockDefaults
         if ($variant !== 'inset') {
             $data['variant'] = $variant;
             $data['_variant'] = 'field_feature_cards_block_variant';
+        }
+
+        if ($surface !== 'solid') {
+            $data['surface'] = $surface;
+            $data['_surface'] = 'field_feature_cards_block_surface';
         }
 
         self::encodeRepeater('cards', 'field_feature_cards_block_cards', $cards ?? self::featureCards($columns), $data);
@@ -1251,6 +1285,14 @@ class BlockDefaults
      * the talent marquee. Until they land in resources/images/pages/home/ the cards render
      * without portraits rather than with broken images — see homeImgIfExists().
      *
+     * Flags come from resources/images/pages/home/flags/, copied from the sales-talents and
+     * flags sets rather than the 19px home/<country>.png icons, which are too small to hold up.
+     * The comp draws rectangular emoji flags; these are the theme's circular set, chosen over
+     * emoji so the glyph does not change shape between Apple, Windows and Android. The two
+     * vector flags in the source sets are 1.1MB (Mexico) and 567KB (Argentina) — detailed coats
+     * of arms — so those two plus Brazil take the 76px PNGs and only Colombia, which is 753
+     * bytes of SVG, stays vector.
+     *
      * @return array<int, array<string, string>>
      */
     public static function homeHeroCards(): array
@@ -1260,7 +1302,7 @@ class BlockDefaults
                 'name' => 'André Vilalobos',
                 'role' => 'Lead Generation (SDR)',
                 'rate' => '$7/hr',
-                'flag' => self::homeImg('mexico.png'),
+                'flag' => self::pageImg('home', 'flags/mexico.png'),
                 'photo' => '',
                 'side' => 'left',
             ],
@@ -1268,7 +1310,7 @@ class BlockDefaults
                 'name' => 'Luana Dias',
                 'role' => 'Social Media Specialist',
                 'rate' => '$6/hr',
-                'flag' => self::homeImg('colombia.png'),
+                'flag' => self::pageImg('home', 'flags/colombia.svg'),
                 'photo' => self::homeImgIfExists('hero-luana.png'),
                 'side' => 'left',
             ],
@@ -1276,7 +1318,7 @@ class BlockDefaults
                 'name' => 'Mariana Costa',
                 'role' => 'Lead Generation (SDR)',
                 'rate' => '$6/hr',
-                'flag' => self::homeImg('argentina.png'),
+                'flag' => self::pageImg('home', 'flags/argentina.png'),
                 'photo' => '',
                 'side' => 'right',
             ],
@@ -1284,7 +1326,7 @@ class BlockDefaults
                 'name' => 'Bruno Carvalho',
                 'role' => 'Sr Executive Assistant',
                 'rate' => '$6/hr',
-                'flag' => self::homeImg('brazil.png'),
+                'flag' => self::pageImg('home', 'flags/brazil.png'),
                 'photo' => self::homeImgIfExists('hero-bruno.png'),
                 'side' => 'right',
             ],
@@ -1444,10 +1486,10 @@ class BlockDefaults
         ];
     }
 
-    public static function renderRolesGrid(array $overrides = []): string
+    public static function renderRolesGrid(array $overrides = [], ?array $cards = null): string
     {
         $data = [];
-        self::encodeRepeater('cards', 'field_roles_grid_block_cards', self::rolesGridCards(), $data);
+        self::encodeRepeater('cards', 'field_roles_grid_block_cards', $cards ?? self::rolesGridCards(), $data);
 
         return self::patternBlock('roles-grid', array_merge($data, $overrides));
     }
@@ -1699,10 +1741,10 @@ class BlockDefaults
         ];
     }
 
-    public static function renderHireVa4Faq(array $overrides = []): string
+    public static function renderHireVa4Faq(array $overrides = [], ?array $faqs = null): string
     {
         $data = [];
-        $faqs = self::hireVa4Faqs();
+        $faqs = $faqs ?? self::hireVa4Faqs();
         $data['faqs'] = count($faqs);
         $data['_faqs'] = 'field_accordion_faq_block_faqs';
         foreach ($faqs as $i => $item) {
@@ -2799,7 +2841,7 @@ class BlockDefaults
                 'rate' => '$10/hr',
                 'duration' => '0:45',
                 'audio_url' => '/app/uploads/2025/08/Victor-Mexico.mp3',
-                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.40.37%20PM-722x1024.png',
+                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.40.37-PM-722x1024.png',
             ],
             [
                 'name' => 'Shaun M.',
@@ -2829,7 +2871,7 @@ class BlockDefaults
                 'rate' => '$10/hr',
                 'duration' => '0:45',
                 'audio_url' => '/app/uploads/2025/03/Mariana-Abravanel-SDR-Brazil-Veed.mp3',
-                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.40.37%20PM-722x1024.png',
+                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.40.37-PM-722x1024.png',
             ],
             [
                 'name' => 'Chantal D.',
@@ -2849,7 +2891,7 @@ class BlockDefaults
                 'rate' => '$9/hr',
                 'duration' => '0:45',
                 'audio_url' => '/app/uploads/2025/03/Carolina-Portilo-Sales-VEED.mp3',
-                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.02.48%20PM-722x1024.png',
+                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.02.48-PM-722x1024.png',
             ],
             [
                 'name' => 'Jahvon J.',
@@ -2879,7 +2921,7 @@ class BlockDefaults
                 'rate' => '$9/hr',
                 'duration' => '0:45',
                 'audio_url' => '/app/uploads/2025/03/Cristina-Hid-EA-Mexico-Veed-VEED.mp3',
-                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.17.03%20PM-722x1024.png',
+                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.17.03-PM-722x1024.png',
             ],
             [
                 'name' => 'Valerie G.',
@@ -2909,7 +2951,7 @@ class BlockDefaults
                 'rate' => '$10/hr',
                 'duration' => '0:45',
                 'audio_url' => '/app/uploads/2025/03/Dana-Mahon-Dominican-Republic-Executive-Assistant-VEED-VEED.mp3',
-                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.19.33%20PM-722x1024.png',
+                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.19.33-PM-722x1024.png',
             ],
             [
                 'name' => 'Marcus L.',
@@ -2929,7 +2971,7 @@ class BlockDefaults
                 'rate' => '$8/hr',
                 'duration' => '0:45',
                 'audio_url' => '/app/uploads/2025/03/Laura-Celebretti-EA_Operations-VEED.mp3',
-                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.26.38%20PM-722x1024.png',
+                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.26.38-PM-722x1024.png',
             ],
             [
                 'name' => 'Joselyn M.',
@@ -2969,7 +3011,7 @@ class BlockDefaults
                 'rate' => '$8/hr',
                 'duration' => '0:45',
                 'audio_url' => '/app/uploads/2025/03/Maria-Villatoro-Guatamala-Customer-Service-VEED-VEED.mp3',
-                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-3.54.22%20PM-722x1024.png',
+                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-3.54.22-PM-722x1024.png',
             ],
             [
                 'name' => 'Pauline A.',
@@ -2989,7 +3031,7 @@ class BlockDefaults
                 'rate' => '$10/hr',
                 'duration' => '0:45',
                 'audio_url' => '/app/uploads/2025/03/Martha-Centino-Medical-Scribe-General-Physician-Mexico-Veed-VEED.mp3',
-                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.45.18%20PM-722x1024.png',
+                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.45.18-PM-722x1024.png',
             ],
             [
                 'name' => 'Soffia R.',
@@ -2999,7 +3041,7 @@ class BlockDefaults
                 'rate' => '$9/hr',
                 'duration' => '0:45',
                 'audio_url' => '/app/uploads/2025/03/Soffia-Rojas-Medical-Veed-VEED.mp3',
-                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.50.56%20PM-722x1024.png',
+                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.50.56-PM-722x1024.png',
             ],
             [
                 'name' => 'Monica P.',
@@ -3186,7 +3228,7 @@ Google Ads',
                 'rate' => '$10/hr',
                 'duration' => '0:45',
                 'audio_url' => '/app/uploads/2025/03/Paula-Oliveira-Project-Manager-Veed-VEED.mp3',
-                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.54.58%20PM-722x1024.png',
+                'resume_url' => '/app/uploads/2025/03/Screenshot-2025-03-30-at-4.54.58-PM-722x1024.png',
             ],
             [
                 'name' => 'Harry B.',

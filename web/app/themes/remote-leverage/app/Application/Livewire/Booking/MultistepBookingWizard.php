@@ -148,6 +148,9 @@ class MultistepBookingWizard extends Component
 
     public string $sessionId = '';
 
+    /** Whether `form_started` has already been emitted for this component instance. */
+    public bool $formStartedTracked = false;
+
     public ?string $referralCode = null;
 
     // Partial lead ID if captured on Step 1
@@ -330,6 +333,8 @@ class MultistepBookingWizard extends Component
         $this->landingUrl = (string) ($req?->fullUrl() ?? '');
         $this->referrerUrl = (string) ($req?->header('referer') ?: $req?->cookie('handl_ref', ''));
         $this->sessionId = (string) Str::uuid();
+
+        $this->trackStepEvent('form_loaded');
     }
 
     public function getActiveEventTypeUri(): string
@@ -434,6 +439,14 @@ class MultistepBookingWizard extends Component
         if ($this->currentStep === 2) {
             $this->loadMonthAvailability();
         }
+
+        // Legacy fired `step_date_selection` only on arrival at the calendar step. `step_viewed`
+        // has no legacy counterpart and is kept as a v2 addition: it is what makes per-step
+        // drop-off measurable at all, which the legacy set could not show.
+        if ($this->currentStep === 2) {
+            $this->trackStepEvent('step_date_selection');
+        }
+
         $this->trackStepEvent('step_viewed', ['step' => $this->currentStep]);
     }
 
@@ -487,6 +500,8 @@ class MultistepBookingWizard extends Component
 
             $lead = $captureAction->execute($leadData);
             $this->leadId = $lead->id;
+
+            $this->trackStepEvent('partial_form_submitted', ['lead_id' => $lead->id]);
         } catch (\Throwable $e) {
             Log::warning('Could not capture partial lead on Step 1: '.$e->getMessage());
         }
@@ -527,6 +542,8 @@ class MultistepBookingWizard extends Component
     public function selectSlot(string $slot): void
     {
         $this->selectedSlot = $slot;
+
+        $this->trackStepEvent('hour_selected', ['selected_time' => $slot]);
     }
 
     public function addGuest(): void
@@ -563,6 +580,10 @@ class MultistepBookingWizard extends Component
     public function submitBooking(): void
     {
         $this->errorMessage = null;
+
+        // Fired before the attempt, not after it: paired against `booking_finished` this is
+        // what makes a failed booking visible as a gap rather than as silence.
+        $this->trackStepEvent('booking_request_sent', ['selected_time' => $this->selectedSlot]);
 
         if (empty($this->firstName) && ! empty($this->name)) {
             $parts = explode(' ', trim($this->name), 2);
@@ -639,16 +660,26 @@ class MultistepBookingWizard extends Component
                     ? Carbon::parse($this->selectedSlot, $this->timezone)->format('l, F j, Y \a\t g:i A').' ('.$this->timezone.')'
                     : 'Scheduled Directly';
 
-                $this->trackStepEvent('booking_completed', [
+                $this->trackStepEvent('booking_finished', [
                     'meeting_id' => $this->bookingReference,
                     'lead_id' => $lead->id,
                     'role' => $this->roleNeeded,
+                    'selected_time' => $this->selectedSlot,
                 ]);
             } else {
                 $this->isBooked = true;
                 $this->confirmedTime = 'Consultation Inquiry Received';
                 $this->meetingUrl = '#';
                 $this->bookingReference = (string) $lead->uuid;
+
+                // The skipCalendar / job-applicant route reaches the thank-you page without
+                // ever booking a slot. It still has to emit the terminal event, or every
+                // funnel reads that route as a 100% drop-off after `booking_request_sent`.
+                $this->trackStepEvent('booking_finished', [
+                    'lead_id' => $lead->id,
+                    'role' => $this->roleNeeded,
+                    'booked_slot' => false,
+                ]);
             }
 
             // A successful booking now navigates to a dedicated thank-you page
@@ -776,14 +807,38 @@ class MultistepBookingWizard extends Component
         return $grid;
     }
 
+    /**
+     * Emit a booking-funnel event under the name the legacy form used.
+     *
+     * The names here are **verbatim from rl-elementor-blocks'
+     * `assets/js/headless-calendly-multistep.js`**, which fired them client-side via
+     * `posthog.capture()`. They are what the existing PostHog funnels, Customer.io campaigns
+     * and n8n flows are keyed to, so they are not free to rename: this method deliberately
+     * does not prefix them. An earlier version emitted `booking_wizard_{$name}`, which meant
+     * every downstream consumer of `form_started` / `hour_selected` / `booking_finished` saw
+     * nothing at all once the Livewire wizard replaced the legacy form.
+     *
+     * The four common properties are also the legacy shape. `form_id` was the Gravity Forms
+     * id there and is the Livewire component id here — different value, same role: a stable
+     * handle for one form instance on one page.
+     *
+     * These fire **server-side** now, from the component, rather than from the browser. That
+     * is strictly more reliable (no ad-blockers, no lost beacon on unload), but it does mean
+     * an event only exists where the component has a lifecycle hook to hang it on — see
+     * `form_started`, which is the one that had to change meaning slightly.
+     */
     protected function trackStepEvent(string $eventName, array $properties = []): void
     {
         try {
             $recorder = app(RecordBehaviorEventAction::class);
             $recorder->execute(new AnalyticsEventData(
-                event: "booking_wizard_{$eventName}",
-                distinctId: $this->email ?: session()->getId(),
+                event: $eventName,
+                distinctId: $this->resolveDistinctId(),
                 properties: array_merge([
+                    'form_id' => (string) $this->getId(),
+                    'session_id' => $this->sessionId,
+                    'form_type' => 'multistep',
+                    'is_isolated' => ! empty($this->isolatedSteps),
                     'step' => $this->currentStep,
                     'selected_date' => $this->selectedDate,
                     'selected_slot' => $this->selectedSlot,
@@ -793,6 +848,60 @@ class MultistepBookingWizard extends Component
         } catch (\Throwable $e) {
             // Silently swallow analytics errors to avoid breaking booking UX
         }
+    }
+
+    /**
+     * Identify the visitor, without letting the attempt lose the event.
+     *
+     * This used to be `$this->email ?: session()->getId()`. Every event raised before the
+     * visitor types an email — which, since the funnel was restored, is most of them —
+     * therefore depended on `session()` exposing `getId()`. Where it does not, the call throws,
+     * and `trackStepEvent()`'s catch-all discards the event with no trace. The component's own
+     * `sessionId` is a per-instance UUID that is always present after mount, so it is a better
+     * anonymous handle than a session id the container may not offer at all.
+     */
+    protected function resolveDistinctId(): string
+    {
+        if ($this->email !== '') {
+            return $this->email;
+        }
+
+        try {
+            $sessionId = (string) session()->getId();
+
+            if ($sessionId !== '') {
+                return $sessionId;
+            }
+        } catch (\Throwable) {
+            // No session driver bound; fall through to the component's own id.
+        }
+
+        return $this->sessionId ?: 'anonymous';
+    }
+
+    /**
+     * `form_started` — the visitor has begun filling the form.
+     *
+     * Legacy bound this to the first `input` event on any visible field. Livewire only learns
+     * about a field when its model round-trips, so this fires on the first property update
+     * instead: later than the legacy event by one debounce, same meaning. The guard is a
+     * public property because it has to survive the component's re-hydration between
+     * requests — a local flag would reset on every one and re-fire the event each keystroke.
+     */
+    public function updated(string $property): void
+    {
+        if ($this->formStartedTracked) {
+            return;
+        }
+
+        // Calendar paging and timezone are not "starting the form" — they move the UI without
+        // the visitor having entered anything.
+        if (in_array($property, ['timezone', 'currentMonth', 'currentYear', 'newGuestEmail'], true)) {
+            return;
+        }
+
+        $this->formStartedTracked = true;
+        $this->trackStepEvent('form_started');
     }
 
     /**

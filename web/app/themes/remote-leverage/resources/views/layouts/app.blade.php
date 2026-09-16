@@ -45,10 +45,6 @@
       @if (config('sentry.dsn'))
         window.SENTRY_DSN = '{{ config('sentry.dsn') }}';
       @endif
-      @if (config('services.posthog.api_key'))
-        window.POSTHOG_API_KEY = '{{ config('services.posthog.api_key') }}';
-        window.POSTHOG_HOST = '{{ config('services.posthog.host', 'https://us.i.posthog.com') }}';
-      @endif
     </script>
 
     {{-- Font preload. `font-display: swap` means an un-preloaded face paints a fallback
@@ -109,7 +105,9 @@
         </aside>
       @endif
 
-      @include('sections.footer')
+      {{-- Slim footer site-wide since the 2026 rebuild; a page opts back into the four-column
+           one by emitting the rl:full-footer marker. See App\Support\PageChrome. --}}
+      @include(App\Support\PageChrome::usesFullFooter() ? 'sections.footer' : 'sections.footer-slim')
     </div>
 
     @php(do_action('get_footer'))

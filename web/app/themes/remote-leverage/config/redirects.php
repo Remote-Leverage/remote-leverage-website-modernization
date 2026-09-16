@@ -384,4 +384,10 @@ return [
     // on 2026-09-15.
     'anyshore' => 'https://anyshore.ai/',
 
+    // Production 301s /deposit/ (and /Deposit/) straight to a Stripe payment link rather than
+    // serving a page. It is the documented fallback in the /vastore5/ objection-handling script
+    // for when the primary route fails, so it has to keep the same behaviour, not become a page.
+    // Verified against production 2026-09-16: 301 -> buy.stripe.com/cNi14nfrY18b7tX6DkfrW0E.
+    'deposit' => 'https://buy.stripe.com/cNi14nfrY18b7tX6DkfrW0E',
+
 ];

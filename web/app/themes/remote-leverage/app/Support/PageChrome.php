@@ -42,6 +42,17 @@ class PageChrome
     private const CTA_ONLY_HEADER_MARKER = 'rl:cta-only-header';
 
     /**
+     * Pages that want the previous four-column footer (Talents / Careers / Products /
+     * Resources) instead of the slim one emit this marker.
+     *
+     * The slim footer became the site-wide default on 2026-09-16 with the homepage rebuild.
+     * Keeping the big one reachable per page is deliberate: it carries the only navigation to
+     * a dozen role and resource pages, and a page that leans on that can ask for it back
+     * without reverting the default for everyone.
+     */
+    private const FULL_FOOTER_MARKER = 'rl:full-footer';
+
+    /**
      * How deep to follow `core/pattern` references. A full-page pattern
      * referencing section patterns is two levels; the cap stops a pattern that
      * (directly or indirectly) references itself from recursing forever.
@@ -94,6 +105,24 @@ class PageChrome
         }
 
         return false;
+    }
+
+    /**
+     * Whether the current page asks for the previous four-column footer.
+     */
+    public static function usesFullFooter(): bool
+    {
+        if (! is_singular()) {
+            return false;
+        }
+
+        $post = get_post();
+
+        if (! $post || ! is_string($post->post_content) || $post->post_content === '') {
+            return false;
+        }
+
+        return self::contentHasMarker($post->post_content, self::FULL_FOOTER_MARKER);
     }
 
     /**

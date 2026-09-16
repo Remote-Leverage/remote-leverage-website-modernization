@@ -42,6 +42,7 @@ class RolesGridBlock extends Block
             'ctaText' => BlockDefaults::cleanText((function_exists('get_field') ? get_field('cta_text') : null) ?: 'BOOK A FREE CONSULTATION'),
             'ctaUrl' => (function_exists('get_field') ? get_field('cta_url') : null) ?: '#booking-footer',
             'adminTint' => $this->adminTint(),
+            'ctaStyle' => (function_exists('get_field') ? get_field('cta_style') : null) ?: 'production',
             'cards' => $this->cards(),
         ];
     }
@@ -66,6 +67,18 @@ class RolesGridBlock extends Block
             ->addText('cta_url', [
                 'label' => 'CTA Button Target URL',
                 'default_value' => '#booking-footer',
+            ])
+            ->addSelect('cta_style', [
+                'label' => 'CTA Button Style',
+                'instructions' => 'Production is the plain-arrow pill measured on /hire-va-4/, /hire-va-6/ and '
+                    .'/hire-va-1st-month-free/. Pill is the 2026 homepage button — larger label, circled chevron, '
+                    .'outline ring — shared with the other CTAs down that page.',
+                'choices' => [
+                    'production' => 'Production arrow pill (default)',
+                    'pill' => '2026 homepage pill',
+                ],
+                'default_value' => 'production',
+                'return_format' => 'value',
             ])
             ->addSelect('admin_tint', [
                 'label' => 'Administrative Card Tint',

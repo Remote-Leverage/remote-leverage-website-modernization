@@ -45,6 +45,9 @@ class DataTableBlock extends Block
             'col0Header' => ($hasGetField ? get_field('col_0_header') : null) ?: '',
             'col1Header' => ($hasGetField ? get_field('col_1_header') : null) ?: 'DIY',
             'col2Header' => ($hasGetField ? get_field('col_2_header') : null) ?: 'Remote Leverage',
+            // 'leverage-first' is the 2026 homepage arrangement; see the view for what it
+            // changes and why the mobile half is a separate composition rather than a reflow.
+            'variant' => ($hasGetField ? get_field('variant') : null) ?: 'diy',
             'rows' => $this->rows(),
         ];
     }
@@ -54,6 +57,19 @@ class DataTableBlock extends Block
         $fields = Builder::make('data_table_block');
 
         $fields
+            ->addSelect('variant', [
+                'label' => 'Row Arrangement',
+                'instructions' => 'DIY is production\'s comparison-page table: label, DIY with a red cross, Remote '
+                    .'Leverage with a green tick. Leverage-first is the 2026 homepage: Remote Leverage second in the '
+                    .'row with the tick, the competitor last with a slate cross, and a separate mobile treatment '
+                    .'driven by the rows\' short values.',
+                'choices' => [
+                    'diy' => 'DIY first, Remote Leverage last (default)',
+                    'leverage-first' => 'Remote Leverage first, competitor last',
+                ],
+                'default_value' => 'diy',
+                'return_format' => 'value',
+            ])
             ->addText('col_0_header', [
                 'label' => 'Criterion Column Header',
                 'instructions' => 'Usually blank. Production labels it on the screening ("Stage") and replacement-policy ("Term") tables.',
@@ -73,8 +89,17 @@ class DataTableBlock extends Block
                 'button_label' => 'Add Comparison Row',
             ])
             ->addText('feature', ['label' => 'Feature / Criterion'])
-            ->addText('diy', ['label' => 'DIY Value'])
+            ->addText('diy', ['label' => 'DIY / Competitor Value'])
             ->addText('rl', ['label' => 'Remote Leverage Value'])
+            ->addText('diy_short', [
+                'label' => 'Competitor Value (mobile)',
+                'instructions' => 'Leverage-first only. The mobile comp drops the row label, so each value has to '
+                    .'stand on its own in half a phone width. Falls back to the full value when empty.',
+            ])
+            ->addText('rl_short', [
+                'label' => 'Remote Leverage Value (mobile)',
+                'instructions' => 'Leverage-first only. Falls back to the full value when empty.',
+            ])
             ->endRepeater();
 
         return $fields->build();
@@ -91,6 +116,8 @@ class DataTableBlock extends Block
             $row['feature'] = BlockDefaults::cleanText($row['feature'] ?? '');
             $row['diy'] = BlockDefaults::cleanText($row['diy'] ?? '');
             $row['rl'] = BlockDefaults::cleanText($row['rl'] ?? '');
+            $row['diy_short'] = BlockDefaults::cleanText($row['diy_short'] ?? '') ?: $row['diy'];
+            $row['rl_short'] = BlockDefaults::cleanText($row['rl_short'] ?? '') ?: $row['rl'];
 
             return $row;
         }, $rows);

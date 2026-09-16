@@ -47,6 +47,11 @@ class FeatureCardsBlock extends Block
             // the card) and 'flush' (product/report pages — image bleeds to the card edges
             // with a larger title). Default stays 'inset' so existing callers are unchanged.
             'variant' => (string) ((function_exists('get_field') ? get_field('variant') : null) ?: 'inset'),
+            // 'frosted' is the 2026 homepage's "Why Remote Leverage" band: the card is a
+            // translucent white wash over a coloured ground rather than an opaque card on a
+            // flat one, and it carries that band's roomier type with it. Default stays 'solid'
+            // so the fifteen patterns already shipping this block are untouched.
+            'surface' => (string) ((function_exists('get_field') ? get_field('surface') : null) ?: 'solid'),
             'cards' => $this->cards($columns),
         ];
     }
@@ -74,6 +79,17 @@ class FeatureCardsBlock extends Block
                     'horizontal' => 'Text left, image right',
                 ],
                 'default_value' => 'inset',
+            ])
+            ->addSelect('surface', [
+                'label' => 'Card Surface',
+                'instructions' => 'Frosted is the homepage "Why Remote Leverage" treatment: a translucent white card '
+                    .'over a coloured band, with a 28px title held to two lines and 16/25 body copy. It is one '
+                    .'treatment, so the surface and the type travel together.',
+                'choices' => [
+                    'solid' => 'Solid white card (default)',
+                    'frosted' => 'Frosted — translucent over a coloured band',
+                ],
+                'default_value' => 'solid',
             ])
             ->addText('ratio', [
                 'label' => 'Card Image Ratio',

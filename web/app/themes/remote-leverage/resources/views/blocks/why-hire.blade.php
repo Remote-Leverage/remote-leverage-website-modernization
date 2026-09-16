@@ -3,6 +3,12 @@
 @php
   use App\Support\BlockDefaults;
 
+  // Two knobs for the 2026 homepage, both defaulting to what /hire-va-4/, /hire-va-6/ and
+  // /reviews/ already render. The comp centres the heading and strips the proof card back to
+  // bare stars over the quote — no "5.0 Star Rating" pill, no closing paragraph.
+  $isCentred = ($headingAlign ?? 'left') === 'center';
+  $bareProof = ($proofChrome ?? 'full') === 'bare';
+
   $globeUrl = BlockDefaults::hireVaImg('globe-1.png');
 
   $cardIcons = [
@@ -17,7 +23,7 @@
   <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
     
     {{-- Section Heading --}}
-    <div class="max-w-3xl mb-12 sm:mb-16">
+    <div @class(['mb-12 sm:mb-16', 'max-w-3xl' => ! $isCentred, 'max-w-3xl mx-auto text-center' => $isCentred])>
       <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold font-display text-brand-hero tracking-tight leading-[1.08]">
         @if (($headline ?? '') === 'Why hire through Remote Leverage?')
           Why hire through<br class="hidden sm:inline"> Remote Leverage?
@@ -34,7 +40,11 @@
       <div class="lg:col-span-5 bg-[#250D4A] rounded-card-lg p-8 sm:p-10 text-white relative overflow-hidden shadow-lg flex flex-col justify-between min-h-[480px]">
         <div class="relative z-10">
           {{-- 5-Star Rating --}}
-          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-xs mb-6">
+          <div @class([
+            'mb-6',
+            'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-xs' => ! $bareProof,
+            'flex' => $bareProof,
+          ])>
             <div class="flex items-center gap-1 text-[#FFD700]">
               @for ($i = 0; $i < 5; $i++)
                 <svg class="w-4 h-4 fill-current" viewBox="0 0 20 20">
@@ -42,16 +52,20 @@
                 </svg>
               @endfor
             </div>
-            <span class="text-xs font-bold text-white tracking-wide">5.0 Star Rating</span>
+            @unless ($bareProof)
+              <span class="text-xs font-bold text-white tracking-wide">5.0 Star Rating</span>
+            @endunless
           </div>
 
           {{-- Value Statement --}}
           <h3 class="text-2xl sm:text-3xl font-bold font-display text-white leading-snug tracking-tight mb-4">
             {{ $proofTitle }}
           </h3>
-          <p class="text-white/80 text-sm leading-relaxed max-w-md">
-            Tap into vetted international professionals who integrate directly into your operations, saving up to 70% compared to local hires.
-          </p>
+          @unless ($bareProof)
+            <p class="text-white/80 text-sm leading-relaxed max-w-md">
+              Tap into vetted international professionals who integrate directly into your operations, saving up to 70% compared to local hires.
+            </p>
+          @endunless
         </div>
 
         {{-- Globe Graphic Flush to Bottom Edge (Bleed) --}}

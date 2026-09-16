@@ -91,7 +91,7 @@ class HomeHeroBlock extends Block
             'ratingLogo' => BlockDefaults::homeImg('google-logo.png'),
             'ratingScore' => BlockDefaults::cleanText($this->field('rating_score')) ?: '4.8',
             'showRating' => $this->field('show_rating') !== false,
-            'headline' => BlockDefaults::cleanText($this->field('headline')) ?: 'Latin American Virtual Assistants',
+            'headline' => BlockDefaults::cleanText($this->field('headline')) ?: "Latin American\nVirtual Assistants",
             'headlineAccent' => BlockDefaults::cleanText($this->field('headline_accent')) ?: '$6-$10 Per Hour',
             'subtitle' => $this->field('subtitle') ?: 'Recruiting agency helping businesses hire English speaking Virtual Assistants from Latin America for <strong>70% less than U.S. Employees.</strong>',
             'checklist' => $this->checklist(),
@@ -179,13 +179,16 @@ class HomeHeroBlock extends Block
                 'label' => 'Google Rating Score',
                 'default_value' => '4.8',
             ])
-            ->addText('headline', [
+            ->addTextarea('headline', [
                 'label' => 'Headline',
-                'default_value' => 'Latin American Virtual Assistants',
+                'instructions' => 'Line breaks are kept. The design sets this on two lines at every width.',
+                'rows' => 2,
+                'new_lines' => '',
+                'default_value' => "Latin American\nVirtual Assistants",
             ])
             ->addText('headline_accent', [
                 'label' => 'Headline Accent Line',
-                'instructions' => 'Rendered on its own line. Black on desktop, brand purple on mobile — that is what the design shows.',
+                'instructions' => 'Rendered on its own third line, in brand purple.',
                 'default_value' => '$6-$10 Per Hour',
             ])
             ->addTextarea('subtitle', [

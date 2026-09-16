@@ -951,17 +951,11 @@ if (sentryDsn) {
   }).catch((err) => console.error('Sentry initialization failed:', err));
 }
 
-// Dynamically load PostHog only if API key is configured
-const posthogKey = window.POSTHOG_API_KEY || import.meta.env.VITE_POSTHOG_API_KEY;
-const posthogHost = window.POSTHOG_HOST || import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com';
-
-if (posthogKey) {
-  import('posthog-js').then(({ default: posthog }) => {
-    window.posthog = posthog;
-    posthog.init(posthogKey, {
-      api_host: posthogHost,
-      person_profiles: 'identified_only',
-      capture_pageview: true,
-    });
-  }).catch((err) => console.error('PostHog initialization failed:', err));
-}
+// PostHog is NOT initialised here. TrackingHooks::injectPostHogSnippet() already loads it on
+// `wp_head` (priority 2) with the official array.js snippet, which is earlier than this module
+// and is what production does. This block used to import the `posthog-js` package and call
+// `init()` a second time against the same key, which loaded two copies of the SDK and captured
+// every pageview twice. It was invisible only because POSTHOG_API_KEY has never been set.
+//
+// `window.posthog` is the snippet's queueing stub until array.js lands, so callers such as
+// resources/js/payment-gateway.js can call `posthog.capture()` immediately either way.

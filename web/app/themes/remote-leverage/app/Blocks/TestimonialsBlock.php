@@ -44,6 +44,8 @@ class TestimonialsBlock extends Block
             // 'plain' drops the quote/company/duration chrome for a bare video wall
             // (production's /signedup/). 'cards' is the default everywhere else.
             'layout' => get_field('layout') ?: 'cards',
+            // Overlay for the bare tiles; see the field's instructions. Unset keeps /signedup/'s.
+            'plain_chrome' => get_field('plain_chrome') ?: 'bare',
             // Production collapses the wall behind a "show more" control on the campaign
             // and steal landing pages, but NOT on /reviews/ (77 cards, all shown) or the
             // bare video walls of /1monthonus/, /hire-va-isolated-form/ and /signedup/.
@@ -68,6 +70,15 @@ class TestimonialsBlock extends Block
                 'label' => 'Card style',
                 'choices' => ['cards' => 'Cards with quote (default)', 'plain' => 'Bare video tiles'],
                 'default_value' => 'cards',
+            ])
+            ->addSelect('plain_chrome', [
+                'label' => 'Bare Tile Overlay',
+                'instructions' => 'Only applies to the bare-video-tile layout. Bare is /signedup/: one centred glass '
+                    .'play button. Player is the 2026 homepage: a magenta play control bottom-left, the duration '
+                    .'opposite it, and a scrub bar along the bottom.',
+                'choices' => ['bare' => 'Centred glass button (default)', 'player' => 'Player chrome (2026 homepage)'],
+                'default_value' => 'bare',
+                'return_format' => 'value',
             ])
             ->addSelect('columns', [
                 'label' => 'Columns',

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 210" width="210" height="210" role="img" aria-label="Task checklist">
+  <rect width="210" height="210" rx="18" fill="#F4F5FD"/>
+  <g>
+    <rect x="22" y="22" width="34" height="34" rx="11" fill="#FFFFFF" stroke="#E6E4F5" stroke-width="1.5"/>
+    <path d="M31 39.5l5.5 5.5L47.5 33" fill="none" stroke="#22A94E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="68" y="33" width="118" height="10" rx="5" fill="#CDC4F0"/>
+  </g>
+  <g>
+    <rect x="22" y="70" width="34" height="34" rx="11" fill="#FFFFFF" stroke="#E6E4F5" stroke-width="1.5"/>
+    <path d="M31 87.5l5.5 5.5L47.5 81" fill="none" stroke="#22A94E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="68" y="81" width="66" height="10" rx="5" fill="#CDC4F0"/>
+  </g>
+  <g>
+    <rect x="22" y="118" width="34" height="34" rx="11" fill="#FFFFFF" stroke="#E6E4F5" stroke-width="1.5"/>
+    <path d="M31 135.5l5.5 5.5L47.5 129" fill="none" stroke="#22A94E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="68" y="129" width="118" height="10" rx="5" fill="#CDC4F0"/>
+  </g>
+  <g>
+    <rect x="22" y="166" width="34" height="34" rx="11" fill="#FFFFFF" stroke="#E6E4F5" stroke-width="1.5"/>
+    <path d="M31 183.5l5.5 5.5L47.5 177" fill="none" stroke="#22A94E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="68" y="177" width="78" height="10" rx="5" fill="#CDC4F0"/>
+  </g>
+</svg>

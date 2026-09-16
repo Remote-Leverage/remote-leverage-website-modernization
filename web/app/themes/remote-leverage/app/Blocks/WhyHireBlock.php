@@ -88,6 +88,8 @@ class WhyHireBlock extends Block
         return [
             'headline' => get_field('headline') ?: 'Why hire through Remote Leverage?',
             'proofTitle' => get_field('proof_title') ?: "We've helped more than 2,000 businesses hire top talent across LatAm, the Caribbean and the EU.",
+            'headingAlign' => get_field('heading_align') ?: 'left',
+            'proofChrome' => get_field('proof_chrome') ?: 'full',
             'cards' => $this->cards(),
         ];
     }
@@ -105,6 +107,20 @@ class WhyHireBlock extends Block
             ->addText('headline', [
                 'label' => 'Section Headline',
                 'default_value' => 'Why hire through Remote Leverage?',
+            ])
+            ->addSelect('heading_align', [
+                'label' => 'Heading Alignment',
+                'choices' => ['left' => 'Left (default)', 'center' => 'Centred'],
+                'default_value' => 'left',
+                'return_format' => 'value',
+            ])
+            ->addSelect('proof_chrome', [
+                'label' => 'Proof Card Detail',
+                'instructions' => 'Full is production: a "5.0 Star Rating" pill above the quote and a closing '
+                    .'paragraph below it. Bare is the 2026 homepage — gold stars and the quote, nothing else.',
+                'choices' => ['full' => 'Rating pill and closing paragraph (default)', 'bare' => 'Stars and quote only'],
+                'default_value' => 'full',
+                'return_format' => 'value',
             ])
             ->addTextarea('proof_title', [
                 'label' => 'Proof Card Title',

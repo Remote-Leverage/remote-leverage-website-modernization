@@ -46,6 +46,8 @@ class AccordionFaqBlock extends Block
         return [
             'headline' => $this->headline(),
             'columns' => $columns,
+            'style' => (function_exists('get_field') ? get_field('style') : null) ?: 'rules',
+            'headingAlign' => (function_exists('get_field') ? get_field('heading_align') : null) ?: 'left',
             'faqsLeft' => array_slice($faqs, 0, $split, true),
             'faqsRight' => array_slice($faqs, $split, null, true),
             'schemaJson' => $this->schemaEnabled() ? $this->generateSchemaJson($faqs) : '',
@@ -60,6 +62,20 @@ class AccordionFaqBlock extends Block
             ->addText('headline', [
                 'label' => 'Headline',
                 'default_value' => 'Frequently Asked Questions',
+            ])
+            ->addSelect('style', [
+                'label' => 'Row Treatment',
+                'instructions' => 'Rules is production: rows divided by a hairline. Cards is the 2026 homepage: each '
+                    .'row a white rounded card on the page ground.',
+                'choices' => ['rules' => 'Hairline rules (default)', 'cards' => 'White cards (2026 homepage)'],
+                'default_value' => 'rules',
+                'return_format' => 'value',
+            ])
+            ->addSelect('heading_align', [
+                'label' => 'Heading Alignment',
+                'choices' => ['left' => 'Left (default)', 'center' => 'Centred'],
+                'default_value' => 'left',
+                'return_format' => 'value',
             ])
             ->addSelect('columns', [
                 'label' => 'Columns',
