@@ -6,18 +6,28 @@
      #F90066 pill on the right.
 
      layouts/app.blade.php picks this over sections.header via App\Support\PageChrome.
-     It is absolutely positioned so the hero keeps the full viewport height beneath it. --}}
-<header class="absolute inset-x-0 top-0 z-30 w-full">
+
+     Positioned `fixed`, not `sticky`: the bar has to stay out of flow so the hero keeps the
+     full viewport height beneath it (hire-va-hero is `min-h-dvh`), and `sticky` would claim
+     90px of that. Fixed gives the same overlay at scroll 0 and follows the page after it.
+
+     On scroll, resources/js/app.js sets `data-stuck` on this element and the bar resolves to
+     a white one — the logo is the white knockout of a dark SVG, so it un-inverts in the same
+     step or it vanishes against the new background. --}}
+<header data-rl-cta-header
+        class="group fixed inset-x-0 top-0 z-40 w-full transition duration-200 data-[stuck]:bg-white data-[stuck]:shadow-[0_1px_3px_0_rgba(15,23,42,0.10)]">
   <div class="w-full px-4 sm:px-6 lg:px-8">
     <div class="rl-container">
       <div class="flex items-center justify-between gap-3 h-[90px]">
-        <a href="{{ home_url('/') }}"
-           class="inline-flex min-w-0 items-center gap-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0 rounded-sm"
+        {{-- Deliberately self-referential. These pages offer no way out, and a logo linking
+             home is the one remaining exit. --}}
+        <a href="#"
+           class="inline-flex min-w-0 items-center gap-2 group/logo focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0 group-data-[stuck]:focus-visible:ring-brand-purple rounded-sm"
            aria-label="{{ get_bloginfo('name', 'display') ?: 'Remote Leverage' }}">
           <img src="{{ Vite::asset('resources/images/logo.svg') }}"
                alt="{{ get_bloginfo('name', 'display') ?: 'Remote Leverage' }}"
                width="154" height="18"
-               class="h-6 sm:h-7 w-auto max-w-full object-contain object-left brightness-0 invert transition-opacity group-hover:opacity-90" />
+               class="h-6 sm:h-7 w-auto max-w-full object-contain object-left brightness-0 invert group-data-[stuck]:brightness-100 group-data-[stuck]:invert-0 transition duration-200 group-hover/logo:opacity-90" />
         </a>
 
         <a href="#booking-footer"

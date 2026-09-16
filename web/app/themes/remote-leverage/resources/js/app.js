@@ -847,6 +847,50 @@ function initPaymentGateway() {
     .catch((err) => console.error('Payment gateway failed to initialise', err));
 }
 
+/**
+ * Paints the CTA-only landing header (sections/header-cta.blade.php) white once the
+ * page has scrolled off the top.
+ *
+ * The bar is `fixed` and transparent at rest so the hero artwork runs under it; that
+ * artwork ends, and a white logo on a white page section is an invisible header. The
+ * `data-stuck` attribute is the single switch — every colour change hangs off it in
+ * the Blade template, so there is nothing to keep in sync here.
+ *
+ * rAF-throttled: the scroll listener only records that a frame is due, and the write
+ * happens once per frame, so a fast flick does not queue a style recalc per event.
+ */
+function initCtaHeader() {
+  const header = document.querySelector('[data-rl-cta-header]');
+  if (!header) {
+    return;
+  }
+
+  const THRESHOLD = 24; // Clear of the one-pixel jitter a trackpad produces at rest.
+  let ticking = false;
+  let stuck = null;
+
+  const apply = () => {
+    ticking = false;
+    const next = window.scrollY > THRESHOLD;
+    if (next === stuck) {
+      return;
+    }
+    stuck = next;
+    header.toggleAttribute('data-stuck', next);
+  };
+
+  const onScroll = () => {
+    if (!ticking) {
+      ticking = true;
+      window.requestAnimationFrame(apply);
+    }
+  };
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  // A reload part-way down the page restores the scroll position before this runs.
+  apply();
+}
+
 function initMobileNav() {
   const button = document.querySelector('[data-rl-nav-toggle]');
   const panel = document.getElementById('rl-mobile-nav');
@@ -877,11 +921,13 @@ function initMobileNav() {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     initMobileNav();
+    initCtaHeader();
     initPaymentGateway();
     scheduleLivewire();
   });
 } else {
   initMobileNav();
+  initCtaHeader();
   initPaymentGateway();
   scheduleLivewire();
 }
