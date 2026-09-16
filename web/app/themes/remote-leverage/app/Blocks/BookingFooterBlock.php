@@ -92,6 +92,9 @@ class BookingFooterBlock extends Block
 
         return [
             'headline' => $headline ?: 'Book a free consultation',
+            // The 2026 homepage draws the white card here; every other page the dark glass one.
+            'skin' => ($this->block->data['skin'] ?? null)
+                ?: ((function_exists('get_field') ? get_field('skin') : null) ?: 'glass'),
             'mapImage' => BlockDefaults::resolveImageUrl(
                 (function_exists('get_field') ? get_field('map_image') : null) ?: 506
             ),
