@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "934b1690c7750a6b2d27f8e84139cdea",
+    "content-hash": "5ba308013797fc37606fa0d5353e4091",
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
@@ -1274,6 +1274,37 @@
                 "source": "https://plugins.svn.wordpress.org/google-site-kit"
             },
             "time": "2026-09-07T18:21:08+00:00"
+        },
+        {
+            "name": "wp-plugin/wordfence",
+            "version": "9.0.1",
+            "source": {
+                "type": "svn",
+                "url": "https://plugins.svn.wordpress.org/wordfence/",
+                "reference": "tags/9.0.1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://downloads.wordpress.org/plugin/wordfence.9.0.1.zip"
+            },
+            "require": {
+                "composer/installers": "~1.0|~2.0"
+            },
+            "type": "wordpress-plugin",
+            "notification-url": "https://wp-packages.org/downloads",
+            "authors": [
+                {
+                    "name": "Mark Maunder"
+                }
+            ],
+            "description": "Firewall, Malware Scanner, Two Factor Auth, and Comprehensive Security Features, powered by our 24-hour team. Make security a priority with Wordfence.",
+            "homepage": "https://www.wordfence.com/",
+            "support": {
+                "changelog": "https://wordpress.org/plugins/wordfence/#developers",
+                "issues": "https://wordpress.org/support/plugin/wordfence",
+                "source": "https://plugins.svn.wordpress.org/wordfence"
+            },
+            "time": "2026-09-08T15:41:22+00:00"
         },
         {
             "name": "wp-plugin/wordpress-seo",

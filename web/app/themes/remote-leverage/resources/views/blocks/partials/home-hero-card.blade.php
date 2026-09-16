@@ -1,40 +1,40 @@
-{{-- One floating talent card in the homepage hero: name + flag, role, an optional black rate
-     pill, and an optional cutout portrait clipped by the card's bottom edge.
+{{-- One talent card in the homepage hero: name + flag, role, and a cutout portrait standing on
+     the card floor, clipped by its rounded bottom edge.
 
-     Measured off Homepage V3.png: 180x255 at 1366px (colour-run chords corrected for the
-     card's own rotation), 16px radius, 18px padding, name 17/700, role 13px #60636C, rate pill
-     black with 12/700 white. The surface colour is passed in — #DDE2F6
-     (--color-lavender-tint) behind, #EBEBFF in front.
+     The card fills its positioned wrapper, which is sized as a share of the fan box — 240x322
+     at xl (the comp's 180x255 scaled up a quarter on request, 2026-09-16) and 75% of that at
+     lg. The portrait is 73% of the card's height for the same reason: one number holds at both
+     sizes. Type is the one thing that cannot be a percentage, so it steps at xl. The surface
+     colour is passed in: #DDE2F6 (--color-lavender-tint) for the two cards set back, #EBEBFF
+     for the one in front.
 
-     Params: $card (name, role, rate, flag, photo), $surface. --}}
-<div class="relative flex h-[255px] w-[180px] flex-col overflow-hidden rounded-2xl {{ $surface }} p-[18px] shadow-[0_18px_40px_-18px_rgba(19,19,47,0.35)]">
+     No rate pill: dropped 2026-09-16. The portrait took the space back.
+
+     Params: $card (name, role, flag, photo), $surface. --}}
+<div class="relative flex h-full w-full flex-col overflow-hidden rounded-2xl {{ $surface }} p-4 xl:p-[22px] shadow-[0_18px_40px_-18px_rgba(19,19,47,0.35)] transition-shadow duration-500 group-hover:shadow-[0_30px_46px_-20px_rgba(19,19,47,0.5)]">
   <div class="relative z-10">
-    {{-- The name holds one line: 180px of card less 36px of padding leaves 144px, which
-         "André Vilalobos" plus a flag fills exactly at 15px. nowrap makes that a hard promise
-         rather than something that survives until someone adds a longer name. --}}
-    <p class="flex items-center gap-1.5 whitespace-nowrap font-display text-[15px] font-bold leading-tight text-brand-hero">
+    {{-- Name and role each hold one line at both sizes: 240px of card less 44px of padding
+         leaves 196px, which "Bruno Carvalho" plus a flag fills at 17px and "Administrative
+         Assistant" at 14px. nowrap makes that a hard promise rather than something that
+         survives until someone adds a longer name, and keeps every photo on one baseline. --}}
+    <p class="flex items-center gap-1.5 whitespace-nowrap font-display text-[15px] font-bold leading-tight text-brand-hero xl:text-[17px]">
       <span>{{ $card['name'] }}</span>
       @if (! empty($card['flag']))
-        <img src="{{ $card['flag'] }}" alt="" width="14" height="14" class="h-[14px] w-[14px] shrink-0" decoding="async">
+        <img src="{{ $card['flag'] }}" alt="" width="16" height="16" class="h-3.5 w-3.5 shrink-0 xl:h-4 xl:w-4" decoding="async">
       @endif
     </p>
 
     @if (! empty($card['role']))
-      <p class="mt-1 font-display text-[13px] leading-tight text-[#60636C]">{{ $card['role'] }}</p>
-    @endif
-
-    @if (! empty($card['rate']))
-      <span class="mt-3 inline-flex items-center rounded-full bg-black px-3 py-1 font-display text-[12px] font-bold leading-none text-white">
-        {{ $card['rate'] }}
-      </span>
+      <p class="mt-1 whitespace-nowrap font-display text-[12.5px] leading-tight text-[#60636C] xl:text-[14px]">{{ $card['role'] }}</p>
     @endif
   </div>
 
-  {{-- The portrait is a transparent cutout that sits on the card floor and is clipped by the
-       card's own rounded bottom edge, which is why it is absolutely placed rather than in flow. --}}
+  {{-- Absolutely placed rather than in flow so the figure stands on the card's floor and is
+       clipped by its own rounded bottom edge. Every portrait is trimmed to its subject and set
+       to a common 560px height upstream, so one CSS height gives all three the same scale. --}}
   @if (! empty($card['photo']))
-    <img src="{{ $card['photo'] }}" alt="" width="200" height="220"
-         class="pointer-events-none absolute -bottom-px left-1/2 z-0 h-[150px] w-auto max-w-none -translate-x-1/2 object-contain object-bottom "
+    <img src="{{ $card['photo'] }}" alt="" width="350" height="560"
+         class="pointer-events-none absolute -bottom-px left-1/2 z-0 h-[73%] w-auto max-w-none -translate-x-1/2 object-contain object-bottom"
          decoding="async" loading="eager">
   @endif
 </div>

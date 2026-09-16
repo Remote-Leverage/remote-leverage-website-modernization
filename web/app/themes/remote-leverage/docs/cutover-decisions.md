@@ -330,16 +330,30 @@ minutes if anyone wants it later.
 
 ## Security and tracking
 
-### 31. WordFence is not ported — the edge WAF replaces it
-WordFence appears nowhere in this repo (zero references across every file), and it is **not
-being added**. v2 runs as an immutable container on ECS: WordFence's firewall optimization
-writes `.user.ini` / `auto_prepend_file` and its scanner expects a writable tree, so anything it
-configured on disk would be discarded by the next deploy. Staging already sits behind CloudFront
-and production behind Cloudflare, which is where request filtering now belongs.
+### 31. WordFence **is** ported — reversed 2026-09-16
+Originally recorded as "not ported, the edge WAF replaces it". **That decision was reversed the
+same week**, before any work followed from it. `wp-plugin/wordfence: ^9.0` is now a composer
+dependency and installs to `web/app/plugins/wordfence` like every other plugin (gitignored;
+it ships through the deploy, not the repo).
 
-Production's own WordFence status was never confirmed — Cloudflare returns 403 for every
-`readme.txt` probe, including plugins known to be installed, so presence is not observable from
-outside. That check is moot under this decision.
+Production's status, unverifiable from outside at the time, is now confirmed from the 2026-08-27
+backup: **WordFence 9.0.0 is installed and the WAF is active** (`wordfence-waf.php` at the web
+root, the `auto_prepend_file` half). The earlier "could not confirm" note was an artefact of
+Cloudflare returning 403 for every `readme.txt` probe, including plugins known to be installed.
+
+The operational caveats from the original entry still hold and are implementation notes, not
+objections:
+
+- The container is immutable and rebuilt on every deploy, so anything WordFence writes to disk —
+  `.user.ini` / `auto_prepend_file` for firewall optimisation, scan state — does not survive.
+  Expect to re-run firewall optimisation after a deploy, or to bake it into the image.
+- Scans against a read-only application tree will report the tree as unchanged, which is the
+  intended property of an immutable deploy rather than a finding.
+- Staging sits behind CloudFront and production behind Cloudflare. WordFence now runs *in addition
+  to* that edge layer, not instead of it.
+
+Settings are not carried over automatically: the plugin's configuration lives in the production
+database, and moving it is a separate step from adding the dependency.
 
 ### 32. v2 inherits **both** production GTM containers
 Production serves two containers, `GTM-53JDTQCZ` and `GTM-P4KZNJWL` (read off its HTML,

@@ -8,7 +8,6 @@
 ?>
 <!-- wp:pattern {"slug":"remote-leverage/reviews-testimonials"} /-->
 <!-- wp:pattern {"slug":"remote-leverage/reviews-hero-repeat"} /-->
-<!-- wp:pattern {"slug":"remote-leverage/vapricing-trust-pills"} /-->
 <!-- wp:pattern {"slug":"remote-leverage/reviews-roles-pricing"} /-->
 <!-- wp:pattern {"slug":"remote-leverage/trust-and-impact"} /-->
 <!-- wp:pattern {"slug":"remote-leverage/reviews-why-hire"} /-->

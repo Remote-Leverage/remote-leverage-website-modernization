@@ -1244,24 +1244,6 @@ class BlockDefaults
     // --- HOME HERO (2026 homepage) ---
 
     /**
-     * Resolve a homepage image only if it actually exists, otherwise an empty string.
-     *
-     * homeImg() always hands back a URL, 404 included, which is the right behaviour for art
-     * that is expected to be there. The hero's cutout portraits are the exception: they are
-     * supplied separately from the build, so the hero has to render cleanly without them
-     * rather than with two broken images in it.
-     */
-    public static function homeImgIfExists(string $file): string
-    {
-        $url = self::homeImg($file);
-
-        // homeImg() signals "found nothing" by returning its uploads/home fallback verbatim.
-        $miss = esc_url(set_url_scheme(self::imgBase().'/'.$file, 'https'));
-
-        return $url === $miss ? '' : $url;
-    }
-
-    /**
      * The hero's six checklist items, in the single order that serves both breakpoints.
      *
      * @return array<int, string>
@@ -1279,18 +1261,23 @@ class BlockDefaults
     }
 
     /**
-     * The four floating talent cards, in back-to-front order per side.
+     * The three hero talent cards, in placement order: back-left, front-centre, back-right.
      *
-     * The two cutout portraits are hero-specific art, not the grey-studio `con-*` set used by
-     * the talent marquee. Until they land in resources/images/pages/home/ the cards render
-     * without portraits rather than with broken images — see homeImgIfExists().
+     * Three, not the comp's four — the fourth (André Vilalobos) carried no portrait and existed
+     * only to peek out from behind another card. With every card now showing a face, a hidden
+     * filler card had nothing to add.
+     *
+     * Portraits are hero-specific art, supplied 2026-09-16 and normalised into
+     * resources/images/pages/home/hero/: each was trimmed of its transparent margin and set to
+     * a common 560px height, because the three arrived framed very differently and the same CSS
+     * height would otherwise have rendered three different figure sizes.
      *
      * Flags come from resources/images/pages/home/flags/, copied from the sales-talents and
      * flags sets rather than the 19px home/<country>.png icons, which are too small to hold up.
      * The comp draws rectangular emoji flags; these are the theme's circular set, chosen over
      * emoji so the glyph does not change shape between Apple, Windows and Android. The two
      * vector flags in the source sets are 1.1MB (Mexico) and 567KB (Argentina) — detailed coats
-     * of arms — so those two plus Brazil take the 76px PNGs and only Colombia, which is 753
+     * of arms — so Brazil and Argentina take the 76px PNGs and only Colombia, which is 753
      * bytes of SVG, stays vector.
      *
      * @return array<int, array<string, string>>
@@ -1299,36 +1286,22 @@ class BlockDefaults
     {
         return [
             [
-                'name' => 'André Vilalobos',
-                'role' => 'Lead Generation (SDR)',
-                'rate' => '$7/hr',
-                'flag' => self::pageImg('home', 'flags/mexico.png'),
-                'photo' => '',
-                'side' => 'left',
+                'name' => 'Mariana Costa',
+                'role' => 'Sales Assistant',
+                'flag' => self::pageImg('home', 'flags/argentina.png'),
+                'photo' => self::pageImg('home', 'hero/hero-mariana.png'),
             ],
             [
                 'name' => 'Luana Dias',
-                'role' => 'Social Media Specialist',
-                'rate' => '$6/hr',
+                'role' => 'Administrative Assistant',
                 'flag' => self::pageImg('home', 'flags/colombia.svg'),
-                'photo' => self::homeImgIfExists('hero-luana.png'),
-                'side' => 'left',
-            ],
-            [
-                'name' => 'Mariana Costa',
-                'role' => 'Lead Generation (SDR)',
-                'rate' => '$6/hr',
-                'flag' => self::pageImg('home', 'flags/argentina.png'),
-                'photo' => '',
-                'side' => 'right',
+                'photo' => self::pageImg('home', 'hero/hero-luana.png'),
             ],
             [
                 'name' => 'Bruno Carvalho',
                 'role' => 'Sr Executive Assistant',
-                'rate' => '$6/hr',
                 'flag' => self::pageImg('home', 'flags/brazil.png'),
-                'photo' => self::homeImgIfExists('hero-bruno.png'),
-                'side' => 'right',
+                'photo' => self::pageImg('home', 'hero/hero-bruno.png'),
             ],
         ];
     }

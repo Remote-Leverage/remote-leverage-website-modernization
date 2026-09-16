@@ -27,7 +27,7 @@ class HomeHeroBlock extends Block
      *
      * @var string
      */
-    public $description = 'The 2026 homepage hero: Google rating, centred headline, checklist card, pink CTA and floating talent cards.';
+    public $description = 'The 2026 homepage hero: headline, subtitle, checklist and CTA on the left, a fan of three talent cards on the right.';
 
     /**
      * The block category.
@@ -139,7 +139,7 @@ class HomeHeroBlock extends Block
     }
 
     /**
-     * The four floating talent cards, two per side.
+     * The talent cards, in placement order: back-left, front-centre, back-right.
      *
      * @return array<int, array<string, string>>
      */
@@ -151,10 +151,8 @@ class HomeHeroBlock extends Block
             return array_map(fn ($card) => [
                 'name' => BlockDefaults::cleanText($card['name'] ?? ''),
                 'role' => BlockDefaults::cleanText($card['role'] ?? ''),
-                'rate' => BlockDefaults::cleanText($card['rate'] ?? ''),
                 'flag' => $card['flag'] ?? '',
                 'photo' => $card['photo'] ?? '',
-                'side' => ($card['side'] ?? 'left') === 'right' ? 'right' : 'left',
             ], $custom);
         }
 
@@ -215,22 +213,17 @@ class HomeHeroBlock extends Block
                 'default_value' => '#booking-footer',
             ])
             ->addRepeater('cards', [
-                'label' => 'Floating Talent Cards (leave empty for the preset four)',
-                'instructions' => 'Desktop only — the mobile design has no floating cards. Two per side, in back-to-front order.',
+                'label' => 'Talent Cards (leave empty for the preset three)',
+                'instructions' => 'Desktop only — the mobile design has no talent cards. Three cards, in placement '
+                    .'order: back-left, front-centre, back-right. A fourth would have nowhere to sit in the fan.',
                 'layout' => 'block',
+                'max' => 3,
                 'button_label' => 'Add Card',
             ])
             ->addText('name', ['label' => 'Name'])
             ->addText('role', ['label' => 'Role'])
-            ->addText('rate', ['label' => 'Hourly Rate Pill', 'instructions' => 'e.g. $6/hr. Leave empty to omit the pill.'])
             ->addImage('flag', ['label' => 'Flag', 'return_format' => 'url'])
-            ->addImage('photo', ['label' => 'Cutout Portrait', 'return_format' => 'url', 'instructions' => 'Transparent PNG. Leave empty for a card with no portrait.'])
-            ->addSelect('side', [
-                'label' => 'Side',
-                'choices' => ['left' => 'Left of the headline', 'right' => 'Right of the headline'],
-                'default_value' => 'left',
-                'return_format' => 'value',
-            ])
+            ->addImage('photo', ['label' => 'Cutout Portrait', 'return_format' => 'url', 'instructions' => 'Transparent PNG, trimmed of its margin.'])
             ->endRepeater();
 
         return $fields->build();

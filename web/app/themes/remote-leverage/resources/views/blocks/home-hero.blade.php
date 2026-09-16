@@ -5,8 +5,8 @@
        · Mobile — everything centred in one column: headline, subtitle, checklist, CTA. No
          talent cards, no rating row.
        · Desktop (lg and up, per direction 2026-09-16) — a two-column split: the copy left
-         aligned in the left column, all four talent cards clustered in the right one. Before
-         this the copy was centred with a card pair flanking it either side.
+         aligned in the left column, a fan of three talent cards in the right one. Before this
+         the copy was centred with a card pair flanking it either side.
 
      Tokens measured off Homepage V3.png at 1366px and Page_v1.2.png at 376px. Container stays
      the canonical max-w-[1380px] — per docs/design-system.md rule 1 the container is the one
@@ -17,29 +17,24 @@
      order of the six items makes the desktop two-column grid and the mobile single column
      agree. --}}
 @php
-  // The cards were split left/right of the centred copy. Now they share one cluster, so the
-  // field only decides which of the two stacks a card joins — `side` keeps its name because it
-  // still means "which pile", and the stored content does not need rewriting.
-  $nearStack = array_values(array_filter($cards, fn ($c) => ($c['side'] ?? 'left') === 'left'));
-  $farStack = array_values(array_filter($cards, fn ($c) => ($c['side'] ?? 'left') === 'right'));
-
-  // Within a stack the first card sits behind and paler, the second overlaps it lower and
-  // nearer. Spelled out per slot rather than computed: Tailwind scans source text and never
-  // sees a class assembled by concatenation.
-  $cardSkin = [
-    ['surface' => 'bg-lavender-tint', 'z' => 'z-10'],
-    ['surface' => 'bg-[#EBEBFF]', 'z' => 'z-20'],
-  ];
-
-  // Cluster geometry, in a 452x452 box: two overlapping pairs side by side, the right pair
-  // dropped lower so the four read as a fan rather than a grid. Rotation travels as a custom
-  // property because .rl-hero-card's idle float has to rebuild the whole transform each
-  // keyframe — a Tailwind rotate-* utility would be overwritten by the animation.
+  // A three-card fan: two cards set back and tilted away to either side, the third centred,
+  // lower and nearer. Depth is carried by three things at once — vertical offset, stacking
+  // order and surface tint — so the arrangement reads as considered rather than as three cards
+  // that happen to overlap.
+  //
+  // Offsets are percentages of the fan box, and the card sizes itself as a percentage too, so
+  // one set of numbers holds at both box sizes. The box shrinks to 75% at lg, where a 1024px
+  // viewport cannot spare 568px beside the headline. A transform scale would have been simpler
+  // to write and wrong: transforms do not affect layout, so the column would still have
+  // reserved the full width and squeezed the copy to ~300px.
+  //
+  // Rotation travels as a custom property rather than a Tailwind rotate-* utility: the hover
+  // state in .rl-hero-card rebuilds the whole transform to straighten the card, and would
+  // overwrite a utility's rotation.
   $placement = [
-    ['pos' => 'left-[18px] top-0', 'rot' => '-7deg', 'delay' => '0s'],
-    ['pos' => 'left-0 top-[136px]', 'rot' => '-3deg', 'delay' => '.9s'],
-    ['pos' => 'left-[268px] top-[44px]', 'rot' => '7deg', 'delay' => '.45s'],
-    ['pos' => 'left-[252px] top-[180px]', 'rot' => '3deg', 'delay' => '1.35s'],
+    ['pos' => 'left-0 top-[6.2%]', 'rot' => '-9deg', 'z' => 'z-10', 'surface' => 'bg-lavender-tint'],
+    ['pos' => 'left-[28.5%] top-[34.2%]', 'rot' => '-2deg', 'z' => 'z-20', 'surface' => 'bg-[#EBEBFF]'],
+    ['pos' => 'left-[57.7%] top-0', 'rot' => '9deg', 'z' => 'z-10', 'surface' => 'bg-lavender-tint'],
   ];
 @endphp
 
@@ -47,7 +42,7 @@
      pinned under it, so the hero takes the slack and centres in whatever is left. --}}
 <section class="relative flex flex-1 flex-col justify-center overflow-hidden bg-bg-light pt-10 pb-10 lg:pt-14 lg:pb-8">
   <div class="relative w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_452px] lg:items-center lg:gap-10 xl:gap-16">
+    <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-10 xl:gap-16">
 
       <div class="relative z-30 mx-auto flex max-w-[720px] flex-col items-center text-center lg:mx-0 lg:max-w-none lg:items-start lg:text-left">
 
@@ -80,11 +75,17 @@
         </p>
 
         {{-- Checklist: magenta ticks on the bare ground at every width, one column on mobile and
-             two on desktop. The columns are `max-content` rather than `auto`: an auto track
-             absorbs free space before justify-content gets a look in, so the columns butt
-             together and the longer items wrap. --}}
+             two on desktop.
+
+             On mobile the list is `w-fit mx-auto`, so the block shrinks to its longest item and
+             centres as a unit while the items stay left-aligned inside it. It was `w-full`,
+             which pinned every tick to the screen edge under centred copy.
+
+             The desktop columns are `max-content` rather than `auto`: an auto track absorbs
+             free space before justify-content gets a look in, so the columns butt together and
+             the longer items wrap. --}}
         @if ($checklist)
-          <ul class="mt-8 grid w-full max-w-[548px] grid-cols-1 gap-y-[18px] text-left lg:mt-7 lg:w-auto lg:max-w-none lg:grid-cols-[max-content_max-content] lg:justify-start lg:gap-x-10 lg:gap-y-[14px]">
+          <ul class="mx-auto mt-8 grid w-fit max-w-full grid-cols-1 gap-y-[18px] text-left lg:mx-0 lg:mt-7 lg:w-auto lg:max-w-none lg:grid-cols-[max-content_max-content] lg:justify-start lg:gap-x-10 lg:gap-y-[14px]">
             @foreach ($checklist as $item)
               <li class="flex items-center gap-3">
                 <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-magenta">
@@ -106,18 +107,28 @@
         ])
       </div>
 
-      {{-- Talent cards. lg and up only: the cluster needs its own 452px column, which a phone
-           does not have, and the mobile comp has no cards at all. --}}
+      {{-- Talent cards. lg and up only: the fan needs its own column, which a phone does not
+           have, and the mobile design has no cards at all.
+
+           The column auto-sizes to the fan, which is why the box carries real widths rather
+           than a transform. --}}
       @if ($cards)
-        <div class="relative hidden h-[452px] w-[452px] lg:block" aria-hidden="true">
-          @foreach (array_merge($nearStack, $farStack) as $i => $card)
-            @php($place = $placement[$i % count($placement)])
-            @php($skin = $cardSkin[($i % 2)])
-            <div class="absolute {{ $place['pos'] }} {{ $skin['z'] }} rl-hero-card"
-                 style="--rl-card-rot: {{ $place['rot'] }}; animation-delay: {{ $place['delay'] }};">
-              @include('blocks.partials.home-hero-card', ['card' => $card, 'surface' => $skin['surface']])
-            </div>
-          @endforeach
+        {{-- pr clears the rotated corners. A 240x322 card turned 9deg reaches ~50px past its own
+             box, and the section clips at the viewport, so without this the right-hand card lost
+             its top corner. --}}
+        <div class="hidden lg:block lg:pr-10 xl:pr-14">
+          <div class="relative h-[388px] w-[424px] xl:h-[520px] xl:w-[568px]" aria-hidden="true">
+            @foreach (array_slice($cards, 0, count($placement)) as $i => $card)
+              @php($place = $placement[$i])
+              {{-- The wrapper carries the size, not the card: the card's percentage width would
+                   otherwise resolve against this absolutely-positioned box, which has no width
+                   of its own and shrinks to its content. --}}
+              <div class="group absolute aspect-[240/322] w-[42.3%] {{ $place['pos'] }} {{ $place['z'] }} rl-hero-card"
+                   style="--rl-card-rot: {{ $place['rot'] }};">
+                @include('blocks.partials.home-hero-card', ['card' => $card, 'surface' => $place['surface']])
+              </div>
+            @endforeach
+          </div>
         </div>
       @endif
 
