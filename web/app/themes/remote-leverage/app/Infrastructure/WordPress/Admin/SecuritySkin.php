@@ -308,7 +308,7 @@ class SecuritySkin
         .rl-security-skin .wf-options-icon { fill: #71717a !important; width: 14px !important; height: 14px !important; }
 
         /* --- Cards ----------------------------------------------------------------- */
-        .rl-security-skin .wf-block,
+        .rl-security-skin .wf-block:not(.wf-block-transparent),
         .rl-security-skin .wf-card,
         .rl-security-skin .wf-dashboard-item,
         .rl-security-skin .wf-scanner-progress {
@@ -331,8 +331,25 @@ class SecuritySkin
             font-size: 15px !important; font-weight: 600 !important; letter-spacing: -0.01em !important;
             color: #09090b !important; margin: 0 !important; text-transform: none !important;
         }
+        /* `.wf-block-content` carries `margin: 0 -1.5rem`, which exists to cancel the
+           `padding: 0 1.5rem` WordFence puts on `.wf-block`. We replace that padding with our
+           own on the content, so the negative margin has nothing left to cancel and instead
+           hangs 24px past each edge of the card — visible as rules and dividers running wider
+           than the white surface they belong to. */
         .rl-security-skin .wf-block-content,
-        .rl-security-skin .wf-dashboard-item-content { padding: 16px 18px !important; }
+        .rl-security-skin .wf-dashboard-item-content {
+            padding: 16px 18px !important; margin-left: 0 !important; margin-right: 0 !important;
+        }
+        /* `.wf-block-transparent` is WordFence's unstyled container — it holds the
+           Save/Cancel control row. Given the card treatment it renders as a white panel
+           floating in the middle of the options list. */
+        .rl-security-skin .wf-block.wf-block-transparent {
+            background: transparent !important; border: 0 !important;
+            box-shadow: none !important; padding: 0 !important;
+        }
+        .rl-security-skin .wf-block.wf-block-transparent > .wf-block-content {
+            padding-left: 0 !important; padding-right: 0 !important;
+        }
         .rl-security-skin .wf-block-footer { padding: 12px 18px !important; border-top: 1px solid #f4f4f5 !important; background: #fafafa !important; }
         .rl-security-skin .wf-block.wf-active > .wf-block-header { border-bottom: 1px solid #f4f4f5 !important; }
 
@@ -654,7 +671,8 @@ class SecuritySkin
         .rl-security-skin #wf-satisfaction-prompt,
         .rl-security-skin .wf-satisfaction-prompt,
         .rl-security-skin .wf-license-upgrade-prompt,
-        .rl-security-skin #wf-site-cleaning-bottom { display: none !important; }
+        .rl-security-skin #wf-site-cleaning-bottom,
+        .rl-security-skin .wf-audit-log-premium-callout { display: none !important; }
 
         /* --- Scan status ------------------------------------------------------------------------------
            The Scan page leads with the Wordfence wordmark drawn as stacked bars, which at this
@@ -685,7 +703,7 @@ class SecuritySkin
            legend. Kept (it is real UI when traffic exists) and given the card treatment so it
            looks deliberate. */
         .rl-security-skin #wf-live-traffic-legend {
-            bottom: 16px !important; left: 196px !important;
+            bottom: 52px !important; left: 196px !important;
             background: #fff !important; border: 1px solid #e4e4e7 !important;
             border-radius: 10px !important; box-shadow: 0 4px 12px rgba(0,0,0,.08) !important;
             padding: 8px 14px !important; font-size: 12px !important; color: #71717a !important;
