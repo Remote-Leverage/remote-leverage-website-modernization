@@ -44,9 +44,14 @@ use App\Support\BlockDefaults;
             </a>
         </div>
 
-        <?= BlockDefaults::renderTalentGrid(['layout' => 'grid', '_layout' => 'field_talent_grid_block_layout']) ?>
+        <?= BlockDefaults::renderTalentGrid([
+            'layout' => 'grid',
+            '_layout' => 'field_talent_grid_block_layout',
+            'aspect' => 'square',
+            '_aspect' => 'field_talent_grid_block_aspect',
+        ]) ?>
 
-        <?php // Six trust badges, inside the dark band as on production. ?>
+        <?php // Six trust badges, inside the dark band as on production.?>
         <div class="mt-14 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
             <?php foreach ([
                 'No Contracts',

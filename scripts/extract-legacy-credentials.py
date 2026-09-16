@@ -26,19 +26,25 @@ import re
 import sys
 
 # Exact option names only — no prefixes, no wildcards, no caller-supplied patterns.
+#
+# Corrected 2026-09-16 after the first run returned "not present" for most of these. The
+# guessed `rl_*` names did not exist; the real ones were read out of the legacy plugin
+# source (`rl-elementor-blocks/src`), which is code rather than credential data:
+#   - there is NO rl_jlc slack *token* option at all. JoinLiveCallIntegration posts to
+#     slack.com/api/chat.postMessage with a bearer token it borrows from the
+#     **gravityformsslack** add-on's own settings, so the token lives there.
+#   - Customer.io is `rl_cio_write_key` / `rl_cio_region`, not `rl_customerio_*`.
+#   - HubSpot likewise belongs to the **gravityformshubspot** add-on (OAuth).
 WANTED = [
-    # Slack — production uses the Bot API + channel; the webhook option is empty.
-    "rl_jlc_slack_bot_token",
-    "rl_jlc_slack_token",
+    # Slack — production dispatches through the Bot API to a channel; the webhook is empty.
     "rl_jlc_slack_channel",
     "rl_jlc_slack_webhook_url",
-    # Customer.io — server-side Track API v1.
-    "rl_customerio_site_id",
-    "rl_customerio_api_key",
-    "rl_customerio_app_api_key",
-    # HubSpot — legacy used the Gravity Forms add-on over OAuth.
-    "rl_hubspot_access_token",
-    "rl_hubspot_portal_id",
+    "gravityformsaddon_gravityformsslack_settings",
+    # Customer.io — the browser CDP source.
+    "rl_cio_write_key",
+    "rl_cio_region",
+    # HubSpot — the Gravity Forms add-on's OAuth credential.
+    "gravityformsaddon_gravityformshubspot_settings",
 ]
 
 MAX_VALUE_BYTES = 400
