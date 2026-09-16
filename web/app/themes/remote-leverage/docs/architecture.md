@@ -26,7 +26,7 @@ WordPress loads the theme
       └─ includes app/setup.php and app/filters.php  (plain WordPress hooks)
 ```
 
-### The nine domain providers
+### The ten domain providers
 
 Registered in order by `DomainServiceProvider::$providers`:
 
@@ -41,6 +41,7 @@ Registered in order by `DomainServiceProvider::$providers`:
 | `RouteServiceProvider` | Loads `routes/web.php` (web middleware) and `routes/api.php` (api middleware, `/api` prefix) |
 | `SyncServiceProvider` | Sync abilities, commands, `EnvironmentSyncAdmin` |
 | `AiServiceProvider` | MCP landing-page abilities |
+| `ObservabilityServiceProvider` | Integration-call recording: Laravel HTTP client events, the `http_api_debug` hook for `wp_remote_*`, and the daily retention prune — see [observability.md](observability.md) |
 
 `ThemeServiceProvider` itself also registers Sage's Blade view composers (`app/View/Composers`).
 
@@ -162,7 +163,7 @@ A Stage 1 row without its matching Stage 2 row is how you find a listener that s
 
 ## 5. Data
 
-### Custom tables (12 migrations, `app/Infrastructure/Database/Migrations`)
+### Custom tables (19 migrations, `app/Infrastructure/Database/Migrations`)
 
 | Table | Domain | Created |
 | :--- | :--- | :--- |
@@ -174,8 +175,17 @@ A Stage 1 row without its matching Stage 2 row is how you find a listener that s
 | `rl_lead_activity_logs` | Lead | 2026-09-07 |
 | `rl_referrers` | Referral | 2026-09-09 |
 | `rl_payouts` | Referral | 2026-09-09 |
+| `rl_lead_profiles` | Lead | 2026-09-16 |
+| `rl_lead_identifiers` | Lead | 2026-09-16 |
+| `rl_integration_calls` | Observability | 2026-09-16 |
 
-Plus four alter migrations: tracking columns and a fulltext/search index on leads, `referrer_id` on the referral tables, and booking-retry columns on leads.
+Plus nine alter migrations: tracking columns and a fulltext/search index on leads, `referrer_id`
+on the referral tables, booking-retry and consent columns, and — on 2026-09-16 — full attribution,
+the PostHog session id, the HubSpot contact id and `device_id`.
+
+`rl_lead_profiles` / `rl_lead_identifiers` are the identity graph: the identifiers a person has
+reused across submissions, consolidated so a block can apply to the person rather than to one row.
+`rl_integration_calls` is the full request and response of every outbound integration call.
 
 All use the WordPress table prefix (so `wp_rl_leads` on a default install). Migrations run through `wp acorn migrate`, and automatically on container start via `wp acorn rl:deploy` — see [deployment.md](deployment.md).
 

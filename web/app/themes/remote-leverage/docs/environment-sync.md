@@ -60,6 +60,19 @@ staging, requiring `manage_options`:
 This is the only piece that must exist before anything else works. It replaces the
 CLI bootstrap entirely — no redeploy, no container shell, no secrets-manager round trip.
 
+> **Prerequisite: Application Passwords must be available on the target.** WordFence disables them
+> by default, which makes every sync call fail as `rest_not_logged_in` — the same response as a
+> wrong password, so it reads like a credential problem rather than a feature being switched off.
+> `config/wordfence.php` keeps them enabled; if sync suddenly stops working, check the target's
+> REST index first:
+>
+> ```bash
+> curl -s "https://<host>/wp-json/" | jq .authentication
+> # {} means disabled — no credential can authenticate
+> ```
+>
+> See [known-issues.md](known-issues.md) entry 22.
+
 Revoke is the same screen: delete the application password, drop the capability.
 
 ## 2. Dataset model

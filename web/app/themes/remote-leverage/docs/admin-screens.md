@@ -23,6 +23,14 @@ Every screen requires `manage_options`.
 
 **Lead dossier** (`?view_lead=ID`): contact details, revenue tier, the full UTM/attribution set including `gclid` and `fbclid`, the booked slot and Google Meet URL, and the execution timeline comparing Stage 1 dispatch against Stage 2 consumption with expandable JSON payloads. This is the screen that answers "did HubSpot actually receive this lead?" — see [domains/lead.md](domains/lead.md#the-dual-write-audit-contract).
 
+Since 2026-09-16 that timeline interleaves a second source: the **integration call log**, the full
+request and response of every outbound call made on this lead's behalf. The activity log says what
+each domain decided to do; the call log says what actually crossed the wire. Reading them merged
+is the point — a HubSpot 400 sits directly under the entry that claimed the sync succeeded. Each
+row carries a 16px source icon, and a call row expands to request headers and body, response
+headers and body, duration, and which account it authenticated as. Credentials appear only as
+fingerprints. See [observability.md](observability.md).
+
 **Actions**: CSV export of the filtered set; one-click 30-day retention purge (the floor is enforced in `PurgeOldLeadsAction`, not in the UI); manual status updates. Handled in `handleAdminActions()` on `admin_init`, gated on `manage_options` and a nonce.
 
 ## Referrers

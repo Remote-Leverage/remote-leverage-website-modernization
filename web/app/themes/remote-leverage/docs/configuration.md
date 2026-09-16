@@ -106,16 +106,42 @@ Local only — read by the sync commands to call *out* to a remote. Never added 
 
 `wp acorn rl:wordfence --dry-run` reports drift without writing.
 
+**One WordFence default is deliberately reversed.** `loginSec_disableApplicationPasswords` ships
+as `true` and switches WordPress Application Passwords off site-wide, which breaks Environment
+Sync, `rl:sync:page` and both MCP servers with an error (`rest_not_logged_in`) indistinguishable
+from a wrong password. `config/wordfence.php` sets it to `false`, and the setting must stay
+**present** — absent means WordFence's default wins again. See
+[known-issues.md](known-issues.md) entry 22 for the full account and the bounded risk.
+
 ## Monitoring
 
 `config/sentry.php` reads a large Sentry option set. The one that matters:
 
 | Variable | Notes |
 | :--- | :--- |
-| `SENTRY_LARAVEL_DSN` (or `SENTRY_DSN`) | **Not set in `.env`.** Sentry is installed and configured but reports nothing. |
+| `SENTRY_LARAVEL_DSN` (or `SENTRY_DSN`) | Optional. **The DSN is committed as the `config/sentry.php` default** since 2026-09-16 — a DSN is not a secret, and ECS maps Secrets Manager keys to env vars one at a time, so waiting on a task-definition change left Sentry silent. Set this only to point an environment somewhere else. |
 | `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE`, `SENTRY_TRACES_SAMPLE_RATE`, `SENTRY_PROFILES_SAMPLE_RATE` | Optional |
 
 Every other `SENTRY_*` key in `config/sentry.php` is the package's own default set — breadcrumb and tracing toggles — and needs no project value.
+
+`ignore_exceptions` and `ignore_transactions` in that file, plus the browser-side filters in
+`resources/js/app.js`, exist to keep the alert channel readable. Both are covered in
+[observability.md](observability.md).
+
+## Monitoring — integration call log
+
+`config/observability.php`. Records the full request and response of every outbound integration
+call into `rl_integration_calls`; see [observability.md](observability.md).
+
+| Variable | Notes |
+| :--- | :--- |
+| `RL_RECORD_INTEGRATION_CALLS` | Default `true`. Master switch. |
+| `RL_RECORD_UNKNOWN_HOSTS` | Default `false`. Records hosts outside the allowlist as `other`. Off because the bulk content-import commands would bury real integration traffic. |
+| `RL_RECORD_WP_HTTP` | Default `true`. Captures the outgoing lead webhook, which uses WordPress' HTTP API rather than Laravel's. |
+| `RL_INTEGRATION_CALL_RETENTION_DAYS` | Default `30`. These rows contain full lead PII by design, so they are pruned daily rather than kept. |
+
+Credentials are never stored — `Authorization` is replaced by a stable fingerprint, and the
+Calendly pool additionally records which **account** a call authenticated as.
 
 ## AI providers
 

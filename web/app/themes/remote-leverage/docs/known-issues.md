@@ -172,11 +172,21 @@ Note the verifier *also* returns an error for an empty secret, so a future calle
 
 Unrelated bycatch, fixed in passing: the test suite's `log` stub implemented only `info`/`error`/`warning`/`debug`, so the first caller to use any other PSR-3 level failed with `undefined method` inside a facade rather than anywhere near the code under test. It now implements all of PSR-3.
 
-### 8. Sentry is installed but silent
+### ~~8. Sentry is installed but silent~~ — ✅ **FIXED 2026-09-16**
 
-`sentry/sentry-laravel` is a dependency, `config/sentry.php` is fully populated, and `@sentry/browser` is in `package.json` — but no `SENTRY_LARAVEL_DSN` or `SENTRY_DSN` is set in `.env`. Nothing is reported from any environment.
+`sentry/sentry-laravel` was a dependency, `config/sentry.php` was fully populated, and
+`@sentry/browser` was in `package.json` — but no `SENTRY_LARAVEL_DSN` or `SENTRY_DSN` was set, so
+nothing was reported from any environment.
 
-**Proposed fix:** set the DSN for staging now, and treat "errors reported" as a cutover gate for production.
+**Fixed by** committing the DSN as the `config/sentry.php` default rather than waiting on an
+environment variable. ECS maps Secrets Manager keys to env vars one at a time in the task
+definition, so a new key is invisible to the application until an infrastructure change lands —
+and a DSN is not a secret.
+
+The same change addressed the *opposite* problem, which arrives the moment reporting works: the
+browser SDK had no filtering whatsoever, so at cutover it would have inherited production's noise
+profile — every GTM tag, browser extension and headless-bot error becoming one of our alerts. See
+[observability.md](observability.md) for what is filtered and why.
 
 ### 9. A block field can silently blank a repeater sub-field of the same derived key
 
@@ -520,6 +530,49 @@ and only one landed.
 **Adjacent cleanup this unblocks:** `STAGING_SYNC_BODY_AUTH` and
 `web/app/mu-plugins/rl-sync-body-auth.php` are now dead weight — see
 [domains/sync.md](domains/sync.md).
+
+### 22. WordFence disables WordPress Application Passwords by default — ✅ **FIXED 2026-09-16**
+
+`loginSec_disableApplicationPasswords` ships as `true` (`wfConfig.php:93`). When set, WordFence
+adds `__return_false` to the `wp_is_application_passwords_available` filter, which turns
+Application Passwords off **for the whole site**, not just for wp-admin.
+
+Everything this project does machine-to-machine authenticates that way, so installing WordFence on
+2026-09-16 broke all of it at once: the Environment Sync screen, `wp acorn rl:sync:page`, and both
+the `rl-staging` and `rl-production` MCP servers.
+
+**Why it cost an afternoon.** The symptom is `rest_not_logged_in` — and on the REST API that is
+returned for *no credentials* and *bad credentials* alike, because when Application Passwords are
+unavailable core returns early without ever setting a credential error. A deliberately wrong
+password, a non-existent user and no `Authorization` header at all produce byte-identical
+responses. Two wrong conclusions came out of that: first that CloudFront was stripping
+`Authorization` (it is not — that was fixed in `6fb3b96` and works), and then that WordFence was
+innocent, from reading the login-security module, which *does* let Application Passwords past 2FA,
+rather than the main plugin class, which disables them outright.
+
+**The reliable test** is the REST index, because core adds this key if and only if
+`wp_is_application_passwords_available()` is true:
+
+```bash
+curl -s "https://<host>/wp-json/" | jq .authentication
+# {"application-passwords": {...}}  -> available
+# {}                                -> disabled; nothing can authenticate
+```
+
+**Fixed by** `'loginSec_disableApplicationPasswords' => false` in `config/wordfence.php`, applied
+on every deploy by `WordfenceConfigurator`. The setting must be **present and false** — merely
+absent means WordFence's default wins. `tests/Unit/WordfenceConfigTest.php` pins that.
+
+**The trade-off is real and deliberate.** WordFence disables these because an Application Password
+bypasses 2FA. The exposure is bounded because the only holder is the dedicated `sync-service`
+user, which has `rl_manage_ai_sync` and nothing else — no admin role, no `manage_options` — with a
+password provisioned per environment rather than shared. Human logins keep 2FA. A companion test
+asserts that premise so the justification cannot silently rot.
+
+**Note for the UI:** despite the `loginSec_` prefix, the toggle lives on the **Firewall** options
+page, not Login Security — `admin.php?page=WordfenceWAF&subpage=waf_options#wf-option-loginSec-disableApplicationPasswords-label`.
+Passkeys, which *are* under Login Security, are an unrelated 2FA method and enabling them does not
+help.
 
 ## Stale documentation
 
