@@ -23,6 +23,13 @@
  *   landing_url       full URL                         landing_display  host+path, trimmed
  *   replay_url        PostHog session replay           admin_url     wp-admin lead detail
  *   submission_type   Partial | Final
+ *   lead_id           what an action button carries; the handler reads everything else from
+ *                     the database, which is what stops a payload asserting facts about a lead
+ *   interactive       a flag, not a fact: non-empty only once SLACK_SIGNING_SECRET is set.
+ *                     `_when` on it is how the action buttons stay hidden until they work
+ *
+ * The live-call and referral templates carry their own sets — see the listeners that build
+ * them, and docs/slack-app.md for which template each event renders.
  *
  * ## Conditional blocks
  *
@@ -34,7 +41,9 @@
  *
  * ## House rule
  *
- * No emoji, anywhere. Hierarchy comes from headers, dividers and field grouping.
+ * No emoji, anywhere. Hierarchy comes from headers, dividers and field grouping. Every family
+ * of templates below has a test asserting it, because the Block Kit Builder emoji picker is one
+ * click away from the JSON you are about to paste in here.
  */
 return [
 
@@ -108,7 +117,6 @@ return [
                         'type' => 'button',
                         '_when' => ['admin_url'],
                         'text' => ['type' => 'plain_text', 'text' => 'Open in portal', 'emoji' => false],
-                        'style' => 'primary',
                         'url' => '{{ admin_url }}',
                     ],
                     [
@@ -122,6 +130,62 @@ return [
                         '_when' => ['hubspot_url'],
                         'text' => ['type' => 'plain_text', 'text' => 'Open in HubSpot', 'emoji' => false],
                         'url' => '{{ hubspot_url }}',
+                    ],
+                ],
+            ],
+
+            /*
+             * The buttons that do something here rather than send you somewhere.
+             *
+             * A separate row from the links above because they are a different kind of thing:
+             * one row leaves Slack, the other changes a lead without leaving it. Six buttons on
+             * one line wrap into an unreadable block at any sensible window width anyway.
+             *
+             * `_when: interactive` is the feature flag. It resolves empty until
+             * SLACK_SIGNING_SECRET is set, and an unconfigured app must not render these —
+             * Slack answers a button it cannot deliver with "not configured to handle
+             * interactive responses" printed in the channel, under every lead, forever.
+             */
+            [
+                'type' => 'actions',
+                '_when' => ['interactive'],
+                'elements' => [
+                    [
+                        'type' => 'button',
+                        'action_id' => 'lead_claim',
+                        'text' => ['type' => 'plain_text', 'text' => 'Claim', 'emoji' => false],
+                        'style' => 'primary',
+                        'value' => '{{ lead_id }}',
+                    ],
+                    [
+                        'type' => 'button',
+                        'action_id' => 'lead_contacted',
+                        'text' => ['type' => 'plain_text', 'text' => 'Mark contacted', 'emoji' => false],
+                        'value' => '{{ lead_id }}',
+                    ],
+                    [
+                        'type' => 'button',
+                        'action_id' => 'lead_block',
+                        'text' => ['type' => 'plain_text', 'text' => 'Block', 'emoji' => false],
+                        'style' => 'danger',
+                        'value' => '{{ lead_id }}',
+
+                        /*
+                         * Blocking is silent and covers every identifier the person has ever
+                         * used, so it is both the most destructive button here and the one whose
+                         * effect is hardest to see afterwards. Slack's own confirm dialog is the
+                         * cheapest guard against a mis-tap on a phone.
+                         */
+                        'confirm' => [
+                            'title' => ['type' => 'plain_text', 'text' => 'Block this person?', 'emoji' => false],
+                            'text' => [
+                                'type' => 'mrkdwn',
+                                'text' => 'Blocks every email, phone and device already linked to *{{ name }}*, and any identifier linked later. Their forms keep working and nothing reaches sales, the CRM or this channel again.',
+                            ],
+                            'confirm' => ['type' => 'plain_text', 'text' => 'Block', 'emoji' => false],
+                            'deny' => ['type' => 'plain_text', 'text' => 'Cancel', 'emoji' => false],
+                            'style' => 'danger',
+                        ],
                     ],
                 ],
             ],
@@ -168,6 +232,277 @@ return [
                     [
                         'type' => 'button',
                         'text' => ['type' => 'plain_text', 'text' => 'Open lead', 'emoji' => false],
+                        'url' => '{{ admin_url }}',
+                    ],
+                ],
+            ],
+        ],
+    ],
+    /*
+    |--------------------------------------------------------------------------
+    | Action confirmations
+    |--------------------------------------------------------------------------
+    |
+    | Posted by SlackInteractionController when somebody presses a button, as a reply under
+    | that lead's own alert. Context blocks rather than sections: this is a margin note on a
+    | message that is already there, and rendering it at the same weight as the lead itself
+    | would make a busy channel read as twice as busy.
+    |
+    | The block confirmation is the exception. It broadcasts to the channel, because a
+    | moderation decision taken silently by one person is the kind of thing the rest of the
+    | team should be able to see and question.
+    */
+    'lead_claimed' => [
+        'color' => null,
+        'fallback' => '{{ actor }} claimed {{ name }}',
+        'blocks' => [
+            [
+                'type' => 'context',
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => 'Claimed by {{ actor }}'],
+                ],
+            ],
+        ],
+    ],
+
+    'lead_contacted' => [
+        'color' => null,
+        'fallback' => '{{ actor }} marked {{ name }} contacted',
+        'blocks' => [
+            [
+                'type' => 'context',
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => 'Marked contacted by {{ actor }}'],
+                ],
+            ],
+        ],
+    ],
+
+    'lead_blocked' => [
+        'color' => null,
+        'fallback' => '{{ actor }} blocked {{ name }}',
+        'blocks' => [
+            [
+                'type' => 'section',
+                'text' => [
+                    'type' => 'mrkdwn',
+                    'text' => "*Blocked by {{ actor }}*\n{{ name }} and every identifier linked to them. Nothing from this person reaches sales, the CRM or this channel again.",
+                ],
+            ],
+            [
+                'type' => 'actions',
+                '_when' => ['admin_url'],
+                'elements' => [
+                    [
+                        'type' => 'button',
+                        'text' => ['type' => 'plain_text', 'text' => 'Review in portal', 'emoji' => false],
+                        'url' => '{{ admin_url }}',
+                    ],
+                ],
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Live calls
+    |--------------------------------------------------------------------------
+    |
+    | Somebody asked to talk to a consultant right now. The routed one is a summons: a real
+    | meeting starts within fifteen minutes and it is already booked. The declined one is the
+    | more useful of the two, because until it existed nobody could see that it had happened.
+    */
+    'live_call_routed' => [
+        'color' => null,
+        'fallback' => "Live call connecting now: {{ name }}\n{{ email }}\n{{ phone }}",
+        'blocks' => [
+            [
+                'type' => 'section',
+                'text' => ['type' => 'mrkdwn', 'text' => '*{{ headline }}*'],
+            ],
+            [
+                'type' => 'card',
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ name }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => 'Starting within 15 minutes', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ contact_line }}', 'verbatim' => false],
+            ],
+            [
+                'type' => 'actions',
+                'elements' => [
+                    [
+                        'type' => 'button',
+                        '_when' => ['meeting_url'],
+                        'text' => ['type' => 'plain_text', 'text' => 'Join call', 'emoji' => false],
+                        'style' => 'primary',
+                        'url' => '{{ meeting_url }}',
+                    ],
+                    [
+                        'type' => 'button',
+                        '_when' => ['admin_url'],
+                        'text' => ['type' => 'plain_text', 'text' => 'Open in portal', 'emoji' => false],
+                        'url' => '{{ admin_url }}',
+                    ],
+                ],
+            ],
+        ],
+    ],
+
+    'live_call_declined' => [
+        'color' => null,
+        'fallback' => "{{ headline }}: {{ name }}\n{{ reason_label }}\n{{ email }}\n{{ phone }}",
+        'blocks' => [
+            [
+                'type' => 'section',
+                'text' => ['type' => 'mrkdwn', 'text' => '*{{ headline }}*'],
+            ],
+            [
+                'type' => 'card',
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ name }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ reason_label }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ contact_line }}', 'verbatim' => false],
+            ],
+
+            /*
+             * Only on the refusals that are ours to fix. A busy team needs no explanation; a
+             * missing event type has been turning every visitor away since it broke, and saying
+             * so is the difference between a quiet afternoon and an incident.
+             */
+            [
+                'type' => 'context',
+                '_when' => ['our_fault'],
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => 'This is a configuration or API failure, not availability. Every live call request fails until it is fixed.'],
+                ],
+            ],
+            [
+                'type' => 'actions',
+                'elements' => [
+                    [
+                        'type' => 'button',
+                        '_when' => ['admin_url'],
+                        'text' => ['type' => 'plain_text', 'text' => 'Open in portal', 'emoji' => false],
+                        'style' => 'primary',
+                        'url' => '{{ admin_url }}',
+                    ],
+                    [
+                        'type' => 'button',
+                        '_when' => ['replay_url'],
+                        'text' => ['type' => 'plain_text', 'text' => 'Watch session', 'emoji' => false],
+                        'url' => '{{ replay_url }}',
+                    ],
+                ],
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Referral programme
+    |--------------------------------------------------------------------------
+    |
+    | Dispatched since the programme shipped and, until now, visible only in wp-admin. A
+    | referral is the time-sensitive one: somebody vouched for us to a person they know, and
+    | the follow-up either happens while that is warm or it does not happen.
+    */
+    'referrer_registered' => [
+        'color' => null,
+        'fallback' => "New referrer: {{ name }}\n{{ email }}\n{{ referral_code }}",
+        'blocks' => [
+            [
+                'type' => 'section',
+                'text' => ['type' => 'mrkdwn', 'text' => '*New referrer registered*'],
+            ],
+            [
+                'type' => 'card',
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ name }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ company }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ email_link }}', 'verbatim' => false],
+            ],
+            [
+                'type' => 'context',
+                '_when' => ['referral_code'],
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => 'Code: {{ referral_code }}   ·   Status: {{ status }}'],
+                ],
+            ],
+            [
+                'type' => 'actions',
+                '_when' => ['admin_url'],
+                'elements' => [
+                    [
+                        'type' => 'button',
+                        'text' => ['type' => 'plain_text', 'text' => 'Open referrers', 'emoji' => false],
+                        'url' => '{{ admin_url }}',
+                    ],
+                ],
+            ],
+        ],
+    ],
+
+    'referral_recorded' => [
+        'color' => null,
+        'fallback' => "Referral from {{ referrer_name }}: {{ name }}\n{{ email }}\n{{ phone }}",
+        'blocks' => [
+            [
+                'type' => 'section',
+                'text' => ['type' => 'mrkdwn', 'text' => '*Referral from {{ referrer_name }}*'],
+            ],
+            [
+                'type' => 'card',
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ name }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ status }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ contact_line }}', 'verbatim' => false],
+            ],
+            [
+                'type' => 'context',
+                '_when' => ['referral_code'],
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => 'Code: {{ referral_code }}'],
+                ],
+            ],
+            [
+                'type' => 'actions',
+                '_when' => ['admin_url'],
+                'elements' => [
+                    [
+                        'type' => 'button',
+                        'text' => ['type' => 'plain_text', 'text' => 'Open referrals', 'emoji' => false],
+                        'style' => 'primary',
+                        'url' => '{{ admin_url }}',
+                    ],
+                ],
+            ],
+        ],
+    ],
+
+    'payout_completed' => [
+        'color' => null,
+        'fallback' => 'Payout sent: {{ amount }} to {{ referrer_name }}',
+        'blocks' => [
+            [
+                'type' => 'section',
+                'text' => ['type' => 'mrkdwn', 'text' => '*Referral payout sent*'],
+            ],
+            [
+                'type' => 'card',
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ amount }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ referrer_name }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ referral_count }}', 'verbatim' => false],
+            ],
+            [
+                'type' => 'context',
+                '_when' => ['transfer_id'],
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => 'Transfer: {{ transfer_id }}   ·   Status: {{ status }}'],
+                ],
+            ],
+            [
+                'type' => 'actions',
+                '_when' => ['admin_url'],
+                'elements' => [
+                    [
+                        'type' => 'button',
+                        'text' => ['type' => 'plain_text', 'text' => 'Open payouts', 'emoji' => false],
                         'url' => '{{ admin_url }}',
                     ],
                 ],

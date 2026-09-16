@@ -82,6 +82,62 @@ class WordfenceConfigurator
     }
 
     /**
+     * Report what `apply()` would change, without changing it.
+     *
+     * The Security screens surface this: a key that reads as drifted is either a hand-edit in
+     * wp-admin that the next deploy will revert, or a deploy that never ran. Both are worth
+     * seeing before the revert surprises someone, and neither is visible from WordFence's own
+     * settings pages — they show the live value with nothing to say it is contested.
+     *
+     * Read-only on purpose. This runs while wp-admin renders; writing WordFence's option
+     * store from a page render is the deploy command's job, not a dashboard widget's.
+     *
+     * @return array{matching: string[], drifted: list<array{key: string, current: mixed, desired: mixed}>, unknown: string[], skipped: ?string}
+     */
+    public function audit(): array
+    {
+        $result = [
+            'matching' => [],
+            'drifted' => [],
+            'unknown' => [],
+            'skipped' => null,
+        ];
+
+        if (! $this->available()) {
+            $result['skipped'] = 'WordFence is not loaded on this environment.';
+
+            return $result;
+        }
+
+        /** @var array<string, mixed> $settings */
+        $settings = config('wordfence.settings', []);
+
+        foreach ($settings as $key => $desired) {
+            if (! $this->isKnownKey($key)) {
+                $result['unknown'][] = $key;
+
+                continue;
+            }
+
+            $current = $this->get($key);
+
+            if ($this->matches($current, $desired)) {
+                $result['matching'][] = $key;
+
+                continue;
+            }
+
+            $result['drifted'][] = [
+                'key' => $key,
+                'current' => $current,
+                'desired' => $desired,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * Is WordFence loaded and usable?
      */
     public function available(): bool

@@ -7,11 +7,13 @@ namespace App\Infrastructure\Providers;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Scheduling\Actions\RetryFailedBookingAction;
 use App\Domains\Scheduling\Actions\WarmCalendlyMetadataCacheAction;
+use App\Domains\Scheduling\Events\LiveCallRequested;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Gateways\CalendlyMetadataCache;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
 use App\Domains\Scheduling\Gateways\GoogleCalendarClient;
 use App\Domains\Scheduling\Listeners\HandleLeadCreatedForBooking;
+use App\Domains\Scheduling\Listeners\HandleLiveCallEventsForSlack;
 use App\Domains\Scheduling\Services\CalendlyEventTypeDiscoveryService;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use App\Domains\Scheduling\Services\LiveCallAvailabilityRouter;
@@ -34,6 +36,7 @@ class SchedulingServiceProvider extends ServiceProvider
         $this->app->singleton(GoogleCalendarClient::class, fn () => new GoogleCalendarClient);
         $this->app->singleton(LiveCallAvailabilityRouter::class, fn () => new LiveCallAvailabilityRouter);
         $this->app->singleton(HandleLeadCreatedForBooking::class);
+        $this->app->singleton(HandleLiveCallEventsForSlack::class);
     }
 
     /**
@@ -85,6 +88,17 @@ class SchedulingServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::listen(LeadCreated::class, [HandleLeadCreatedForBooking::class, 'handle']);
+
+        /*
+         * Live call alerts, deferred past the response like the lead ones. The visitor is
+         * staring at a spinner waiting to be told whether they can talk to someone — putting a
+         * Slack round trip in front of that answer would be the wrong place to spend it.
+         *
+         * Static closure, no `$this`: see the note in LeadServiceProvider.
+         */
+        Event::listen(LiveCallRequested::class, function (LiveCallRequested $event) {
+            dispatch(static fn () => app(HandleLiveCallEventsForSlack::class)->handle($event))->afterResponse();
+        });
 
         $this->nameCalendlyTokensInLogs();
 

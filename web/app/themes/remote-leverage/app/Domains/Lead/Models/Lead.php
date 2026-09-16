@@ -63,6 +63,10 @@ class Lead extends Model
         'status',
         'booking_retry_count',
         'booking_next_retry_at',
+        // Where this lead's Slack alert lives, so later events reply to it rather than
+        // starting a new message. See the 2026_09_16_000007 migration.
+        'slack_message_ts',
+        'slack_channel_id',
         // something for dynamic properties
     ];
 

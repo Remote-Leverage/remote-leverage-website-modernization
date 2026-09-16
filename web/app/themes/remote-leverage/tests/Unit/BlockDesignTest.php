@@ -17,18 +17,92 @@ use App\Support\BlockDesign;
  *
  * The rest pins the attribute merging, because a block whose wrapper already carries fifty
  * Tailwind classes must keep all of them.
+ *
+ * The scoping cases immediately below are the ones that used to leak. Scoping was once nothing
+ * more than substituting the `selector` keyword, so CSS written without it — which is most CSS,
+ * and all CSS written by someone who has not read the field instructions — was emitted verbatim
+ * and applied site-wide.
  */
-it('scopes the selector keyword to the generated class', function () {
-    $css = BlockDesign::sanitiseCss('selector .card { border-radius: 24px; }', 'rl-d-abc12345');
+it('scopes a plain selector that never mentions the block', function () {
+    $css = BlockDesign::sanitiseCss('.rl-card { border-radius: 24px }', 'rl-d-abc12345');
 
-    expect($css)->toBe('.rl-d-abc12345 .card { border-radius: 24px; }');
+    expect($css)->toBe('.rl-d-abc12345 .rl-card{ border-radius: 24px }');
+});
+
+it('scopes every selector in a list independently', function () {
+    $css = BlockDesign::sanitiseCss('h2, h3 { color: red }', 'rl-d-abc12345');
+
+    expect($css)->toBe('.rl-d-abc12345 h2,.rl-d-abc12345 h3{ color: red }');
+});
+
+it('does not split a selector list inside :is() or an attribute value', function () {
+    $css = BlockDesign::sanitiseCss(':is(h2, h3) { color: red }', 'rl-d-abc12345');
+
+    expect($css)->toBe('.rl-d-abc12345 :is(h2, h3){ color: red }');
+});
+
+it('resolves selector and & to the block itself', function () {
+    expect(BlockDesign::sanitiseCss('selector { color: red }', 'rl-d-abc12345'))
+        ->toBe('.rl-d-abc12345{ color: red }')
+        ->and(BlockDesign::sanitiseCss('&:hover { color: red }', 'rl-d-abc12345'))
+        ->toBe('.rl-d-abc12345:hover{ color: red }')
+        ->and(BlockDesign::sanitiseCss('selector .card { color: red }', 'rl-d-abc12345'))
+        ->toBe('.rl-d-abc12345 .card{ color: red }');
+});
+
+it('applies bare declarations to the block', function () {
+    $css = BlockDesign::sanitiseCss('background: #fff; padding: 20px;', 'rl-d-abc12345');
+
+    expect($css)->toBe('.rl-d-abc12345{background: #fff; padding: 20px}');
+});
+
+it('scopes rules inside a media query', function () {
+    $css = BlockDesign::sanitiseCss('@media (max-width: 600px) { .card { color: red } }', 'rl-d-abc12345');
+
+    expect($css)->toContain('@media (max-width: 600px){')
+        ->and($css)->toContain('.rl-d-abc12345 .card{ color: red }');
+});
+
+it('leaves keyframe stops and font-face descriptors alone', function () {
+    $css = BlockDesign::sanitiseCss(
+        '@keyframes spin { 0% { transform: rotate(0) } 100% { transform: rotate(360deg) } }',
+        'rl-d-abc12345'
+    );
+
+    expect($css)->toContain('0% { transform: rotate(0) }')
+        ->and($css)->not->toContain('.rl-d-abc12345 0%');
+});
+
+it('keeps nested rules nested under the scoped parent', function () {
+    $css = BlockDesign::sanitiseCss('.card { color: red; &:hover { color: blue } }', 'rl-d-abc12345');
+
+    expect($css)->toStartWith('.rl-d-abc12345 .card{')
+        ->and($css)->toContain('&:hover { color: blue }');
+});
+
+it('cannot be escaped with an early closing brace', function () {
+    $css = BlockDesign::sanitiseCss('.card { color: red } } body { display: none }', 'rl-d-abc12345');
+
+    expect($css)->toContain('.rl-d-abc12345 body{ display: none }')
+        ->and($css)->not->toMatch('/(^|[},])\s*body\s*\{/');
+});
+
+it('neutralises a selector aimed above the block rather than honouring it', function () {
+    $css = BlockDesign::sanitiseCss(':root { --brand: red }', 'rl-d-abc12345');
+
+    expect($css)->toBe('.rl-d-abc12345 :root{ --brand: red }');
 });
 
 it('does not rewrite selector inside a longer identifier', function () {
-    $css = BlockDesign::sanitiseCss('.my-selector { color: red; } selector { color: blue; }', 'rl-d-abc12345');
+    $css = BlockDesign::sanitiseCss('.my-selector { color: red }', 'rl-d-abc12345');
 
-    expect($css)->toContain('.my-selector { color: red; }')
-        ->and($css)->toContain('.rl-d-abc12345 { color: blue; }');
+    expect($css)->toBe('.rl-d-abc12345 .my-selector{ color: red }');
+});
+
+it('does not mistake a brace inside a string for structure', function () {
+    $css = BlockDesign::sanitiseCss('.card::after { content: "}" }', 'rl-d-abc12345');
+
+    expect($css)->toBe('.rl-d-abc12345 .card::after{ content: "}" }');
 });
 
 it('strips anything that would break out of the style element', function () {
@@ -59,10 +133,12 @@ it('hides a comment used to smuggle a closing style tag', function () {
     expect($css)->not->toContain('</style');
 });
 
-it('caps runaway css', function () {
+it('caps runaway css without leaving a half-written rule', function () {
     $css = BlockDesign::sanitiseCss(str_repeat('selector{color:red}', 5000), 'rl-d-abc12345');
 
-    expect(strlen($css))->toBeLessThanOrEqual(BlockDesign::MAX_CSS_BYTES);
+    expect(strlen($css))->toBeLessThanOrEqual(BlockDesign::MAX_CSS_BYTES)
+        ->and($css)->toEndWith('}')
+        ->and(substr_count($css, '{'))->toBe(substr_count($css, '}'));
 });
 
 it('compiles spacing, background and visibility into scoped rules', function () {

@@ -8,6 +8,7 @@ use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\PhoneValidationService;
+use App\Domains\Scheduling\Events\LiveCallRequested;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Models\LiveCallSession;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
@@ -59,24 +60,14 @@ class RouteInstantCallAction
         if (! empty($phone)) {
             $validated = $this->phoneValidator->validateAndFormat($phone, 'US');
             if (! $validated['isValid'] || ! in_array($validated['countryCode'], ['US', 'CA'], true)) {
-                return [
-                    'routed' => false,
-                    'session_id' => $sessionId,
-                    'message' => 'Live calls are currently only available for US and Canada phone numbers.',
-                    'redirect_url' => null,
-                ];
+                return $this->decline('phone_not_supported', 'Live calls are currently only available for US and Canada phone numbers.', $sessionId, $visitorData, $lead);
             }
         }
 
         // 3. Manual team-online toggle (independent of the concurrency lock below).
         $status = $this->router->getStatus();
         if (! $status['available']) {
-            return [
-                'routed' => false,
-                'session_id' => $sessionId,
-                'message' => 'Consultants are currently in sessions. Please schedule a time.',
-                'redirect_url' => null,
-            ];
+            return $this->decline('team_offline', 'Consultants are currently in sessions. Please schedule a time.', $sessionId, $visitorData, $lead);
         }
 
         // 4. Concurrency lock: is someone already on a call right now? Self-heal
@@ -94,23 +85,13 @@ class RouteInstantCallAction
         }
 
         if ($busy) {
-            return [
-                'routed' => false,
-                'session_id' => $sessionId,
-                'message' => 'A sales representative is currently occupied in a live call.',
-                'redirect_url' => null,
-            ];
+            return $this->decline('consultant_busy', 'A sales representative is currently occupied in a live call.', $sessionId, $visitorData, $lead);
         }
 
         // 5. Search for an immediate (<=15 min out) slot.
         $eventTypeUri = $this->eventTypeRoleResolver->get('live_call');
         if (! $eventTypeUri) {
-            return [
-                'routed' => false,
-                'session_id' => $sessionId,
-                'message' => 'Live call event type is not configured.',
-                'redirect_url' => null,
-            ];
+            return $this->decline('not_configured', 'Live call event type is not configured.', $sessionId, $visitorData, $lead);
         }
 
         $slots = $this->calendlyClient->getAvailableSlots(
@@ -129,12 +110,7 @@ class RouteInstantCallAction
         }
 
         if (! $immediateSlot) {
-            return [
-                'routed' => false,
-                'session_id' => $sessionId,
-                'message' => 'No consultants have an immediate opening. Please schedule a time.',
-                'redirect_url' => null,
-            ];
+            return $this->decline('no_immediate_slot', 'No consultants have an immediate opening. Please schedule a time.', $sessionId, $visitorData, $lead);
         }
 
         // 6. Create the invitee.
@@ -165,12 +141,7 @@ class RouteInstantCallAction
                 description: 'Failed to create Calendly invitee for instant live call'
             );
 
-            return [
-                'routed' => false,
-                'session_id' => $sessionId,
-                'message' => 'Unable to connect right now. Please schedule a time.',
-                'redirect_url' => null,
-            ];
+            return $this->decline('booking_failed', 'Unable to connect right now. Please schedule a time.', $sessionId, $visitorData, $lead);
         }
 
         // 7. Poll for the Meet URL, falling back to the invitee's own link.
@@ -181,12 +152,7 @@ class RouteInstantCallAction
         if (empty($meetUrl) || $this->isPlaceholderUrl($meetUrl)) {
             $session->update(['status' => 'failed', 'calendly_invitee_uri' => $invitee['uri'] ?? '']);
 
-            return [
-                'routed' => false,
-                'session_id' => $sessionId,
-                'message' => 'Unable to resolve a meeting link. Please schedule a time.',
-                'redirect_url' => null,
-            ];
+            return $this->decline('no_meeting_link', 'Unable to resolve a meeting link. Please schedule a time.', $sessionId, $visitorData, $lead);
         }
 
         $session->update([
@@ -222,11 +188,60 @@ class RouteInstantCallAction
 
         Log::info('Instant live call booked', ['session_id' => $sessionId, 'meet_url' => $meetUrl]);
 
+        /*
+         * Separate from LeadBookingCompleted above, which is off by default in Slack
+         * (`SLACK_NOTIFY_ON_BOOKING`) because the legacy feed never sent it. A live call cannot
+         * inherit that default: it starts within fifteen minutes and somebody has to be there.
+         */
+        Event::dispatch(new LiveCallRequested(
+            outcome: LiveCallRequested::ROUTED,
+            reason: '',
+            sessionId: $sessionId,
+            visitor: $visitorData,
+            lead: $lead,
+            meetUrl: $meetUrl,
+        ));
+
         return [
             'routed' => true,
             'session_id' => $sessionId,
             'message' => 'Connecting to senior consultant...',
             'redirect_url' => $meetUrl,
+        ];
+    }
+
+    /**
+     * Turn somebody away, and say so out loud.
+     *
+     * Every refusal in `execute()` returns the same shape and, until this existed, told nobody:
+     * the visitor got a polite line and the moment was gone. Routing it through one method is
+     * what makes "how many people asked for a call and could not have one" a question with an
+     * answer — and `reason` is a stable slug rather than the visitor-facing sentence precisely
+     * so that answer survives a copy change.
+     *
+     * @param  array<string, mixed>  $visitorData
+     * @return array{routed: bool, session_id: string, message: string, redirect_url: null}
+     */
+    protected function decline(
+        string $reason,
+        string $message,
+        string $sessionId,
+        array $visitorData,
+        ?Lead $lead,
+    ): array {
+        Event::dispatch(new LiveCallRequested(
+            outcome: LiveCallRequested::DECLINED,
+            reason: $reason,
+            sessionId: $sessionId,
+            visitor: $visitorData,
+            lead: $lead,
+        ));
+
+        return [
+            'routed' => false,
+            'session_id' => $sessionId,
+            'message' => $message,
+            'redirect_url' => null,
         ];
     }
 

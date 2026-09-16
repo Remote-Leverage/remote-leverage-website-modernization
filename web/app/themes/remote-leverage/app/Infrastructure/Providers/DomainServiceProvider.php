@@ -14,6 +14,8 @@ use App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
 use App\Infrastructure\WordPress\Admin\MarketingDashboard;
 use App\Infrastructure\WordPress\Admin\PartnerHubAdmin;
 use App\Infrastructure\WordPress\Admin\ReferralAdminDashboard;
+use App\Infrastructure\WordPress\Admin\SecurityAdmin;
+use App\Infrastructure\WordPress\Admin\Seo\SeoAdmin;
 use App\Infrastructure\WordPress\Admin\SocialKitAdmin;
 use App\Infrastructure\WordPress\Admin\WordPressAdminTheme;
 use App\Infrastructure\WordPress\PostTypes\CaseStudyPostType;
@@ -59,8 +61,10 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(PartnerHubAdmin::class, fn () => new PartnerHubAdmin);
         $this->app->singleton(ReferralAdminDashboard::class, fn () => new ReferralAdminDashboard);
         $this->app->singleton(CalendlyAdminDashboard::class, fn () => new CalendlyAdminDashboard);
+        $this->app->singleton(SecurityAdmin::class, fn () => new SecurityAdmin);
         $this->app->singleton(SocialKitAssets::class, fn () => new SocialKitAssets);
         $this->app->singleton(SocialKitAdmin::class, fn () => new SocialKitAdmin);
+        $this->app->singleton(SeoAdmin::class, fn () => new SeoAdmin);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -87,7 +91,9 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->make(PartnerHubAdmin::class)->register();
         $this->app->make(ReferralAdminDashboard::class)->register();
         $this->app->make(CalendlyAdminDashboard::class)->register();
+        $this->app->make(SecurityAdmin::class)->register();
         $this->app->make(SocialKitAssets::class)->register();
         $this->app->make(SocialKitAdmin::class)->register();
+        $this->app->make(SeoAdmin::class)->register();
     }
 }

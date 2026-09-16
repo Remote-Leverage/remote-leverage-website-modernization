@@ -8,9 +8,9 @@ use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
-use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Lead\Services\SlackMessageRenderer;
-use Illuminate\Support\Facades\Http;
+use App\Infrastructure\Slack\SlackCredentials;
+use App\Infrastructure\Slack\SlackTransport;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -26,9 +26,10 @@ use Illuminate\Support\Facades\Log;
  *  - **The message format is what the sales team reads at a glance.** Field order and labels are
  *    reproduced from the feed rather than redesigned.
  *
- * Transport: production posts through the Gravity Forms Slack add-on's bot token to a channel
- * (`chat.postMessage`). This supports that, and falls back to a plain incoming webhook when no
- * token is configured. Moving to a dedicated Slack app is WR-186.
+ * Transport: {@see SlackTransport}, shared with the referral and live-call alerts — bot token
+ * where one is configured, incoming webhook otherwise. The app is now this site's own ("Remote
+ * Leverage Website") rather than the Gravity Forms add-on's, which is what made threading and
+ * the action buttons possible. See docs/slack-app.md.
  */
 class HandleLeadEventsForSlack
 {
@@ -37,6 +38,7 @@ class HandleLeadEventsForSlack
 
     public function __construct(
         protected LeadActivityLogger $activityLogger,
+        protected SlackTransport $transport = new SlackTransport,
     ) {}
 
     /**
@@ -89,6 +91,11 @@ class HandleLeadEventsForSlack
 
     /**
      * Build and send the message.
+     *
+     * The partial opens the thread; everything afterwards replies into it. That is why the
+     * `ts` is stored here rather than only read: a lead's whole story — booked, canceled,
+     * claimed, blocked — hangs off the one card the channel already scrolled past, instead of
+     * arriving as a fresh card with no stated relationship to the first.
      */
     protected function dispatchSlackNotification(Lead $lead, string $type, array $context = []): void
     {
@@ -99,8 +106,28 @@ class HandleLeadEventsForSlack
             $this->valuesFor($lead, $context),
         );
 
+        /*
+         * Broadcast the reply. A booking is the event the team is waiting for, and a plain
+         * threaded reply is collapsed behind "1 reply" for anyone not already watching the
+         * thread — quieter than the flat message it replaced, which is the wrong trade for
+         * this one.
+         */
+        $threadTs = $isFinal ? $this->threadTsFor($lead) : null;
+
         try {
-            $success = $this->send($rendered['text'], $rendered['blocks'], $rendered['color'] ?? null);
+            $result = $this->send(
+                $rendered['text'],
+                $rendered['blocks'],
+                $rendered['color'] ?? null,
+                $threadTs,
+                broadcast: $threadTs !== null,
+            );
+
+            $success = $result !== null;
+
+            if (! $isFinal) {
+                $this->rememberThread($lead, $result);
+            }
 
             $this->activityLogger->logConsumption(
                 leadId: $lead->id,
@@ -115,6 +142,60 @@ class HandleLeadEventsForSlack
         } catch (\Throwable $e) {
             Log::error("HandleLeadEventsForSlack: Exception sending to Slack for lead #{$lead->id}: ".$e->getMessage());
         }
+    }
+
+    /**
+     * The message later events should reply to, or null to post at top level.
+     *
+     * A `ts` identifies a message only within the channel that produced it. If `SLACK_CHANNEL`
+     * has changed since the parent was posted, replying with the old timestamp does not fail —
+     * Slack posts it flat, which merely looks like the threading is broken. Checking the stored
+     * channel is what keeps that from being mysterious.
+     */
+    protected function threadTsFor(Lead $lead): ?string
+    {
+        $ts = trim((string) $lead->slack_message_ts);
+
+        if ($ts === '') {
+            return null;
+        }
+
+        $stored = trim((string) $lead->slack_channel_id);
+
+        // Through SlackCredentials, not config directly: an environment wired by the admin
+        // setting would otherwise compare against an empty string here and thread onto a
+        // message in whatever channel it used to post to.
+        $current = SlackCredentials::channel();
+
+        // Only a definite disagreement disqualifies it. An unknown on either side is the
+        // webhook transport or an older row, and flat-posting those would be a regression.
+        if ($stored !== '' && $current !== '' && $stored !== $current) {
+            return null;
+        }
+
+        return $ts;
+    }
+
+    /**
+     * Store where the alert landed, so the rest of this lead's life can reply to it.
+     *
+     * `saveQuietly` on purpose: this is bookkeeping about a notification, and letting it emit
+     * model events would re-enter the very listeners the notification came from. Skipped for a
+     * lead that is not in the database — the value would have nowhere to go, and inserting one
+     * to hold it would invent a lead.
+     */
+    protected function rememberThread(Lead $lead, ?array $result): void
+    {
+        $ts = $result['ts'] ?? null;
+
+        if ($ts === null || $ts === '' || ! $lead->exists) {
+            return;
+        }
+
+        $lead->forceFill([
+            'slack_message_ts' => (string) $ts,
+            'slack_channel_id' => $result['channel'] ?? null,
+        ])->saveQuietly();
     }
 
     /**
@@ -236,7 +317,35 @@ class HandleLeadEventsForSlack
             'submission_type' => (string) $lead->submission_type,
             'meeting_time' => (string) ($context['start_time'] ?? ''),
             'meeting_url' => (string) ($context['meet_url'] ?? ''),
+
+            /*
+             * What an action button needs to name the lead it acts on. A Block Kit button
+             * carries a single opaque `value` string, so the lead id is the whole payload —
+             * everything else the handler needs it reads from the database, which is also what
+             * stops a crafted interaction from asserting facts about a lead.
+             */
+            'lead_id' => (string) ($lead->id ?? ''),
+
+            /*
+             * Gates the action buttons. Until the app has a signing secret there is no
+             * interactivity request URL either, and Slack renders "not configured to handle
+             * interactive responses" beside every button — so an unconfigured environment gets
+             * the link buttons it always had and none of the broken ones.
+             *
+             * The value is a flag, not a fact, which is why it renders as the empty string when
+             * off: `_when` drops a block whose named value is empty, and that is the whole
+             * mechanism.
+             */
+            'interactive' => $this->interactionsEnabled() && $lead->id ? 'yes' : '',
         ];
+    }
+
+    /**
+     * Is there anywhere for a button press to go?
+     */
+    protected function interactionsEnabled(): bool
+    {
+        return SlackCredentials::signingSecret() !== '';
     }
 
     /**
@@ -339,99 +448,20 @@ class HandleLeadEventsForSlack
     /**
      * Send by bot token where one is configured, else by incoming webhook.
      *
-     * The bot path is what production uses and is the only one that can target a channel by id.
-     * Both are supported because the webhook needs no Slack app, and a dedicated app is still
-     * pending (WR-186).
+     * A thin seam over {@see SlackTransport} rather than the transport itself: the tests for
+     * this listener assert on what it *would* send by overriding this one method, and that is
+     * worth keeping now that three listeners share the transport underneath.
+     *
+     * @param  array<int, array<string, mixed>>  $blocks
+     * @return array{ts: ?string, channel: ?string}|null Null when nothing was sent.
      */
-    protected function send(string $text, array $blocks = [], ?string $color = null): bool
-    {
-        /*
-         * Environment first, admin setting second — the same precedence HubSpotGateway and the
-         * ZeroBounce check use. The setting exists because ECS maps Secrets Manager keys to
-         * environment variables one at a time in the task definition, so a newly added
-         * credential is unreachable until that changes; this lets an environment be wired
-         * without waiting on it.
-         */
-        $settings = (new LeadSettingsService)->get();
-
-        $token = (string) (config('services.slack.bot_token') ?: ($settings['slack_bot_token'] ?? ''));
-        $channel = (string) (config('services.slack.channel') ?: ($settings['slack_channel'] ?? ''));
-
-        if ($token !== '' && $channel !== '') {
-            $payload = [
-                'channel' => $channel,
-                'text' => $text,
-                'mrkdwn' => true,
-
-                /*
-                 * No link previews. The landing page is a marketing page, so Slack unfurls it
-                 * into a card with the hero copy and a reading time — several times taller than
-                 * the alert itself, and it buries the lead's details under an advert for our
-                 * own site.
-                 */
-                'unfurl_links' => false,
-                'unfurl_media' => false,
-            ];
-
-            if ($blocks !== []) {
-                /*
-                 * A colour means box it: blocks nested in an attachment render with a coloured
-                 * bar down the left and read as one unit rather than as loose blocks in the
-                 * channel. Without a colour they go at top level, unboxed.
-                 *
-                 * `text` stays on the message itself either way — it is the notification
-                 * preview, and Slack does not take it from an attachment.
-                 */
-                if ($color !== null) {
-                    $payload['attachments'] = [['color' => $color, 'blocks' => $blocks]];
-                } else {
-                    $payload['blocks'] = $blocks;
-                }
-            }
-
-            $response = Http::withToken($token)
-                ->timeout(5)
-                ->post('https://slack.com/api/chat.postMessage', $payload);
-
-            // Slack answers 200 with `ok: false` on an application error (bad token, missing
-            // scope, bot not in channel), so the status code alone is not the outcome.
-            if ($response->successful() && $response->json('ok') === true) {
-                return true;
-            }
-
-            Log::warning('HandleLeadEventsForSlack: chat.postMessage rejected', [
-                'status' => $response->status(),
-                'error' => $response->json('error'),
-            ]);
-
-            return false;
-        }
-
-        $webhookUrl = $this->webhookUrl();
-
-        if ($webhookUrl === '') {
-            Log::info('HandleLeadEventsForSlack: no bot token or webhook URL configured; nothing sent.');
-
-            return false;
-        }
-
-        $response = Http::timeout(5)->post($webhookUrl, array_filter([
-            'text' => $text,
-            'blocks' => $blocks ?: null,
-            'unfurl_links' => false,
-        ]));
-
-        return $response->successful();
-    }
-
-    protected function webhookUrl(): string
-    {
-        $url = (string) (config('services.slack.webhook_url') ?? '');
-
-        if ($url === '' && function_exists('get_option')) {
-            $url = (string) (get_option('rl_jlc_slack_webhook_url') ?: get_option('rl_slack_webhook_url') ?: '');
-        }
-
-        return $url;
+    protected function send(
+        string $text,
+        array $blocks = [],
+        ?string $color = null,
+        ?string $threadTs = null,
+        bool $broadcast = false,
+    ): ?array {
+        return $this->transport->post($text, $blocks, $color, $threadTs, $broadcast);
     }
 }

@@ -151,7 +151,11 @@ and below, background colour, and hiding a section on mobile or desktop.
 
 Use those controls rather than the Custom CSS box underneath them. The controls are limited to
 values that match the rest of the site, so they cannot produce something that looks off-brand.
-The CSS box is there for when a developer needs it.
+
+If you do use the Custom CSS box, write ordinary CSS — it only ever affects the one section you
+typed it into, so you do not need to worry about class names clashing with the rest of the site
+or about breaking another page. Something aimed outside that section simply will not do
+anything.
 
 One thing the background control does **not** do is change the text colour with it. Putting a
 dark background behind a section designed for a light one gives you dark text on a dark

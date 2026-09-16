@@ -8,6 +8,10 @@ web/app/upgrade
 web/app/uploads/*
 !web/app/uploads/.gitkeep
 web/app/cache/*
+# WordFence's runtime WAF state: live rules, attack data, and an 8.6MB GeoIP database,
+# all rewritten by the plugin on every request. Per-environment by nature, and the
+# firewall recreates the directory on boot if it is missing.
+web/app/wflogs/
 
 # WordPress
 web/wp

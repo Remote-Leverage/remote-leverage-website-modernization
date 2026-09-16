@@ -33,6 +33,15 @@ class LeadSettingsService
             'slack_bot_token' => '',
             'slack_channel' => '',
             'slack_webhook_url' => '',
+
+            /*
+             * Verifies inbound Slack interactions, and doubles as the on switch for the lead
+             * alert's action buttons — see SlackInteractionController. Here for the same reason
+             * as the bot token above, and more urgently: the buttons are useless in an
+             * environment that cannot receive a button press, and a task-definition change is
+             * the slowest way to get a secret to one.
+             */
+            'slack_signing_secret' => '',
             'lead_webhook_url' => '',
 
             /*
@@ -112,24 +121,44 @@ class LeadSettingsService
             $optionalFields[$field] = ! empty($input['optional_fields'][$field]);
         }
 
+        /*
+         * A credential the caller did not mention keeps the value it already had.
+         *
+         * This array replaces the stored blob wholesale, so `?? ''` on a key the settings form
+         * does not render silently wipes it on every save. That is not hypothetical: the Slack
+         * bot token and channel have never been on the form — they arrive by environment sync —
+         * and saving the screen for an unrelated reason blanked them, after which alerts
+         * quietly fell back to the incoming webhook with nothing to say why.
+         *
+         * `array_key_exists` rather than `isset` or `??` is the whole fix: submitted-but-empty
+         * still clears the value, which is how a credential is meant to be removed. Only
+         * *absent* means "not on this form, leave it alone".
+         */
+        $current = $this->get();
+
+        $keep = fn (string $key): string => array_key_exists($key, $input)
+            ? trim((string) $input[$key])
+            : trim((string) ($current[$key] ?? ''));
+
         $settings = [
             'notification_emails' => array_values(array_map([$this, 'sanitizeEmail'], $emails)),
             'optional_fields' => $optionalFields,
             'retention_days' => $retentionDays,
-            'hubspot_access_token' => trim((string) ($input['hubspot_access_token'] ?? '')),
-            'hubspot_portal_id' => trim((string) ($input['hubspot_portal_id'] ?? '')),
+            'hubspot_access_token' => $keep('hubspot_access_token'),
+            'hubspot_portal_id' => $keep('hubspot_portal_id'),
             'zerobounce_enabled' => ! empty($input['zerobounce_enabled']),
-            'zerobounce_api_key' => trim((string) ($input['zerobounce_api_key'] ?? '')),
+            'zerobounce_api_key' => $keep('zerobounce_api_key'),
             'domain_validator_mode' => $this->validatorMode($input['domain_validator_mode'] ?? null),
             // Stored as typed, normalised on read: the admin pastes a list and should get the
             // same list back, not a re-sorted, de-duplicated version of it.
             'email_domains' => trim((string) ($input['email_domains'] ?? '')),
             'blacklisted_emails' => trim((string) ($input['blacklisted_emails'] ?? '')),
             'email_validation_message' => trim((string) ($input['email_validation_message'] ?? '')),
-            'slack_bot_token' => trim((string) ($input['slack_bot_token'] ?? '')),
-            'slack_channel' => trim((string) ($input['slack_channel'] ?? '')),
-            'slack_webhook_url' => $this->sanitizeUrl((string) ($input['slack_webhook_url'] ?? '')),
-            'lead_webhook_url' => $this->sanitizeUrl((string) ($input['lead_webhook_url'] ?? '')),
+            'slack_bot_token' => $keep('slack_bot_token'),
+            'slack_channel' => $keep('slack_channel'),
+            'slack_signing_secret' => $keep('slack_signing_secret'),
+            'slack_webhook_url' => $this->sanitizeUrl($keep('slack_webhook_url')),
+            'lead_webhook_url' => $this->sanitizeUrl($keep('lead_webhook_url')),
         ];
 
         if (function_exists('update_option')) {

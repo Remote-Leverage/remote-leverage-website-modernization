@@ -237,6 +237,45 @@ Config::define('CONCATENATE_SCRIPTS', false);
  */
 Config::define('WFWAF_STORAGE_ENGINE', 'mysqli');
 
+/*
+ * The credentials that setting needs to actually work.
+ *
+ * `WFWAF_STORAGE_ENGINE = mysqli` on its own is not enough here. The WAF bootstraps before
+ * WordPress, so it cannot call `wpdb`; it finds the database by *text-parsing* `wp-config.php`
+ * for `define('DB_USER', ...)` (`waf/lib/utils.php::extractCredentialsWPConfig`, via
+ * `token_get_all`). Bedrock's `web/wp-config.php` contains no such literals — it requires this
+ * file, which reads `.env` and defines everything through `Config::define()`. The parser
+ * therefore finds nothing, the mysqli connection fails, and WordFence falls back to flat files
+ * in `wflogs/` while reporting "the WAF storage engine is currently set to mysqli, but
+ * Wordfence is unable to use the database".
+ *
+ * That fallback is the exact failure the mysqli setting above exists to prevent: firewall
+ * state back in the container filesystem, reset on every deploy and unshared between ECS
+ * tasks. The warning is the visible half; the silent half is that the setting was never in
+ * effect.
+ *
+ * `WFWAF_DB_*` is WordFence's own supported override, read from `defined()` before the parse
+ * and taking precedence over it, so no parsing has to succeed. Host is passed through whole
+ * on purpose: WordFence applies the same `host:port` and `:/socket` splitting `wpdb` does
+ * (`wpdb::parse_db_host`), so a DB_HOST carrying a port or a socket path still resolves.
+ *
+ * Like `WFWAF_STORAGE_ENGINE` above, these are defined in the WordPress bootstrap, so they
+ * apply in basic mode — which is what runs here. Extended protection (`auto_prepend_file`)
+ * would execute the WAF before this file is read and would need the same constants set in
+ * WordFence's generated `wordfence-waf.php`.
+ */
+Config::define('WFWAF_DB_NAME', Config::get('DB_NAME'));
+Config::define('WFWAF_DB_USER', Config::get('DB_USER'));
+Config::define('WFWAF_DB_PASSWORD', Config::get('DB_PASSWORD'));
+Config::define('WFWAF_DB_HOST', Config::get('DB_HOST'));
+Config::define('WFWAF_DB_CHARSET', Config::get('DB_CHARSET'));
+Config::define('WFWAF_DB_COLLATE', Config::get('DB_COLLATE'));
+Config::define('WFWAF_TABLE_PREFIX', $table_prefix);
+
+if (env('DB_SSL')) {
+    Config::define('WFWAF_MYSQL_CLIENT_FLAGS', MYSQLI_CLIENT_SSL);
+}
+
 /**
  * Debugging Settings
  */

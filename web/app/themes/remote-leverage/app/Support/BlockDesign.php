@@ -37,12 +37,24 @@ use WP_Block_Type_Registry;
  * ## Why the CSS is scoped, and how
  *
  * Custom CSS that can reach outside its own block is how a design system gets quietly forked —
- * the exact failure CLAUDE.md's "Reuse before you build" section exists to prevent. Every rule
- * emitted here is therefore prefixed with a generated `.rl-d-{hash}` class that is applied to
- * that block instance's own wrapper, and the bare `selector` keyword (Elementor's convention,
- * so the idiom is already familiar) expands to that class. A rule an editor writes as
- * `selector .card { … }` becomes `.rl-d-1a2b3c4d .card { … }` and cannot address anything
- * above itself in the tree.
+ * the exact failure CLAUDE.md's "Reuse before you build" section exists to prevent. Every block
+ * instance gets a generated `.rl-d-{hash}` class on its wrapper, and `scopeRules()` rewrites
+ * **every selector** the author writes to sit beneath it:
+ *
+ *   .rl-card { … }        ->  .rl-d-1a2b3c4d .rl-card { … }
+ *   h2, h3 { … }          ->  .rl-d-1a2b3c4d h2, .rl-d-1a2b3c4d h3 { … }
+ *   &:hover { … }         ->  .rl-d-1a2b3c4d:hover { … }
+ *   color: red            ->  .rl-d-1a2b3c4d { color: red }
+ *
+ * So the box takes ordinary CSS, targets anything **inside** the block by default, and needs no
+ * keyword to be safe. `selector` still works — people arriving from Elementor will type it, and
+ * it is the way to address the block's own wrapper rather than its contents — but it is now a
+ * convenience rather than the thing scoping depends on.
+ *
+ * That distinction is the whole point. Scoping used to *be* the keyword substitution, which
+ * meant it only held when the author remembered: CSS typed as plain `.rl-card { … }` went out
+ * unscoped and applied to every page on the site carrying that class. Nesting was impossible
+ * for the same reason — without a prefix there was nothing to nest under.
  *
  * The hash is derived from the design payload, so two blocks configured identically share one
  * class and one rule rather than duplicating it.
@@ -84,6 +96,15 @@ class BlockDesign
      * else here would hide a block at a width where its own layout had not yet changed.
      */
     public const BREAKPOINT = 1024;
+
+    /**
+     * At-rules whose bodies contain selectors, and so must be recursed into and scoped.
+     *
+     * The ones deliberately absent are as important: `@keyframes` holds percentage stops,
+     * `@font-face` and `@property` hold descriptors. Prefixing any of those with a class turns
+     * a working rule into a discarded one.
+     */
+    public const NESTED_AT_RULES = ['media', 'supports', 'container', 'layer', 'scope', 'document'];
 
     /**
      * Named spacing steps, in pixels.
@@ -296,9 +317,16 @@ class BlockDesign
                 'name' => $p.'css',
                 'type' => 'textarea',
                 'rows' => 8,
-                'instructions' => 'Use <code>selector</code> to mean this block. '.
-                    'Example: <code>selector .rl-card { border-radius: 24px; }</code>. '.
-                    'Rules are scoped to this block and cannot affect the rest of the page. '.
+                'instructions' => 'Write ordinary CSS — it applies inside this block only. '.
+                    '<code>.rl-card { border-radius: 24px }</code> styles the cards in this '.
+                    'block and nothing anywhere else on the site, so you do not need to make '.
+                    'your class names unique. Nesting works. '.
+                    'Use <code>selector</code> (or <code>&amp;</code>) when you mean the block '.
+                    'itself rather than something inside it: '.
+                    '<code>selector { border-top: 1px solid #ddd }</code>. '.
+                    'Bare declarations work too — <code>background: #fff</code> on its own '.
+                    'applies to the block. Rules aimed outside the block, such as '.
+                    '<code>body</code>, will simply not match. '.
                     '@import, @charset and anything script-like are stripped.',
             ],
         ];
@@ -528,21 +556,278 @@ class BlockDesign
         $css = (string) preg_replace('/(javascript|vbscript|data)\s*:/i', '', $css);
         $css = (string) preg_replace('/(behavior|-moz-binding)\s*:[^;}]*/i', '', $css);
 
-        // `selector` is the Elementor idiom for "this block". Replacing it with the generated
-        // class is what makes the rules scoped; the word-boundary check keeps it from matching
-        // inside a longer identifier such as `.my-selector`.
-        $css = (string) preg_replace('/(?<![\w.#-])selector(?![\w-])/', '.'.$scope, $css);
+        // `selector` is Elementor's idiom for "this block", and people arriving from Elementor
+        // will type it. Normalising it to `&` here means scopeRules() below has exactly one
+        // parent reference to resolve instead of two. The word-boundary check keeps it from
+        // matching inside a longer identifier such as `.my-selector`.
+        $css = (string) preg_replace('/(?<![\w.#-])selector(?![\w-])/', '&', $css);
 
-        // Bound the output as well as the input. Scoping expands the text — every `selector`
-        // becomes a longer class — so a payload that fit the cap on the way in can exceed it on
-        // the way out, and it is the emitted bytes that end up on the page. Truncating here can
-        // cut a declaration in half; for a paste this size that is the desired outcome, and an
-        // unterminated rule is discarded by the browser rather than misapplied.
+        $css = self::scopeRules($css, '.'.$scope);
+
+        // Bound the output as well as the input. Scoping expands the text — every selector
+        // grows by the scope class — so a payload that fit the cap on the way in can exceed it
+        // on the way out, and it is the emitted bytes that land on the page. Cut back to the
+        // last complete rule so truncation never leaves a half-written block.
         if (strlen($css) > self::MAX_CSS_BYTES) {
             $css = substr($css, 0, self::MAX_CSS_BYTES);
+            $lastRule = strrpos($css, '}');
+            $css = $lastRule === false ? '' : substr($css, 0, $lastRule + 1);
         }
 
         return trim($css);
+    }
+
+    /**
+     * Prefix every selector in a stylesheet with the block's scope class.
+     *
+     * This is the part that makes the Custom CSS box safe to hand to someone who is not a
+     * developer, and it replaced a much weaker version. Scoping used to be nothing more than
+     * substituting the `selector` keyword, which meant it only worked when the author
+     * remembered to write it: CSS typed as plain `.rl-card { … }` was emitted verbatim and
+     * applied to **every page on the site** that happened to contain that class. An editor
+     * adjusting one landing page could restyle the others and have no way to connect the two.
+     *
+     * Prefixing here instead of asking the author to do it also makes the field behave the way
+     * someone would expect without reading the instructions:
+     *
+     *   .rl-card { … }        ->  .rl-d-abc12345 .rl-card { … }
+     *   h2, h3 { … }          ->  .rl-d-abc12345 h2, .rl-d-abc12345 h3 { … }
+     *   &:hover { … }         ->  .rl-d-abc12345:hover { … }
+     *   selector .card { … }  ->  .rl-d-abc12345 .card { … }
+     *   color: red            ->  .rl-d-abc12345 { color: red }
+     *
+     * The last of those matters more than it looks: bare declarations with no selector at all
+     * are the most likely thing to be typed by someone who has never written a rule, and the
+     * old behaviour silently discarded them.
+     *
+     * Nested rules are passed through rather than flattened. Only the outermost selector needs
+     * the prefix for scoping to hold, and native CSS nesting is supported everywhere this site
+     * is viewed; a browser without it drops the nested rule and keeps the flat declarations
+     * around it, which degrades in the right direction.
+     *
+     * `@media`, `@supports` and friends are recursed into so the rules inside them are scoped
+     * too. `@keyframes` and `@font-face` are not — their inner blocks are keyframe stops and
+     * descriptors, not selectors, and prefixing those would break the rule rather than contain
+     * it.
+     *
+     * A consequence worth stating: a selector aimed above the block, `body` or `:root` or
+     * `.site-header`, becomes `.rl-d-… body` and matches nothing. That is the intended outcome.
+     * The box adjusts one block; it is not a route to a site-wide stylesheet.
+     */
+    private static function scopeRules(string $css, string $scopeSelector): string
+    {
+        $out = '';
+        $prelude = '';
+        $length = strlen($css);
+        $i = 0;
+
+        while ($i < $length) {
+            $char = $css[$i];
+
+            // Step over quoted strings whole, so a brace or comma inside `content: "}"`
+            // cannot be mistaken for structure.
+            if ($char === '"' || $char === "'") {
+                $end = self::readString($css, $i);
+                $prelude .= substr($css, $i, $end - $i);
+                $i = $end;
+
+                continue;
+            }
+
+            if ($char === '{') {
+                $close = self::matchBrace($css, $i);
+                $body = substr($css, $i + 1, $close - $i - 1);
+                $head = trim($prelude);
+                $prelude = '';
+                $i = $close + 1;
+
+                if ($head === '') {
+                    // A block with no selector has nothing to scope it to, so it is dropped
+                    // rather than emitted where it could apply to anything.
+                    continue;
+                }
+
+                if ($head[0] === '@') {
+                    $name = preg_match('/^@([a-zA-Z-]+)/', $head, $m) === 1
+                        ? strtolower($m[1])
+                        : '';
+
+                    $out .= in_array($name, self::NESTED_AT_RULES, true)
+                        ? $head.'{'.self::scopeRules($body, $scopeSelector).'}'
+                        : $head.'{'.$body.'}';
+
+                    continue;
+                }
+
+                $selector = self::prefixSelector($head, $scopeSelector);
+
+                if ($selector !== '') {
+                    $out .= $selector.'{'.$body.'}';
+                }
+
+                continue;
+            }
+
+            if ($char === '}') {
+                // An unbalanced closing brace. Dropping it is load-bearing: left in place it
+                // would close a rule early and let whatever follows apply unscoped.
+                $prelude = '';
+                $i++;
+
+                continue;
+            }
+
+            // A block-less at-rule such as `@layer base;`. Nothing to scope, but it must not
+            // be swept into the selector of whatever rule comes next.
+            if ($char === ';' && str_starts_with(ltrim($prelude), '@')) {
+                $out .= trim($prelude).';';
+                $prelude = '';
+                $i++;
+
+                continue;
+            }
+
+            $prelude .= $char;
+            $i++;
+        }
+
+        // Declarations left over with no rule around them — someone typed `color: red` and
+        // nothing else. Applied to the block itself, which is what they meant.
+        $rest = trim($prelude);
+
+        if ($rest !== '' && str_contains($rest, ':')) {
+            $out .= $scopeSelector.'{'.rtrim($rest, '; ').'}';
+        }
+
+        return $out;
+    }
+
+    /**
+     * Scope one selector list.
+     *
+     * `&` follows the SCSS and CSS-nesting meaning of "the parent", which is what `selector`
+     * was normalised into. Anything without a `&` is treated as a descendant of the block,
+     * because that is what an author writing `.rl-card` means.
+     */
+    private static function prefixSelector(string $selector, string $scopeSelector): string
+    {
+        $scoped = [];
+
+        foreach (self::splitSelectorList($selector) as $part) {
+            $part = trim($part);
+
+            if ($part === '') {
+                continue;
+            }
+
+            $scoped[] = str_contains($part, '&')
+                ? str_replace('&', $scopeSelector, $part)
+                : $scopeSelector.' '.$part;
+        }
+
+        return implode(',', $scoped);
+    }
+
+    /**
+     * Split a selector list on its top-level commas.
+     *
+     * A plain explode() would cut `:is(a, b)` and `[data-x="a,b"]` in half.
+     *
+     * @return array<int, string>
+     */
+    private static function splitSelectorList(string $selector): array
+    {
+        $parts = [];
+        $buffer = '';
+        $depth = 0;
+        $length = strlen($selector);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $selector[$i];
+
+            if ($char === '"' || $char === "'") {
+                $end = self::readString($selector, $i);
+                $buffer .= substr($selector, $i, $end - $i);
+                $i = $end - 1;
+
+                continue;
+            }
+
+            if ($char === '(' || $char === '[') {
+                $depth++;
+            } elseif ($char === ')' || $char === ']') {
+                $depth = max(0, $depth - 1);
+            }
+
+            if ($char === ',' && $depth === 0) {
+                $parts[] = $buffer;
+                $buffer = '';
+
+                continue;
+            }
+
+            $buffer .= $char;
+        }
+
+        $parts[] = $buffer;
+
+        return $parts;
+    }
+
+    /**
+     * Index of the `}` closing the `{` at $open, or the end of the string if it is never
+     * closed. An unterminated rule is treated as running to the end rather than discarded, so
+     * a missing brace costs the author a rule instead of the whole stylesheet.
+     */
+    private static function matchBrace(string $css, int $open): int
+    {
+        $depth = 0;
+        $length = strlen($css);
+
+        for ($i = $open; $i < $length; $i++) {
+            $char = $css[$i];
+
+            if ($char === '"' || $char === "'") {
+                $i = self::readString($css, $i) - 1;
+
+                continue;
+            }
+
+            if ($char === '{') {
+                $depth++;
+            } elseif ($char === '}') {
+                $depth--;
+
+                if ($depth === 0) {
+                    return $i;
+                }
+            }
+        }
+
+        return $length;
+    }
+
+    /**
+     * Index just past the quoted string starting at $start.
+     */
+    private static function readString(string $css, int $start): int
+    {
+        $quote = $css[$start];
+        $length = strlen($css);
+
+        for ($i = $start + 1; $i < $length; $i++) {
+            if ($css[$i] === '\\') {
+                $i++;
+
+                continue;
+            }
+
+            if ($css[$i] === $quote) {
+                return $i + 1;
+            }
+        }
+
+        return $length;
     }
 
     /**

@@ -115,9 +115,24 @@ return [
         /*
          * Alerting. Kept narrow on purpose: an alert stream nobody reads is worse than none,
          * because it trains people to ignore the one that matters.
+         *
+         * Scan alerting is spelled in WordFence 9's vocabulary.
+         *
+         * It was `alertOn_critical => true` / `alertOn_warnings => false` until 2026-09-16.
+         * Neither key exists in `wfConfig::$defaultConfig` any more — WordFence 9 replaced the
+         * pair with a switch plus a threshold — so `isKnownKey()` had been refusing both on
+         * every deploy and the stated intent was never actually in force. The Security screen
+         * surfaced it: unknown keys are listed on `admin.php?page=Wordfence`, where they are
+         * read, rather than only in deploy output, where they were not.
+         *
+         * `alertOn_severityLevel` is a floor, not a filter: WordFence emails about issues at or
+         * above it. 100 is `wfIssues::SEVERITY_CRITICAL`, which reproduces "critical yes,
+         * warnings no" exactly. Spelled as the literal because this file is read before
+         * WordFence loads and the class constant is not available.
          */
-        'alertOn_critical' => true,
-        'alertOn_warnings' => false,
+        'alertOn_scanIssues' => true,
+        'alertOn_severityLevel' => 100,
+
         'alertOn_block' => false,
         'alertOn_loginLockout' => true,
         'alertOn_adminLogin' => false,
@@ -125,5 +140,17 @@ return [
         'alertOn_wordfenceDeactivated' => true,
         'alertOn_update' => false,
         'alert_maxHourly' => 10,
+
+        /*
+         * Drop WordFence's own dashboard widget.
+         *
+         * `SecurityAdmin` replaces it with one built from the same data plus the thing
+         * WordFence cannot know: how far the live configuration has drifted from this file.
+         * `SecurityAdmin::setupDashboard()` also removes the widget at runtime, which covers
+         * a database restored from a dump before the next deploy re-asserts this — but this
+         * is the durable half, because it stops the widget registering at all rather than
+         * unregistering it afterwards.
+         */
+        'email_summary_dashboard_widget_enabled' => false,
     ],
 ];

@@ -1252,6 +1252,22 @@ class WordPressAdminTheme
             #adminmenuback {
                 border-right: 1px solid #27272a !important;
             }
+            /* Core reserves 2em above the sidebar whenever it adds the `php-error` body
+               class, to leave room for a printed PHP error:
+               `.php-error #adminmenuback, .php-error #adminmenuwrap { margin-top: 2em }`.
+               It adds that class whenever `error_get_last()` is non-null and display_errors
+               is on — and `error_get_last()` also reports errors that were suppressed with
+               `@`, which WordPress and its plugins do routinely. The result on a healthy
+               site is a 26px band under the admin bar with nothing in it.
+               Local only: `config/environments/development.php` turns on WP_DEBUG_DISPLAY,
+               while production keeps it off, so the class never appears there.
+               The trade is that a PHP error which really does print will sit under the
+               sidebar's top edge rather than above it; it is still in the page and in
+               `web/app/debug.log`. */
+            .php-error #adminmenuback,
+            .php-error #adminmenuwrap {
+                margin-top: 0 !important;
+            }
             #adminmenuwrap {
                 border-right: 1px solid #27272a !important;
             }
@@ -1952,9 +1968,42 @@ class WordPressAdminTheme
                 border: 1px solid #e4e4e7 !important;
                 border-radius: 10px !important;
                 box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
-                overflow: hidden !important;
+                /*
+                 * Deliberately visible. This was `hidden` to make the radius above clip the
+                 * corner cells, but a table that clips its own overflow also clips anything a
+                 * cell positions outside itself — column-header tooltips were being cut off at
+                 * the table border. The corner cells are rounded individually below instead,
+                 * which keeps the shape without trapping overlays. Needs border-collapse:
+                 * separate to work, which is already set.
+                 */
+                overflow: visible !important;
                 border-collapse: separate !important;
                 border-spacing: 0 !important;
+            }
+            .wp-list-table thead tr:first-child th:first-child,
+            table.widefat thead tr:first-child th:first-child {
+                border-top-left-radius: 10px !important;
+            }
+            .wp-list-table thead tr:first-child th:last-child,
+            table.widefat thead tr:first-child th:last-child {
+                border-top-right-radius: 10px !important;
+            }
+            .wp-list-table tfoot tr:last-child th:first-child,
+            table.widefat tfoot tr:last-child th:first-child {
+                border-bottom-left-radius: 10px !important;
+            }
+            .wp-list-table tfoot tr:last-child th:last-child,
+            table.widefat tfoot tr:last-child th:last-child {
+                border-bottom-right-radius: 10px !important;
+            }
+            /* Tables with no tfoot round off their last body row instead. */
+            .wp-list-table tbody tr:last-child td:first-child,
+            table.widefat tbody tr:last-child td:first-child {
+                border-bottom-left-radius: 10px !important;
+            }
+            .wp-list-table tbody tr:last-child td:last-child,
+            table.widefat tbody tr:last-child td:last-child {
+                border-bottom-right-radius: 10px !important;
             }
             .wp-list-table th,
             table.widefat th {

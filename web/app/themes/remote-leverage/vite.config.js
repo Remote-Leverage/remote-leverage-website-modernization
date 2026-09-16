@@ -29,6 +29,9 @@ export default defineConfig({
         // than being folded into app.css/app.js.
         'resources/css/social-kit.css',
         'resources/js/social-kit.js',
+        // Renames Yoast's Gutenberg sidebar panel; loaded only on editor screens by
+        // App\Infrastructure\WordPress\Admin\Seo\SeoEditor.
+        'resources/js/seo-admin.js',
       ],
       refresh: true,
       // Only the flat files here go through Vite's hashed pipeline. `resources/images/pages/**`

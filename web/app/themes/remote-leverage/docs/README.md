@@ -14,6 +14,7 @@ All project documentation lives here. Start with the [repository README](../../.
 | [local-development.md](local-development.md) | Setup, Docker, WP-CLI inventory, running tests |
 | [deployment.md](deployment.md) | Image build, CI, ECS deploy, post-deploy tasks |
 | [observability.md](observability.md) | The integration call log, credential fingerprinting, the merged lead timeline, and Sentry noise control |
+| [slack-app.md](slack-app.md) | The one Slack app: what it posts, the thread-per-lead model, wiring the action buttons, and the scopes it does not have |
 
 ## Domains
 

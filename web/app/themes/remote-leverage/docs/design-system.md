@@ -290,10 +290,20 @@ and silently does nothing. Every control therefore writes real declarations into
 `<style>`. The extra-classes field is a hook for that CSS, not a styling shortcut — its field
 instructions say so, because an editor would otherwise reasonably assume the opposite.
 
-**Rules are scoped to the block instance.** A generated `.rl-d-{hash}` class goes on the
-wrapper, and the bare `selector` keyword (Elementor's idiom) expands to it, so nothing an editor
-writes can reach the rest of the page. The hash derives from the design payload, so two blocks
-configured alike share one class and one rule.
+**Every selector is rewritten, not just a keyword.** A generated `.rl-d-{hash}` class goes on
+the wrapper and `scopeRules()` prefixes every selector the author writes with it, including
+inside `@media` and `@supports`. So `.rl-card { … }` targets the cards in that block and nothing
+else on the site, nesting works, and bare declarations (`background: #fff` with no selector at
+all) apply to the block. `selector` and `&` still resolve to the wrapper itself, for when that
+is what you mean.
+
+The distinction matters because the first version got it wrong: scoping *was* the `selector`
+substitution, so CSS written without the keyword — most CSS — went out unscoped and applied
+site-wide. `@keyframes` and `@font-face` are deliberately left alone; their inner blocks are
+stops and descriptors, not selectors. A selector aimed above the block (`body`, `:root`) becomes
+`.rl-d-… body` and matches nothing, which is the intended outcome — this box adjusts one block
+and is not a route to a site-wide stylesheet. The hash derives from the design payload, so two
+blocks configured alike share one class and one rule.
 
 **It applies through `render_block`, not the Blade views.** None of the 57 views render ACF
 Composer's attribute bag — they all open with a hardcoded `<section class="…">` — which is also

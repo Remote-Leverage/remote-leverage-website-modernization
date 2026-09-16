@@ -28,13 +28,28 @@ function slackListener(): object
 
         public ?string $sentColor = null;
 
-        protected function send(string $text, array $blocks = [], ?string $color = null): bool
-        {
+        /** @var array<int, ?string> */
+        public array $sentThreadTs = [];
+
+        /** @var array<int, bool> */
+        public array $sentBroadcast = [];
+
+        protected function send(
+            string $text,
+            array $blocks = [],
+            ?string $color = null,
+            ?string $threadTs = null,
+            bool $broadcast = false,
+        ): ?array {
             $this->sent[] = $text;
             $this->sentBlocks[] = $blocks;
             $this->sentColor = $color;
+            $this->sentThreadTs[] = $threadTs;
+            $this->sentBroadcast[] = $broadcast;
 
-            return true;
+            // What chat.postMessage answers with. The listener stores this on the lead so
+            // later events can reply to it.
+            return ['ts' => '1726500000.000100', 'channel' => 'C086BBKUXL5'];
         }
     };
 }
@@ -275,5 +290,64 @@ describe('lead headline', function () {
     test('an unmapped source still reads as a channel rather than being dropped', function () {
         expect(headlineFor(['utm_source' => 'reddit', 'partner' => null]))
             ->toContain('New lead from Reddit');
+    });
+});
+
+describe('the buttons are not offered until they work', function () {
+    beforeEach(function () {
+        config(['slack-notifications' => require __DIR__.'/../../config/slack-notifications.php']);
+    });
+
+    afterEach(function () {
+        // The stubbed config() is a process global, so a secret set here would switch the
+        // action buttons on for every test that runs after this file.
+        config(['services.slack.signing_secret' => '']);
+    });
+
+    test('no signing secret means no action buttons in the alert', function () {
+        /*
+         * Slack prints "not configured to handle interactive responses" beside a button it
+         * cannot deliver — under every lead, forever. Rendering them before the endpoint is
+         * wired would be worse than not having them.
+         */
+        config(['services.slack.signing_secret' => '']);
+
+        $listener = slackListener();
+        $listener->handleCreated(new LeadCreated(lead: slackLead(), context: []));
+
+        $encoded = json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES);
+
+        expect($encoded)->not->toContain('lead_claim')
+            ->and($encoded)->not->toContain('lead_block')
+            ->and($encoded)->toContain('Open in portal');
+    });
+
+    test('a signing secret brings them out, with a confirmation on the destructive one', function () {
+        config(['services.slack.signing_secret' => 'the_real_secret']);
+
+        $listener = slackListener();
+        $listener->handleCreated(new LeadCreated(lead: slackLead(), context: []));
+
+        $encoded = json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES);
+
+        expect($encoded)->toContain('"action_id":"lead_claim"')
+            ->and($encoded)->toContain('"action_id":"lead_contacted"')
+            ->and($encoded)->toContain('"action_id":"lead_block"')
+            ->and($encoded)->toContain('"style":"danger"')
+            ->and($encoded)->toContain('Block this person?');
+    });
+
+    test('the buttons carry the lead id and nothing else', function () {
+        // The handler reads every other fact from the database. A payload that asserted them
+        // would be a payload worth forging.
+        config(['services.slack.signing_secret' => 'the_real_secret']);
+
+        $listener = slackListener();
+        $listener->handleCreated(new LeadCreated(
+            lead: slackLead(['id' => 4242]),
+            context: [],
+        ));
+
+        expect(json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES))->toContain('"value":"4242"');
     });
 });

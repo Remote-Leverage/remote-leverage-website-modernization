@@ -264,6 +264,8 @@ if (! Capsule::schema()->hasTable('rl_leads')) {
         $table->string('posthog_session_id', 100)->nullable();
         $table->string('device_id', 64)->nullable();
         $table->string('hubspot_contact_id', 50)->nullable();
+        $table->string('slack_message_ts', 32)->nullable();
+        $table->string('slack_channel_id', 32)->nullable();
         $table->unsignedInteger('profile_id')->nullable()->index();
         $table->boolean('is_blocked')->default(false)->index();
 
@@ -946,5 +948,147 @@ if (! function_exists('get_field')) {
     function get_field($key, $postId = false, $formatValue = true)
     {
         return $GLOBALS['_wp_mock_post_meta'][$postId][$key] ?? null;
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Asset pipeline, screens and escaping
+|--------------------------------------------------------------------------
+|
+| Added for the SEO admin surfaces (App\Infrastructure\WordPress\Admin\Seo).
+| The enqueue stubs record into globals so a test can assert what a screen
+| registered, dequeued, or hung inline CSS off.
+|
+*/
+
+if (! defined('ARRAY_A')) {
+    define('ARRAY_A', 'ARRAY_A');
+}
+
+if (! function_exists('add_filter')) {
+    function add_filter($hook, $callback, $priority = 10, $accepted_args = 1)
+    {
+        $GLOBALS['rl_added_filters'][$hook][] = $callback;
+
+        return true;
+    }
+}
+
+if (! function_exists('apply_filters')) {
+    function apply_filters($hook, $value, ...$args)
+    {
+        return $value;
+    }
+}
+
+if (! function_exists('remove_all_actions')) {
+    function remove_all_actions($hook, $priority = false)
+    {
+        $GLOBALS['rl_cleared_actions'][] = $hook;
+        unset($GLOBALS['rl_added_actions'][$hook]);
+
+        return true;
+    }
+}
+
+if (! function_exists('wp_register_style')) {
+    function wp_register_style($handle, $src, $deps = [], $ver = false, $media = 'all')
+    {
+        $GLOBALS['rl_registered_styles'][$handle] = $deps;
+
+        return true;
+    }
+}
+
+if (! function_exists('wp_enqueue_style')) {
+    function wp_enqueue_style($handle, $src = '', $deps = [], $ver = false, $media = 'all')
+    {
+        $GLOBALS['rl_enqueued_styles'][] = $handle;
+
+        return true;
+    }
+}
+
+if (! function_exists('wp_add_inline_style')) {
+    function wp_add_inline_style($handle, $data)
+    {
+        $GLOBALS['rl_inline_styles'][$handle][] = $data;
+
+        return true;
+    }
+}
+
+if (! function_exists('wp_dequeue_style')) {
+    function wp_dequeue_style($handle)
+    {
+        $GLOBALS['rl_dequeued_styles'][] = $handle;
+    }
+}
+
+if (! function_exists('wp_dequeue_script')) {
+    function wp_dequeue_script($handle)
+    {
+        $GLOBALS['rl_dequeued_scripts'][] = $handle;
+    }
+}
+
+if (! function_exists('wp_style_is')) {
+    /**
+     * Registered-ness is seeded by a test through $GLOBALS['rl_known_styles'].
+     */
+    function wp_style_is($handle, $list = 'enqueued')
+    {
+        return in_array($handle, $GLOBALS['rl_known_styles'] ?? [], true);
+    }
+}
+
+if (! class_exists('WP_Screen')) {
+    class WP_Screen
+    {
+        public string $id = '';
+
+        public string $base = '';
+
+        public function __construct(string $id = '', string $base = '')
+        {
+            $this->id = $id;
+            $this->base = $base;
+        }
+    }
+}
+
+if (! function_exists('get_current_screen')) {
+    function get_current_screen()
+    {
+        return $GLOBALS['rl_current_screen'] ?? null;
+    }
+}
+
+if (! function_exists('get_edit_post_link')) {
+    function get_edit_post_link($post = 0, $context = 'display')
+    {
+        return 'http://example.test/wp/wp-admin/post.php?post='.(int) $post.'&action=edit';
+    }
+}
+
+if (! function_exists('esc_html__')) {
+    function esc_html__($text, $domain = 'default')
+    {
+        return htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (! function_exists('wp_die')) {
+    function wp_die($message = '', $title = '', $args = [])
+    {
+        throw new RuntimeException('wp_die: '.(is_string($message) ? $message : ''));
+    }
+}
+
+if (! function_exists('get_post_types')) {
+    function get_post_types($args = [], $output = 'names', $operator = 'and')
+    {
+        return $GLOBALS['rl_post_types'] ?? ['post' => 'post', 'page' => 'page'];
     }
 }

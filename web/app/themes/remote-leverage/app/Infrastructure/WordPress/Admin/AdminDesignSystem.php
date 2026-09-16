@@ -140,6 +140,27 @@ class AdminDesignSystem
 
         .rl-inline { display: inline; }
         .rl-empty { color: #71717a; font-size: 13px; padding: 18px 20px; }
+
+        /*
+         * Anchors styled as controls.
+         *
+         * WordPressAdminTheme's "Global Link & Text Neutralization" block paints every link in
+         * the content area with `#wpbody-content a { color: #09090b !important; text-decoration:
+         * underline !important }`. That selector is (1,0,1); every rule above is (0,1,0), so
+         * !important does not save them — an <a class="rl-btn rl-btn-primary"> renders as black
+         * text on a black button with an underline through it. The ID in these selectors is
+         * what clears that bar, and is the only reason they are qualified this way.
+         */
+        #wpbody-content .rl-admin-wrap a.rl-btn,
+        #wpbody-content .rl-admin-wrap a.rl-tab {
+            text-decoration: none !important;
+        }
+        #wpbody-content .rl-admin-wrap a.rl-btn-primary { color: #fafafa !important; }
+        #wpbody-content .rl-admin-wrap a.rl-btn-outline { color: #09090b !important; }
+        #wpbody-content .rl-admin-wrap a.rl-btn-destructive { color: #ef4444 !important; }
+        #wpbody-content .rl-admin-wrap a.rl-btn-destructive:hover { color: #dc2626 !important; }
+        #wpbody-content .rl-admin-wrap a.rl-tab { color: #71717a !important; }
+        #wpbody-content .rl-admin-wrap a.rl-tab-active { color: #09090b !important; }
         CSS;
     }
 }

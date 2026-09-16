@@ -53,6 +53,7 @@ The four event-type vars seed `CalendlyEventTypeRoleResolver` (option `rl_calend
 | :--- | :--- |
 | `HUBSPOT_ACCESS_TOKEN`, `HUBSPOT_PORTAL_ID` | `HubSpotGateway`, as the fallback behind the admin-configured token. **Neither is in `.env` or `.env.example`** — without one or the other, HubSpot sync silently no-ops. |
 | `SLACK_WEBHOOK_URL` | `HandleLeadEventsForSlack` (option `rl_slack_webhook_url` wins) |
+| `SLACK_SIGNING_SECRET` | `SlackInteractionController`, and the on switch for the lead alert's action buttons. Falls back to the admin setting (Leads → Settings), which is how it reaches staging via environment sync. Unset in both → the endpoint refuses every request **and** the buttons are not rendered. See [slack-app.md](slack-app.md). |
 | `LEAD_WEBHOOK_URL` | `HandleLeadEventsForWebhook` (option `rl_lead_webhook_url` wins) |
 
 ## Tracking
