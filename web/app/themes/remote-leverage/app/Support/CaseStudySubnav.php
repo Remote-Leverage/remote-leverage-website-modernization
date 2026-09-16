@@ -92,7 +92,7 @@ class CaseStudySubnav
      *
      * Measured at 1440px on 2026-09-15:
      *
-     *   case_study archive + single  1260px + px-8  → content starts at x=122
+     *   case_study archive + single  1380px + px-8  → content starts at x=62
      *   /reviews/                    1380px, no side padding at this width → x=30
      *
      * Since the 2026-09-15 parity revert only the case-study row is reachable — the
@@ -101,7 +101,7 @@ class CaseStudySubnav
      * the one production actually ships the bar against.
      */
     private const CONTAINERS = [
-        self::TAB_CASE_STUDIES => 'max-w-[1260px] mx-auto px-4 sm:px-6 lg:px-8',
+        self::TAB_CASE_STUDIES => 'w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8',
         self::TAB_REVIEWS => 'max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-0',
     ];
 

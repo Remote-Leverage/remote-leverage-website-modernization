@@ -1,23 +1,41 @@
 {{-- Case study template body: dark hero band, then the study's prose, metrics and quotes. Rendered
-     from case_study post content. --}}
+     from case_study post content.
+
+     Type, colour and component sizing measured off https://remoteleverage.com/case-study/chick-fil-a/
+     and /case-study/bench-accounting/ with getComputedStyle at 1440px (2026-09-15):
+       eyebrow       16px / 24px, weight 600, copy already uppercase
+       client name   60px / 60px, weight 700, #FFFFFF
+       headline      48px / 56px, weight 500, #FFFBFF
+       logo tile     434 x 434, 20px radius, white
+       info rows     18px / 32px, label weight 500 / value weight 300, label column 209px
+       stat value    46px / 69px, weight 500 · stat label 26px / 39px, weight 500
+       hero stats    three fixed 240px columns; Outcomes stats two fixed 340px columns
+       pull quote    50px / 56px, weight 500, #333, full container width
+       attribution   24px / 36px, #333 · headshot 100 x 100
+       section head  30px / 40px, weight 500, #333
+       body copy     18px / 28px, #333
+
+     Container is deliberately NOT production's 1240px: the canonical theme container is
+     1380px (CLAUDE.md "Conventions" rule 1 / docs/design-system.md rule 1). Width is the one
+     value not measured off production. --}}
 @php
-    $proseClasses = '[&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-black/70 [&_p]:leading-relaxed [&_p]:text-lg '
-        .'[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-4 [&_ul]:space-y-2 [&_ul]:text-black/70 [&_ul]:text-lg '
-        .'[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-4 [&_ol]:space-y-2 [&_ol]:text-black/70 [&_ol]:text-lg '
-        .'[&_li]:leading-relaxed '
+    $proseClasses = '[&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-[#333333] [&_p]:leading-7 [&_p]:text-lg '
+        .'[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-4 [&_ul]:space-y-2 [&_ul]:text-[#333333] [&_ul]:text-lg '
+        .'[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-4 [&_ol]:space-y-2 [&_ol]:text-[#333333] [&_ol]:text-lg '
+        .'[&_li]:leading-7 '
         .'[&_a]:text-brand-purple [&_a]:underline [&_a]:decoration-brand-purple/40 hover:[&_a]:decoration-brand-purple '
         .'[&_strong]:font-bold [&_strong]:text-black [&_b]:font-bold [&_b]:text-black';
 @endphp
 
 {{-- Hero: dark band matching production's case-study template family --}}
 <div class="w-full bg-[#270028] pt-14 pb-20 sm:pb-24">
-    <div class="max-w-[1260px] mx-auto px-4 sm:px-6 lg:px-8">
-        <span class="inline-flex items-center text-xs font-bold tracking-[0.1em] text-white uppercase mb-6">
+    <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
+        <span class="inline-flex items-center text-base leading-6 font-semibold text-white uppercase mb-6">
             Case Study
         </span>
 
         @if (! empty($clientName))
-            <h1 class="font-display text-4xl sm:text-5xl lg:text-[60px] font-bold text-white tracking-[-0.02em] leading-tight mb-8 sm:mb-10">
+            <h1 class="font-display text-4xl sm:text-5xl lg:text-[60px] lg:leading-[60px] font-bold text-white tracking-[-0.02em] leading-tight mb-8 sm:mb-10">
                 {{ $clientName }}
             </h1>
         @endif
@@ -25,20 +43,20 @@
         <div class="flex flex-col sm:flex-row gap-8 sm:gap-0">
             <div class="sm:w-[35%]">
                 @if (! empty($logo))
-                    <div class="max-w-[220px] rounded-2xl overflow-hidden bg-white p-6">
+                    <div class="w-full max-w-[434px] aspect-square rounded-[20px] overflow-hidden bg-white p-8">
                         @if (! empty($websiteUrl))
-                            <a href="{{ $websiteUrl }}" target="_blank" rel="noopener noreferrer">
-                                <img src="{{ $logo }}" alt="{{ $clientName }}" class="w-full h-auto object-contain" loading="lazy" decoding="async">
+                            <a href="{{ $websiteUrl }}" target="_blank" rel="noopener noreferrer" class="block w-full h-full">
+                                <img src="{{ $logo }}" alt="{{ $clientName }}" class="w-full h-full object-contain" loading="lazy" decoding="async">
                             </a>
                         @else
-                            <img src="{{ $logo }}" alt="{{ $clientName }}" class="w-full h-auto object-contain" loading="lazy" decoding="async">
+                            <img src="{{ $logo }}" alt="{{ $clientName }}" class="w-full h-full object-contain" loading="lazy" decoding="async">
                         @endif
                     </div>
                 @endif
             </div>
 
             <div class="sm:w-[65%] sm:pl-12">
-                <h2 class="font-display text-2xl sm:text-3xl lg:text-[42px] font-medium text-[#FFFBFF] tracking-[0.01em] leading-tight mb-5">
+                <h2 class="font-display text-2xl sm:text-3xl lg:text-[48px] lg:leading-[56px] font-medium text-[#FFFBFF] tracking-[0.01em] leading-tight mb-5">
                     {!! $headline !!}
                 </h2>
 
@@ -49,11 +67,11 @@
                 @endif
 
                 @if (! empty($infoItems))
-                    <div class="flex flex-col gap-1 mb-10">
+                    <div class="flex flex-col mb-10">
                         @foreach ($infoItems as $item)
                             @if (! empty($item['value']))
-                                <div class="flex items-baseline gap-4 text-lg">
-                                    <span class="font-medium text-white w-40 shrink-0">{{ $item['label'] }}:</span>
+                                <div class="flex items-baseline gap-4 text-lg leading-8">
+                                    <span class="font-medium text-white w-[193px] shrink-0">{{ $item['label'] }}:</span>
                                     <span class="font-light text-white">{{ $item['value'] }}</span>
                                 </div>
                             @endif
@@ -62,13 +80,13 @@
                 @endif
 
                 @if (! empty($stats))
-                    <div class="flex flex-wrap gap-x-14 gap-y-6">
+                    <div class="flex flex-wrap gap-y-6">
                         @foreach ($stats as $stat)
-                            <div>
-                                <div class="font-display text-3xl sm:text-4xl lg:text-[46px] font-medium text-white leading-none mb-1">
+                            <div class="w-full sm:w-[240px]">
+                                <div class="font-display text-3xl sm:text-4xl lg:text-[46px] lg:leading-[69px] font-medium text-white leading-none">
                                     {{ $stat['value'] }}
                                 </div>
-                                <div class="text-lg sm:text-xl text-white/85 leading-snug">
+                                <div class="text-xl sm:text-[26px] sm:leading-[39px] font-medium text-white leading-snug">
                                     {{ $stat['label'] }}
                                 </div>
                             </div>
@@ -80,25 +98,25 @@
     </div>
 </div>
 
-<div class="w-full max-w-[1260px] mx-auto px-4 sm:px-6 lg:px-8">
+<div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
 
     {{-- Pull quote --}}
     @if (! empty($quoteText))
-        <div class="max-w-3xl py-16 sm:py-20">
-            <p class="font-display text-2xl sm:text-3xl lg:text-[40px] font-medium text-black/80 tracking-[-0.01em] leading-tight mb-6">
+        <div class="py-16 sm:py-20">
+            <p class="font-display text-2xl sm:text-3xl lg:text-[50px] lg:leading-[56px] font-medium text-[#333333] tracking-[-0.01em] leading-tight mb-6">
                 &ldquo;{{ $quoteText }}&rdquo;
             </p>
             <div class="flex items-center gap-4">
                 @if (! empty($quotePhoto))
-                    <img src="{{ $quotePhoto }}" alt="{{ $quoteName }}" width="64" height="64"
-                        class="w-16 h-16 rounded-full object-cover shrink-0" loading="lazy" decoding="async">
+                    <img src="{{ $quotePhoto }}" alt="{{ $quoteName }}" width="100" height="100"
+                        class="w-[100px] h-[100px] rounded-full object-cover shrink-0" loading="lazy" decoding="async">
                 @endif
-                <div class="text-lg leading-snug">
+                <div class="text-2xl leading-9">
                     @if (! empty($quoteName))
-                        <div class="text-black font-medium">{{ $quoteName }}</div>
+                        <div class="text-[#333333] font-medium">{{ $quoteName }}</div>
                     @endif
                     @if (! empty($quoteCompany))
-                        <div class="text-black font-medium">{{ $quoteCompany }}</div>
+                        <div class="text-[#333333] font-medium">{{ $quoteCompany }}</div>
                     @endif
                 </div>
             </div>
@@ -111,7 +129,7 @@
             <div class="flex flex-col sm:flex-row gap-4 sm:gap-0">
                 <div class="sm:w-[35%]">
                     @if (! empty($section['heading']))
-                        <h2 class="font-display text-2xl sm:text-[30px] font-medium text-black tracking-[-0.01em] leading-tight">
+                        <h2 class="font-display text-2xl sm:text-[30px] sm:leading-10 font-medium text-[#333333] tracking-[-0.01em] leading-tight">
                             {{ $section['heading'] }}
                         </h2>
                     @endif
@@ -119,13 +137,13 @@
 
                 <div class="sm:w-[65%] sm:pl-12">
                     @if ($section['type'] === 'stats' && ! empty($section['rows']))
-                        <div class="grid grid-cols-2 gap-x-10 gap-y-8 max-w-lg">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-8 max-w-[700px]">
                             @foreach ($section['rows'] as $row)
-                                <div>
-                                    <div class="font-display text-3xl sm:text-4xl lg:text-[46px] font-medium text-black leading-none mb-1">
+                                <div class="sm:w-[340px]">
+                                    <div class="font-display text-3xl sm:text-4xl lg:text-[46px] lg:leading-[69px] font-medium text-black leading-none">
                                         {{ $row['value'] }}
                                     </div>
-                                    <div class="text-lg sm:text-xl text-black/70 leading-snug">
+                                    <div class="text-xl sm:text-[26px] sm:leading-[39px] font-medium text-black leading-snug">
                                         {{ $row['label'] }}
                                     </div>
                                 </div>
@@ -134,13 +152,13 @@
                     @elseif ($section['type'] === 'table' && ! empty($section['rows']))
                         <div class="flex flex-col gap-2 w-full">
                             <div class="grid grid-cols-2 bg-black/[0.03] rounded-card px-5 sm:px-6 py-3">
-                                <span class="text-xs sm:text-sm font-bold text-black uppercase tracking-wide">Success Metric</span>
-                                <span class="text-xs sm:text-sm font-bold text-black uppercase tracking-wide">Outcome</span>
+                                <span class="text-xs sm:text-sm font-bold text-[#333333] uppercase tracking-wide">Success Metric</span>
+                                <span class="text-xs sm:text-sm font-bold text-[#333333] uppercase tracking-wide">Outcome</span>
                             </div>
                             @foreach ($section['rows'] as $row)
                                 <div class="grid grid-cols-2 border-b border-black/6 px-5 sm:px-6 py-3">
-                                    <span class="text-sm text-black/70">{{ $row['value'] }}</span>
-                                    <span class="text-sm text-black font-medium">{{ $row['label'] }}</span>
+                                    <span class="text-sm text-[#333333]">{{ $row['value'] }}</span>
+                                    <span class="text-sm text-[#333333] font-medium">{{ $row['label'] }}</span>
                                 </div>
                             @endforeach
                         </div>
@@ -159,7 +177,7 @@
         <div class="flex flex-col sm:flex-row gap-4 sm:gap-0 pb-16 sm:pb-20" x-data="{ playing: false }">
             <div class="sm:w-[35%]">
                 @if (! empty($video['name']))
-                    <h2 class="font-display text-2xl sm:text-[30px] font-medium text-black tracking-[-0.01em] leading-tight">
+                    <h2 class="font-display text-2xl sm:text-[30px] sm:leading-10 font-medium text-[#333333] tracking-[-0.01em] leading-tight">
                         Video: {{ $video['name'] }}
                     </h2>
                 @endif
@@ -167,7 +185,7 @@
 
             <div class="sm:w-[65%] sm:pl-12 max-w-2xl">
                 @if (! empty($video['caption']))
-                    <p class="text-lg text-black/70 leading-relaxed mb-5">Video: {{ $video['caption'] }}</p>
+                    <p class="text-lg leading-7 text-[#333333] mb-5">Video: {{ $video['caption'] }}</p>
                 @endif
 
                 <div class="relative w-full aspect-video rounded-card overflow-hidden bg-slate-900 cursor-pointer group"

@@ -19,11 +19,11 @@
 @section('content')
     {{-- Hero: dark gradient band matching the case-study single template family --}}
     <div class="w-full" style="background-image:linear-gradient(65deg, #270028 0%, #4E1450 100%)">
-        <div class="max-w-[1260px] mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-14 sm:pt-20 sm:pb-16">
+        <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-14 sm:pt-20 sm:pb-16">
             <span class="inline-flex items-center text-xs font-bold tracking-[0.1em] text-white uppercase mb-4">
                 Case Studies
             </span>
-            <h1 class="font-display text-3xl sm:text-4xl lg:text-[48px] font-medium text-[#FFFBFF] tracking-[0.01em] leading-tight mb-5 max-w-2xl">
+            <h1 class="font-display text-3xl sm:text-4xl lg:text-[48px] lg:leading-[56px] font-medium text-[#FFFBFF] tracking-[0.01em] leading-tight mb-5 max-w-2xl">
                 Real Hiring Outcomes. Exceptional Remote Talent.
             </h1>
             <p class="text-base sm:text-lg font-light text-white/85 leading-relaxed max-w-2xl mb-14">
@@ -53,7 +53,7 @@
     </div>
 
     {{-- Case study cards --}}
-    <div class="w-full max-w-[1260px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+    <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach ($allCaseStudies as $cs)
                 @php
@@ -61,7 +61,7 @@
                     $tags = is_array($tags) ? $tags : (json_decode((string) $tags, true) ?: []);
                     $logoUrl = get_post_meta($cs->ID, 'case_study_index_logo', true) ?: get_the_post_thumbnail_url($cs->ID, 'medium');
                 @endphp
-                <div class="bg-white rounded-[5px] p-8 sm:p-10 flex flex-col border border-[#FB33FF]">
+                <div class="bg-white rounded-[5px] px-6 py-10 sm:px-[25px] flex flex-col border border-[#FB33FF]">
                     <div class="mb-8 h-12 flex items-center">
                         @if ($logoUrl)
                             <img src="{{ $logoUrl }}" alt="{{ get_the_title($cs) }}"
@@ -81,7 +81,7 @@
                     @if (! empty($tags))
                         <div class="flex flex-wrap gap-2 mb-6">
                             @foreach ($tags as $tag)
-                                <span class="text-sm font-medium text-[#4E1450] bg-[#FECEFF] rounded-full px-4.5 py-2">
+                                <span class="text-sm font-medium text-[#333333] bg-[#FECEFF] rounded-[20px] px-4.5 py-2">
                                     {{ $tag }}
                                 </span>
                             @endforeach
@@ -89,7 +89,7 @@
                     @endif
 
                     <a href="{{ get_permalink($cs) }}"
-                        class="inline-flex items-center justify-center bg-[#4E1450] hover:bg-[#3A0F3D] text-white text-sm font-bold rounded-md px-8 py-3.5 transition-colors self-start">
+                        class="inline-flex items-center justify-center bg-[#640467] hover:bg-[#4E1450] text-white text-[15px] leading-[17px] font-light rounded-[5px] px-[70px] py-[18px] transition-colors self-start">
                         Read More
                     </a>
                 </div>
