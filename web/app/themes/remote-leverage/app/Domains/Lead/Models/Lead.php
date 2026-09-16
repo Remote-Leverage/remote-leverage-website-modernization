@@ -43,6 +43,7 @@ class Lead extends Model
         'session_id',
         'posthog_session_id',
         'hubspot_contact_id',
+        'device_id',
         'utm_id',
         'li_fat_id',
         'fbc',
@@ -70,6 +71,10 @@ class Lead extends Model
         // The HandL first-touch set plus any query parameter without a column of its own.
         // See App\Domains\Lead\Services\AttributionCollector.
         'attribution' => 'array',
+
+        // The database hands back 0/1; without this every `=== true` check against it is false
+        // and a blocked lead reads as unblocked.
+        'is_blocked' => 'boolean',
     ];
 
     /**

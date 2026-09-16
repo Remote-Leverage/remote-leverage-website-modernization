@@ -50,6 +50,13 @@ class AttributionCollector
         'partner' => ['partner'],
         'scheduler_link' => ['scheduler_link'],
         'landing_page_base' => ['handl_landing_page_base'],
+
+        /*
+         * Our own visitor cookie. First-party and long-lived, so it survives the ad-blockers
+         * that remove PostHog's — which matters because that traffic is disproportionately the
+         * traffic worth recognising on a return visit.
+         */
+        'device_id' => ['rl_vid'],
     ];
 
     /**

@@ -11,8 +11,57 @@ class TrackingHooks
      */
     public function register(): void
     {
+        add_action('wp_head', [$this, 'injectVisitorCookie'], 1);
         add_action('wp_head', [$this, 'injectPostHogSnippet'], 2);
         add_action('wp_footer', [$this, 'injectCustomerIOSnippet'], 20);
+    }
+
+    /**
+     * Set a first-party visitor cookie, `rl_vid`.
+     *
+     * This is the only identifier that can recognise a returning visitor. `rl_leads.uuid` is
+     * minted per row and `session_id` per component mount, so neither survives a second visit;
+     * PostHog's distinct id does, but disappears whenever PostHog is blocked — which is
+     * disproportionately the traffic worth recognising.
+     *
+     * Set client-side rather than from PHP so a page served from the CDN still gets one: a
+     * `Set-Cookie` on a cached response is either stripped or, worse, cached and handed to
+     * every subsequent visitor, which would give thousands of people the same identity.
+     *
+     * It identifies a browser, not a person, and is treated as a **weak** identifier
+     * accordingly — recorded as evidence, never enough on its own to merge two profiles. See
+     * `IdentityResolver`.
+     */
+    public function injectVisitorCookie(): void
+    {
+        $days = 365;
+
+        echo <<<HTML
+<script>
+(function () {
+  try {
+    var name = 'rl_vid';
+    var match = document.cookie.match(new RegExp('(^|;\\s*)' + name + '=([^;]*)'));
+    var id = match ? match[2] : null;
+
+    if (!id) {
+      // crypto.randomUUID is unavailable on older Safari and on any non-secure origin.
+      id = (window.crypto && window.crypto.randomUUID)
+        ? window.crypto.randomUUID()
+        : 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+    }
+
+    // Re-set on every load so the expiry rolls forward for anyone who keeps visiting.
+    document.cookie = name + '=' + id
+      + '; path=/; max-age=' + (60 * 60 * 24 * {$days})
+      + '; SameSite=Lax'
+      + (location.protocol === 'https:' ? '; Secure' : '');
+  } catch (e) {
+    // Cookies disabled. The visitor stays unrecognised, which is the correct outcome.
+  }
+})();
+</script>
+HTML;
     }
 
     /**

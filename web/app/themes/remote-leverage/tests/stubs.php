@@ -244,11 +244,65 @@ if (! Capsule::schema()->hasTable('rl_leads')) {
         $table->string('referrer_url', 500)->nullable();
         $table->timestamp('consent_at')->nullable();
         $table->string('session_id', 100)->nullable();
+
+        // Attribution and identity added 2026-09-16. Kept in step with the migrations under
+        // app/Infrastructure/Database/Migrations — a column missing here fails only in the
+        // tests that write real rows, which is a confusing place to discover it.
+        $table->string('utm_id', 150)->nullable();
+        $table->string('li_fat_id', 150)->nullable();
+        $table->string('fbc', 255)->nullable();
+        $table->string('oppref', 150)->nullable();
+        $table->string('partner', 150)->nullable();
+        $table->string('data_source', 100)->nullable();
+        $table->string('intake_form', 50)->nullable();
+        $table->string('ip_address', 45)->nullable();
+        $table->text('scheduler_link')->nullable();
+        $table->text('landing_page_base')->nullable();
+        $table->string('timezone', 64)->nullable();
+        $table->string('submission_type', 50)->nullable();
+        $table->text('attribution')->nullable();
+        $table->string('posthog_session_id', 100)->nullable();
+        $table->string('device_id', 64)->nullable();
+        $table->string('hubspot_contact_id', 50)->nullable();
+        $table->unsignedInteger('profile_id')->nullable()->index();
+        $table->boolean('is_blocked')->default(false)->index();
+
         $table->string('source_type')->default('organic')->index();
         $table->string('source_id')->nullable()->index();
         $table->string('status')->default('captured')->index();
         $table->timestamps();
         $table->softDeletes();
+    });
+}
+
+if (! Capsule::schema()->hasTable('rl_lead_profiles')) {
+    Capsule::schema()->create('rl_lead_profiles', function ($table) {
+        $table->increments('id');
+        $table->string('uuid')->unique();
+        $table->string('status')->default('active')->index();
+        $table->timestamp('blocked_at')->nullable();
+        $table->string('blocked_by', 100)->nullable();
+        $table->text('block_reason')->nullable();
+        $table->unsignedInteger('merged_into_id')->nullable()->index();
+        $table->timestamp('merged_at')->nullable();
+        $table->unsignedInteger('lead_count')->default(0);
+        $table->timestamps();
+    });
+}
+
+if (! Capsule::schema()->hasTable('rl_lead_identifiers')) {
+    Capsule::schema()->create('rl_lead_identifiers', function ($table) {
+        $table->increments('id');
+        $table->unsignedInteger('profile_id')->index();
+        $table->string('type')->index();
+        $table->string('value_hash', 64);
+        $table->string('value_preview', 60)->nullable();
+        $table->string('strength')->default('strong')->index();
+        $table->timestamp('first_seen_at')->nullable();
+        $table->timestamp('last_seen_at')->nullable();
+        $table->unsignedInteger('seen_count')->default(1);
+        $table->timestamps();
+        $table->unique(['type', 'value_hash']);
     });
 }
 
