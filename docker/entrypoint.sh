@@ -43,21 +43,26 @@ if [ -n "${APP_SECRET_ARN:-}" ]; then
     # PHP rather than jq: it is guaranteed present in this image, and it can do
     # the shell-quoting correctly. Only scalars are exported, and only keys that
     # are not already set.
-    _exports=$(printf '%s' "$_secret_json" | php -r '
-      $raw = stream_get_contents(STDIN);
-      $data = json_decode($raw, true);
-      if (!is_array($data)) { fwrite(STDERR, "entrypoint: secret is not a JSON object\n"); exit(0); }
-      $set = 0;
-      foreach ($data as $key => $value) {
-        if (!preg_match("/^[A-Z_][A-Z0-9_]*$/", (string) $key)) { continue; }
-        if (getenv($key) !== false) { continue; }
-        if (!is_scalar($value) && $value !== null) { continue; }
-        $quoted = "'" . str_replace("'", "'\\''", (string) $value) . "'";
-        echo "export {$key}={$quoted}\n";
-        $set++;
-      }
-      fwrite(STDERR, "entrypoint: exported {$set} key(s) from the application secret\n");
-    ')
+    #
+    # The PHP must live in a quoted heredoc. php -r ' ... $quoted = "'" ... $value'
+    # closes the single-quoted string and lets the shell expand $value; with
+    # set -u that is `value: parameter not set` and the container exits 2.
+    _exports=$(printf '%s' "$_secret_json" | php -r "$(cat <<'PHP'
+$raw = stream_get_contents(STDIN);
+$data = json_decode($raw, true);
+if (!is_array($data)) { fwrite(STDERR, "entrypoint: secret is not a JSON object\n"); exit(0); }
+$set = 0;
+foreach ($data as $key => $value) {
+    if (!preg_match('/^[A-Z_][A-Z0-9_]*$/', (string) $key)) { continue; }
+    if (getenv($key) !== false) { continue; }
+    if (!is_scalar($value) && $value !== null) { continue; }
+    $quoted = "'" . str_replace("'", "'\\''", (string) $value) . "'";
+    echo "export {$key}={$quoted}\n";
+    $set++;
+}
+fwrite(STDERR, "entrypoint: exported {$set} key(s) from the application secret\n");
+PHP
+)")
 
     eval "$_exports"
     unset _exports _secret_json
