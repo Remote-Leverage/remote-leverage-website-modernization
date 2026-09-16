@@ -1447,7 +1447,12 @@ class BlockDefaults
             [
                 'title' => 'Lead Generation',
                 'desc' => 'Outreach calls, emails, texting, and follow-up that keeps your pipeline full.',
-                'img' => self::homeImg('Frame-1092.png'),
+                // Served from the theme, not via homeImg(): CloudFront cached a zero-length
+                // response for /app/uploads/home/Frame-1092.webp and ignores query strings, so
+                // that URL cannot be un-poisoned from outside AWS. A new path is a new cache
+                // key. Keeping it under the theme also puts it out of reach of the uploads
+                // search order that let one bad file shadow a good one in the first place.
+                'img' => self::pageImg('home', 'roles/lead-generation.png'),
             ],
             [
                 'title' => 'Sales (SDR)',
