@@ -15,7 +15,7 @@
     @if (! empty($headline))
         {{-- Production centres this heading on the stacked pages and left-aligns it on /reviews/. --}}
         <h2 @class([
-            'font-display text-3xl sm:text-4xl font-bold text-black tracking-[-0.03em] leading-tight mb-10',
+            'font-display text-[34px] sm:text-[48px] font-bold text-black tracking-[-0.03em] leading-tight mb-10',
             'text-center' => ! $isPhotoSplit,
         ])>
             {!! $headline !!}
