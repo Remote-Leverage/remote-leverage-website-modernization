@@ -168,7 +168,15 @@ class HubSpotGateway
             'partner_name' => $lead->partner,
             'referrer_rewardful_id' => $lead->referral_code,
             'source' => $lead->data_source,
-            'intake_form' => $lead->intake_form,
+            /*
+             * `intake_form` is a booleancheckbox in HubSpot, whose only valid values are the
+             * strings 'true' and 'false'. The Lead stores the legacy Gravity Forms value 'yes',
+             * and sending that rejected the **entire** request with a 400 — every other
+             * property on it lost with it. That is the failure mode this mapping was always
+             * one bad value away from, so the conversion belongs here at the boundary rather
+             * than changing what the Lead records.
+             */
+            'intake_form' => $lead->intake_form ? 'true' : null,
             'ip_address' => $lead->ip_address,
             'schedule_link' => $lead->scheduler_link,
             'landing_page' => $lead->landing_page_base ?: $lead->landing_url,

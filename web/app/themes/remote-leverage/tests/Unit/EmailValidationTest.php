@@ -229,3 +229,17 @@ describe('form field binding', function () {
             ->and($blade)->toContain('wire:model.live="timezone"');
     });
 });
+
+describe('HubSpot property value types', function () {
+    test('intake_form is sent as a booleancheckbox value, not the legacy "yes"', function () {
+        // HubSpot's intake_form accepts only 'true'/'false'. Sending 'yes' 400s the whole
+        // request — every other property on it lost too, which is how a complete sync failed
+        // on one field. Verified against the portal's property schema on 2026-09-16.
+        $source = file_get_contents(
+            __DIR__.'/../../app/Domains/Lead/Services/HubSpotGateway.php'
+        );
+
+        expect($source)->toContain("'intake_form' => \$lead->intake_form ? 'true' : null")
+            ->and($source)->not->toContain("'intake_form' => \$lead->intake_form,");
+    });
+});
