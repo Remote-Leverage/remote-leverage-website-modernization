@@ -37,6 +37,15 @@
 
     <div class="relative z-10 w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
 
+        {{-- Co-brand wordmark, top-left above the headline. Left-aligned against the
+             centred hero, matching production's first content widget on the partner pages. --}}
+        @if (! empty($lockup))
+            <img src="{{ $lockup }}"
+                alt="{{ $lockupLabel ?: 'Partner lockup' }}"
+                class="mb-10 h-[18px] w-auto max-w-full mx-auto sm:mx-0"
+                width="229" height="18" loading="eager" decoding="sync" />
+        @endif
+
         <h2 class="font-display font-bold text-[34px] leading-[42px] sm:text-[52px] sm:leading-[60px] tracking-[-1.56px] {{ $heroText }} mb-6 max-w-[860px] mx-auto">
             {!! nl2br(e($headline)) !!}
         </h2>

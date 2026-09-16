@@ -13,6 +13,9 @@ $partner = [
     'deep_bg' => 'var(--color-brand-dark-violet)',
     'final_cta_text' => 'Get Started Now',
 
+    'lockup' => 'lockup-lano.svg',
+    'lockup_label' => 'Lano x Remote Leverage',
+
     'hero_title' => 'Lano × Remote Leverage: Your Global Team, Fully Powered.',
     'hero_paragraphs' => [
         'You have the world-class compliance and payroll infrastructure of Lano. Now, fill your seats with the top 1% of specialized LATAM and global talent in as little as 4 days.',

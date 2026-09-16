@@ -42,6 +42,11 @@ class PartnerHeroBlock extends Block
         return [
             'tone' => get_field('tone') ?: 'brand-gradient',
             'badges' => is_array(get_field('badges')) ? get_field('badges') : [],
+            // Production opens both co-branded pages with a wordmark lockup above the
+            // headline (an inline SVG in an Elementor HTML widget). Empty by default so
+            // every other page using this hero is unaffected.
+            'lockup' => BlockDefaults::resolveImageUrl($field('lockup_image') ?: ''),
+            'lockupLabel' => $field('lockup_label') ?: '',
             'headline' => $field('headline') ?: 'Remote Leverage × Partner',
             'paragraphs' => $this->paragraphs(),
             'ctaText' => $field('cta_text') ?: 'Book a Strategy Sync',
@@ -61,6 +66,12 @@ class PartnerHeroBlock extends Block
         $fields = Builder::make('partner_hero_block');
 
         $fields
+            ->addImage('lockup_image', [
+                'label' => 'Co-brand Lockup',
+                'instructions' => 'Wordmark lockup shown top-left above the headline, as on /remote-leverage-x-oyster/. Leave empty on non-partner heroes.',
+                'return_format' => 'url',
+            ])
+            ->addText('lockup_label', ['label' => 'Lockup Alt Text', 'placeholder' => 'Remote Leverage x Oyster'])
             ->addTextarea('headline', ['label' => 'Headline', 'rows' => 2])
             ->addRepeater('paragraphs', [
                 'label' => 'Intro Paragraphs',

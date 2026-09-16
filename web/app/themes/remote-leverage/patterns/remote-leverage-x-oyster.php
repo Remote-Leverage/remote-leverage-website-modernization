@@ -13,6 +13,9 @@ $partner = [
     'deep_bg' => 'var(--color-brand-dark-violet)',
     'final_cta_text' => 'Book a Strategy Sync',
 
+    'lockup' => 'lockup-oyster.svg',
+    'lockup_label' => 'Remote Leverage x Oyster',
+
     'hero_title' => 'Remote Leverage × Oyster',
     'hero_paragraphs' => [
         'Hire the right people globally. Employ and pay them compliantly in 180+ countries.',

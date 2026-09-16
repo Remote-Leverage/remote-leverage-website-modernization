@@ -91,6 +91,8 @@ $statIcons = [
 ?>
 <!-- ============ HERO ============ -->
 <?= BlockDefaults::renderPartnerHero([
+    'lockup_image' => empty($partner['lockup']) ? '' : $pimg($partner['lockup']),
+    'lockup_label' => $partner['lockup_label'] ?? '',
     'headline' => $partner['hero_title'],
     'cta_text' => $partner['hero_cta_text'],
     'cta_url' => $partner['hero_cta_url'],
