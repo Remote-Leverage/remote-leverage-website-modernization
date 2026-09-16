@@ -18,7 +18,8 @@
                             <div class="flex flex-col gap-5 px-5 pt-2.5 pb-[30px]">
                                 <div class="flex items-start justify-between gap-3">
                                     <h3 class="font-display text-xl font-bold leading-tight tracking-[-0.6px] text-black">
-                                        {{ $card['title'] }}
+                                        {{-- Raw so an inline <br> lands, as production wraps both card titles. --}}
+                                        {!! $card['title'] !!}
                                     </h3>
 
                                     @if ($card['icon'] === 'check')

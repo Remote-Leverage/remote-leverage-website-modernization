@@ -18,7 +18,11 @@
   // standard six English items when the block's repeater is empty.
 @endphp
 
-<section class="relative overflow-hidden bg-[#1E0B38] text-white min-h-dvh flex flex-col justify-between pt-6 sm:pt-8 pb-6 sm:pb-8 lg:pb-10">
+{{-- pt-24 below lg clears the fixed 90px CTA-only header (sections/header-cta.blade.php).
+     Desktop keeps pt-8: there the grid's `my-auto` leaves ~96px of centring slack, so the
+     header is cleared already. On mobile the content fills the box, that slack collapses to
+     0, and the eyebrow pill rendered underneath the header. --}}
+<section class="relative overflow-hidden bg-[#1E0B38] text-white min-h-dvh flex flex-col justify-between pt-24 lg:pt-8 pb-6 sm:pb-8 lg:pb-10">
   {{-- Hero Background Graphic with Candidate Grid --}}
   <div class="absolute inset-0 z-0 pointer-events-none select-none">
     <img src="{{ BlockDefaults::themeImg('hire-va-4/hire-va-bg.webp') }}"
@@ -35,11 +39,21 @@
          App\Support\PageChrome. Production renders it above the hero on the page
          background, not overlaid on the artwork. --}}
 
-    {{-- Center Main Grid (Value Prop & Consultation Card) --}}
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center my-auto py-6 sm:py-8 lg:py-10">
-      
+    {{-- Center Main Grid (Value Prop & Consultation Card).
+         `form-first` splits the checklist into its own grid child so it can be ordered
+         below the booking card once the hero stacks, which is how production serves
+         /hire-va-4/, /hire-for-less/, /hire-va-6/ and /hire-va-1st-month-free/ at 390px.
+         Desktop is pinned with explicit col-start/row-start so the split is unchanged,
+         and lg:gap-y-0 keeps the headline's own mb-8 as the only gap between the two
+         left-hand cells, exactly as when they shared one.
+
+         The default keeps the original two-child markup untouched: emitting the split
+         structure unconditionally moved /spanish/'s vertically-centred headline by 6px. --}}
+    @php($formFirst = ($mobileOrder ?? 'checklist-first') === 'form-first')
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 {{ $formFirst ? 'lg:gap-x-12 lg:gap-y-0' : 'lg:gap-12' }} items-center my-auto py-6 sm:py-8 lg:py-10">
+
       {{-- Left Column: Value Proposition --}}
-      <div class="lg:col-span-6 xl:col-span-7">
+      <div class="{{ $formFirst ? 'order-1 lg:order-none lg:col-start-1 lg:row-start-1' : '' }} lg:col-span-6 xl:col-span-7">
         {{-- Trust eyebrow pill — omitted entirely when the block passes a blank badge --}}
         @if (! empty($badgeText))
           <div class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/10 border border-white/15 text-white/90 text-xs sm:text-sm font-medium mb-6 backdrop-blur-xs shadow-xs">
@@ -52,21 +66,20 @@
           {!! $headline !!}
         </h1>
 
-        {{-- Reassurance checklist (2 columns, simple white checkmark) --}}
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-3.5 gap-x-6">
-          @foreach ($checklist as $item)
-            <div class="flex items-center gap-3 text-white text-sm sm:text-base font-medium">
-              <svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              <span>{{ $item }}</span>
-            </div>
-          @endforeach
-        </div>
+        @unless ($formFirst)
+          @include('blocks.partials.hire-va-checklist', ['checklist' => $checklist])
+        @endunless
       </div>
 
+      @if ($formFirst)
+        {{-- Ordered below the booking card on phones, back under the headline at lg. --}}
+        <div class="order-3 lg:order-none lg:col-span-6 xl:col-span-7 lg:col-start-1 lg:row-start-2">
+          @include('blocks.partials.hire-va-checklist', ['checklist' => $checklist])
+        </div>
+      @endif
+
       {{-- Right Column: Interactive Booking Card --}}
-      <div class="lg:col-span-6 xl:col-span-5">
+      <div class="{{ $formFirst ? 'order-2 lg:order-none lg:col-start-7 xl:col-start-8 lg:row-start-1 lg:row-span-2' : '' }} lg:col-span-6 xl:col-span-5">
         <div id="consultation-card" class="bg-white rounded-[24px] p-6 sm:p-8 text-neutral-900 border border-white/20 shadow-[0_24px_60px_rgba(0,0,0,0.35)] relative z-10 max-w-[500px] lg:ml-auto w-full">
           <div class="mb-6">
             <h2 class="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight leading-tight">

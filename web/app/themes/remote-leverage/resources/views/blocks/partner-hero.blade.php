@@ -23,7 +23,10 @@
     $heroBody = $isLight ? 'text-black/80' : 'text-white/90';
 @endphp
 
-<section class="relative w-full overflow-hidden pt-16 lg:pt-20" style="{{ $heroBg }}">
+{{-- rl-partner-hero is a styling hook, not a utility: app.css uses it to add header
+     clearance on the pages where the site header floats over this hero (body class
+     rl-header-over-hero). Without it the headline renders under the logo. --}}
+<section class="rl-partner-hero relative w-full overflow-hidden pt-16 lg:pt-20" style="{{ $heroBg }}">
     {{-- The shared world map on brand heroes; a full-opacity illustration on the light tone. --}}
     <div @class([
             'pointer-events-none absolute inset-x-0 top-0 h-full z-0 bg-no-repeat bg-top',

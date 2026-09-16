@@ -133,6 +133,7 @@ class HireVaHeroBlock extends Block
             'hideProgressBar' => $hideProgressBar,
             'formButtonText' => get_field('form_button_text') ?: 'Find me an Assistant',
             'checklist' => self::resolveChecklist(get_field('checklist')),
+            'mobileOrder' => get_field('mobile_order') === 'form-first' ? 'form-first' : 'checklist-first',
         ];
     }
 
@@ -251,6 +252,16 @@ class HireVaHeroBlock extends Block
             ->addText('form_button_text', [
                 'label' => 'Step 1 Button Text',
                 'default_value' => 'Find me an Assistant',
+            ])
+            ->addSelect('mobile_order', [
+                'label' => 'Mobile Stacking Order',
+                'instructions' => 'Which comes first once the hero stacks into one column. Production is not consistent: /hire-va-4/ and /hire-va-6/ put the booking card above the checklist, /sales-talents/ puts the checklist first. Desktop is unaffected either way.',
+                'choices' => [
+                    'checklist-first' => 'Checklist, then booking card',
+                    'form-first' => 'Booking card, then checklist',
+                ],
+                'default_value' => 'checklist-first',
+                'return_format' => 'value',
             ])
             ->addRepeater('isolated_steps', [
                 'label' => 'Isolated Sub-Steps Sequence',

@@ -39,6 +39,10 @@ class DataTableBlock extends Block
         $hasGetField = function_exists('get_field');
 
         return [
+            // Production labels the criterion column on some tables ("Stage" on the
+            // screening table, "Term" on the replacement-policies one) and leaves it
+            // blank on others. Unset renders the blank cell every existing usage has.
+            'col0Header' => ($hasGetField ? get_field('col_0_header') : null) ?: '',
             'col1Header' => ($hasGetField ? get_field('col_1_header') : null) ?: 'DIY',
             'col2Header' => ($hasGetField ? get_field('col_2_header') : null) ?: 'Remote Leverage',
             'rows' => $this->rows(),
@@ -50,6 +54,11 @@ class DataTableBlock extends Block
         $fields = Builder::make('data_table_block');
 
         $fields
+            ->addText('col_0_header', [
+                'label' => 'Criterion Column Header',
+                'instructions' => 'Usually blank. Production labels it on the screening ("Stage") and replacement-policy ("Term") tables.',
+                'default_value' => '',
+            ])
             ->addText('col_1_header', [
                 'label' => 'Column 1 Header',
                 'default_value' => 'DIY',

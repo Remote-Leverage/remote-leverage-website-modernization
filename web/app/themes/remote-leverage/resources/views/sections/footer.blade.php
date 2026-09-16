@@ -1,10 +1,12 @@
 <footer class="content-info bg-black text-slate-300">
-  <div class="w-full px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
+  <div class="w-full px-4 sm:px-6 lg:px-8 py-10 sm:py-16 lg:py-20">
     <div class="rl-container">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8">
+    {{-- Two columns on phones: stacking all four cells made the footer 1644px —
+         taller than most pages' content and 4x production's mobile footer. --}}
+    <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10 sm:gap-10 lg:gap-8">
 
       <!-- Brand & Mission Column -->
-      <div class="space-y-6">
+      <div class="col-span-2 md:col-span-1 space-y-6">
         <a href="{{ home_url('/') }}" class="inline-block focus:outline-none focus:ring-2 focus:ring-brand-purple rounded-lg">
           <div class="flex items-center gap-3">
             <img
@@ -89,7 +91,8 @@
       </div>
 
       <!-- Contact -->
-      <div>
+      {{-- Full width on phones: the five 36px social buttons overflow a half column at 390px. --}}
+      <div class="col-span-2 md:col-span-1">
         <h3 class="text-base font-bold text-white mb-4 font-display">
           {{ __('Contact', 'remote-leverage') }}
         </h3>
@@ -129,7 +132,7 @@
     </div>
 
     <!-- Bottom Legal Bar -->
-    <div class="mt-16 pt-8 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+    <div class="mt-10 sm:mt-16 pt-8 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
       <p>
         &copy; {{ date('Y') }} {{ $siteName ?? 'Remote Leverage' }}. {{ __('All rights reserved.', 'remote-leverage') }}
       </p>

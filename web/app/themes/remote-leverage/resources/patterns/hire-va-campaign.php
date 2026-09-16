@@ -53,6 +53,10 @@ $hero = [
     'hide_profile_header' => '1',
     'hide_progress_bar' => '1',
     'form_button_text' => 'Find me an Assistant',
+    // Production stacks the booking card above the checklist on phones for this family
+    // (measured at 390px on /hire-va-6/ and /hire-va-1st-month-free/); the checklist-first
+    // default would push the form's submit button below the fold.
+    'mobile_order' => 'form-first',
     'isolated_steps' => [
         ['step_label' => 'Email', 'step_fields' => ['email']],
         ['step_label' => 'Complete First Step', 'step_fields' => ['monthly_revenue', 'name', 'phone', 'consent']],

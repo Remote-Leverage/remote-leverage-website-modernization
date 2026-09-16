@@ -1990,3 +1990,18 @@ h2.wp-block-heading,
 .rl-header-over-hero header .sub-menu img {
   filter: none;
 }
+
+/* The overlay header (.rl-header-over-hero) is position:absolute, so it reserves no space.
+   A hero it floats over must supply that space itself, or its headline renders underneath
+   the logo — `/remote-leverage-x-lano/` and `/remote-leverage-x-oyster/` put their h2 at
+   64px against an 81px header. Scoped to the overlay pages so the same hero keeps its
+   normal spacing everywhere else. */
+.rl-header-over-hero .rl-partner-hero {
+  padding-top: 7rem;
+}
+
+@media (min-width: 1024px) {
+  .rl-header-over-hero .rl-partner-hero {
+    padding-top: 8rem;
+  }
+}

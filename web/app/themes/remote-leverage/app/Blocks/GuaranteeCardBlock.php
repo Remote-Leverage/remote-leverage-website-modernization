@@ -89,6 +89,9 @@ class GuaranteeCardBlock extends Block
             'ctaText' => get_field('cta_text') ?: 'BOOK MY FREE 15-MIN CALL',
             'ctaUrl' => get_field('cta_url') ?: '#booking-footer',
             'background' => get_field('background') ?: 'radial-purple',
+            // The comparison pages state the guarantee as prose instead of the icon trio.
+            // Unset keeps the trio, so every existing usage is unchanged.
+            'body' => get_field('body') ?: '',
             // Unset means "show them" — only an explicit off hides the trio.
             'showReassuranceItems' => get_field('show_reassurance_items') === null
                 ? true
@@ -117,6 +120,13 @@ class GuaranteeCardBlock extends Block
                     'flat-midnight' => 'Flat #250D4A (ecommerce page)',
                 ],
                 'default_value' => 'radial-purple',
+            ])
+            ->addWysiwyg('body', [
+                'label' => 'Guarantee copy (prose variant)',
+                'instructions' => 'Leave empty to render the three reassurance items. Filled, it replaces them with prose, as production does on the comparison pages.',
+                'media_upload' => 0,
+                'tabs' => 'visual',
+                'toolbar' => 'basic',
             ])
             ->addTrueFalse('show_reassurance_items', [
                 'label' => 'Show the three reassurance items',

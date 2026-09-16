@@ -27,7 +27,10 @@
 
     <div class="relative w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
 
-        <div class="pt-14 lg:pt-28 pb-8 lg:pb-16 max-w-full lg:max-w-[620px] lg:min-h-[610px]">
+        {{-- pt-28 rather than pt-14 below lg: the site header floats over this hero
+             (rl-header-over-hero), so 56px put the h1 underneath it at phone widths.
+             Desktop already used pt-28 and is unchanged. --}}
+        <div class="pt-28 pb-8 lg:pb-16 max-w-full lg:max-w-[620px] lg:min-h-[610px]">
             <h1 class="font-display font-bold text-[34px] leading-[40px] sm:text-[46px] sm:leading-[53px] tracking-[-1.44px] text-bg-light mb-5">
                 {!! nl2br(e($headline)) !!}
             </h1>

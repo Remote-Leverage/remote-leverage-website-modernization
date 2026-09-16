@@ -66,7 +66,9 @@
     $vaCheck = '<svg class="h-[22px] w-[22px] shrink-0 text-[#01FF00]" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true"><path d="M173.9 439.4l-166.4-166.4c-10-10-10-26.2 0-36.2l36.2-36.2c10-10 26.2-10 36.2 0L192 312.7 432.1 72.6c10-10 26.2-10 36.2 0l36.2 36.2c10 10 10 26.2 0 36.2l-294.4 294.4c-10 10-26.2 10-36.2 0z"/></svg>';
   @endphp
 
-  <section class="relative flex min-h-[780px] items-center overflow-hidden bg-[linear-gradient(135deg,#6200A4_0%,#6E1686_100%)] py-16">
+  {{-- pt-28 clears the fixed 90px CTA-only header. py-16 left only 64px, so the centred
+       headline rendered underneath it at 390px, 700px and 1440px alike. --}}
+  <section class="relative flex min-h-[780px] items-center overflow-hidden bg-[linear-gradient(135deg,#6200A4_0%,#6E1686_100%)] pt-28 pb-16">
     @if (! empty($backgroundImage))
       {{-- `backgroundImageClass` optionally hides the art below a breakpoint. Empty (the default)
            shows it at every width, which is what /1monthonus/ does; /hire-va/ passes
@@ -151,7 +153,9 @@
          aria-hidden="true"
          class="absolute inset-0 w-full h-full object-cover object-left-top pointer-events-none select-none" />
 
-    <div class="relative z-10 w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16 lg:py-20">
+    {{-- pt-28/lg:pt-32 clears the fixed 90px CTA-only header; py-14/16/20 put the headline
+         under it at every width. --}}
+    <div class="relative z-10 w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-14 sm:pb-16 lg:pt-32 lg:pb-20">
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-10 items-center">
 
         {{-- Left: headline, intro, tick list --}}

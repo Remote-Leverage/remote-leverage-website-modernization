@@ -5,7 +5,7 @@
     <div
         class="bg-white rounded-card px-6 sm:px-8 py-4 border border-black/4 shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
         <div class="grid grid-cols-1 sm:grid-cols-[38%_31%_31%] items-center">
-            <div class="hidden sm:block"></div>
+            <div class="hidden sm:block font-display text-base sm:text-[17px] font-bold text-black">{{ $col0Header ?? '' }}</div>
             <div class="font-display text-base sm:text-[17px] font-bold text-black">{{ $col1Header }}</div>
             <div class="font-display text-base sm:text-[17px] font-bold text-black">{{ $col2Header }}</div>
         </div>

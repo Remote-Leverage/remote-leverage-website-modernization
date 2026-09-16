@@ -47,7 +47,9 @@ class ImageCardGridBlock extends Block
 
         $cards = array_values(array_filter(
             (array) ($field('cards') ?: []),
-            fn ($c) => ! empty($c['title']) || ! empty($c['image']) || ! empty($c['icon'])
+            // Body text alone is enough to keep a card: Athena's "hiring easy" steps
+            // are untitled and imageless, and would otherwise be trimmed as empty rows.
+            fn ($c) => ! empty($c['title']) || ! empty($c['image']) || ! empty($c['icon']) || ! empty($c['text'])
         ));
 
         return [

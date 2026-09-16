@@ -15,7 +15,9 @@
   $bg = ($background ?? 'radial-purple') === 'flat-midnight'
       ? 'background: #250D4A;'
       : 'background: radial-gradient(84.9% 75.5% at 65.45% 17.36%, #8A2BE2 0%, #250D4A 100%);';
-  $showReassurance = ! isset($showReassuranceItems) || $showReassuranceItems;
+  // Prose copy (the comparison pages) takes the place of the icon trio.
+  $prose = trim($body ?? '');
+  $showReassurance = $prose === '' && (! isset($showReassuranceItems) || $showReassuranceItems);
 @endphp
 
 <section class="pt-12 sm:pt-16 lg:pt-20 pb-16 sm:pb-20 lg:pb-24 text-white relative overflow-hidden" style="{{ $bg }}">
@@ -27,6 +29,12 @@
         <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold font-display text-white tracking-tight leading-[1.1] mb-10">
           {{ $headline }}
         </h2>
+
+        @if ($prose !== '')
+        <div class="max-w-2xl mb-10 space-y-5 text-white/80 text-base sm:text-lg leading-relaxed [&_p]:mb-0 [&_strong]:text-white [&_a]:underline">
+          {!! $prose !!}
+        </div>
+        @endif
 
         {{-- Reassurance items. /ecommerce-virtual-assistant/ shows the badge image alone,
              so this trio is switchable rather than always-on. --}}

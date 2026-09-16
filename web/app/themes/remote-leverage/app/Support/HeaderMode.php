@@ -53,12 +53,41 @@ class HeaderMode
         $opening = substr($content, 0, 2000);
 
         foreach (self::DARK_HERO_BLOCKS as $block) {
-            if (str_contains($opening, $block)) {
-                return true;
+            $at = strpos($opening, $block);
+
+            if ($at === false) {
+                continue;
             }
+
+            if (self::blockIsLightToned($content, $at)) {
+                continue;
+            }
+
+            return true;
         }
 
         return false;
+    }
+
+    /**
+     * `acf/partner-hero` paints either the dark partner gradient or production's pale
+     * #F4F6FC band, chosen by its `tone` field. Only the dark tone wants a white header
+     * floating over it — over the light band the inverted logo and white nav links are
+     * invisible, which is what `/ecommerce-virtual-assistant/` shipped.
+     *
+     * The tone sits in the block comment's own JSON, which can run past the opening
+     * window, so it is read from the full content rather than from `$opening`.
+     */
+    protected static function blockIsLightToned(string $content, int $blockAt): bool
+    {
+        $end = strpos($content, '/-->', $blockAt);
+
+        $comment = $end === false
+            ? substr($content, $blockAt)
+            : substr($content, $blockAt, $end - $blockAt);
+
+        return str_contains($comment, '"tone":"light"')
+            || str_contains($comment, '\"tone\":\"light\"');
     }
 
     protected static function patternContent(string $slug): ?string
