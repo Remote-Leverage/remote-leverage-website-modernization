@@ -1027,8 +1027,18 @@
 
             if (sessionId) {
               clearInterval(posthogPoll);
+
               if (!$wire.get('posthogSessionId')) {
                 $wire.set('posthogSessionId', sessionId, false);
+              }
+
+              // The browser's identity, so server-side funnel events join the same person
+              // rather than creating a second one PostHog cannot reconcile.
+              if (typeof window.posthog.get_distinct_id === 'function' && !$wire.get('posthogDistinctId')) {
+                const distinctId = window.posthog.get_distinct_id();
+                if (distinctId) {
+                  $wire.set('posthogDistinctId', distinctId, false);
+                }
               }
             }
           }

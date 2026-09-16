@@ -188,6 +188,14 @@ class MultistepBookingWizard extends Component
      */
     public string $posthogSessionId = '';
 
+    /**
+     * PostHog's distinct id for this browser.
+     *
+     * Without it the server-side funnel events are filed under a different identity from
+     * everything the browser captured — two half-people per visitor, and no funnel joins up.
+     */
+    public string $posthogDistinctId = '';
+
     public ?string $referralCode = null;
 
     // Partial lead ID if captured on Step 1
@@ -884,8 +892,21 @@ class MultistepBookingWizard extends Component
     protected function trackStepEvent(string $eventName, array $properties = []): void
     {
         try {
-            $recorder = app(RecordBehaviorEventAction::class);
-            $recorder->execute(new AnalyticsEventData(
+            /*
+             * Deferred, not inline.
+             *
+             * `RecordBehaviorEventAction` makes two outbound HTTP calls (PostHog and
+             * Customer.io). Called inline, those ran *inside the Livewire round trip* — so a
+             * keystroke on a `wire:model.live` field waited on two third-party endpoints before
+             * the component could respond. The visible symptom is the form eating characters:
+             * the response lands late and patches the DOM over what was typed meanwhile.
+             *
+             * Every other listener in this codebase already dispatches `afterResponse()` for
+             * exactly this reason; this one did not, which was an oversight rather than a
+             * decision. The event data is captured now and sent after the response is flushed,
+             * so the component returns at local speed regardless of how slow analytics is.
+             */
+            $event = new AnalyticsEventData(
                 event: $eventName,
                 distinctId: $this->resolveDistinctId(),
                 properties: array_merge([
@@ -897,11 +918,41 @@ class MultistepBookingWizard extends Component
                     'selected_date' => $this->selectedDate,
                     'selected_slot' => $this->selectedSlot,
                     'role_needed' => $this->roleNeeded,
+
+                    /*
+                     * Ties this server-side event to the browser's session replay. Without
+                     * `$session_id` PostHog has no way to place the event on the recording's
+                     * timeline, which is why the replay inspector showed 30 autocaptured events
+                     * and zero custom ones — the events were arriving, just not attached.
+                     */
+                    '$session_id' => $this->posthogSessionId ?: null,
                 ], $properties)
-            ));
+            );
+
+            $this->deferTracking(static fn () => app(RecordBehaviorEventAction::class)->execute($event));
         } catch (\Throwable $e) {
             // Silently swallow analytics errors to avoid breaking booking UX
         }
+    }
+
+    /**
+     * Run analytics after the response has been flushed.
+     *
+     * `afterResponse()` registers a terminating callback, which only a full Application has. In
+     * a bare container — how the unit tests build the component — there is nothing to register
+     * against and the callback is silently dropped, which would make this whole funnel
+     * untestable *and* look like it worked. Falling back to an inline call there keeps the
+     * behaviour observable without changing what production does.
+     */
+    protected function deferTracking(\Closure $callback): void
+    {
+        if (method_exists(app(), 'terminating')) {
+            dispatch($callback)->afterResponse();
+
+            return;
+        }
+
+        $callback();
     }
 
     /**
@@ -941,6 +992,15 @@ class MultistepBookingWizard extends Component
 
     protected function resolveDistinctId(): string
     {
+        /*
+         * The browser's own distinct id wins when we have it. PostHog joins client and server
+         * events by this value, so using the email here — which the browser never sees — files
+         * the funnel under a second identity and breaks every funnel that spans both.
+         */
+        if ($this->posthogDistinctId !== '') {
+            return $this->posthogDistinctId;
+        }
+
         if ($this->email !== '') {
             return $this->email;
         }

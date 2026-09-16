@@ -40,6 +40,8 @@ class CustomerIOClient
             ], $profile->traits ?? []);
 
             $response = Http::withBasicAuth($this->siteId, $this->apiKey)
+                ->timeout(3)
+                ->connectTimeout(2)
                 ->put("https://track.customer.io/api/v1/customers/{$profile->identifier}", array_filter($attributes));
 
             return $response->successful();
@@ -61,6 +63,8 @@ class CustomerIOClient
 
         try {
             $response = Http::withBasicAuth($this->siteId, $this->apiKey)
+                ->timeout(3)
+                ->connectTimeout(2)
                 ->post("https://track.customer.io/api/v1/customers/{$event->distinctId}/events", [
                     'name' => $event->event,
                     'data' => $event->properties,

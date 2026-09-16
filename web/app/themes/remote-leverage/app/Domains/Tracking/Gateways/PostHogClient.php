@@ -30,7 +30,10 @@ class PostHogClient
         }
 
         try {
-            $response = Http::post("{$this->host}/capture/", [
+            // Timeout, because this is called from a Livewire round trip. Laravel's default
+            // is 30s, so an unreachable PostHog would hold a keystroke response open for
+            // half a minute. Analytics must never be able to stall the form.
+            $response = Http::timeout(3)->connectTimeout(2)->post("{$this->host}/capture/", [
                 'api_key' => $this->apiKey,
                 'event' => $event->event,
                 'distinct_id' => $event->distinctId,
@@ -60,7 +63,7 @@ class PostHogClient
             // differ: /decide returned a flat `featureFlags` map of key => value, /flags
             // returns `flags` as key => {enabled, variant, …}. Both are read below, because a
             // self-hosted instance may still be on the older response.
-            $response = Http::post("{$this->host}/flags/?v=2", [
+            $response = Http::timeout(3)->connectTimeout(2)->post("{$this->host}/flags/?v=2", [
                 'api_key' => $this->apiKey,
                 'distinct_id' => $distinctId,
                 'person_properties' => $personProperties,

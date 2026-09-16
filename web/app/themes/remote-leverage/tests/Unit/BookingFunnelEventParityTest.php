@@ -44,6 +44,9 @@ function captureWizardEvents(callable $exercise): array
     app()->instance(RecordBehaviorEventAction::class, $recorder);
 
     try {
+        // Tracking is dispatched `afterResponse()` in production so two outbound HTTP calls
+        // never run inside a Livewire round trip — see MultistepBookingWizard::deferTracking().
+        // Under the bare test container that seam runs inline, so events are observable here.
         $exercise();
     } finally {
         app()->forgetInstance(RecordBehaviorEventAction::class);
