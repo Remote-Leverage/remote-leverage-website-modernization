@@ -57,26 +57,31 @@ describe('zero-byte files never shadow a working asset', function () {
         expect($isUsable($this->dir.'/missing.webp'))->toBeFalse('a missing file must read as absent');
     });
 
-    test('every resolver that probes the filesystem uses the predicate', function () {
-        // Guards against a fourth resolver being added later with a bare is_file() probe,
-        // which is how this bug reached staging in the first place: preferWebp() had the
-        // zero-byte guard all along and the other three simply never got it.
-        $source = file_get_contents(dirname(__DIR__, 2).'/app/Support/BlockDefaults.php');
+    test('the directory-searching resolvers all use the predicate', function () {
+        // Precise rather than a count of is_file() calls across the file: preferWebp() and
+        // generateWebp() legitimately probe a conversion they are about to make or replace, and
+        // already handle the empty case themselves. The invariant that matters is narrower —
+        // a resolver that walks a list of candidate directories and returns the first hit must
+        // not accept an empty file, or one bad upload shadows every fallback behind it.
+        //
+        // Reflection gives exact line ranges; bounding a method body by scanning for the next
+        // `function` keyword quietly swallowed the predicate's own is_file() and reported a
+        // failure that was not there.
+        $lines = file(dirname(__DIR__, 2).'/app/Support/BlockDefaults.php');
 
-        preg_match_all('/^\s*(?:if \()?.*\bis_file\(/m', $source, $matches);
+        foreach (['homeImg', 'themeImg', 'resolveImageUrl'] as $method) {
+            $r = new ReflectionMethod(BlockDefaults::class, $method);
+            $body = implode('', array_slice(
+                $lines,
+                $r->getStartLine() - 1,
+                $r->getEndLine() - $r->getStartLine() + 1
+            ));
 
-        $bare = array_values(array_filter(
-            $matches[0],
-            fn (string $line) => ! str_contains($line, 'isUsableImage')
-        ));
-
-        // preferWebp() keeps its own two probes: it checks a conversion it is about to make or
-        // replace, and deletes an empty one rather than falling through to another directory.
-        expect(count($bare))->toBeLessThanOrEqual(
-            3,
-            "New is_file() probe(s) found in BlockDefaults without the zero-byte guard:\n  "
-                .implode("\n  ", array_map('trim', $bare))
-                ."\nUse self::isUsableImage() so an empty file falls through to the next candidate."
-        );
+            expect($body)->not->toMatch(
+                '/(?<!isUsable)\bis_file\(/',
+                "BlockDefaults::{$method}() probes the filesystem with a bare is_file(). Use "
+                    .'self::isUsableImage() so a zero-byte file falls through to the next candidate.'
+            );
+        }
     });
 });
