@@ -82,6 +82,15 @@ return [
     'posthog' => [
         'api_key' => env('POSTHOG_API_KEY'),
         'host' => env('POSTHOG_HOST', 'https://us.i.posthog.com'),
+
+        /*
+         * Numeric project id — the one in the dashboard URL, NOT the `phc_` key. Used only to
+         * build session-replay links for the lead timeline; nothing authenticates with it.
+         */
+        'project_id' => env('POSTHOG_PROJECT_ID', '282594'),
+
+        // Replay links live on the app host, not the ingestion host in `host` above.
+        'app_host' => env('POSTHOG_APP_HOST', 'https://us.posthog.com'),
     ],
 
     'slack' => [

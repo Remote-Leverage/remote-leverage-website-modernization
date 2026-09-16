@@ -999,6 +999,43 @@
       if (gclid && !$wire.get('gclid')) $wire.set('gclid', gclid, false);
       if (fbclid && !$wire.get('fbclid')) $wire.set('fbclid', fbclid, false);
       if (referralCode && !$wire.get('referralCode')) $wire.set('referralCode', referralCode, false);
+
+      /*
+       * PostHog's session id, so the lead timeline can link to the session replay.
+       *
+       * Only the browser knows it, so unlike the rest of the attribution it cannot be read
+       * server-side. It is also not available synchronously: the snippet queues calls until
+       * array.js loads, and `get_session_id` returns nothing until then. Hence the short poll
+       * rather than a single read at init — a single read reliably returns undefined on a cold
+       * visit, which is exactly the visit worth replaying.
+       *
+       * `false` on the set() keeps it out of the request queue: this is a passive stamp and
+       * must never cost the visitor a round trip mid-form.
+       */
+      let posthogAttempts = 0;
+      const posthogPoll = setInterval(function() {
+        posthogAttempts++;
+
+        if (posthogAttempts > 20) {           // ~10s, then give up quietly
+          clearInterval(posthogPoll);
+          return;
+        }
+
+        try {
+          if (window.posthog && typeof window.posthog.get_session_id === 'function') {
+            const sessionId = window.posthog.get_session_id();
+
+            if (sessionId) {
+              clearInterval(posthogPoll);
+              if (!$wire.get('posthogSessionId')) {
+                $wire.set('posthogSessionId', sessionId, false);
+              }
+            }
+          }
+        } catch (e) {
+          clearInterval(posthogPoll);        // PostHog blocked or absent; not worth retrying
+        }
+      }, 500);
     })();
   </script>
   @endscript

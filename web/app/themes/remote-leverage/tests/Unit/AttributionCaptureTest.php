@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\AttributionCollector;
 use Illuminate\Http\Request;
 
@@ -192,5 +193,49 @@ describe('HubSpot field coverage', function () {
         $source = file_get_contents(__DIR__.'/../../app/Domains/Lead/Services/HubSpotGateway.php');
 
         expect($source)->not->toContain("'rl_");
+    });
+});
+
+describe('PostHog session replay link', function () {
+    test('builds a link from PostHog own session id', function () {
+        config([
+            'services.posthog.project_id' => '282594',
+            'services.posthog.app_host' => 'https://us.posthog.com',
+        ]);
+
+        $lead = new Lead;
+        $lead->forceFill(['posthog_session_id' => '0199abc-de-f0', 'session_id' => 'our-own-uuid']);
+
+        expect($lead->posthogReplayUrl())
+            ->toBe('https://us.posthog.com/project/282594/replay/0199abc-de-f0');
+    });
+
+    test('returns null rather than a dead link when PostHog never gave us a session', function () {
+        // A broken admin link reads as a PostHog outage; no link reads as no recording.
+        config(['services.posthog.project_id' => '282594']);
+
+        $lead = new Lead;
+        $lead->forceFill(['posthog_session_id' => null, 'session_id' => 'our-own-uuid']);
+
+        expect($lead->posthogReplayUrl())->toBeNull();
+    });
+
+    test('returns null when the project id is not configured', function () {
+        config(['services.posthog.project_id' => '']);
+
+        $lead = new Lead;
+        $lead->forceFill(['posthog_session_id' => 'abc123']);
+
+        expect($lead->posthogReplayUrl())->toBeNull();
+    });
+
+    test('never builds the link from our own session_id', function () {
+        // The two ids are unrelated; ours means nothing to PostHog and would always 404.
+        config(['services.posthog.project_id' => '282594']);
+
+        $lead = new Lead;
+        $lead->forceFill(['posthog_session_id' => 'posthog-side', 'session_id' => 'ours-must-not-appear']);
+
+        expect($lead->posthogReplayUrl())->not->toContain('ours-must-not-appear');
     });
 });

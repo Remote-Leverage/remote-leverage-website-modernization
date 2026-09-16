@@ -180,6 +180,14 @@ class MultistepBookingWizard extends Component
     /** Client IP, taken from the forwarded header because this sits behind a CDN. */
     public ?string $ipAddress = null;
 
+    /**
+     * PostHog's session id, pushed in from the browser once the SDK has one.
+     *
+     * Only the browser knows it, so it cannot be collected server-side like the rest of the
+     * attribution. It is what makes the session replay reachable from the lead timeline.
+     */
+    public string $posthogSessionId = '';
+
     public ?string $referralCode = null;
 
     // Partial lead ID if captured on Step 1
@@ -919,6 +927,7 @@ class MultistepBookingWizard extends Component
     {
         return array_filter(array_merge($this->attributionNamed, [
             'ip_address' => $this->ipAddress,
+            'posthog_session_id' => $this->posthogSessionId,
             'timezone' => $this->timezone,
             'submission_type' => $submissionType,
 

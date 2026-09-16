@@ -1377,6 +1377,53 @@ class LeadsAdminDashboard
                         </table>
                     </div>
 
+                    <!-- Everything else the visit carried -->
+                    <?php
+                    $rawAttribution = is_array($lead->attribution) ? $lead->attribution : [];
+        if ($rawAttribution !== []) { ?>
+                        <div class="rl-detail-card">
+                            <h3 class="rl-detail-title">Full Capture</h3>
+                            <p style="margin: 0 0 10px; color: #52525b; font-size: 12px;">
+                                Everything else the visit carried — the HandL first-touch set, and any URL
+                                parameter without a column of its own. Shown in full deliberately: a parameter
+                                nobody has mapped yet is exactly the one worth seeing here.
+                            </p>
+                            <table class="rl-key-value-table">
+                                <?php foreach ($rawAttribution as $group => $values) { ?>
+                                    <?php if (is_array($values)) { ?>
+                                        <tr><td colspan="2" style="padding-top: 8px; font-weight: 600; color: #09090b;">
+                                            <?php echo esc_html($group === 'unmapped' ? 'Unmapped parameters' : ucfirst((string) $group)); ?>
+                                        </td></tr>
+                                        <?php foreach ($values as $key => $value) { ?>
+                                            <tr>
+                                                <td style="font-size: 11px;"><?php echo esc_html((string) $key); ?>:</td>
+                                                <td style="word-break: break-all; font-size: 11px;"><code><?php echo esc_html((string) $value); ?></code></td>
+                                            </tr>
+                                        <?php } ?>
+                                    <?php } else { ?>
+                                        <tr>
+                                            <td style="font-size: 11px;"><?php echo esc_html((string) $group); ?>:</td>
+                                            <td style="word-break: break-all; font-size: 11px;"><code><?php echo esc_html((string) $values); ?></code></td>
+                                        </tr>
+                                    <?php } ?>
+                                <?php } ?>
+                            </table>
+                        </div>
+                    <?php } ?>
+
+                    <!-- Session Replay -->
+                    <?php if ($replayUrl = $lead->posthogReplayUrl()) { ?>
+                        <div class="rl-detail-card">
+                            <h3 class="rl-detail-title">Session Replay</h3>
+                            <p style="margin: 0 0 10px; color: #52525b; font-size: 12px;">
+                                Watch what this person actually did — which step they stalled on, what they
+                                re-read, where they left.
+                            </p>
+                            <a href="<?php echo esc_url($replayUrl); ?>" target="_blank" rel="noopener noreferrer"
+                               class="button button-secondary">Open in PostHog &rarr;</a>
+                        </div>
+                    <?php } ?>
+
                     <!-- Attribution & UTM Data Card -->
                     <div class="rl-detail-card">
                         <h3 class="rl-detail-title">Attribution & UTM Data</h3>
@@ -1395,8 +1442,35 @@ class LeadsAdminDashboard
                             <?php if ($lead->fbclid) { ?>
                                 <tr><td>Facebook Click ID:</td><td><code><?php echo esc_html($lead->fbclid); ?></code></td></tr>
                             <?php } ?>
+                            <?php if ($lead->utm_id) { ?>
+                                <tr><td>UTM ID:</td><td><code><?php echo esc_html($lead->utm_id); ?></code></td></tr>
+                            <?php } ?>
+                            <?php if ($lead->li_fat_id) { ?>
+                                <tr><td>LinkedIn Click ID:</td><td><code><?php echo esc_html($lead->li_fat_id); ?></code></td></tr>
+                            <?php } ?>
+                            <?php if ($lead->fbc) { ?>
+                                <tr><td>Meta _fbc:</td><td><code style="font-size: 10px;"><?php echo esc_html($lead->fbc); ?></code></td></tr>
+                            <?php } ?>
+                            <?php if ($lead->partner) { ?>
+                                <tr><td>Partner:</td><td><?php echo esc_html($lead->partner); ?></td></tr>
+                            <?php } ?>
+                            <?php if ($lead->oppref) { ?>
+                                <tr><td>Opp Ref:</td><td><code><?php echo esc_html($lead->oppref); ?></code></td></tr>
+                            <?php } ?>
+                            <?php if ($lead->data_source) { ?>
+                                <tr><td>Data Source:</td><td><?php echo esc_html($lead->data_source); ?></td></tr>
+                            <?php } ?>
+                            <?php if ($lead->submission_type) { ?>
+                                <tr><td>Submission:</td><td><?php echo esc_html($lead->submission_type); ?></td></tr>
+                            <?php } ?>
+                            <?php if ($lead->ip_address) { ?>
+                                <tr><td>IP Address:</td><td><code><?php echo esc_html($lead->ip_address); ?></code></td></tr>
+                            <?php } ?>
                             <?php if ($lead->landing_url) { ?>
                                 <tr><td>Landing URL:</td><td style="word-break: break-all; font-size: 11px;"><?php echo esc_html($lead->landing_url); ?></td></tr>
+                            <?php } ?>
+                            <?php if ($lead->scheduler_link) { ?>
+                                <tr><td>Scheduler Link:</td><td style="word-break: break-all; font-size: 11px;"><?php echo esc_html($lead->scheduler_link); ?></td></tr>
                             <?php } ?>
                         </table>
                     </div>

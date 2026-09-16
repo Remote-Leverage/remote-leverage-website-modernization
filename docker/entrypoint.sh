@@ -5,6 +5,67 @@ if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
 
+# ---------------------------------------------------------------------------
+# Load the application secret into the environment.
+#
+# ECS maps Secrets Manager keys to environment variables one at a time, in the
+# task definition. That means every new key — a new integration credential, a
+# feature flag — needs an infrastructure change before the application can see
+# it, and until then the app reads it as unset. Unset is indistinguishable from
+# "deliberately blank" to every guard in the codebase, so the integration is
+# simply dark and nothing says why. That is how SENTRY_LARAVEL_DSN and
+# CUSTOMERIO_CDP_WRITE_KEY were live in Secrets Manager and invisible to the app
+# at the same time.
+#
+# Reading the whole secret here decouples the two: adding a key becomes a
+# deploy, not a ticket.
+#
+# Deliberate properties:
+#   - No-op when APP_SECRET_ARN is unset, so this is safe to ship before the
+#     task role has been granted access.
+#   - Existing environment variables always win. Anything the task definition
+#     already maps keeps its value, so this cannot change current behaviour.
+#   - Soft failure. A secret that cannot be fetched leaves the container serving
+#     on whatever the task definition provided rather than refusing to start;
+#     the warning goes to CloudWatch. DB credentials come from the task
+#     definition, so the site stays up and only optional integrations degrade.
+#   - Values are never echoed.
+# ---------------------------------------------------------------------------
+if [ -n "${APP_SECRET_ARN:-}" ]; then
+  echo "entrypoint: loading application secret from Secrets Manager..."
+
+  if _secret_json=$(aws secretsmanager get-secret-value \
+        --secret-id "$APP_SECRET_ARN" \
+        --region "${AWS_REGION:-us-east-1}" \
+        --query SecretString \
+        --output text 2>/dev/null); then
+
+    # PHP rather than jq: it is guaranteed present in this image, and it can do
+    # the shell-quoting correctly. Only scalars are exported, and only keys that
+    # are not already set.
+    _exports=$(printf '%s' "$_secret_json" | php -r '
+      $raw = stream_get_contents(STDIN);
+      $data = json_decode($raw, true);
+      if (!is_array($data)) { fwrite(STDERR, "entrypoint: secret is not a JSON object\n"); exit(0); }
+      $set = 0;
+      foreach ($data as $key => $value) {
+        if (!preg_match("/^[A-Z_][A-Z0-9_]*$/", (string) $key)) { continue; }
+        if (getenv($key) !== false) { continue; }
+        if (!is_scalar($value) && $value !== null) { continue; }
+        $quoted = "'" . str_replace("'", "'\\''", (string) $value) . "'";
+        echo "export {$key}={$quoted}\n";
+        $set++;
+      }
+      fwrite(STDERR, "entrypoint: exported {$set} key(s) from the application secret\n");
+    ')
+
+    eval "$_exports"
+    unset _exports _secret_json
+  else
+    echo "entrypoint: WARNING could not read $APP_SECRET_ARN; continuing with the task definition environment only" >&2
+  fi
+fi
+
 mkdir -p /var/www/html/web/app/cache/acorn/framework/views \
          /var/www/html/web/app/cache/acorn/framework/cache \
          /var/www/html/web/app/cache/acorn/logs \

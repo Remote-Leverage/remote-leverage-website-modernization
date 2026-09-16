@@ -41,6 +41,7 @@ class Lead extends Model
         'referrer_url',
         'consent_at',
         'session_id',
+        'posthog_session_id',
         'utm_id',
         'li_fat_id',
         'fbc',
@@ -69,6 +70,30 @@ class Lead extends Model
         // See App\Domains\Lead\Services\AttributionCollector.
         'attribution' => 'array',
     ];
+
+    /**
+     * Link to this lead's PostHog session replay, or null when there is nothing to link to.
+     *
+     * Built from PostHog's own session id — `session_id` on this model is a UUID minted here
+     * for internal correlation and means nothing to PostHog, so a link built from it would
+     * always 404.
+     *
+     * Returns null rather than a broken link when the id or the project id is missing: a dead
+     * link in an admin screen is worse than no link, because it looks like a PostHog problem.
+     */
+    public function posthogReplayUrl(): ?string
+    {
+        $sessionId = trim((string) $this->posthog_session_id);
+        $projectId = trim((string) config('services.posthog.project_id', ''));
+
+        if ($sessionId === '' || $projectId === '') {
+            return null;
+        }
+
+        $appHost = rtrim((string) config('services.posthog.app_host', 'https://us.posthog.com'), '/');
+
+        return "{$appHost}/project/{$projectId}/replay/".rawurlencode($sessionId);
+    }
 
     /**
      * Get all activity log entries for this lead.
