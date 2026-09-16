@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\WordPress\Admin;
 
+use App\Domains\Lead\Actions\BlockLeadProfileAction;
 use App\Domains\Lead\Actions\PurgeOldLeadsAction;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
+use App\Domains\Lead\Models\LeadProfile;
 use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Scheduling\Actions\RetryFailedBookingAction;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
@@ -130,6 +132,29 @@ class LeadsAdminDashboard
                 ]);
 
                 wp_safe_redirect(admin_url('admin.php?page=rl-leads&view_lead='.$lead->id.'&status_updated=1'));
+                exit;
+            }
+        }
+
+        if ($action === 'block_lead_profile' || $action === 'unblock_lead_profile') {
+            check_admin_referer('rl_block_lead_nonce');
+
+            $lead = Lead::query()->find((int) ($_POST['lead_id'] ?? 0));
+
+            if ($lead) {
+                $blocker = app(BlockLeadProfileAction::class);
+
+                if ($action === 'block_lead_profile') {
+                    $blocker->blockLead($lead, trim((string) ($_POST['block_reason'] ?? '')));
+                } elseif ($lead->profile_id) {
+                    $profile = LeadProfile::query()->find($lead->profile_id);
+
+                    if ($profile) {
+                        $blocker->unblock($profile);
+                    }
+                }
+
+                wp_safe_redirect(admin_url('admin.php?page=rl-leads&view_lead='.$lead->id.'&block_updated=1'));
                 exit;
             }
         }
@@ -1383,9 +1408,67 @@ class LeadsAdminDashboard
                         </table>
                     </div>
 
+                    <!-- Identity and blocking -->
+                    <?php
+                    $profile = $lead->profile_id
+                        ? LeadProfile::query()->find($lead->profile_id)
+                        : null;
+        $isBlocked = (bool) $lead->is_blocked;
+        ?>
+                    <div class="rl-detail-card" style="<?php echo $isBlocked ? 'border-left: 3px solid #b91c1c;' : ''; ?>">
+                        <h3 class="rl-detail-title">Identity<?php echo $isBlocked ? ' — BLOCKED' : ''; ?></h3>
+
+                        <?php if ($profile) { ?>
+                            <p style="margin: 0 0 10px; color: #52525b; font-size: 12px;">
+                                Blocking applies to the <strong>person</strong>, not this submission: every
+                                email, phone and device already linked to them is blocked, and so is any
+                                identifier seen alongside those later. They are not told — the form keeps
+                                working, but nothing reaches Slack, HubSpot or the calendar.
+                            </p>
+
+                            <table class="rl-key-value-table">
+                                <tr><td>Profile:</td><td><code><?php echo esc_html(substr((string) $profile->uuid, 0, 8)); ?></code></td></tr>
+                                <tr><td>Leads:</td><td><?php echo (int) $profile->lead_count; ?></td></tr>
+                                <?php foreach ($profile->identifiers as $identifier) { ?>
+                                    <tr>
+                                        <td><?php echo esc_html(ucfirst((string) $identifier->type)); ?>:</td>
+                                        <td>
+                                            <code style="font-size: 11px;"><?php echo esc_html((string) $identifier->value_preview); ?></code>
+                                            <?php if ($identifier->strength === 'weak') { ?>
+                                                <span style="color: #a1a1aa; font-size: 10px;"> evidence only, never merges</span>
+                                            <?php } ?>
+                                        </td>
+                                    </tr>
+                                <?php } ?>
+                                <?php if ($isBlocked) { ?>
+                                    <tr><td>Blocked by:</td><td><?php echo esc_html((string) $profile->blocked_by); ?></td></tr>
+                                    <tr><td>Reason:</td><td><?php echo esc_html((string) $profile->block_reason); ?></td></tr>
+                                <?php } ?>
+                            </table>
+
+                            <form method="post" style="margin-top: 12px;"
+                                  onsubmit="return confirm('<?php echo $isBlocked ? 'Unblock this person everywhere?' : 'Block this person across every identifier they have used?'; ?>');">
+                                <?php wp_nonce_field('rl_block_lead_nonce'); ?>
+                                <input type="hidden" name="rl_action" value="<?php echo $isBlocked ? 'unblock_lead_profile' : 'block_lead_profile'; ?>" />
+                                <input type="hidden" name="lead_id" value="<?php echo (int) $lead->id; ?>" />
+                                <?php if (! $isBlocked) { ?>
+                                    <input type="text" name="block_reason" class="regular-text" placeholder="Reason (recorded against the profile)" style="margin-bottom: 8px; width: 100%;" />
+                                <?php } ?>
+                                <button type="submit" class="button <?php echo $isBlocked ? 'button-secondary' : 'button-link-delete'; ?>">
+                                    <?php echo $isBlocked ? 'Unblock this person' : 'Block this person'; ?>
+                                </button>
+                            </form>
+                        <?php } else { ?>
+                            <p style="margin: 0; color: #52525b; font-size: 12px;">
+                                No identity profile yet — this lead carried nothing identifiable, or predates
+                                identity resolution.
+                            </p>
+                        <?php } ?>
+                    </div>
+
                     <!-- Everything else the visit carried -->
                     <?php
-                    $rawAttribution = is_array($lead->attribution) ? $lead->attribution : [];
+        $rawAttribution = is_array($lead->attribution) ? $lead->attribution : [];
         if ($rawAttribution !== []) { ?>
                         <div class="rl-detail-card">
                             <h3 class="rl-detail-title">Full Capture</h3>

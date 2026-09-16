@@ -30,6 +30,17 @@ class HandleLeadCreatedForBooking
     public function handle(LeadCreated $event): void
     {
         $lead = $event->lead;
+        /*
+         * Shadow ban. The booking simply does not happen — which is the point of the block,
+         * since the cost of an abusive lead is a wasted slot on a sales rep's calendar.
+         *
+         * The wizard still shows its confirmation. That is the trade a shadow ban makes: a
+         * visible failure tells them which identifier to change.
+         */
+        if ($event->lead->is_blocked) {
+            return;
+        }
+
         $preferredSlot = $event->context['preferred_slot'] ?? null;
         $timezone = $event->context['timezone'] ?? 'America/New_York';
 

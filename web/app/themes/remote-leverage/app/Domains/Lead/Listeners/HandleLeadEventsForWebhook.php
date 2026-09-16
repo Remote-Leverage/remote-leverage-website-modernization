@@ -22,6 +22,17 @@ class HandleLeadEventsForWebhook
      */
     public function handleCreated(LeadCreated $event): void
     {
+        /*
+         * Shadow ban. The form succeeded and the lead is stored, but nothing downstream fires.
+         *
+         * Silence rather than a refusal is deliberate: an error tells someone which identifier
+         * to change and they are back within a minute under a new address. This costs them
+         * nothing to trigger and a great deal to detect.
+         */
+        if ($event->lead->is_blocked) {
+            return;
+        }
+
         $this->dispatchWebhook($event->lead, 'lead.partial_captured', $event->context);
     }
 

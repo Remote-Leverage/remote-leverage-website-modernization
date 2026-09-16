@@ -8,6 +8,7 @@ use App\Domains\Lead\Data\LeadCaptureData;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Events\LeadFormSubmitted;
 use App\Domains\Lead\Models\Lead;
+use App\Domains\Lead\Services\IdentityResolver;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Referral\Services\AttributionEngine;
@@ -126,6 +127,17 @@ class CaptureLeadAction
                 'uuid' => (string) Str::uuid(),
             ], $leadAttributes));
         }
+
+        /*
+         * Resolve the identity graph before anything downstream runs.
+         *
+         * Order matters: this sets `is_blocked` on the lead, and the listeners that must
+         * suppress for a blocked person read that column. Resolving after the event would let
+         * the Slack alert and the CRM sync fire first, which is the whole thing a shadow ban is
+         * for. It never throws and never bans — see IdentityResolver.
+         */
+        app(IdentityResolver::class)->resolve($lead);
+        $lead->refresh();
 
         // 6. Dual Logging: Stage 1 (Dispatch log for LeadCreated)
         $this->activityLogger->logDispatch(

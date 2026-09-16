@@ -44,6 +44,17 @@ class HandleLeadEventsForSlack
      */
     public function handleCreated(LeadCreated $event): void
     {
+        /*
+         * Shadow ban. The form succeeded and the lead is stored, but nothing downstream fires.
+         *
+         * Silence rather than a refusal is deliberate: an error tells someone which identifier
+         * to change and they are back within a minute under a new address. This costs them
+         * nothing to trigger and a great deal to detect.
+         */
+        if ($event->lead->is_blocked) {
+            return;
+        }
+
         $submissionType = (string) ($event->lead->submission_type ?? '');
 
         // Parity with the GF feed's condition. LeadCreated fires for both the partial capture

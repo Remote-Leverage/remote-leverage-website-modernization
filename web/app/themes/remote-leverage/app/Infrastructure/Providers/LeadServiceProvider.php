@@ -87,8 +87,27 @@ class LeadServiceProvider extends ServiceProvider
         // The global app() helper (not $this->app) avoids the capture entirely.
         Event::listen(LeadCreated::class, function (LeadCreated $event) {
             dispatch(static function () use ($event) {
-                $gateway = app(HubSpotGateway::class);
                 $logger = app(LeadActivityLogger::class);
+
+                /*
+                 * Shadow ban: a blocked person never reaches the CRM. Syncing them would put
+                 * them in front of sales through the one channel the Slack suppression was
+                 * meant to close, and pollute the contact record they were banned from.
+                 */
+                if ($event->lead->is_blocked) {
+                    $logger->logConsumption(
+                        leadId: $event->lead->id,
+                        eventType: 'LeadCreated',
+                        actorDomain: 'Lead',
+                        outcome: 'skipped',
+                        description: 'HubSpot sync skipped: lead profile is blocked',
+                        payload: ['profile_id' => $event->lead->profile_id],
+                    );
+
+                    return;
+                }
+
+                $gateway = app(HubSpotGateway::class);
 
                 $contactId = $gateway->syncContact($event->lead);
 

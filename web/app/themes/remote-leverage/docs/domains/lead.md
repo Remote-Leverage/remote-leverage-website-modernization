@@ -12,6 +12,92 @@ Under Gravity Forms, a lead's journey was invisible. A submission fired hooks; w
 
 This domain makes the whole journey a queryable record, and makes partial submissions first-class: someone who types an email and leaves is a `partial` lead, not nothing.
 
+## Identity graph — the "passport"
+
+One person, across every identifier they have used. Built 2026-09-16 so a lead can be blocked as
+a *person* rather than as an email address.
+
+### Why `rl_leads.uuid` could not do this
+
+It is `Str::uuid()` minted per row and declared `unique()` — a surrogate key. A returning visitor
+gets a brand new one every time, so it can never link two visits. Same for `session_id`, which is
+minted per component mount. Recognising a returning visitor needs an identifier that persists,
+which is why `device_id` and the first-party `rl_vid` cookie exist.
+
+### Tables
+
+| Table | Holds |
+| :--- | :--- |
+| `rl_lead_profiles` | The person. A block lives here, which is what makes it cover identifiers attached later. |
+| `rl_lead_identifiers` | One row per `(type, value_hash)`, unique. The edge list. |
+| `rl_leads.profile_id` / `is_blocked` | The link, and a denormalised flag the suppressing listeners read. |
+
+Identifier values are **hashed** with an application salt, never stored in the clear, so a block
+survives a data-deletion request without retaining personal data. `value_preview` keeps a masked
+remnant (`a***@example.com`) for recognising a row in the admin.
+
+### Strength — the rule everything else follows
+
+A block lives on the profile, so merging two profiles merges their blocks. **A false merge is a
+false ban:** an innocent person silently stops reaching sales, and nothing about the symptom
+points at the cause.
+
+| Strength | Types | May merge two profiles? |
+| :--- | :--- | :--- |
+| strong | `email`, `phone` | Yes — close to unique per person, deliberately entered |
+| weak | `device` | **Never.** Recorded as evidence only |
+
+A shared browser, an office machine or a cleared cookie would otherwise fuse unrelated people.
+IP is not an identifier type at all: behind CloudFront the origin sees an edge node shared by
+thousands.
+
+Other guards, each protecting against a specific way the graph could over-merge:
+
+- **Phones under seven digits are discarded.** Otherwise everyone who typed `1234` becomes one
+  bannable person.
+- **Gmail dots and `+tags` fold; other providers do not.** At Gmail those really are one mailbox.
+  Folding everywhere would merge two real people.
+- **Merges are reversible.** The losing profile is kept and points at the winner — an over-merge
+  that cannot be seen cannot be undone.
+- **A block survives a merge in the safe direction only.** If either side was blocked, the winner
+  is blocked; otherwise a block would vanish because it happened to be raised against the newer
+  record.
+
+### Resolving links; it never blocks
+
+`IdentityResolver` builds the graph. `BlockLeadProfileAction` is a separate, human action.
+
+That separation is deliberate: linking can be poisoned. Someone already blocked can enter a
+competitor's phone number or a victim's email, and a graph that blocked automatically would do
+that work for them. The graph is evidence; a person makes the decision.
+
+### Blocking is a shadow ban
+
+The form still succeeds and the lead is still stored. What stops is everything downstream:
+
+| Suppressed | Where |
+| :--- | :--- |
+| Slack alert | `HandleLeadEventsForSlack` |
+| HubSpot sync | `LeadServiceProvider`, logged as `skipped` |
+| Outgoing webhook | `HandleLeadEventsForWebhook` |
+| Calendly booking | `HandleLeadCreatedForBooking` |
+
+Silence rather than an error, for the same reason the email validator's rejection message is
+generic: telling someone they are blocked tells them which identifier to change, and they are
+back within a minute under a new one.
+
+`CaptureLeadAction` resolves the identity **before** dispatching `LeadCreated`, because the
+listeners read `is_blocked` off the lead — resolving afterwards would let the Slack alert and the
+CRM sync fire first, which is the entire thing the block exists to prevent.
+
+### Operating it
+
+Block from the lead detail screen in wp-admin: **Leads → (a lead) → Identity**. The panel shows
+the profile, its identifiers with masked previews, which are evidence-only, and who blocked it
+and why. Unblocking clears the flag from every attached lead, so a reversed decision does not
+leave someone silently suppressed.
+
+
 ## Storage
 
 **`rl_leads`** (`wp_rl_leads` with the default prefix)

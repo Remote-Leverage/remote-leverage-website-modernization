@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domains\Lead\Actions\BlockLeadProfileAction;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadIdentifier;
 use App\Domains\Lead\Models\LeadProfile;
@@ -238,5 +239,86 @@ describe('blocking', function () {
 
         expect($profile->isBlocked())->toBeFalse()
             ->and($profile->status)->toBe('active');
+    });
+});
+
+describe('blocking a profile', function () {
+    test('blocks every lead the person has ever submitted', function () {
+        $resolver = new IdentityResolver;
+        $action = new BlockLeadProfileAction($resolver);
+
+        $first = makeLead(['email' => 'abuse@example.com', 'phone' => '+1 650 555 0100']);
+        $second = makeLead(['email' => 'abuse2@example.com', 'phone' => '+1 650 555 0100']);
+        $resolver->resolve($first);
+        $resolver->resolve($second);
+
+        $action->blockLead($first, 'repeat abuse', 'adrian');
+
+        expect($first->fresh()->is_blocked)->toBeTrue()
+            ->and($second->fresh()->is_blocked)->toBeTrue();
+    });
+
+    test('a later submission on a new email is blocked on arrival', function () {
+        // The scenario the whole feature exists for: they come back under another address but
+        // reuse a phone we already know.
+        $resolver = new IdentityResolver;
+        $action = new BlockLeadProfileAction($resolver);
+
+        $known = makeLead(['email' => 'abuse@example.com', 'phone' => '+1 650 555 0100']);
+        $resolver->resolve($known);
+        $action->blockLead($known, 'spam');
+
+        $returning = makeLead(['email' => 'brand-new@example.com', 'phone' => '+1 650 555 0100']);
+        $resolver->resolve($returning);
+
+        expect($returning->fresh()->is_blocked)->toBeTrue();
+    });
+
+    test('the block records who did it and why', function () {
+        $resolver = new IdentityResolver;
+        $action = new BlockLeadProfileAction($resolver);
+
+        $lead = makeLead(['email' => 'abuse@example.com']);
+        $resolver->resolve($lead);
+        $profile = $action->blockLead($lead, 'sent abusive messages', 'adrian');
+
+        expect($profile->blocked_by)->toBe('adrian')
+            ->and($profile->block_reason)->toBe('sent abusive messages')
+            ->and($profile->blocked_at)->not->toBeNull();
+    });
+
+    test('unblocking clears the flag from the leads too', function () {
+        // Otherwise a reversed decision leaves the person silently suppressed forever.
+        $resolver = new IdentityResolver;
+        $action = new BlockLeadProfileAction($resolver);
+
+        $lead = makeLead(['email' => 'mistake@example.com']);
+        $profile = $resolver->resolve($lead);
+
+        $action->block($profile, 'wrong call');
+        expect($lead->fresh()->is_blocked)->toBeTrue();
+
+        $action->unblock($profile);
+
+        expect($lead->fresh()->is_blocked)->toBeFalse()
+            ->and($profile->fresh()->blocked_at)->toBeNull()
+            ->and($profile->fresh()->block_reason)->toBeNull();
+    });
+
+    test('blocking an unrelated person leaves them alone', function () {
+        // The test that matters most: a block must not leak across the graph.
+        $resolver = new IdentityResolver;
+        $action = new BlockLeadProfileAction($resolver);
+
+        $bad = makeLead(['email' => 'abuse@example.com', 'device_id' => 'shared-browser']);
+        $innocent = makeLead(['email' => 'buyer@example.com', 'device_id' => 'shared-browser']);
+        $resolver->resolve($bad);
+        $resolver->resolve($innocent);
+
+        $action->blockLead($bad, 'spam');
+
+        expect($bad->fresh()->is_blocked)->toBeTrue()
+            // Same device, different person. A weak identifier never merges, so never bans.
+            ->and($innocent->fresh()->is_blocked)->toBeFalse();
     });
 });
