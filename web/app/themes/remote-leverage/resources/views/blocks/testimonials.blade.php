@@ -49,6 +49,9 @@
         // Only meaningful alongside layout=plain: 'bare' is /signedup/'s centred glass button,
         // 'player' is the 2026 homepage's play/duration/scrub overlay.
         $plainChrome = ($plain_chrome ?? 'bare') === 'player' ? 'player' : 'bare';
+        // 'outline' is production's pill on /reviews/ and the campaign pages; 'pill' is the
+        // 2026 homepage's magenta CTA pill, the same one the rest of that page uses.
+        $controlStyle = ($control_style ?? 'outline') === 'pill' ? 'pill' : 'outline';
         // Whole class strings so Tailwind's scanner sees them literally.
         $controlTone = ($tone ?? 'light') === 'dark'
             ? 'border-white text-white hover:text-white/90'
@@ -144,15 +147,32 @@
     </div>
 
     @if ($collapsible)
-        {{-- The label lives on the button itself rather than an inner <span> so a caller's
-             descendant-scoped tone overrides cannot repaint it. --}}
         <div class="mt-[60px] flex justify-center">
-            <button type="button" @click="expanded = ! expanded"
-                :aria-expanded="expanded ? 'true' : 'false'"
-                x-text="expanded ? 'Show less' : 'Show more'"
-                class="inline-flex items-center justify-center rounded-full border px-5 py-2.5 font-display text-[16px] font-bold uppercase leading-6 tracking-[-0.45px] transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple {{ $controlTone }}">
-                Show more
-            </button>
+            @if ($controlStyle === 'pill')
+                {{-- The 2026 homepage's magenta pill with a circled chevron, sharing its class
+                     list with blocks/partials/cta-pill.blade.php so the two cannot drift.
+
+                     The label is two x-show spans rather than x-text on the button: x-text
+                     replaces the element's entire contents, which would delete the icon on the
+                     first toggle. Both are rendered server-side and one is hidden inline, so the
+                     collapsed state is correct before Alpine boots. --}}
+                <button type="button" @click="expanded = ! expanded"
+                    :aria-expanded="expanded ? 'true' : 'false'"
+                    class="{{ \App\Support\BlockDefaults::ctaPillClasses() }}">
+                    <span x-show="! expanded">Show more</span>
+                    <span x-show="expanded" style="display:none">Show less</span>
+                    @include('blocks.partials.cta-pill-icon', ['icon' => 'chevron-down'])
+                </button>
+            @else
+                {{-- The label lives on the button itself rather than an inner <span> so a
+                     caller's descendant-scoped tone overrides cannot repaint it. --}}
+                <button type="button" @click="expanded = ! expanded"
+                    :aria-expanded="expanded ? 'true' : 'false'"
+                    x-text="expanded ? 'Show less' : 'Show more'"
+                    class="inline-flex items-center justify-center rounded-full border px-5 py-2.5 font-display text-[16px] font-bold uppercase leading-6 tracking-[-0.45px] transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple {{ $controlTone }}">
+                    Show more
+                </button>
+            @endif
         </div>
     @endif
 

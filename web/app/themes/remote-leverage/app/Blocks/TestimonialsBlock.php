@@ -47,6 +47,7 @@ class TestimonialsBlock extends Block
             // Overlay for the bare tiles; see the field's instructions. Unset keeps /signedup/'s.
             'plain_chrome' => get_field('plain_chrome') ?: 'bare',
             'mobile_columns' => get_field('mobile_columns') ?: '1',
+            'control_style' => get_field('control_style') ?: 'outline',
             // Production collapses the wall behind a "show more" control on the campaign
             // and steal landing pages, but NOT on /reviews/ (77 cards, all shown) or the
             // bare video walls of /1monthonus/, /hire-va-isolated-form/ and /signedup/.
@@ -79,6 +80,14 @@ class TestimonialsBlock extends Block
                     .'opposite it, and a scrub bar along the bottom.',
                 'choices' => ['bare' => 'Centred glass button (default)', 'player' => 'Player chrome (2026 homepage)'],
                 'default_value' => 'bare',
+                'return_format' => 'value',
+            ])
+            ->addSelect('control_style', [
+                'label' => 'Show-more Control Style',
+                'instructions' => 'Outline is production\'s pill. Pill is the 2026 homepage\'s magenta CTA button '
+                    .'with a circled chevron, matching the other CTAs down that page.',
+                'choices' => ['outline' => 'Outline pill (default)', 'pill' => 'Magenta CTA pill (2026 homepage)'],
+                'default_value' => 'outline',
                 'return_format' => 'value',
             ])
             ->addSelect('mobile_columns', [

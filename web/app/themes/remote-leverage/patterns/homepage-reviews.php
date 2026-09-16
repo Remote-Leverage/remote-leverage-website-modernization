@@ -32,6 +32,7 @@ use App\Support\BlockDefaults;
             'layout' => 'plain',
             'plain_chrome' => 'player',
             'mobile_columns' => '2',
+            'control_style' => 'pill',
             'columns' => '2',
             'show_more' => 1,
             'visible_count' => 6,

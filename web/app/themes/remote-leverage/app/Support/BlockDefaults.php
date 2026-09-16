@@ -1264,6 +1264,57 @@ class BlockDefaults
         return self::patternBlock('client-logos-marquee', array_merge($data, $overrides), ['align' => 'full']);
     }
 
+    /**
+     * The 2026 homepage's magenta CTA pill, as one class list.
+     *
+     * Lives here rather than only in blocks/partials/cta-pill.blade.php because the reviews
+     * wall needs the same pill on a <button> carrying Alpine state, and the partial renders an
+     * <a>. One source beats two copies drifting apart. `app/` is inside Tailwind's @source
+     * globs (see resources/css/app.css), so the scanner sees these literals.
+     *
+     * Measured off Homepage V3.png: 348x61, fill #F90066, label 19px/700 uppercase with
+     * tracking -0.45px, and a 1.5px ring 4px outside the fill.
+     */
+    public static function ctaPillClasses(string $extra = ''): string
+    {
+        $base = 'group inline-flex items-center justify-center gap-9 rounded-full bg-brand-magenta '
+            .'py-[19px] pl-10 pr-8 font-display text-[17px] font-bold uppercase leading-none '
+            .'tracking-[-0.45px] text-white outline outline-[1.5px] outline-offset-4 '
+            .'outline-brand-magenta transition-all duration-200 hover:bg-brand-magenta-hover '
+            .'hover:outline-brand-magenta-hover focus:outline-brand-magenta focus-visible:ring-2 '
+            .'focus-visible:ring-brand-magenta focus-visible:ring-offset-2 sm:text-[19px]';
+
+        return trim($base.' '.$extra);
+    }
+
+    /**
+     * The guarantee card's three reassurance items, as production words them.
+     *
+     * The first line is the one that varies: production qualifies the guarantee as six months
+     * extended to twelve, while the 2026 homepage states a flat twelve. Both headings read
+     * "12-Month Replacement Guarantee", so the qualifier is that page's claim rather than a
+     * typo — which is why it is overridable per page instead of corrected here.
+     *
+     * @return array<int, array{title: string, text: string}>
+     */
+    public static function guaranteeReassuranceItems(): array
+    {
+        return [
+            [
+                'title' => 'Not the right fit?',
+                'text' => 'Free replacement any time in the first 6 months, extended to 12.',
+            ],
+            [
+                'title' => 'No long-term contracts.',
+                'text' => 'One flat fee, only if you hire.',
+            ],
+            [
+                'title' => 'A dedicated manager helps with onboarding, training, and tracking',
+                'text' => '',
+            ],
+        ];
+    }
+
     // --- HOME HERO (2026 homepage) ---
 
     /**

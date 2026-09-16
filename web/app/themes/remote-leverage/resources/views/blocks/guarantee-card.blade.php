@@ -7,6 +7,7 @@
   $icon1 = BlockDefaults::hireVaImg('stash_arrows-switch.svg');
   $icon2 = BlockDefaults::hireVaImg('majesticons_file-line-3.svg');
   $icon3 = BlockDefaults::hireVaImg('material-symbols_person-check-rounded.svg');
+  $slotIcons = [$icon1, $icon2, $icon3];
 @endphp
 
 @php
@@ -48,50 +49,32 @@
         @endif
 
         {{-- Reassurance items. /ecommerce-virtual-assistant/ shows the badge image alone,
-             so this trio is switchable rather than always-on. --}}
+             so this trio is switchable rather than always-on.
+
+             The copy is data rather than three hard-coded blocks: the 2026 homepage states the
+             guarantee as a flat 12 months where production qualifies it as "6 months, extended
+             to 12", and a claim about the guarantee's own terms should not need a template edit
+             to differ between pages. Icons stay positional — they illustrate the slot, not the
+             sentence, and an editor should not have to supply one to reword a line. --}}
         @if ($showReassurance)
         <div class="space-y-7 mb-10">
-          {{-- Item 1 --}}
-          <div class="flex items-start gap-4">
-            <div class="w-11 h-11 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-              <img src="{{ $icon1 }}" alt="" class="w-6 h-6 object-contain">
+          @foreach ($reassuranceItems as $i => $item)
+            <div class="flex items-start gap-4">
+              <div class="w-11 h-11 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                <img src="{{ $slotIcons[$i % count($slotIcons)] }}" alt="" class="w-6 h-6 object-contain">
+              </div>
+              <div>
+                <h3 @class(['text-lg sm:text-xl font-bold text-white', 'mb-1' => ! empty($item['text'])])>
+                  {{ $item['title'] }}
+                </h3>
+                @if (! empty($item['text']))
+                  <p class="text-white/80 text-sm sm:text-base leading-relaxed">
+                    {{ $item['text'] }}
+                  </p>
+                @endif
+              </div>
             </div>
-            <div>
-              <h3 class="text-lg sm:text-xl font-bold text-white mb-1">
-                Not the right fit?
-              </h3>
-              <p class="text-white/80 text-sm sm:text-base leading-relaxed">
-                Free replacement any time in the first 6 months, extended to 12.
-              </p>
-            </div>
-          </div>
-
-          {{-- Item 2 --}}
-          <div class="flex items-start gap-4">
-            <div class="w-11 h-11 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-              <img src="{{ $icon2 }}" alt="" class="w-6 h-6 object-contain">
-            </div>
-            <div>
-              <h3 class="text-lg sm:text-xl font-bold text-white mb-1">
-                No long-term contracts.
-              </h3>
-              <p class="text-white/80 text-sm sm:text-base leading-relaxed">
-                One flat fee, only if you hire.
-              </p>
-            </div>
-          </div>
-
-          {{-- Item 3 --}}
-          <div class="flex items-start gap-4">
-            <div class="w-11 h-11 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-              <img src="{{ $icon3 }}" alt="" class="w-6 h-6 object-contain">
-            </div>
-            <div>
-              <h3 class="text-lg sm:text-xl font-bold text-white">
-                A dedicated manager helps with onboarding, training, and tracking
-              </h3>
-            </div>
-          </div>
+          @endforeach
         </div>
         @endif
 

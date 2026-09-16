@@ -2,6 +2,7 @@
 
 namespace App\Blocks;
 
+use App\Support\BlockDefaults;
 use Log1x\AcfComposer\Block;
 use StoutLogic\AcfBuilder\FieldsBuilder;
 
@@ -88,6 +89,7 @@ class GuaranteeCardBlock extends Block
             'headline' => get_field('headline') ?: '12-Month Replacement Guarantee',
             'ctaText' => get_field('cta_text') ?: 'BOOK MY FREE 15-MIN CALL',
             'ctaStyle' => (function_exists('get_field') ? get_field('cta_style') : null) ?: 'production',
+            'reassuranceItems' => $this->reassuranceItems(),
             'ctaUrl' => get_field('cta_url') ?: '#booking-footer',
             'background' => get_field('background') ?: 'radial-purple',
             // The comparison pages state the guarantee as prose instead of the icon trio.
@@ -102,9 +104,24 @@ class GuaranteeCardBlock extends Block
 
     /**
      * The block field group.
-     *
-     * @return array
      */
+    /**
+     * @return array<int, array{title: string, text: string}>
+     */
+    public function reassuranceItems(): array
+    {
+        $custom = function_exists('get_field') ? get_field('reassurance_items') : null;
+
+        if (! is_array($custom) || $custom === []) {
+            return BlockDefaults::guaranteeReassuranceItems();
+        }
+
+        return array_map(fn ($row) => [
+            'title' => BlockDefaults::cleanText($row['title'] ?? ''),
+            'text' => BlockDefaults::cleanText($row['text'] ?? ''),
+        ], $custom);
+    }
+
     public function fields()
     {
         $fields = new FieldsBuilder('guarantee_card');
@@ -141,6 +158,17 @@ class GuaranteeCardBlock extends Block
                 'tabs' => 'visual',
                 'toolbar' => 'basic',
             ])
+            ->addRepeater('reassurance_items', [
+                'label' => 'Reassurance Items (leave empty for the preset three)',
+                'instructions' => 'Icons are positional and come from the block, so only the wording is set here. '
+                    .'Leave the supporting line empty for a title-only item.',
+                'layout' => 'block',
+                'max' => 3,
+                'button_label' => 'Add Item',
+            ])
+            ->addText('title', ['label' => 'Title'])
+            ->addText('text', ['label' => 'Supporting line'])
+            ->endRepeater()
             ->addTrueFalse('show_reassurance_items', [
                 'label' => 'Show the three reassurance items',
                 'instructions' => 'Off renders the guarantee badge alone, as production does on /ecommerce-virtual-assistant/.',
