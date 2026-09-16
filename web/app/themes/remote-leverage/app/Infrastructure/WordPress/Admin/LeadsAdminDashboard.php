@@ -16,10 +16,25 @@ use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class LeadsAdminDashboard
 {
+    /** What each timeline relation is called in the notice shown when it cannot be read. */
+    private const TIMELINE_SOURCE_LABELS = [
+        'activityLogs' => 'activity log',
+        'integrationCalls' => 'integration call history',
+    ];
+
+    /** @var array<string, EloquentCollection> Loaded timeline relations, keyed "<lead id>:<relation>". */
+    private array $timelineSources = [];
+
+    /** @var array<string, string> Labels of relations that failed to load, same key shape. */
+    private array $unavailableSources = [];
+
     public function register(): void
     {
         add_action('admin_menu', [$this, 'addMenuPages']);
@@ -1578,14 +1593,48 @@ class LeadsAdminDashboard
                                 </div>
                             </div>
                             <span class="rl-count-badge">
-                                <?php echo esc_html((string) ($lead->activityLogs->count() + $lead->integrationCalls->count())); ?> events
+                                <?php
+                                    /*
+                                     * Counted off the same guarded load the timeline below uses, so a
+                                     * source that could not be read cannot report a count it did not fetch.
+                                     */
+                                    $eventCount = $this->timelineSource($lead, 'activityLogs')->count()
+                                        + $this->timelineSource($lead, 'integrationCalls')->count();
+        ?>
+                                <?php echo esc_html((string) $eventCount); ?> events
                             </span>
                         </div>
 
                         <?php $timeline = $this->mergedTimeline($lead); ?>
 
+                        <?php if (($missingSources = $this->unavailableTimelineSources($lead)) !== []) { ?>
+                            <div class="notice notice-warning inline" style="margin: 0 0 14px; padding: 8px 12px;">
+                                <p style="margin: 0; font-size: 12px;">
+                                    <strong>Timeline incomplete.</strong>
+                                    The <?php echo esc_html(implode(' and the ', $missingSources)); ?>
+                                    could not be read, so events from
+                                    <?php echo count($missingSources) === 1 ? 'it are' : 'them are'; ?>
+                                    missing below. This is usually a pending database migration —
+                                    run <code>wp acorn migrate</code>. The reason is in the error log.
+                                </p>
+                            </div>
+                        <?php } ?>
+
                         <?php if ($timeline === []) { ?>
-                            <p style="color: #a1a1aa; font-size: 13px;">No activity logged yet for this lead.</p>
+                            <?php
+        /*
+         * "Nothing happened" and "we could not look" are different answers, and
+         * only one of them is safe to act on. When every source failed there is
+         * no empty state to report — the notice above is the whole message.
+         */
+                            ?>
+                            <?php if (count($missingSources) < count(self::TIMELINE_SOURCE_LABELS)) { ?>
+                                <p style="color: #a1a1aa; font-size: 13px;">
+                                    <?php echo $missingSources === []
+                                        ? 'No activity logged yet for this lead.'
+                                        : 'Nothing logged in the sources that could be read.'; ?>
+                                </p>
+                            <?php } ?>
                         <?php } else { ?>
                             <?php
                                 /*
@@ -1751,9 +1800,26 @@ class LeadsAdminDashboard
 
                     <select name="domain" class="rl-select">
                         <option value="">All Domains</option>
-                        <option value="Lead" <?php selected($domainFilter, 'Lead'); ?>>Lead</option>
-                        <option value="Scheduling" <?php selected($domainFilter, 'Scheduling'); ?>>Scheduling</option>
-                        <option value="Tracking" <?php selected($domainFilter, 'Tracking'); ?>>Tracking</option>
+                        <?php
+                            /*
+                             * Read off the table rather than hardcoded. The fixed list had drifted to
+                             * three of the seven actors actually being written — Slack, OutgoingWebhook,
+                             * Referral and EmailNotification were all unfilterable — and a hardcoded
+                             * list silently loses each new actor the day it starts logging.
+                             */
+                            $domains = LeadActivityLog::query()
+                                ->select('actor_domain')
+                                ->distinct()
+                                ->orderBy('actor_domain')
+                                ->pluck('actor_domain')
+                                ->filter()
+                                ->all();
+        ?>
+                        <?php foreach ($domains as $domain) { ?>
+                            <option value="<?php echo esc_attr($domain); ?>" <?php selected($domainFilter, $domain); ?>>
+                                <?php echo esc_html($domain); ?>
+                            </option>
+                        <?php } ?>
                     </select>
 
                     <select name="outcome" class="rl-select">
@@ -2340,7 +2406,7 @@ class LeadsAdminDashboard
     {
         $entries = [];
 
-        foreach ($lead->activityLogs as $log) {
+        foreach ($this->timelineSource($lead, 'activityLogs') as $log) {
             $entries[] = [
                 'type' => 'log',
                 'model' => $log,
@@ -2352,7 +2418,7 @@ class LeadsAdminDashboard
             ];
         }
 
-        foreach ($lead->integrationCalls as $call) {
+        foreach ($this->timelineSource($lead, 'integrationCalls') as $call) {
             $entries[] = [
                 'type' => 'call',
                 'model' => $call,
@@ -2382,6 +2448,68 @@ class LeadsAdminDashboard
         });
 
         return $entries;
+    }
+
+    /**
+     * One of the two timeline relations, or an empty collection if its table cannot be read.
+     *
+     * Both halves of this card are diagnostics. Losing one is a degraded card; letting it throw
+     * costs the whole lead detail screen — name, email, booking state, everything — because the
+     * exception escapes mid-render, after output has started, and surfaces as a "headers already
+     * sent" fatal that names neither the table nor the relation. That is what a pending
+     * `create_integration_calls_table` migration did on 2026-09-16.
+     *
+     * Deliberately narrow: only `QueryException`, which is the storage-shaped failure (missing
+     * table, missing column, connection gone). Anything else is a bug in the timeline itself and
+     * should still be loud.
+     *
+     * @param  'activityLogs'|'integrationCalls'  $relation
+     * @return EloquentCollection<int, covariant \Illuminate\Database\Eloquent\Model>
+     */
+    protected function timelineSource(Lead $lead, string $relation): EloquentCollection
+    {
+        $key = $lead->getKey().':'.$relation;
+
+        if (isset($this->timelineSources[$key])) {
+            return $this->timelineSources[$key];
+        }
+
+        try {
+            return $this->timelineSources[$key] = $lead->{$relation};
+        } catch (QueryException $e) {
+            /*
+             * Recorded against the lead rather than a flat flag: the count badge and the timeline
+             * body both ask, and a second attempt would repeat a query already known to fail.
+             */
+            $this->unavailableSources[$key] = self::TIMELINE_SOURCE_LABELS[$relation] ?? $relation;
+
+            Log::warning(
+                "LeadsAdminDashboard: {$relation} unavailable for lead {$lead->getKey()}, "
+                ."timeline rendered without it: {$e->getMessage()}"
+            );
+
+            return $this->timelineSources[$key] = new EloquentCollection;
+        }
+    }
+
+    /**
+     * Human names of the timeline sources that failed to load for this lead, if any.
+     *
+     * Drives the inline notice on the card. A silent guard would be worse than the crash it
+     * replaces — an empty timeline reading as "nothing happened" is how a missing table becomes
+     * a wrong conclusion about a lead.
+     *
+     * @return array<int, string>
+     */
+    protected function unavailableTimelineSources(Lead $lead): array
+    {
+        $prefix = $lead->getKey().':';
+
+        return array_values(array_filter(
+            $this->unavailableSources,
+            fn (string $key) => str_starts_with($key, $prefix),
+            ARRAY_FILTER_USE_KEY
+        ));
     }
 
     protected function extractMeetingDetails(Lead $lead): array

@@ -98,7 +98,7 @@ class LeadServiceProvider extends ServiceProvider
                     $logger->logConsumption(
                         leadId: $event->lead->id,
                         eventType: 'LeadCreated',
-                        actorDomain: 'Lead',
+                        actorDomain: 'HubSpot',
                         outcome: 'skipped',
                         description: 'HubSpot sync skipped: lead profile is blocked',
                         payload: ['profile_id' => $event->lead->profile_id],
@@ -121,7 +121,7 @@ class LeadServiceProvider extends ServiceProvider
                 $logger->logConsumption(
                     leadId: $event->lead->id,
                     eventType: 'LeadCreated',
-                    actorDomain: 'Lead',
+                    actorDomain: 'HubSpot',
                     outcome: $contactId ? 'succeeded' : 'failed',
                     description: $contactId ? "Synced contact to HubSpot (ID: {$contactId})" : 'HubSpot contact sync failed',
                     payload: ['hubspot_contact_id' => $contactId]

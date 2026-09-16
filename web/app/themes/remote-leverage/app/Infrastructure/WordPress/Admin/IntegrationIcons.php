@@ -29,6 +29,7 @@ class IntegrationIcons
         'Referral' => 'rl',
         'Scheduling' => 'calendly',
         'Tracking' => 'customerio',
+        'HubSpot' => 'hubspot',
         'Slack' => 'slack',
         'OutgoingWebhook' => 'webhook',
         'EmailNotification' => 'email',
