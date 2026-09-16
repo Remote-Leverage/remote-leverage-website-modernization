@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domains\Sync\SyncCapability;
 use App\Infrastructure\WordPress\Security\WordfenceConfigurator;
 
 /*
@@ -177,5 +178,28 @@ describe('config/wordfence.php', function () {
         $config = require __DIR__.'/../../config/wordfence.php';
 
         expect($config['settings']['loginSec_lockInvalidUsers'])->toBeFalse();
+    });
+});
+
+describe('application passwords', function () {
+    test('they are explicitly kept enabled', function () {
+        /*
+         * WordFence ships `loginSec_disableApplicationPasswords => true`, which filters
+         * `wp_is_application_passwords_available` to false for the entire site. That breaks
+         * Environment Sync, `rl:sync:page` and both MCP servers at once, and the symptom is
+         * `rest_not_logged_in` — indistinguishable from a wrong password, which is why it cost
+         * an afternoon to find. The setting must be present and false, not merely absent:
+         * absent means WordFence's default wins.
+         */
+        $settings = require __DIR__.'/../../config/wordfence.php';
+
+        expect($settings['settings'])->toHaveKey('loginSec_disableApplicationPasswords')
+            ->and($settings['settings']['loginSec_disableApplicationPasswords'])->toBeFalse();
+    });
+
+    test('the credential that depends on them is still least-privilege', function () {
+        // Re-enabling app passwords is only defensible because the holder is not an admin.
+        // If that ever changes, the trade-off above stops holding.
+        expect(SyncCapability::NAME)->toBe('rl_manage_ai_sync');
     });
 });

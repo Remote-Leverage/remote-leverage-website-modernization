@@ -83,6 +83,29 @@ return [
         'loginSec_blockAdminReg' => true,
 
         /*
+         * Application Passwords stay ON. WordFence disables them by default.
+         *
+         * This is the one WordFence default we deliberately reverse, so it is worth stating
+         * why. `loginSec_disableApplicationPasswords` ships as `true`, and when set it adds
+         * `__return_false` to the `wp_is_application_passwords_available` filter — which turns
+         * off Application Passwords for the whole site, not just for wp-admin.
+         *
+         * Everything this project does machine-to-machine authenticates that way: the
+         * Environment Sync screen, `rl:sync:page`, and the `rl-staging` / `rl-production` MCP
+         * servers. With the default left in place all of them fail as `rest_not_logged_in`,
+         * which reads exactly like a wrong credential and sends you looking at the proxy — the
+         * header never arrives at a check that would report anything else, because core bails
+         * out before it gets there.
+         *
+         * The reason WordFence turns them off is real: an Application Password bypasses 2FA.
+         * The exposure is bounded here because the only holder is the dedicated `sync-service`
+         * user, which has `rl_manage_ai_sync` and nothing else — no admin role, no
+         * `manage_options` — and its password is provisioned per environment rather than
+         * shared. Human logins keep 2FA.
+         */
+        'loginSec_disableApplicationPasswords' => false,
+
+        /*
          * Live traffic writes a row per request. Behind a CDN most requests never reach the
          * origin, so the view is misleading as well as expensive — and the useful signal
          * (blocks, lockouts) is recorded regardless of this setting.
