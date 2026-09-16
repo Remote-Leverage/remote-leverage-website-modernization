@@ -31,6 +31,7 @@ use App\Support\BlockDefaults;
         BlockDefaults::withFieldKeys('testimonials_block', [
             'layout' => 'plain',
             'plain_chrome' => 'player',
+            'mobile_columns' => '2',
             'columns' => '2',
             'show_more' => 1,
             'visible_count' => 6,

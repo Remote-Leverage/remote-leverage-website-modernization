@@ -213,6 +213,31 @@ Config::define('WP_POST_REVISIONS', env('WP_POST_REVISIONS') ?? true);
 Config::define('CONCATENATE_SCRIPTS', false);
 
 /**
+ * WordFence
+ *
+ * `WFWAF_STORAGE_ENGINE` is the setting that makes WordFence viable on this stack. Its default
+ * keeps firewall state — rules, blocked IPs, rate-limit counters, attack log — in flat files
+ * under `wp-content/wflogs/`. That directory lives inside the application container, which is
+ * immutable and rebuilt on every deploy, so the firewall would silently reset its learned state
+ * and block list on each release.
+ *
+ * `mysqli` moves that state into the database, where it persists across rebuilds and is shared
+ * by every ECS task rather than each one keeping its own partial view. This is not a workaround:
+ * it is what WordFence selects for itself on WP Engine and Flywheel, which have the same
+ * ephemeral-filesystem property (see `waf/bootstrap.php`).
+ *
+ * Read by `waf/bootstrap.php`, which the plugin loads itself (`wordfence.php:136`), so this
+ * applies whether or not PHP's `auto_prepend_file` is pointed at the WAF. Without the prepend
+ * WordFence runs in basic mode — after WordPress loads rather than before it — which is the
+ * expected state here; extended protection would need the Docker image to set `auto_prepend_file`
+ * and would not survive a rebuild on its own.
+ *
+ * Everything else about WordFence is configured in `config/wordfence.php` in the theme and
+ * applied on deploy by `rl:wordfence`.
+ */
+Config::define('WFWAF_STORAGE_ENGINE', 'mysqli');
+
+/**
  * Debugging Settings
  */
 Config::define('WP_DEBUG_DISPLAY', false);

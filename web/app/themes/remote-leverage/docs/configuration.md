@@ -60,7 +60,7 @@ The four event-type vars seed `CalendlyEventTypeRoleResolver` (option `rl_calend
 | Variable | Read by |
 | :--- | :--- |
 | `POSTHOG_API_KEY`, `POSTHOG_HOST` | `PostHogClient`, front-end snippet. Host defaults to `https://us.i.posthog.com`. |
-| `CUSTOMERIO_SITE_ID`, `CUSTOMERIO_API_KEY`, `CUSTOMERIO_APP_API_KEY` | `CustomerIOClient` |
+| `CUSTOMERIO_SITE_ID`, `CUSTOMERIO_API_KEY` | `CustomerIOClient` (Track API v1). `CUSTOMERIO_APP_API_KEY` was **removed 2026-09-16** — only `config/services.php` ever referenced it, nothing read it. The App API is a different Customer.io product (broadcasts, segments) that this codebase does not use. |
 | `CUSTOMERIO_CDP_WRITE_KEY` | `TrackingHooks` — the browser CDP snippet (`window.cioanalytics`), added 2026-09-15 when v2 switched from the classic `_cio` tracker to match production. **Not the site id**: CDP takes a write key, a different Customer.io product, and a site id here 404s the asset URL and silently queues every event forever. Blank → no snippet, every client call site no-ops. Server-side Track API v1 still uses `SITE_ID`/`API_KEY`. |
 
 GTM, LinkedIn Insight and Meta Pixel are configured inside the Google Site Kit / GTM container, not here.
@@ -93,6 +93,18 @@ Local only — read by the sync commands to call *out* to a remote. Never added 
 | `STAGING_SYNC_URL`, `STAGING_SYNC_USER`, `STAGING_SYNC_APP_PASSWORD` | The `sync-service` user's application password on staging |
 | `PRODUCTION_SYNC_URL`, `PRODUCTION_SYNC_USER`, `PRODUCTION_SYNC_APP_PASSWORD` | Present so gate 3 has a URL to refuse. Setting these does not make production syncable — three other gates still refuse. |
 | `STAGING_SYNC_BODY_AUTH` | **Temporary, and now removable.** Sends the sync credential in the request body as well as the `Authorization` header, for a CDN that strips the header. Read by `SyncClient`; the receiving half is `web/app/mu-plugins/rl-sync-body-auth.php`. **Verified 2026-09-15: CloudFront now forwards `Authorization` on `/wp-json/wp-abilities/*`, so this flag is no longer doing anything** — a header-only call to `app/export-syncable-settings` on staging returns 200, and the same call with no credential returns 401. Set it to `false`, confirm a push still runs, then delete both halves. `SyncClient` refuses to attach it when either side is production. See [domains/sync.md](domains/sync.md). |
+
+## Security — WordFence
+
+`config/wordfence.php` (theme) and one Bedrock constant. Settings are applied on deploy by
+`rl:deploy`; the repository is the source of truth and wp-admin drift is reverted.
+
+| Variable | Notes |
+| :--- | :--- |
+| `WORDFENCE_APPLY_ON_DEPLOY` | Default `true`. Set `false` to leave WordFence entirely under wp-admin control on an environment. |
+| `WFWAF_STORAGE_ENGINE` | **Not an env var** — defined as `mysqli` in `config/application.php`. Keeps firewall state in the database rather than in `wp-content/wflogs/`, which does not survive a container rebuild. Do not remove it. |
+
+`wp acorn rl:wordfence --dry-run` reports drift without writing.
 
 ## Monitoring
 

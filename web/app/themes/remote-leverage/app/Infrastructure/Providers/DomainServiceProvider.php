@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Providers;
 
+use App\Infrastructure\Console\Commands\ApplyWordfenceConfigCommand;
 use App\Infrastructure\Console\Commands\PartnerSeedCommand;
 use App\Infrastructure\Console\Commands\RunDeployTasksCommand;
 use App\Infrastructure\WordPress\Admin\CalendlyAdminDashboard;
@@ -60,7 +61,11 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(SocialKitAdmin::class, fn () => new SocialKitAdmin);
 
         if ($this->app->runningInConsole()) {
-            $this->commands([RunDeployTasksCommand::class, PartnerSeedCommand::class]);
+            $this->commands([
+                RunDeployTasksCommand::class,
+                PartnerSeedCommand::class,
+                ApplyWordfenceConfigCommand::class,
+            ]);
         }
     }
 

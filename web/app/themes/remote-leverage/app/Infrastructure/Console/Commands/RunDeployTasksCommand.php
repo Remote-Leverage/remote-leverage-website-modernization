@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Console\Commands;
 
 use App\Ai\Provisioning\ContentAgentProvisioner;
+use App\Infrastructure\WordPress\Security\WordfenceConfigurator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -75,6 +76,7 @@ class RunDeployTasksCommand extends Command
 
         $this->flushRewriteRules();
         $this->provisionContentAgent();
+        $this->applyWordfenceConfig();
 
         $this->info('Deploy tasks complete.');
 
@@ -130,6 +132,52 @@ class RunDeployTasksCommand extends Command
 
         foreach ($result['revoked'] as $capability) {
             $this->line("  revoked  {$capability}");
+        }
+    }
+
+    /**
+     * Re-assert config/wordfence.php over WordFence's database-held settings.
+     *
+     * WordFence is configured in wp-admin and stores that in the database. This container is
+     * rebuilt on every deploy and staging's database is refreshed from elsewhere, so settings
+     * tuned by hand have no durability and no audit trail. Re-applying here makes the repo the
+     * source of truth — the same reasoning as the content-agent reconciliation above.
+     *
+     * Idempotent, and never fatal: a security plugin's configuration is not worth failing a
+     * release over, so an absent or mid-upgrade WordFence is reported and stepped over.
+     */
+    private function applyWordfenceConfig(): void
+    {
+        $configurator = app(WordfenceConfigurator::class);
+
+        try {
+            $result = $configurator->apply();
+        } catch (Throwable $e) {
+            $this->warn('Could not apply the WordFence config: '.$e->getMessage());
+
+            return;
+        }
+
+        if ($result['skipped'] !== null) {
+            $this->info('WordFence config skipped: '.$result['skipped']);
+
+            return;
+        }
+
+        if ($result['applied'] === [] && $result['unknown'] === []) {
+            $this->info('WordFence config already matches; nothing to do.');
+
+            return;
+        }
+
+        $this->info('Applying the WordFence config...');
+
+        foreach (array_keys($result['applied']) as $key) {
+            $this->line("  set  {$key}");
+        }
+
+        if ($result['unknown'] !== []) {
+            $this->warn('  unknown key(s) skipped: '.implode(', ', $result['unknown']));
         }
     }
 

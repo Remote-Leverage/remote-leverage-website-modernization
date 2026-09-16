@@ -31,10 +31,21 @@
         // Production's /signedup/ wall is a bare 16:9 video grid on a 20px gutter, with no
         // quote, company or duration chrome. 'cards' stays the default everywhere else.
         if ($isPlain) {
+            // `mobile_columns` only changes the base breakpoint. /signedup/ runs one tile per
+            // row below md and keeps it; the 2026 homepage puts two across, which needs the
+            // tiles to go portrait as well — a 16:9 tile in half a 376px screen is 92px tall
+            // and reads as a strip rather than a face.
+            $twoUpMobile = (string) ($mobile_columns ?? '1') === '2';
+            $baseCols = $twoUpMobile ? 'grid grid-cols-2' : 'grid grid-cols-1';
             $gridCols = ($columns ?? '3') === '2'
-                ? 'grid grid-cols-1 md:grid-cols-2 gap-5 '.$gridTail
-                : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 '.$gridTail;
+                ? $baseCols.' md:grid-cols-2 gap-5 '.$gridTail
+                : $baseCols.' md:grid-cols-2 lg:grid-cols-3 gap-5 '.$gridTail;
         }
+
+        // Measured off Page_v1.2.png: a mobile tile is 163x216 at 376px, so 3:4.
+        $plainAspect = ($isPlain && (string) ($mobile_columns ?? '1') === '2')
+            ? 'aspect-[3/4] md:aspect-video'
+            : 'aspect-video';
         // Only meaningful alongside layout=plain: 'bare' is /signedup/'s centred glass button,
         // 'player' is the 2026 homepage's play/duration/scrub overlay.
         $plainChrome = ($plain_chrome ?? 'bare') === 'player' ? 'player' : 'bare';
@@ -53,7 +64,7 @@
             @endphp
             @if ($isPlain)
                 <button type="button" @if ($hidden) x-show="expanded" style="display:none" @endif
-                    class="group relative block w-full aspect-video rounded-xl overflow-hidden bg-slate-900 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple"
+                    class="group relative block w-full {{ $plainAspect }} rounded-xl overflow-hidden bg-slate-900 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple"
                     @click="openModal('{{ $t['video_url'] }}')"
                     aria-label="Play video testimonial{{ ! empty($t['company']) ? ': '.$t['company'] : '' }}">
                     <img src="{{ $t['image'] }}" alt="{{ $t['company'] ?? '' }}" width="630" height="354"

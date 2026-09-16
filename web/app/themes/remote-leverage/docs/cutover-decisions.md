@@ -352,8 +352,32 @@ objections:
 - Staging sits behind CloudFront and production behind Cloudflare. WordFence now runs *in addition
   to* that edge layer, not instead of it.
 
-Settings are not carried over automatically: the plugin's configuration lives in the production
-database, and moving it is a separate step from adding the dependency.
+**Configuration is code, not wp-admin (added 2026-09-16).** The operational caveats above were
+answered rather than accepted:
+
+- `config/wordfence.php` (theme) holds the settings; `WordfenceConfigurator` applies them from
+  `rl:deploy` on every container start, so a rebuilt container and a refreshed staging database
+  both re-converge instead of losing whatever was tuned by hand. Idempotent — only drifted keys
+  are written — and never fatal, since a security plugin's settings are not worth failing a
+  release over. `wp acorn rl:wordfence --dry-run` reports drift without writing.
+- **`WFWAF_STORAGE_ENGINE` is set to `mysqli`** in Bedrock's `config/application.php`. This is
+  the setting that made the port viable: the default keeps firewall state — rules, blocked IPs,
+  rate-limit counters, attack log — in flat files under `wp-content/wflogs/`, inside the
+  immutable container, so the firewall would reset its block list on every release. `mysqli`
+  moves it to the database, where it persists and is shared across ECS tasks. It is what
+  WordFence selects for itself on WP Engine and Flywheel for the same reason.
+- `autoUpdate` is forced **off**: the plugin is a composer dependency, and a self-update either
+  fails against a read-only tree or silently diverges from `composer.lock` until the next deploy
+  reverts it.
+
+Extended protection (PHP `auto_prepend_file`) is still **not** configured, so WordFence runs in
+basic mode — after WordPress loads rather than before it. Enabling it would mean setting
+`auto_prepend_file` in the Docker image; it cannot be done from wp-admin durably here, because
+what that writes does not survive a rebuild. Accepted for now.
+
+The production **settings** are still not carried over: they live in production's database, and
+moving them is a separate step from adding the dependency. What `config/wordfence.php` asserts
+is a deliberate baseline, not a copy of production.
 
 **Production runs three security plugins, and only WordFence is doing enforcement** (audited
 2026-09-16 from the backup, so only WordFence is ported):

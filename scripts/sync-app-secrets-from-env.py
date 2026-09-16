@@ -51,7 +51,6 @@ ALLOWLIST = [
     # Tracking
     "CUSTOMERIO_SITE_ID",
     "CUSTOMERIO_API_KEY",
-    "CUSTOMERIO_APP_API_KEY",
     # Browser CDP snippet — a different credential from CUSTOMERIO_SITE_ID.
     "CUSTOMERIO_CDP_WRITE_KEY",
     "POSTHOG_API_KEY",

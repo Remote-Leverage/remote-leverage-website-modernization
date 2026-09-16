@@ -32,8 +32,9 @@
   <div class="w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
       
-      {{-- Left Column: Guarantee Details --}}
-      <div class="lg:col-span-7 pt-4 sm:pt-6">
+      {{-- Left Column: Guarantee Details. Ordered after the badge below lg — see the badge's
+           own note for why. --}}
+      <div class="order-2 lg:order-none lg:col-span-7 pt-4 sm:pt-6">
         <h2 class="text-3xl sm:text-4xl lg:text-[42px] lg:leading-[48px] font-bold font-display text-white tracking-tight leading-[1.1] mb-10 {{ $headingMeasure }}">
           {{ $headline }}
         </h2>
@@ -111,8 +112,15 @@
         </div>
       </div>
 
-      {{-- Right Column: 3D Medals Badge FLUSH to the bleeding top edge --}}
-      <div class="lg:col-span-5 flex justify-center lg:justify-end -mt-12 sm:-mt-16 lg:-mt-20 pointer-events-none">
+      {{-- Right Column: 3D Medals Badge FLUSH to the bleeding top edge.
+           `order-1` below lg puts the badge above the copy when the grid collapses to one
+           column. The negative top margin exists to bleed the medals off the band's top edge,
+           which only works while the badge is the first thing in the column — stacked last it
+           dragged the ribbons up through the CTA instead, clipping the button on every page
+           shipping this block (verified on /hire-va-4/ at 376px, not just the homepage). This
+           is also what the 2026 mobile comp draws: medals bleeding in at the top, heading
+           beneath them. --}}
+      <div class="order-1 lg:order-none lg:col-span-5 flex justify-center lg:justify-end -mt-12 sm:-mt-16 lg:-mt-20 pointer-events-none">
         <img src="{{ $badgeImg }}"
              alt="12-Month Replacement Guarantee Medals"
              width="578"

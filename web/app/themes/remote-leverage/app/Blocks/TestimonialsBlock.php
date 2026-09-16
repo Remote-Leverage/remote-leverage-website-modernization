@@ -46,6 +46,7 @@ class TestimonialsBlock extends Block
             'layout' => get_field('layout') ?: 'cards',
             // Overlay for the bare tiles; see the field's instructions. Unset keeps /signedup/'s.
             'plain_chrome' => get_field('plain_chrome') ?: 'bare',
+            'mobile_columns' => get_field('mobile_columns') ?: '1',
             // Production collapses the wall behind a "show more" control on the campaign
             // and steal landing pages, but NOT on /reviews/ (77 cards, all shown) or the
             // bare video walls of /1monthonus/, /hire-va-isolated-form/ and /signedup/.
@@ -78,6 +79,14 @@ class TestimonialsBlock extends Block
                     .'opposite it, and a scrub bar along the bottom.',
                 'choices' => ['bare' => 'Centred glass button (default)', 'player' => 'Player chrome (2026 homepage)'],
                 'default_value' => 'bare',
+                'return_format' => 'value',
+            ])
+            ->addSelect('mobile_columns', [
+                'label' => 'Tiles per row on mobile',
+                'instructions' => 'Bare-tile layout only. One is /signedup/. Two is the 2026 homepage, which also '
+                    .'switches the tiles to 3:4 below md — a 16:9 tile in half a phone width is too short to read.',
+                'choices' => ['1' => 'One (default)', '2' => 'Two'],
+                'default_value' => '1',
                 'return_format' => 'value',
             ])
             ->addSelect('columns', [
