@@ -87,6 +87,31 @@ One local-only surface: `/partners/lano/` is a v2 partner-hub route with no prod
 equivalent; production covers that partnership at `/remote-leverage-x-lano/`, which is captured
 separately as its own page.
 
+## What the first full run showed (2026-09-15)
+
+322 captures, 81 surfaces, both viewports. Comparing page heights — the cheap proxy described
+above, not a pixel diff:
+
+| | pairs | over 10% apart | median gap | v2 taller |
+|---|---|---|---|---|
+| Desktop 1440 | 80 | 29 | 6.4% | 50 |
+| Mobile 390 | 80 | **49** | **14.0%** | 53 |
+
+**Desktop is broadly in shape; mobile is not.** Mobile has nearly twice as many pages out of
+tolerance and more than double the median gap. The worst cases are not subtle — `/` is 12,060px
+on production and 23,397px in v2 at 390px wide; `/terms-of-use/` is 6,535px against 23,100px.
+
+This is real, not a capture artifact. Both sides were verified to match `(max-width: 767px)`,
+neither has horizontal overflow at 390px, and the only elements wider than the viewport are the
+intentional marquees. v2 simply stacks much taller on mobile.
+
+Several landing pages in the `hire-va` family land within a few hundred pixels of each other
+(~23,320px local against ~12,300px production), which points at one shared pattern rather than
+per-page drift — worth fixing once at the source.
+
+The one page where v2 is *shorter* than production is the case-study archive, for the reason
+below.
+
 ## Known issue this surfaced
 
 `/case-study/` renders only **10** of the **23** published case studies. `archive-case_study.blade.php`

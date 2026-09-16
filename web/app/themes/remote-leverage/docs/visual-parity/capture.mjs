@@ -11,6 +11,7 @@
  *   node docs/visual-parity/capture.mjs --side=production    # one side only
  *   node docs/visual-parity/capture.mjs --viewport=mobile    # one viewport only
  *   node docs/visual-parity/capture.mjs --force              # re-shoot existing files
+ *   node docs/visual-parity/capture.mjs --timeout=240000     # slow pages (production /blog/)
  *
  * Requires Playwright with a real Chrome channel:  npx playwright install chrome
  *
@@ -32,7 +33,7 @@
  *      it is safe here, and why forcing `position: static` instead is worse.
  */
 
-import { mkdir, writeFile, access } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, access, open } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -56,13 +57,13 @@ const args = Object.fromEntries(
   })
 );
 
-const manifest = JSON.parse(
-  await (await import('node:fs/promises')).readFile(join(HERE, 'manifest.json'), 'utf8')
-);
+const manifest = JSON.parse(await readFile(join(HERE, 'manifest.json'), 'utf8'));
 
 const SHOTS = resolve(HERE, args.out ?? 'shots');
 const CONCURRENCY = Number(args.concurrency ?? 3);
 const RETRIES = Number(args.retries ?? 2);
+// Production's /blog/ carries ~180 images and does not fire `load` inside 90s.
+const NAV_TIMEOUT = Number(args.timeout ?? 90000);
 const FORCE = args.force === 'true';
 const SIDES = args.side && args.side !== 'both' ? [args.side] : ['production', 'local'];
 const VIEWPORTS =
@@ -148,7 +149,7 @@ async function settle(page) {
 async function shoot(context, job) {
   const page = await context.newPage();
   try {
-    await page.goto(job.url, { waitUntil: 'load', timeout: 90000 });
+    await page.goto(job.url, { waitUntil: 'load', timeout: NAV_TIMEOUT });
     await page.waitForTimeout(2500);
     await settle(page);
 
@@ -236,10 +237,62 @@ await browser.close();
 const failed = results.filter((r) => !r.ok);
 const capturedAt = new Date().toISOString();
 
+// Merge with whatever a previous run recorded. A partial run — one --filter, one --side, a
+// retry of a single slow page — must not erase the metadata for everything else, which is
+// what a plain overwrite here used to do.
+let previous = [];
+try {
+  previous = JSON.parse(await readFile(join(SHOTS, 'results.json'), 'utf8')).results ?? [];
+} catch {
+  /* first run */
+}
+
+const key = (r) => `${r.slug}.${r.side}.${r.viewport}`;
+const merged = new Map(previous.map((r) => [key(r), r]));
+for (const r of results) {
+  // A skipped job carries no geometry; keep the richer record already on file.
+  if (r.skipped && merged.has(key(r))) continue;
+  merged.set(key(r), r);
+}
+const all = [...merged.values()];
+
 await writeFile(
   join(SHOTS, 'results.json'),
-  JSON.stringify({ capturedAt, results }, null, 2)
+  JSON.stringify({ capturedAt, results: all }, null, 2)
 );
+
+// Page height is the cheap signal the viewer filters on, and it is recoverable from the PNG
+// itself (IHDR height, at deviceScaleFactor 1), so the index stays correct even for captures
+// whose in-memory record was lost.
+const pngHeight = async (file) => {
+  try {
+    const fh = await open(file, 'r');
+    try {
+      const buf = Buffer.alloc(24);
+      await fh.read(buf, 0, 24, 0);
+      return buf.readUInt32BE(20);
+    } finally {
+      await fh.close();
+    }
+  } catch {
+    return null;
+  }
+};
+
+const index = [];
+for (const page of manifest.pages) {
+  const shots = {};
+  for (const viewport of ['desktop', 'mobile']) {
+    for (const side of ['production', 'local']) {
+      const file = join(SHOTS, viewport, `${page.slug}.${side}.png`);
+      const height = await pngHeight(file);
+      if (height === null) continue;
+      const rec = merged.get(`${page.slug}.${side}.${viewport}`);
+      shots[`${viewport}.${side}`] = { height, brokenImages: rec?.brokenImages ?? null };
+    }
+  }
+  index.push({ ...page, shots });
+}
 
 // Data for index.html. Written as a plain script rather than JSON because the viewer is
 // opened over file://, where fetch() of a sibling file is blocked but <script src> is not.
@@ -247,18 +300,7 @@ await writeFile(
   join(SHOTS, 'data.js'),
   'window.PARITY = ' +
     JSON.stringify(
-      {
-        capturedAt,
-        viewports: { desktop: manifest.desktop, mobile: manifest.mobile },
-        pages: manifest.pages.map((p) => ({
-          ...p,
-          shots: Object.fromEntries(
-            results
-              .filter((r) => r.slug === p.slug && r.ok)
-              .map((r) => [`${r.viewport}.${r.side}`, { height: r.height, brokenImages: r.brokenImages }])
-          ),
-        })),
-      },
+      { capturedAt, viewports: { desktop: manifest.desktop, mobile: manifest.mobile }, pages: index },
       null,
       2
     ) +
@@ -266,4 +308,5 @@ await writeFile(
 );
 
 console.log(`\ndone: ${results.filter((r) => r.ok).length} ok, ${failed.length} failed`);
+console.log(`index: ${index.filter((p) => Object.keys(p.shots).length).length} pages with captures`);
 for (const f of failed) console.log(`  FAIL ${f.viewport} ${f.side} ${f.slug} — ${f.error}`);
