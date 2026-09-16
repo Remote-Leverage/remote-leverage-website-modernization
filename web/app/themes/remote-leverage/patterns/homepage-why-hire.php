@@ -36,6 +36,7 @@ $data = BlockDefaults::withFieldKeys('why_hire', [
     'headline' => 'Why Hire Through Remote Leverage?',
     'heading_align' => 'center',
     'proof_chrome' => 'bare',
+    'proof_background' => 'violet',
     'proof_title' => "We've helped more than 2,000 businesses hire top talent across LATAM, the Caribbean and the EU.",
 ]);
 ?>

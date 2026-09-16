@@ -2614,7 +2614,18 @@ class BlockDefaults
         ];
         self::encodeRepeater('cards', 'field_roles_pricing_grid_block_cards', self::rolesPricingGridCards(), $data);
 
-        return self::patternBlock('roles-pricing-grid', array_merge($data, $overrides), ['align' => 'full']);
+        $merged = array_merge($data, $overrides);
+
+        // Carry the ACF key alongside any scalar override, the way _headline does.
+        // Without it the value rides on the block's data array alone, which is one
+        // refactor away from being ignored.
+        foreach (['variant', 'columns'] as $key) {
+            if (array_key_exists($key, $merged)) {
+                $merged['_'.$key] = 'field_roles_pricing_grid_block_'.$key;
+            }
+        }
+
+        return self::patternBlock('roles-pricing-grid', $merged, ['align' => 'full']);
     }
 
     public static function renderAboutHero(array $overrides = []): string

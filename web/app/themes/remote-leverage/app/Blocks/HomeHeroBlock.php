@@ -90,7 +90,9 @@ class HomeHeroBlock extends Block
         return [
             'ratingLogo' => BlockDefaults::homeImg('google-logo.png'),
             'ratingScore' => BlockDefaults::cleanText($this->field('rating_score')) ?: '4.8',
-            'showRating' => $this->field('show_rating') !== false,
+            // Explicitly false-aware: an ACF true/false stores 0, and `0 !== false` is true,
+            // so a plain !== check would have kept showing the row when it was switched off.
+            'showRating' => (bool) ($this->field('show_rating') ?? true),
             'headline' => BlockDefaults::cleanText($this->field('headline')) ?: "Latin American\nVirtual Assistants",
             'headlineAccent' => BlockDefaults::cleanText($this->field('headline_accent')) ?: '$6-$10 Per Hour',
             'subtitle' => $this->field('subtitle') ?: 'Recruiting agency helping businesses hire English speaking Virtual Assistants from Latin America for <strong>70% less than U.S. Employees.</strong>',
@@ -171,8 +173,8 @@ class HomeHeroBlock extends Block
         $fields
             ->addTrueFalse('show_rating', [
                 'label' => 'Show the Google rating row',
-                'instructions' => 'Desktop only — the mobile design omits it either way.',
-                'default_value' => 1,
+                'instructions' => 'Desktop only — the mobile design omits it either way. Off since 2026-09-16.',
+                'default_value' => 0,
                 'ui' => 1,
             ])
             ->addText('rating_score', [

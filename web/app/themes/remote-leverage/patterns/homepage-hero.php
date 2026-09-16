@@ -16,7 +16,7 @@ use App\Support\BlockDefaults;
 ?>
 <!-- wp:group {"align":"full","className":"rl-home-screen-1 rl-screen flex flex-col","backgroundColor":"bg-light","layout":{"type":"default"}} -->
 <div class="wp-block-group alignfull rl-home-screen-1 rl-screen flex flex-col has-bg-light-background-color has-background">
-    <!-- wp:acf/home-hero {"name":"acf/home-hero","data":{},"align":"full","mode":"preview"} /-->
+    <!-- wp:acf/home-hero {"name":"acf/home-hero","data":{"show_rating":0,"_show_rating":"field_home_hero_show_rating"},"align":"full","mode":"preview"} /-->
 
     <div class="w-full pb-10">
         <?= BlockDefaults::renderClientLogosMarquee() ?>

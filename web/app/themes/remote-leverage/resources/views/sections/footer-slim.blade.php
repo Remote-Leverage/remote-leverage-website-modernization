@@ -14,11 +14,13 @@
 
     <div class="flex flex-col gap-10 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
       <a href="{{ home_url('/') }}" class="inline-block shrink-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple">
+        {{-- The stacked lockup, not the single-line logo.svg the header uses: the comp sets the
+             footer mark on two lines. brightness-0 invert paints the purple artwork white. --}}
         <img
-          src="{{ Vite::asset('resources/images/logo.svg') }}"
+          src="{{ Vite::asset('resources/images/rl-logo-5.png') }}"
           alt="{{ $siteName ?? 'Remote Leverage' }}"
-          width="243"
-          height="67"
+          width="1286"
+          height="387"
           loading="lazy"
           decoding="async"
           class="h-12 w-auto max-w-full object-contain object-left brightness-0 invert sm:h-[67px]"

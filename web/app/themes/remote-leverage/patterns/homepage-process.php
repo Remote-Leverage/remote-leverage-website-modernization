@@ -18,25 +18,15 @@ $steps[2]['title'] = 'Interview and Hire<br>Your Favorite';
 ?>
 <!-- wp:group {"align":"full","className":"px-4 sm:px-6 lg:px-8","style":{"spacing":{"padding":{"top":"5rem","bottom":"5.5rem"}}},"backgroundColor":"bg-light","layout":{"type":"constrained","contentSize":"1380px"}} -->
 <div class="wp-block-group alignfull px-4 sm:px-6 lg:px-8 has-bg-light-background-color has-background" style="padding-top:5rem;padding-bottom:5.5rem">
-    <!-- wp:columns {"verticalAlignment":"top","style":{"spacing":{"blockGap":{"left":"4rem"}}}} -->
-    <div class="wp-block-columns are-vertically-aligned-top">
-        <!-- wp:column {"verticalAlignment":"top","width":"52%"} -->
-        <div class="wp-block-column is-vertically-aligned-top" style="flex-basis:52%">
-            <!-- wp:heading {"level":2,"style":{"typography":{"lineHeight":"1.08","letterSpacing":"-0.02em"}},"fontSize":"huge"} -->
-            <h2 class="wp-block-heading has-huge-font-size" style="letter-spacing:-0.02em;line-height:1.08">How Hiring Works<br>With Remote Leverage</h2>
-            <!-- /wp:heading -->
-        </div>
-        <!-- /wp:column -->
-
-        <!-- wp:column {"verticalAlignment":"top","width":"48%"} -->
-        <div class="wp-block-column is-vertically-aligned-top" style="flex-basis:48%">
-            <!-- wp:paragraph {"style":{"typography":{"lineHeight":"1.6"}}} -->
-            <p style="line-height:1.6">Hire top-tier talent in just 48 hours. We screen thousands of applicants daily, so you only meet the top 1%. Move from open role to working team member in days, not weeks.</p>
-            <!-- /wp:paragraph -->
-        </div>
-        <!-- /wp:column -->
+    <?php /* Heading beside its intro on desktop, stacked on mobile. A core wp:columns block was
+         staying side by side at 376px here — the theme does not load core's column stacking
+         CSS — which set the heading one word per line. */ ?>
+    <!-- wp:html -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[52%_1fr] lg:gap-16 lg:items-start">
+        <h2 class="font-display text-4xl sm:text-5xl lg:text-[48px] font-bold leading-[1.08] tracking-[-0.02em] text-brand-hero">How Hiring Works<br class="hidden sm:inline">With Remote Leverage</h2>
+        <p class="text-base leading-[1.6] text-black lg:pt-2">Hire top-tier talent in just 48 hours. We screen thousands of applicants daily, so you only meet the top 1%. Move from open role to working team member in days, not weeks.</p>
     </div>
-    <!-- /wp:columns -->
+    <!-- /wp:html -->
 
     <?= BlockDefaults::renderBlockWithRepeater(
         'process-steps',

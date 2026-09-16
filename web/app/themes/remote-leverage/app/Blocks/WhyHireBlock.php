@@ -90,6 +90,7 @@ class WhyHireBlock extends Block
             'proofTitle' => get_field('proof_title') ?: "We've helped more than 2,000 businesses hire top talent across LatAm, the Caribbean and the EU.",
             'headingAlign' => get_field('heading_align') ?: 'left',
             'proofChrome' => get_field('proof_chrome') ?: 'full',
+            'proofBackground' => get_field('proof_background') ?: 'midnight',
             'cards' => $this->cards(),
         ];
     }
@@ -120,6 +121,14 @@ class WhyHireBlock extends Block
                     .'paragraph below it. Bare is the 2026 homepage — gold stars and the quote, nothing else.',
                 'choices' => ['full' => 'Rating pill and closing paragraph (default)', 'bare' => 'Stars and quote only'],
                 'default_value' => 'full',
+                'return_format' => 'value',
+            ])
+            ->addSelect('proof_background', [
+                'label' => 'Proof Card Ground',
+                'instructions' => 'Midnight is the flat #250D4A production paints. Violet is the 2026 homepage: '
+                    .'#6410A6 with a #7616B6 radial behind the globe.',
+                'choices' => ['midnight' => 'Flat midnight #250D4A (default)', 'violet' => 'Violet gradient (2026 homepage)'],
+                'default_value' => 'midnight',
                 'return_format' => 'value',
             ])
             ->addTextarea('proof_title', [

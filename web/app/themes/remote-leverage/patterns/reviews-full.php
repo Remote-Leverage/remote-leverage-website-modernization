@@ -15,4 +15,4 @@
 <!-- wp:pattern {"slug":"remote-leverage/reviews-process-steps"} /-->
 <!-- wp:pattern {"slug":"remote-leverage/reviews-guarantee-6mo"} /-->
 <!-- wp:pattern {"slug":"remote-leverage/reviews-faq"} /-->
-<!-- wp:pattern {"slug":"remote-leverage/booking-footer"} /-->
+<!-- wp:pattern {"slug":"remote-leverage/reviews-booking-footer"} /-->

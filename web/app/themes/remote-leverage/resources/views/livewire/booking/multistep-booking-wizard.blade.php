@@ -438,8 +438,10 @@
         >
           @if ($skin !== 'naked')
             <div class="space-y-1 mb-6">
-              <h3 class="text-xl font-bold font-display text-brand-hero tracking-tight">Your Contact Information</h3>
-              <p class="text-xs text-slate-600">Provide your contact details so our advisor can review your company requirements.</p>
+              <h3 class="text-xl font-bold font-display text-brand-hero tracking-tight">{{ $cardTitle }}</h3>
+              @if ($cardSubtitle !== '')
+                <p class="text-xs text-slate-600">{{ $cardSubtitle }}</p>
+              @endif
             </div>
           @endif
 

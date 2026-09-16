@@ -1,7 +1,5 @@
 <?php
 
-use App\Support\BlockDefaults;
-
 /**
  * Title: Homepage Comparison - Skip the Hiring Headache
  * Slug: remote-leverage/homepage-headache

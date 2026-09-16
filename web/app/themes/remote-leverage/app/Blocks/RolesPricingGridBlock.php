@@ -77,6 +77,7 @@ class RolesPricingGridBlock extends Block
                 'choices' => [
                     'stacked' => 'Photo on top, tasks and tools below (default)',
                     'split-chip' => 'Salary chip left, role copy right',
+                    'photo-split' => 'Photo left, role copy right (production /reviews/)',
                 ],
                 'default_value' => 'stacked',
             ])

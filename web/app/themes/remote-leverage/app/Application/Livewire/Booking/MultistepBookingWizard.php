@@ -64,6 +64,17 @@ class MultistepBookingWizard extends Component
 
     public string $buttonText = 'Book a Consultation';
 
+    /**
+     * Heading and supporting line on the card, above the fields.
+     *
+     * Defaults are what every page carrying the light/glass card already renders; the 2026
+     * homepage's booking footer names its own ("Book a Free 15-Minute Consultation", with no
+     * supporting line).
+     */
+    public string $cardTitle = 'Your Contact Information';
+
+    public string $cardSubtitle = 'Provide your contact details so our advisor can review your company requirements.';
+
     // Step 1: Contact / Qualification Details
     public string $email = '';
 

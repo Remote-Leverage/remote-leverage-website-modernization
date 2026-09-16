@@ -9,6 +9,13 @@
   $isCentred = ($headingAlign ?? 'left') === 'center';
   $bareProof = ($proofChrome ?? 'full') === 'bare';
 
+  // Proof card ground. 'midnight' is the flat #250D4A every page shipping this block was
+  // measured against; 'violet' is the 2026 homepage's #6410A6 with a #7616B6 radial blooming
+  // behind the globe (per direction 2026-09-16).
+  $proofSurface = ($proofBackground ?? 'midnight') === 'violet'
+    ? 'background-color:#6410A6;background-image:radial-gradient(70% 55% at 50% 78%, #7616B6 0%, rgba(118,22,182,0) 76%);'
+    : 'background-color:#250D4A;';
+
   $globeUrl = BlockDefaults::hireVaImg('globe-1.png');
 
   $cardIcons = [
@@ -37,7 +44,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
       
       {{-- Left Column: Massive Dark Purple Card with Bleeding Globe --}}
-      <div class="lg:col-span-5 bg-[#250D4A] rounded-card-lg p-8 sm:p-10 text-white relative overflow-hidden shadow-lg flex flex-col justify-between min-h-[480px]">
+      <div class="lg:col-span-5 rounded-card-lg p-8 sm:p-10 text-white relative overflow-hidden shadow-lg flex flex-col justify-between min-h-[480px]" style="{{ $proofSurface }}">
         <div class="relative z-10">
           {{-- 5-Star Rating --}}
           <div @class([

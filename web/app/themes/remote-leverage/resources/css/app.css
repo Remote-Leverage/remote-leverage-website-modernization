@@ -270,6 +270,65 @@ body.admin-bar {
     min-height: calc(100dvh - var(--rl-header-h) - var(--rl-admin-bar-h, 0px));
   }
 
+  /*
+   * Homepage hero talent cards: a slow idle float, and a lift-and-straighten on hover.
+   *
+   * The rotation lives in --rl-card-rot rather than a Tailwind rotate-* utility because both
+   * the float keyframes and the hover state have to rebuild the whole transform — a utility's
+   * `rotate` would be overwritten the moment either one sets `transform`, and the card would
+   * snap square. Each card sets the property and its own animation-delay inline, so the four
+   * drift out of phase instead of bobbing in unison.
+   *
+   * Hover cancels the animation and straightens the card, which is why the transition has to
+   * cover transform as well as box-shadow.
+   */
+  .rl-hero-card {
+    --rl-card-rot: 0deg;
+    transform: rotate(var(--rl-card-rot));
+    transform-origin: 50% 60%;
+    animation: rl-hero-card-float 7s ease-in-out infinite;
+    transition: transform 0.45s cubic-bezier(0.22, 0.7, 0.28, 1);
+    will-change: transform;
+  }
+
+  .rl-hero-card:hover {
+    animation-play-state: paused;
+    transform: rotate(0deg) translateY(-14px) scale(1.045);
+    z-index: 30;
+  }
+
+  /* The shadow belongs to the card itself, not the positioning wrapper: a filter here would
+     also blur the wrapper's own stacking context and double up on the card's box-shadow. */
+  .rl-hero-card > * {
+    transition: box-shadow 0.45s ease;
+  }
+
+  .rl-hero-card:hover > * {
+    box-shadow: 0 30px 46px -20px rgb(19 19 47 / 0.5);
+  }
+
+  @keyframes rl-hero-card-float {
+    0%,
+    100% {
+      transform: rotate(var(--rl-card-rot)) translateY(0);
+    }
+    50% {
+      transform: rotate(var(--rl-card-rot)) translateY(-12px);
+    }
+  }
+
+  /* Someone who has asked for less motion still gets the hover feedback, just without the
+     perpetual drift and without the card travelling. */
+  @media (prefers-reduced-motion: reduce) {
+    .rl-hero-card {
+      animation: none;
+    }
+
+    .rl-hero-card:hover {
+      transform: rotate(0deg) scale(1.02);
+    }
+  }
+
   /* General Site Container (1380px) */
   .site-container,
   .rl-container {

@@ -31,6 +31,7 @@ ALLOWLIST = [
     "NONCE_SALT",
     "APP_KEY",
     "ACF_PRO_KEY",
+    # Scheduling — Calendly
     "CALENDLY_API_KEY",
     "CALENDLY_API_KEY_2",
     "CALENDLY_API_KEY_3",
@@ -39,30 +40,42 @@ ALLOWLIST = [
     "CALENDLY_DEFAULT_EVENT_TYPE",
     "CALENDLY_T10_EVENT_TYPE",
     "CALENDLY_T0_EVENT_TYPE",
+    "CALENDLY_LIVE_CALL_EVENT_TYPE",
+    # Without this the Calendly webhook returns 503 and processes nothing.
+    "CALENDLY_WEBHOOK_SIGNING_KEY",
+    # Scheduling — Google Calendar
     "GOOGLE_CALENDAR_CLIENT_ID",
     "GOOGLE_CALENDAR_CLIENT_SECRET",
-    "GOOGLE_OAUTH_CLIENT_ID",
-    "GOOGLE_OAUTH_CLIENT_SECRET",
     "GOOGLE_CALENDAR_REFRESH_TOKEN",
     "GOOGLE_CALENDAR_ID",
+    # Tracking
     "CUSTOMERIO_SITE_ID",
     "CUSTOMERIO_API_KEY",
     "CUSTOMERIO_APP_API_KEY",
+    # Browser CDP snippet — a different credential from CUSTOMERIO_SITE_ID.
+    "CUSTOMERIO_CDP_WRITE_KEY",
+    "POSTHOG_API_KEY",
+    "POSTHOG_HOST",
+    # Payments — Stripe
     "STRIPE_KEY",
     "STRIPE_SECRET",
     "STRIPE_TEST_KEY",
     "STRIPE_TEST_SECRET",
+    # Without this the Stripe webhook returns 503 and processes nothing.
     "STRIPE_WEBHOOK_SECRET",
     "STRIPE_CONNECT_CLIENT_ID",
-    "GEMINI_API_KEY",
-    "REFERRAL_WEBHOOK_SECRET",
-    "ZEROBOUNCE_API_KEY",
-    "POSTHOG_API_KEY",
-    "POSTHOG_HOST",
-    "NOTION_API_KEY",
-    "NOTION_PARTNERS_DATABASE_ID",
+    "STRIPE_WEBHOOK_FORWARD_URL",
+    # Lead / CRM
+    "HUBSPOT_ACCESS_TOKEN",
+    "HUBSPOT_PORTAL_ID",
     "SLACK_WEBHOOK_URL",
     "LEAD_WEBHOOK_URL",
+    "REFERRAL_WEBHOOK_URL",
+    # Monitoring
+    "SENTRY_LARAVEL_DSN",
+    # AI
+    "GEMINI_API_KEY",
+    # Mail
     "MAIL_HOST",
     "MAIL_PORT",
     "MAIL_USERNAME",
@@ -70,6 +83,16 @@ ALLOWLIST = [
     "MAIL_FROM_ADDRESS",
     "MAIL_FROM_NAME",
 ]
+
+# Deliberately NOT on the allowlist, so they are not resurrected by a stale GitHub secret:
+#   ZEROBOUNCE_API_KEY, REFERRAL_WEBHOOK_SECRET, NOTION_API_KEY, NOTION_PARTNERS_DATABASE_ID,
+#   GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET
+#     — nothing reads any of these; see docs/configuration.md "Keys removed from .env".
+#   STRIPE_DEFAULT_THANKYOU_URL
+#     — PaymentGatewayBlock defaults to home_url() of the thank-you page, which is correct on
+#       every host. Setting it per environment is how a local .test URL once reached staging.
+#   DB_*, WP_HOME, WP_SITEURL
+#     — supplied by the ECS task definition, per this script's docstring.
 
 
 def incoming_secrets() -> dict[str, str]:
