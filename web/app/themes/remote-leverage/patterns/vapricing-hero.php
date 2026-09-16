@@ -62,7 +62,7 @@ use App\Support\BlockDefaults;
 
         <!-- wp:column {"verticalAlignment":"center","width":"62%"} -->
         <div class="wp-block-column is-vertically-aligned-center" style="flex-basis:62%">
-            <?= BlockDefaults::renderVaPricingTalentGrid() ?>
+            <?= BlockDefaults::renderVaPricingTalentGrid(['layout' => 'swipe']) ?>
         </div>
         <!-- /wp:column -->
     </div>

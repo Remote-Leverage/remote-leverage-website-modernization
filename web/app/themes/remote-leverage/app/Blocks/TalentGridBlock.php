@@ -43,6 +43,10 @@ class TalentGridBlock extends Block
             'cards' => $this->cards(),
             // 'row' matches the partner landing pages, where production shows one
             // horizontally scrolling row instead of the default wrapping grid.
+            // 'swipe' keeps that desktop grid but swipes on mobile, where eight portrait
+            // cards two-across cost 1,246px of a 1,746px hero — production spends 227px on
+            // the same profiles by scrolling them. Not the default: it changes mobile
+            // layout, so pages opt in.
             'layout' => (string) ((function_exists('get_field') ? get_field('layout') : null) ?: 'grid'),
         ];
     }
@@ -54,7 +58,11 @@ class TalentGridBlock extends Block
         $fields
             ->addSelect('layout', [
                 'label' => 'Layout',
-                'choices' => ['grid' => 'Wrapping grid (4 across)', 'row' => 'Single scrolling row'],
+                'choices' => [
+                    'grid' => 'Wrapping grid (4 across)',
+                    'row' => 'Single scrolling row',
+                    'swipe' => 'Swipeable row on mobile, grid on desktop',
+                ],
                 'default_value' => 'grid',
             ])
             ->addRepeater('talent_cards', [
