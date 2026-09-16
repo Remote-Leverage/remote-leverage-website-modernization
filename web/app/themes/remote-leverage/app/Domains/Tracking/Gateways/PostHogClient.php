@@ -56,13 +56,28 @@ class PostHogClient
         }
 
         try {
-            $response = Http::post("{$this->host}/decide/?v=3", [
+            // `/flags/?v=2`, not the deprecated `/decide/?v=3` PostHog superseded. The shapes
+            // differ: /decide returned a flat `featureFlags` map of key => value, /flags
+            // returns `flags` as key => {enabled, variant, …}. Both are read below, because a
+            // self-hosted instance may still be on the older response.
+            $response = Http::post("{$this->host}/flags/?v=2", [
                 'api_key' => $this->apiKey,
                 'distinct_id' => $distinctId,
                 'person_properties' => $personProperties,
             ]);
 
             if ($response->successful()) {
+                $flag = $response->json("flags.{$flagKey}");
+
+                if (is_array($flag)) {
+                    return (bool) ($flag['enabled'] ?? false);
+                }
+
+                if ($flag !== null) {
+                    return (bool) $flag;
+                }
+
+                // Legacy shape.
                 $flags = $response->json('featureFlags', []);
 
                 return ! empty($flags[$flagKey]);

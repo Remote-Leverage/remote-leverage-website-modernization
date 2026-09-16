@@ -29,6 +29,13 @@ return [
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
         'client_id' => env('STRIPE_CONNECT_CLIENT_ID'),
 
+        /*
+         * Referrer payouts (Stripe Connect) are shelved until further notice (2026-09-16).
+         * Off means StripeConnectGateway makes no outbound call at all — no account creation,
+         * no onboarding link, no transfer. Set STRIPE_CONNECT_ENABLED=true to bring it back.
+         */
+        'connect_enabled' => filter_var(env('STRIPE_CONNECT_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+
         'test_mode' => filter_var(env('STRIPE_TEST_MODE', false), FILTER_VALIDATE_BOOLEAN),
         'live_publishable_key' => env('STRIPE_KEY'),
         'live_secret_key' => env('STRIPE_SECRET'),

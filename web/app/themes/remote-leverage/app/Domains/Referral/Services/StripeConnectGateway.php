@@ -15,10 +15,31 @@ class StripeConnectGateway
 
     protected ?string $clientId;
 
+    protected bool $enabled;
+
     public function __construct()
     {
         $this->secretKey = config('services.stripe.secret');
         $this->clientId = config('services.stripe.client_id');
+        $this->enabled = (bool) config('services.stripe.connect_enabled', false);
+    }
+
+    /**
+     * Whether Stripe Connect is switched on for this environment.
+     *
+     * Referrer payouts are shelved until further notice (2026-09-16), so this defaults to
+     * **off** and both outbound calls below return null rather than reaching Stripe. The
+     * guard lives here, at the single gateway both call paths go through
+     * (`ProcessPayoutAction` and `ReferrerRegistrationForm`), so there is no second place
+     * for it to be forgotten.
+     *
+     * This is deliberately not keyed off `STRIPE_CONNECT_CLIENT_ID` being blank: that would
+     * make "someone pasted a client id" silently equivalent to "the feature is live".
+     * Re-enable with `STRIPE_CONNECT_ENABLED=true`.
+     */
+    public function enabled(): bool
+    {
+        return $this->enabled;
     }
 
     /**
@@ -26,6 +47,10 @@ class StripeConnectGateway
      */
     public function createOnboardingLink(Referrer $referrer, string $returnUrl, string $refreshUrl): ?string
     {
+        if (! $this->enabled) {
+            return null;
+        }
+
         if (! $this->secretKey) {
             Log::warning('StripeConnectGateway: Missing Stripe secret key.');
 
@@ -89,6 +114,10 @@ class StripeConnectGateway
      */
     public function transferPayout(Payout $payout): ?string
     {
+        if (! $this->enabled) {
+            return null;
+        }
+
         if (! $this->secretKey) {
             Log::warning('StripeConnectGateway: Missing Stripe secret key.');
 
