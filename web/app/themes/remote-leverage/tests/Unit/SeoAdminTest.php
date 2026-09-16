@@ -122,21 +122,33 @@ describe('SeoMenu', function () {
             ->and(array_keys($GLOBALS['submenu']['wpseo_dashboard']))->toBe([0, 1, 2]);
     });
 
-    it('rebrands the admin bar node', function () {
-        $bar = new \WP_Admin_Bar;
-        $bar->add_node(['id' => 'wpseo-menu', 'title' => 'Yoast SEO']);
+    it('switches the toolbar menu off at Yoast own gate', function () {
+        $menu = new SeoMenu;
 
-        (new SeoMenu)->rebrandAdminBar($bar);
-
-        expect($bar->get_node('wpseo-menu')['title'])->toBe('SEO');
+        // WPSEO_Admin_Bar_Menu::register_hooks() bails on this before adding the node or
+        // enqueueing its front-end and admin stylesheets.
+        expect($menu->disableAdminBarMenu(['enable_admin_bar_menu' => true])['enable_admin_bar_menu'])
+            ->toBeFalse()
+            // Other keys in the option are left exactly as they were.
+            ->and($menu->disableAdminBarMenu(['enable_xml_sitemap' => true]))
+            ->toBe(['enable_xml_sitemap' => true, 'enable_admin_bar_menu' => false]);
     });
 
-    it('leaves the admin bar alone when Yoast has no node', function () {
+    it('passes a non-array option straight through', function () {
+        // The option can legitimately be false before Yoast has ever written it.
+        expect((new SeoMenu)->disableAdminBarMenu(false))->toBeFalse();
+    });
+
+    it('removes the toolbar node if something re-enabled it behind the option', function () {
         $bar = new \WP_Admin_Bar;
+        $bar->add_node(['id' => 'wpseo-menu', 'title' => 'Yoast SEO']);
+        $bar->add_node(['id' => 'site-name', 'title' => 'Remote Leverage']);
 
-        (new SeoMenu)->rebrandAdminBar($bar);
+        (new SeoMenu)->removeAdminBarMenu($bar);
 
-        expect($bar->get_node('wpseo-menu'))->toBeNull();
+        expect($bar->get_node('wpseo-menu'))->toBeNull()
+            // Nothing else on the toolbar is touched.
+            ->and($bar->get_node('site-name'))->not->toBeNull();
     });
 });
 
@@ -665,47 +677,6 @@ describe('Settings upsell rail', function () {
         expect($css)->toContain('div[class*="yst-fixed"][class*="yst-end-8"]')
             // Hiding it alone would leave 17.5rem of empty inline-end padding behind.
             ->toContain('padding-inline-end: 0 !important');
-    });
-});
-
-describe('SeoMenu admin bar', function () {
-    it('removes the storefront nodes the toolbar keeps separately from the admin menu', function () {
-        $bar = new \WP_Admin_Bar;
-        $bar->add_node(['id' => 'wpseo-menu', 'title' => 'Yoast SEO']);
-        $bar->add_node(['id' => 'wpseo-notifications', 'title' => 'Notifications']);
-        $bar->add_node(['id' => 'wpseo-settings', 'title' => 'SEO Settings']);
-        $bar->add_node(['id' => 'wpseo-academy', 'title' => 'Academy']);
-        $bar->add_node(['id' => 'wpseo-get-premium', 'title' => 'Upgrade']);
-        // Underscores, unlike every sibling — taken from the rendered toolbar.
-        $bar->add_node(['id' => 'wpseo_brand_insights', 'title' => 'AI Brand Insights']);
-
-        (new SeoMenu)->rebrandAdminBar($bar);
-
-        expect($bar->get_node('wpseo-academy'))->toBeNull()
-            ->and($bar->get_node('wpseo-get-premium'))->toBeNull()
-            ->and($bar->get_node('wpseo_brand_insights'))->toBeNull()
-            // The working ones stay.
-            ->and($bar->get_node('wpseo-notifications'))->not->toBeNull()
-            ->and($bar->get_node('wpseo-settings'))->not->toBeNull();
-    });
-
-    it('swaps the Yoast mark for a dashicon without losing the score or counter', function () {
-        $title = '<div id="yoast-ab-icon" class="ab-item yoast-logo svg" style="background-image: url(&quot;data:image/svg+xml;base64,PHN2Zw==&quot;)"></div>'
-            .'<div class="wpseo-score-icon good"></div>'
-            .'<span class="update-plugins count-22"><span class="plugin-count">22</span></span>';
-
-        $rebranded = SeoMenu::rebrandBarTitle($title);
-
-        expect($rebranded)->toContain('ab-icon dashicons dashicons-search')
-            ->not->toContain('yoast-ab-icon')
-            ->not->toContain('base64')
-            // The three live pieces that follow the logo in the same string survive.
-            ->and($rebranded)->toContain('wpseo-score-icon good')
-            ->and($rebranded)->toContain('count-22');
-    });
-
-    it('leaves a title that never had the logo markup alone', function () {
-        expect(SeoMenu::rebrandBarTitle('Yoast SEO'))->toBe('SEO');
     });
 });
 

@@ -76,8 +76,18 @@ class SeoMenu
         // its script enqueued, rather than hidden after the fact.
         add_filter('wpseo_helpscout_show_beacon', '__return_false');
 
+        // Yoast's own gate for the toolbar menu. WPSEO_Admin_Bar_Menu::register_hooks() bails
+        // on this before adding anything, so the node is never built and its front-end and
+        // admin stylesheets are never enqueued — as opposed to removing the node afterwards,
+        // which would still pay for both. Yoast reads it on `wp_loaded`; Acorn boots on
+        // `after_setup_theme`, so this filter is always in place first.
+        add_filter('option_wpseo', [$this, 'disableAdminBarMenu']);
+        add_filter('default_option_wpseo', [$this, 'disableAdminBarMenu']);
+
         add_action('admin_menu', [$this, 'rebrand'], 100);
-        add_action('admin_bar_menu', [$this, 'rebrandAdminBar'], 100);
+        // Belt and braces for the multisite path, where network options can re-enable the menu
+        // behind the site-level one.
+        add_action('admin_bar_menu', [$this, 'removeAdminBarMenu'], 999);
         add_filter('admin_title', [$this, 'filterAdminTitle'], 10, 2);
     }
 
@@ -165,79 +175,31 @@ class SeoMenu
     }
 
     /**
-     * Admin-bar nodes that are storefront, not function.
+     * Force Yoast's toolbar menu off, whatever the stored option says.
      *
-     * Ids read off the rendered toolbar rather than the source — `wpseo_brand_insights` uses
-     * underscores where every sibling uses hyphens, which is not something you would guess.
-     *
-     * @var list<string>
+     * @param  mixed  $option  The `wpseo` option, normally an array.
+     * @return mixed
      */
-    private const REMOVED_ADMIN_BAR_NODES = [
-        'wpseo-academy',
-        'wpseo-get-premium',
-        'wpseo_brand_insights',
-    ];
-
-    /**
-     * Clean up the toolbar's SEO menu: our icon, our name, none of the storefront.
-     *
-     * The menu removals here are separate from the admin-menu ones — WP_Admin_Bar keeps its own
-     * node tree, so stripping `wpseo_submenu_pages` does nothing to the toolbar. That is why
-     * Academy, Upgrade and AI Brand Insights survived the first pass.
-     */
-    public function rebrandAdminBar(\WP_Admin_Bar $bar): void
+    public function disableAdminBarMenu($option)
     {
-        foreach (self::REMOVED_ADMIN_BAR_NODES as $id) {
-            $bar->remove_node($id);
+        if (! is_array($option)) {
+            return $option;
         }
 
-        $node = $bar->get_node('wpseo-menu');
+        $option['enable_admin_bar_menu'] = false;
 
-        if ($node === null) {
-            return;
-        }
-
-        $bar->add_node([
-            'id' => 'wpseo-menu',
-            'title' => self::rebrandBarTitle(self::nodeTitle($node)),
-        ]);
+        return $option;
     }
 
     /**
-     * Swap the Yoast mark in the toolbar for a dashicon, keeping everything after it.
+     * Remove the toolbar node if something re-enabled it behind the option.
      *
-     * The title is a concatenation — logo, then the current page's score badge, the notification
-     * counter and the notification popup — so it cannot simply be replaced wholesale without
-     * losing three live pieces of UI. The logo itself is a `<div id="yoast-ab-icon">` carrying a
-     * base64 SVG background, and `.ab-icon` is what WordPress expects a toolbar glyph to be.
+     * Removing the root takes its children with it, so the score, notification and settings
+     * sub-nodes need no separate handling.
      */
-    public static function rebrandBarTitle(string $title): string
+    public function removeAdminBarMenu(\WP_Admin_Bar $bar): void
     {
-        $withoutLogo = preg_replace(
-            '/<div id="yoast-ab-icon".*?<\/div>/s',
-            '<span class="ab-icon dashicons dashicons-search" aria-hidden="true"></span>',
-            $title
-        ) ?? $title;
-
-        return self::stripVendor($withoutLogo);
-    }
-
-    /**
-     * Read a node's title regardless of whether it arrives as an object or an array.
-     *
-     * WP_Admin_Bar::get_node() returns a stdClass in core; the theme's test stub returns an
-     * array, and enough existing tests depend on that shape that changing it is not worth the
-     * churn. Accepting both keeps this method exercisable without a live WordPress.
-     *
-     * @param  object|array<string, mixed>  $node
-     */
-    private static function nodeTitle(object|array $node): string
-    {
-        if (is_array($node)) {
-            return (string) ($node['title'] ?? '');
-        }
-
-        return (string) ($node->title ?? '');
+        $bar->remove_node('wpseo-menu');
     }
 
     /**

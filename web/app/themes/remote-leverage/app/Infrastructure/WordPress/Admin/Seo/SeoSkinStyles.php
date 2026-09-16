@@ -1017,8 +1017,6 @@ class SeoSkinStyles
             visibility: visible;
         }
 
-        /* --- Admin bar SEO item --- */
-        #wp-admin-bar-wpseo-menu .wpseo-score-icon { vertical-align: middle !important; }
         CSS;
     }
 

@@ -148,14 +148,22 @@ registers a src-less style handle that declares the Yoast sheets as dependencies
 Unregistered dependencies are filtered out first — naming one makes WordPress skip the whole
 stylesheet silently, which reads as "the skin randomly doesn't apply on some screens".
 
-### The admin bar is a separate tree
+### The admin bar is removed, not restyled
 
-`WP_Admin_Bar` keeps its own nodes, so filtering `wpseo_submenu_pages` does nothing to the
-toolbar — Academy, Upgrade and AI Brand Insights survived the first pass because of that.
-`SeoMenu::rebrandAdminBar()` removes them by id (`wpseo_brand_insights` uses underscores where
-every sibling uses hyphens) and swaps the `<div id="yoast-ab-icon">` logo for a dashicon, keeping
-the score badge, notification counter and popup that are concatenated after it in the same title
-string.
+The toolbar's SEO menu is switched off at Yoast's own gate: `SeoMenu::disableAdminBarMenu()`
+filters `option_wpseo` (and `default_option_wpseo`) to force `enable_admin_bar_menu` false.
+`WPSEO_Admin_Bar_Menu::register_hooks()` returns early on that check, so the node is never built
+**and** `yoast-seo-adminbar` is never enqueued on either the front end or in wp-admin — removing
+the node on `admin_bar_menu` instead would still pay for both. Yoast reads the option on
+`wp_loaded`; Acorn boots on `after_setup_theme`, so the filter is always in place first.
+
+`removeAdminBarMenu()` on `admin_bar_menu` at 999 is belt and braces for the multisite path,
+where network options can re-enable the menu behind the site-level one. Removing the root node
+takes its children with it.
+
+Note this also turns off the "SEO in the admin bar" toggle on Yoast's own Settings screen: it
+will read as off and switching it on will not bring the menu back. That is intended — the
+decision lives in code, not in the database.
 
 ### The one thing that could not stay in PHP
 
