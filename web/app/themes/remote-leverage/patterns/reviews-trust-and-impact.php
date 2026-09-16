@@ -44,7 +44,7 @@ use App\Support\BlockDefaults;
             </a>
         </div>
 
-        <?php // The stat graphic sits below the headline here, not beside it. ?>
+        <?php // The stat graphic sits below the headline here, not beside it.?>
         <div class="mx-auto max-w-[760px]">
             <?php echo BlockDefaults::renderTrustStats(); ?>
         </div>

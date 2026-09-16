@@ -15,10 +15,12 @@ use App\Support\BlockDefaults;
     <div class="wp-block-columns" style="margin-bottom:3rem">
         <!-- wp:column {"width":"60%"} -->
         <div class="wp-block-column" style="flex-basis:60%">
-            <?php // 40px/1.08, measured off production's /reviews/ h1 on 2026-09-16.
-                  // The "huge" preset is 48px and was overshooting. ?>
-            <!-- wp:heading {"level":1,"style":{"typography":{"fontSize":"40px","lineHeight":"1.08","letterSpacing":"-0.03em"}}} -->
-            <h1 class="wp-block-heading" style="font-size:40px;letter-spacing:-0.03em;line-height:1.08">
+            <?php // Production's /reviews/ h1 measures 40px, but app.css enforces 48px on every
+                  // h1 with !important as a design-system rule (docs/design-system.md, --text-section).
+                  // Left on the system size deliberately: an inline override here is silently
+                  // ignored, so pretending otherwise would be dead code.?>
+            <!-- wp:heading {"level":1,"style":{"typography":{"lineHeight":"1.08","letterSpacing":"-0.03em"}},"fontSize":"huge"} -->
+            <h1 class="wp-block-heading has-huge-font-size" style="letter-spacing:-0.03em;line-height:1.08">
                 Client Reviews
             </h1>
             <!-- /wp:heading -->

@@ -355,6 +355,23 @@ objections:
 Settings are not carried over automatically: the plugin's configuration lives in the production
 database, and moving it is a separate step from adding the dependency.
 
+**Production runs three security plugins, and only WordFence is doing enforcement** (audited
+2026-09-16 from the backup, so only WordFence is ported):
+
+| Plugin | State on production | Why it is not ported |
+| :--- | :--- | :--- |
+| `wordfence` 9.0.0 | Active, WAF wired via `auto_prepend_file` since 2025-05-29 (`wordfence-waf.php`, logs to `wp-content/wflogs/`) | **Ported** — this entry |
+| `wp-fail2ban` 5.4.1 | Active, but **no `WP_FAIL2BAN_*` constant is set in `wp-config.php`**, so it runs on defaults | Defaults only write syslog lines; blocking needs matching `fail2ban` jails on the host. Production is managed hosting and v2 is ECS — neither gives us host jails, so it would be log noise |
+| `malcare-security` 6.69 | Active | Its firewall wants `auto_prepend_file` too (`protect/prepend`), and WordFence already owns it — only one can. Whether it is even connected to the MalCare service is not observable from the backup |
+
+So "production has three, v2 has one" is not the gap it first looks like: one enforces, one is
+inert without host access, and one cannot hold the hook it needs. Neither omission is a silent
+downgrade.
+
+Unverified, and deliberately so: no `wf*` or `bv*` tables and no `wp-content/wflogs/` are present
+in the backup. That is far more likely to be the backup tool excluding security-plugin data than
+evidence the plugins never ran — it is not treated as a finding either way.
+
 ### 32. v2 inherits **both** production GTM containers
 Production serves two containers, `GTM-53JDTQCZ` and `GTM-P4KZNJWL` (read off its HTML,
 2026-09-15). Site Kit is connected to **both**, for straight parity: every tag already living in

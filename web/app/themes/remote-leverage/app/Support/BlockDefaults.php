@@ -307,7 +307,7 @@ class BlockDefaults
         }
 
         $themePath = get_theme_file_path('public/images/'.$path);
-        if (is_file($themePath)) {
+        if (self::isUsableImage($themePath)) {
             return esc_url(set_url_scheme(get_template_directory_uri().'/public/images/'.$path, 'https'));
         }
 
@@ -345,13 +345,36 @@ class BlockDefaults
         foreach ($dirs as $dir => $url) {
             foreach (['webp', 'png', 'jpg', 'jpeg', 'svg'] as $ext) {
                 $path = $dir.'/'.$name.'.'.$ext;
-                if (is_file($path)) {
+                if (self::isUsableImage($path)) {
                     return esc_url(set_url_scheme(rtrim($url, '/').'/'.$name.'.'.$ext, 'https'));
                 }
             }
         }
 
         return esc_url(set_url_scheme(self::imgBase().'/'.$file, 'https'));
+    }
+
+    /**
+     * Whether a candidate path is a file the browser can actually draw.
+     *
+     * Existence is not enough. Staging's EFS uploads have carried a zero-byte
+     * `home/Frame-1092.webp` more than once: it answers 200 with content-length 0, so the
+     * browser renders alt text while every check that only asks `is_file()` reports the asset
+     * present. Because the uploads directories are searched before the theme's own copies, one
+     * empty file there permanently shadowed a perfectly good `public/images/hire-va-4/`
+     * original on every page using that block.
+     *
+     * Treating an empty file as absent lets the search fall through to the next candidate,
+     * which fixes this class of failure wherever it appears rather than one filename at a time.
+     * preferWebp() has guarded its own conversions this way all along; homeImg(), themeImg()
+     * and resolveImageUrl() simply never got the same treatment.
+     *
+     * filesize() costs nothing extra here — PHP serves it from the stat cache is_file() just
+     * populated for the same path.
+     */
+    private static function isUsableImage(string $path): bool
+    {
+        return is_file($path) && filesize($path) > 0;
     }
 
     /**
@@ -417,7 +440,7 @@ class BlockDefaults
         // This is the branch that actually carries the sample-applicant media:
         // those files were synced into uploads/ without being registered as
         // attachments, so the library lookup above finds nothing.
-        if (defined('WP_CONTENT_DIR') && is_file(WP_CONTENT_DIR.'/uploads/'.$relative)) {
+        if (defined('WP_CONTENT_DIR') && self::isUsableImage(WP_CONTENT_DIR.'/uploads/'.$relative)) {
             // Re-encode per segment: $relative was decoded for the filesystem
             // probe, and filenames here really do contain spaces.
             $encoded = implode('/', array_map('rawurlencode', explode('/', $relative)));
