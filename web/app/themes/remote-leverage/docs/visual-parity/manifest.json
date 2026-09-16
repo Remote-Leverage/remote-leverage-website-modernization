@@ -1,0 +1,665 @@
+{
+  "desktop": {
+    "width": 1440,
+    "height": 1000
+  },
+  "mobile": {
+    "width": 390,
+    "height": 844
+  },
+  "hosts": {
+    "local": "https://remoteleverage-v2.test",
+    "production": "https://remoteleverage.com"
+  },
+  "pages": [
+    {
+      "slug": "case-study--archive",
+      "type": "archive",
+      "postId": null,
+      "local": "/case-study/",
+      "production": "/case-study/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--anchorage-care-coordination",
+      "type": "case_study",
+      "postId": 390,
+      "local": "/case-study/anchorage-care-coordination/",
+      "production": "/case-study/anchorage-care-coordination/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--bench-accounting",
+      "type": "case_study",
+      "postId": 385,
+      "local": "/case-study/bench-accounting/",
+      "production": "/case-study/bench-accounting/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--chick-fil-a",
+      "type": "case_study",
+      "postId": 384,
+      "local": "/case-study/chick-fil-a/",
+      "production": "/case-study/chick-fil-a/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--clean-cozy-home",
+      "type": "case_study",
+      "postId": 391,
+      "local": "/case-study/clean-cozy-home/",
+      "production": "/case-study/clean-cozy-home/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--conservice",
+      "type": "case_study",
+      "postId": 396,
+      "local": "/case-study/conservice/",
+      "production": "/case-study/conservice/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--construction-home-services-virtual-assistants",
+      "type": "case_study",
+      "postId": 405,
+      "local": "/case-study/construction-home-services-virtual-assistants/",
+      "production": "/case-study/construction-home-services-virtual-assistants/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--doran-industries",
+      "type": "case_study",
+      "postId": 389,
+      "local": "/case-study/doran-industries/",
+      "production": "/case-study/doran-industries/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--double-close",
+      "type": "case_study",
+      "postId": 401,
+      "local": "/case-study/double-close/",
+      "production": "/case-study/double-close/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--emporia-consulting",
+      "type": "case_study",
+      "postId": 386,
+      "local": "/case-study/emporia-consulting/",
+      "production": "/case-study/emporia-consulting/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--fast-real-estate",
+      "type": "case_study",
+      "postId": 397,
+      "local": "/case-study/fast-real-estate/",
+      "production": "/case-study/fast-real-estate/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--gotham-lighting-supply",
+      "type": "case_study",
+      "postId": 403,
+      "local": "/case-study/gotham-lighting-supply/",
+      "production": "/case-study/gotham-lighting-supply/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--haus-of-her",
+      "type": "case_study",
+      "postId": 394,
+      "local": "/case-study/haus-of-her/",
+      "production": "/case-study/haus-of-her/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--hawaiian-philanthropy",
+      "type": "case_study",
+      "postId": 398,
+      "local": "/case-study/hawaiian-philanthropy/",
+      "production": "/case-study/hawaiian-philanthropy/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--jeremis-auto-repair",
+      "type": "case_study",
+      "postId": 387,
+      "local": "/case-study/jeremis-auto-repair/",
+      "production": "/case-study/jeremis-auto-repair/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--mobile-mixologist",
+      "type": "case_study",
+      "postId": 388,
+      "local": "/case-study/mobile-mixologist/",
+      "production": "/case-study/mobile-mixologist/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--on-the-outskirt",
+      "type": "case_study",
+      "postId": 393,
+      "local": "/case-study/on-the-outskirt/",
+      "production": "/case-study/on-the-outskirt/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--private-practices-hire-faster",
+      "type": "case_study",
+      "postId": 406,
+      "local": "/case-study/private-practices-hire-faster/",
+      "production": "/case-study/private-practices-hire-faster/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--saber-tech-group-unloads-admin",
+      "type": "case_study",
+      "postId": 402,
+      "local": "/case-study/saber-tech-group-unloads-admin/",
+      "production": "/case-study/saber-tech-group-unloads-admin/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--smiley-injury-law",
+      "type": "case_study",
+      "postId": 392,
+      "local": "/case-study/smiley-injury-law/",
+      "production": "/case-study/smiley-injury-law/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--soccer-stars",
+      "type": "case_study",
+      "postId": 395,
+      "local": "/case-study/soccer-stars/",
+      "production": "/case-study/soccer-stars/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--the-acre-hub",
+      "type": "case_study",
+      "postId": 400,
+      "local": "/case-study/the-acre-hub/",
+      "production": "/case-study/the-acre-hub/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--watson-psychiatry",
+      "type": "case_study",
+      "postId": 404,
+      "local": "/case-study/watson-psychiatry/",
+      "production": "/case-study/watson-psychiatry/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "case-study--wright-legal-group",
+      "type": "case_study",
+      "postId": 399,
+      "local": "/case-study/wright-legal-group/",
+      "production": "/case-study/wright-legal-group/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "home",
+      "type": "page",
+      "postId": 7,
+      "local": "/",
+      "production": "/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "1monthonus-flp",
+      "type": "page",
+      "postId": 1000044,
+      "local": "/1monthonus-flp/",
+      "production": "/1monthonus-flp/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "1monthonus",
+      "type": "page",
+      "postId": 1000052,
+      "local": "/1monthonus/",
+      "production": "/1monthonus/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "about-us",
+      "type": "page",
+      "postId": 209,
+      "local": "/about-us/",
+      "production": "/about-us/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "affiliate-program",
+      "type": "page",
+      "postId": 212,
+      "local": "/affiliate-program/",
+      "production": "/affiliate-program/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "blog",
+      "type": "page",
+      "postId": 799,
+      "local": "/blog/",
+      "production": "/blog/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "compare-athena",
+      "type": "page",
+      "postId": 382,
+      "local": "/compare-athena/",
+      "production": "/compare-athena/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "comparison-wing-assistant-ads",
+      "type": "page",
+      "postId": 408,
+      "local": "/comparison-wing-assistant-ads/",
+      "production": "/comparison-wing-assistant-ads/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "comparison",
+      "type": "page",
+      "postId": 323,
+      "local": "/comparison/",
+      "production": "/comparison/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "contractor-management",
+      "type": "page",
+      "postId": 1000006,
+      "local": "/contractor-management/",
+      "production": "/contractor-management/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "contractor-payments",
+      "type": "page",
+      "postId": 1000007,
+      "local": "/contractor-payments/",
+      "production": "/contractor-payments/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "contractoragreement",
+      "type": "page",
+      "postId": 1000071,
+      "local": "/contractoragreement/",
+      "production": "/contractoragreement/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "ecommerce-virtual-assistant",
+      "type": "page",
+      "postId": 1000064,
+      "local": "/ecommerce-virtual-assistant/",
+      "production": "/ecommerce-virtual-assistant/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "hire-for-less",
+      "type": "page",
+      "postId": 1000031,
+      "local": "/hire-for-less/",
+      "production": "/hire-for-less/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "hire-real-estate-virtual-assistants-flp",
+      "type": "page",
+      "postId": 1000049,
+      "local": "/hire-real-estate-virtual-assistants-flp/",
+      "production": "/hire-real-estate-virtual-assistants-flp/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "hire-va-1st-month-free",
+      "type": "page",
+      "postId": 1000040,
+      "local": "/hire-va-1st-month-free/",
+      "production": "/hire-va-1st-month-free/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "hire-va-4",
+      "type": "page",
+      "postId": 1000000,
+      "local": "/hire-va-4/",
+      "production": "/hire-va-4/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "hire-va-6",
+      "type": "page",
+      "postId": 1000041,
+      "local": "/hire-va-6/",
+      "production": "/hire-va-6/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "hire-va-email",
+      "type": "page",
+      "postId": 1000045,
+      "local": "/hire-va-email/",
+      "production": "/hire-va-email/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "hire-va-isolated-form",
+      "type": "page",
+      "postId": 1000053,
+      "local": "/hire-va-isolated-form/",
+      "production": "/hire-va-isolated-form/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "hire-va",
+      "type": "page",
+      "postId": 1000066,
+      "local": "/hire-va/",
+      "production": "/hire-va/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant-b",
+      "type": "page",
+      "postId": 1000047,
+      "local": "/hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant-b/",
+      "production": "/hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant-b/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant-c",
+      "type": "page",
+      "postId": 1000048,
+      "local": "/hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant-c/",
+      "production": "/hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant-c/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant",
+      "type": "page",
+      "postId": 1000046,
+      "local": "/hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant/",
+      "production": "/hire-virtual-assistants-from-latam-remote-leverage-isolated-form-fields-variant/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "hmchecklists",
+      "type": "page",
+      "postId": 1000073,
+      "local": "/hmchecklists/",
+      "production": "/hmchecklists/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "impact-report-2026",
+      "type": "page",
+      "postId": 1000008,
+      "local": "/impact-report-2026/",
+      "production": "/impact-report-2026/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "onboardingguide",
+      "type": "page",
+      "postId": 1000077,
+      "local": "/onboardingguide/",
+      "production": "/onboardingguide/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "payment",
+      "type": "page",
+      "postId": 1000036,
+      "local": "/payment/",
+      "production": "/payment/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "privacy-policy",
+      "type": "page",
+      "postId": 3,
+      "local": "/privacy-policy/",
+      "production": "/privacy-policy/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "recruiterchecklists",
+      "type": "page",
+      "postId": 1000074,
+      "local": "/recruiterchecklists/",
+      "production": "/recruiterchecklists/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "referral-program-thank-you-page-deposit",
+      "type": "page",
+      "postId": 1000035,
+      "local": "/referral-program-thank-you-page-deposit/",
+      "production": "/referral-program-thank-you-page-deposit/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "referral-program",
+      "type": "page",
+      "postId": 1000034,
+      "local": "/referral-program/",
+      "production": "/referral-program/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "remote-leverage-x-lano",
+      "type": "page",
+      "postId": 1000010,
+      "local": "/remote-leverage-x-lano/",
+      "production": "/remote-leverage-x-lano/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "remote-leverage-x-oyster",
+      "type": "page",
+      "postId": 1000009,
+      "local": "/remote-leverage-x-oyster/",
+      "production": "/remote-leverage-x-oyster/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "reviews",
+      "type": "page",
+      "postId": 292,
+      "local": "/reviews/",
+      "production": "/reviews/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "sales-talents",
+      "type": "page",
+      "postId": 1000076,
+      "local": "/sales-talents/",
+      "production": "/sales-talents/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "saleschecklists",
+      "type": "page",
+      "postId": 1000075,
+      "local": "/saleschecklists/",
+      "production": "/saleschecklists/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "samples",
+      "type": "page",
+      "postId": 1000005,
+      "local": "/samples/",
+      "production": "/samples/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "services",
+      "type": "page",
+      "postId": 1000070,
+      "local": "/services/",
+      "production": "/services/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "signedup",
+      "type": "page",
+      "postId": 1000032,
+      "local": "/signedup/",
+      "production": "/signedup/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "spanish",
+      "type": "page",
+      "postId": 1000038,
+      "local": "/spanish/",
+      "production": "/spanish/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "steal-back-your-time",
+      "type": "page",
+      "postId": 1000060,
+      "local": "/steal-back-your-time/",
+      "production": "/steal-back-your-time/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "stealing-jobs-lp",
+      "type": "page",
+      "postId": 1000058,
+      "local": "/stealing-jobs-lp/",
+      "production": "/stealing-jobs-lp/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "stealing-jobs",
+      "type": "page",
+      "postId": 1000056,
+      "local": "/stealing-jobs/",
+      "production": "/stealing-jobs/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "store",
+      "type": "page",
+      "postId": 1000072,
+      "local": "/store/",
+      "production": "/store/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "terms-of-use",
+      "type": "page",
+      "postId": 130,
+      "local": "/terms-of-use/",
+      "production": "/terms-of-use/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "vacalendar",
+      "type": "page",
+      "postId": 1000002,
+      "local": "/vacalendar/",
+      "production": "/vacalendar/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "vaonboardingform",
+      "type": "page",
+      "postId": 1000033,
+      "local": "/vaonboardingform/",
+      "production": "/vaonboardingform/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "vaonboardingguide",
+      "type": "page",
+      "postId": 1000078,
+      "local": "/vaonboardingguide/",
+      "production": "/vaonboardingguide/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "vapricing",
+      "type": "page",
+      "postId": 288,
+      "local": "/vapricing/",
+      "production": "/vapricing/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "vastore5",
+      "type": "page",
+      "postId": 1000050,
+      "local": "/vastore5/",
+      "production": "/vastore5/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "vathankyou",
+      "type": "page",
+      "postId": 126,
+      "local": "/vathankyou/",
+      "production": "/vathankyou/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "virtual-assistant-hiring-manager-refundable-deposit",
+      "type": "page",
+      "postId": 1000039,
+      "local": "/virtual-assistant-hiring-manager-refundable-deposit/",
+      "production": "/virtual-assistant-hiring-manager-refundable-deposit/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "wing-assistant-vs-remote-leverage",
+      "type": "page",
+      "postId": 407,
+      "local": "/wing-assistant-vs-remote-leverage/",
+      "production": "/wing-assistant-vs-remote-leverage/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "partners--lano",
+      "type": "rl_partner",
+      "postId": 1000012,
+      "local": "/partners/lano/",
+      "production": null,
+      "productionStatus": "404",
+      "note": "v2-only partner-hub route; production covers the same partnership at /remote-leverage-x-lano/, captured separately"
+    },
+    {
+      "slug": "partners--lexgo",
+      "type": "rl_partner",
+      "postId": 1000011,
+      "local": "/partners/lexgo/",
+      "production": "/partners/lexgo/",
+      "productionStatus": "200"
+    },
+    {
+      "slug": "partners--oyster",
+      "type": "rl_partner",
+      "postId": 122,
+      "local": "/partners/oyster/",
+      "production": "/partners/oyster/",
+      "productionStatus": "200"
+    }
+  ]
+}

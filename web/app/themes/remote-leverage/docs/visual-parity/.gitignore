@@ -1,0 +1,6 @@
+# Captured screenshots: large binaries, cheap to regenerate with capture.mjs.
+# Everything else in this folder (the script, the manifest, the docs) is tracked.
+shots/
+
+# Playwright resolved from a global/npx install rather than a theme dependency.
+node_modules

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visual parity — v2 vs production</title>
+<style>
+  :root {
+    --bg: #f4f6fc; --panel: #fff; --ink: #1a1a1a; --muted: #666;
+    --line: #e2e4ee; --accent: #4E1450; --warn: #b4292f; --ok: #1a7f37;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14121a; --panel: #1d1a25; --ink: #f0eef5; --muted: #a09bb0;
+            --line: #322d3e; --accent: #d98fdd; --warn: #ff8a8a; --ok: #6ee787; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  header { position: sticky; top: 0; z-index: 10; background: var(--panel);
+           border-bottom: 1px solid var(--line); padding: 14px 20px;
+           display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  h1 { font-size: 16px; margin: 0; font-weight: 650; }
+  .meta { color: var(--muted); font-size: 12px; }
+  input[type=search] { flex: 1 1 220px; min-width: 160px; padding: 7px 10px;
+    border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--ink); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .seg button { border: 0; padding: 7px 13px; background: var(--bg); color: var(--ink);
+                cursor: pointer; font-size: 13px; }
+  .seg button[aria-pressed=true] { background: var(--accent); color: #fff; }
+  main { padding: 20px; display: flex; flex-direction: column; gap: 28px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+            padding: 16px 18px 20px; }
+  .head { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; margin-bottom: 12px; }
+  .slug { font-weight: 650; font-size: 15px; }
+  .path { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line);
+         color: var(--muted); }
+  .tag.delta { color: var(--warn); border-color: var(--warn); }
+  .tag.same { color: var(--ok); border-color: var(--ok); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 900px) { .pair { grid-template-columns: 1fr; } }
+  figure { margin: 0; }
+  figcaption { font-size: 12px; color: var(--muted); margin-bottom: 6px;
+               display: flex; justify-content: space-between; gap: 8px; }
+  .frame { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff;
+           max-height: 78vh; overflow-y: auto; }
+  .frame img { display: block; width: 100%; height: auto; }
+  .missing { padding: 28px; text-align: center; color: var(--muted); font-size: 13px; }
+  .empty { padding: 60px 20px; text-align: center; color: var(--muted); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Visual parity</h1>
+  <div class="seg" id="viewport">
+    <button data-v="desktop" aria-pressed="true">Desktop 1440</button>
+    <button data-v="mobile" aria-pressed="false">Mobile 390</button>
+  </div>
+  <div class="seg" id="filter">
+    <button data-f="all" aria-pressed="true">All</button>
+    <button data-f="delta" aria-pressed="false">Height gap &gt;10%</button>
+  </div>
+  <input type="search" id="q" placeholder="Filter by slug or path…">
+  <span class="meta" id="meta"></span>
+</header>
+<main id="out"><div class="empty">Loading…</div></main>
+
+<script src="shots/data.js" onerror="window.__noData=true"></script>
+<script>
+(function () {
+  const out = document.getElementById('out');
+  const meta = document.getElementById('meta');
+
+  if (window.__noData || !window.PARITY) {
+    out.innerHTML = '<div class="empty">No captures found.<br><br>' +
+      'Run <code>node docs/visual-parity/capture.mjs</code> first — ' +
+      'the screenshots are gitignored, so a fresh clone has none.</div>';
+    return;
+  }
+
+  const data = window.PARITY;
+  let viewport = 'desktop';
+  let mode = 'all';
+  let query = '';
+
+  meta.textContent = data.pages.length + ' pages · captured ' +
+    new Date(data.capturedAt).toLocaleString();
+
+  // Height gap is a cheap proxy for "something moved": it caught the /services/ card-height
+  // problem that the screenshots themselves looked fine for.
+  const gap = (p) => {
+    const a = p.shots[viewport + '.production'], b = p.shots[viewport + '.local'];
+    if (!a || !b || !a.height || !b.height) return null;
+    return Math.abs(a.height - b.height) / Math.max(a.height, b.height);
+  };
+
+  function render() {
+    const rows = data.pages.filter((p) => {
+      if (query && !(p.slug + ' ' + p.local).toLowerCase().includes(query)) return false;
+      if (mode === 'delta') { const g = gap(p); return g !== null && g > 0.10; }
+      return true;
+    });
+
+    if (!rows.length) { out.innerHTML = '<div class="empty">Nothing matches.</div>'; return; }
+
+    out.innerHTML = rows.map((p) => {
+      const g = gap(p);
+      const tag = g === null
+        ? '<span class="tag">no pair</span>'
+        : '<span class="tag ' + (g > 0.10 ? 'delta' : 'same') + '">height ' +
+          (g * 100).toFixed(0) + '% apart</span>';
+
+      const side = (which, label) => {
+        if (which === 'production' && !p.production) {
+          return '<figure><figcaption>' + label + '</figcaption>' +
+            '<div class="frame"><div class="missing">' +
+            (p.note || 'No production homologue.') + '</div></div></figure>';
+        }
+        const s = p.shots[viewport + '.' + which];
+        const src = 'shots/' + viewport + '/' + p.slug + '.' + which + '.png';
+        const broken = s && s.brokenImages
+          ? ' · <span style="color:var(--warn)">' + s.brokenImages + ' broken img</span>' : '';
+        return '<figure><figcaption><span>' + label + '</span><span>' +
+          (s ? s.height + 'px tall' + broken : 'not captured') + '</span></figcaption>' +
+          '<div class="frame">' + (s
+            ? '<a href="' + src + '" target="_blank" rel="noopener">' +
+              '<img loading="lazy" src="' + src + '" alt="' + p.slug + ' ' + which + '"></a>'
+            : '<div class="missing">Not captured.</div>') + '</div></figure>';
+      };
+
+      return '<section><div class="head">' +
+        '<span class="slug">' + p.slug + '</span>' +
+        '<span class="path">' + p.local + '</span>' +
+        '<span class="tag">' + p.type + '</span>' + tag +
+        '</div><div class="pair">' +
+        side('production', 'Production') + side('local', 'v2 (local)') +
+        '</div></section>';
+    }).join('');
+  }
+
+  document.getElementById('viewport').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    viewport = b.dataset.v;
+    [...e.currentTarget.children].forEach((c) => c.setAttribute('aria-pressed', c === b));
+    render();
+  });
+  document.getElementById('filter').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    mode = b.dataset.f;
+    [...e.currentTarget.children].forEach((c) => c.setAttribute('aria-pressed', c === b));
+    render();
+  });
+  document.getElementById('q').addEventListener('input', (e) => {
+    query = e.target.value.trim().toLowerCase(); render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
