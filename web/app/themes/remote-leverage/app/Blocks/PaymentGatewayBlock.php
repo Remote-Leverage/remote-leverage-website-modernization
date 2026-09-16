@@ -44,6 +44,19 @@ class PaymentGatewayBlock extends Block
 
     public $keywords = ['payment', 'stripe', 'checkout', 'deposit', 'card'];
 
+    /**
+     * Where a payment lands when neither the block field nor the env var names somewhere.
+     *
+     * Resolved through `home_url()` at render time rather than stored as an absolute URL,
+     * because every absolute form of this is wrong in some environment: `STRIPE_DEFAULT_THANKYOU_URL`
+     * held a `.test` host that `scripts/seed-staging-secrets.sh` would have copied verbatim into
+     * staging, sending paying customers to a domain that does not resolve. The path is the same
+     * on every environment; only the host differs, and WordPress already knows the host.
+     *
+     * The page is `patterns/referral-program-thank-you-deposit.php`.
+     */
+    public const DEFAULT_THANKYOU_PATH = '/referral-program-thank-you-page-deposit/';
+
     public $view = 'blocks.payment-gateway';
 
     public $example = [
@@ -76,12 +89,10 @@ class PaymentGatewayBlock extends Block
         $index = self::$instances++;
         $gateway = app(StripePaymentIntentGateway::class);
 
-        $successUrl = get_field('success_url');
-        $successUrl = is_string($successUrl) ? trim($successUrl) : '';
-
-        if ($successUrl === '') {
-            $successUrl = (string) (config('services.stripe.default_thankyou_url') ?? '');
-        }
+        $successUrl = self::resolveSuccessUrl(
+            get_field('success_url'),
+            config('services.stripe.default_thankyou_url'),
+        );
 
         $postId = (int) ($this->post_id ?: (get_the_ID() ?: 0));
 
@@ -102,6 +113,34 @@ class PaymentGatewayBlock extends Block
             'agreementText' => (string) (get_field('agreement_text') ?: $this->defaultAgreementText()),
             'layout' => get_field('layout') ?: 'one_column',
         ];
+    }
+
+    /**
+     * Resolve where a completed payment lands: block field → env var → this site's own page.
+     *
+     * Kept pure and separate from `with()` so the precedence is testable without mounting the
+     * block. The last step is the one that matters — it is why there is no configuration under
+     * which this returns an empty string, which previously rendered `success-url=""` and left a
+     * paying customer on a dead page.
+     *
+     * @param  mixed  $field  The block's `success_url` field, as ACF returns it.
+     * @param  mixed  $configured  `services.stripe.default_thankyou_url`.
+     */
+    public static function resolveSuccessUrl(mixed $field, mixed $configured): string
+    {
+        $field = is_string($field) ? trim($field) : '';
+
+        if ($field !== '') {
+            return $field;
+        }
+
+        $configured = is_string($configured) ? trim($configured) : '';
+
+        if ($configured !== '') {
+            return $configured;
+        }
+
+        return (string) home_url(self::DEFAULT_THANKYOU_PATH);
     }
 
     /**
@@ -197,7 +236,7 @@ class PaymentGatewayBlock extends Block
             ])
             ->addUrl('success_url', [
                 'label' => 'Success / Thank You Page URL',
-                'instructions' => 'Where the customer lands after payment, and the return_url Stripe redirects to for Link / 3D Secure. Leave blank to use STRIPE_DEFAULT_THANKYOU_URL, or the inline success state when that is unset too.',
+                'instructions' => 'Where the customer lands after payment, and the return_url Stripe redirects to for Link / 3D Secure. Leave blank to use STRIPE_DEFAULT_THANKYOU_URL, or this site\'s own /referral-program-thank-you-page-deposit/ when that is unset too.',
             ])
             ->addSelect('layout', [
                 'label' => 'Layout',

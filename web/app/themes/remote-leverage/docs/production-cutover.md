@@ -174,7 +174,7 @@ These must all be green before DNS moves. One is green; the redirect gate closed
 | Webhook signing secrets set in every environment | [known-issues.md](known-issues.md) #7 | 🔴 **New gate, 2026-09-15.** Both webhook endpoints now fail closed: with no secret they return 503 and process nothing. `STRIPE_WEBHOOK_SECRET` and `CALENDLY_WEBHOOK_SIGNING_KEY` are empty everywhere, so deploying as-is takes Stripe Connect payout events and Calendly booking events dark. Set both before this reaches staging |
 | Canonical tags verified live | [known-issues.md](known-issues.md) **#17** (behaviour) and **#18** (data) | 🟢 **Behaviour proven 2026-09-15 — not a blocker.** Setting `DISALLOW_INDEXING=false` locally makes `/about-us/` emit `index, follow` plus `<link rel="canonical" href="…/about-us/">`; restoring it removes both. The absence on dev and staging is correct, and production (where the constant is absent) will emit canonicals. **#18 remains open** as a data check: production canonicalises both `/hire-va/` and `/hire-va-isolated-form/` at the homepage and the import carried that across faithfully — fixed, but the same blindness covers all 180 imported canonicals, so re-sweep destinations after any further `content:import-seo` run |
 | Error monitoring reporting | — | 🔴 Sentry has no DSN. `SENTRY_LARAVEL_DSN` is now present and blank in `.env` / `.env.example` (2026-09-15) — the key exists, the value is still the gate |
-| Funnel redirect URLs repointed off production | [Funnel URLs configured outside WordPress](#funnel-urls-configured-outside-wordpress) | 🔴 **New gate, 2026-09-15.** Four Calendly events and the Stripe deposit element carry redirect targets set outside WordPress. They still point at `remoteleverage.com`, and `STRIPE_DEFAULT_THANKYOU_URL` is unset so the v2 deposit page emits an empty `success-url` |
+| Funnel redirect URLs repointed off production | [Funnel URLs configured outside WordPress](#funnel-urls-configured-outside-wordpress) | 🔴 **New gate, 2026-09-15.** Four Calendly events carry redirect targets set outside WordPress and still point at `remoteleverage.com`. **The Stripe half is closed (2026-09-15):** `PaymentGatewayBlock` now defaults to `home_url('/referral-program-thank-you-page-deposit/')`, so the deposit page emits a correct same-host `success-url` in every environment with no env var set |
 
 ## Recommended sequence
 
@@ -186,8 +186,9 @@ These must all be green before DNS moves. One is green; the redirect gate closed
 
 **What is actually left, in order:**
 
-1. Set the webhook signing secrets and `STRIPE_DEFAULT_THANKYOU_URL`; repoint the four Calendly
-   redirects. Cheap, and two of them silently break paying customers.
+1. Set the webhook signing secrets; repoint the four Calendly redirects. Cheap, and they
+   silently break paying customers. (`STRIPE_DEFAULT_THANKYOU_URL` no longer needs a value —
+   closed 2026-09-15, see below.)
 2. Re-point `company_logo` and the 171 OpenGraph image URLs off `remoteleverage.com`.
 3. Repeat the Yoast configuration and `content:import-seo` on staging and production.
 4. Take the performance numbers **on staging** — the local run is not what the gate asks for.
@@ -228,12 +229,18 @@ Production's deposit element hardcodes an absolute success URL:
 success-url="https://remoteleverage.com/referral-program-thank-you-page-deposit/"
 ```
 
-v2 does the right thing and reads it from config — `PaymentGatewayBlock` falls back to
-`services.stripe.default_thankyou_url` — but **`STRIPE_DEFAULT_THANKYOU_URL` is not set in
-`.env`**, so the rendered page emits `success-url=""`. A customer who pays today lands
-nowhere. Set it to the v2 `/referral-program-thank-you-page-deposit/` before the deposit page
-goes live. This sits alongside the Stripe-credentials blocker already recorded against that
-page in [PAGE-MIGRATION-STATUS.md](../../../../../PAGE-MIGRATION-STATUS.md) §P2.
+**Closed 2026-09-15.** v2 reads it from config, and `PaymentGatewayBlock` now ends that chain
+on a path rather than an absolute URL: block field `success_url` → `STRIPE_DEFAULT_THANKYOU_URL`
+→ `home_url(PaymentGatewayBlock::DEFAULT_THANKYOU_PATH)`. The last of those is
+`/referral-program-thank-you-page-deposit/` on whatever host is serving, so the deposit page
+emits a correct same-host `success-url` with no environment configuration at all, and there is
+no longer any state in which it renders `success-url=""`.
+
+The env var was not merely unset — it held `https://remoteleverage-v2.test/…`, a local host that
+`scripts/seed-staging-secrets.sh` copies verbatim (it is not in that script's `SKIP` set). Seeding
+staging would have pointed a live checkout at a domain that does not resolve. It is now blank in
+both `.env` and `.env.example`, documented as an override for sending payment to a *different*
+host and nothing else.
 
 ### Calendly — four events to re-check
 

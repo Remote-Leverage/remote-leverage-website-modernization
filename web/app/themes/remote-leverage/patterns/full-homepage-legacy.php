@@ -1,9 +1,15 @@
 <?php
 /**
- * Title: Full Homepage - Remote Leverage Modern
- * Slug: remote-leverage/full-homepage
+ * Title: Full Homepage (Legacy) - Remote Leverage Modern
+ * Slug: remote-leverage/full-homepage-legacy
  * Categories: remote-leverage
- * Description: Complete modernized Remote Leverage homepage assembled from modular Gutenberg blocks and patterns.
+ * Description: The homepage Remote Leverage shipped until the 2026 rebuild, kept whole at /homepage-legacy.
+ *
+ * Retired from the front page on 2026-09-15 when patterns/homepage-full.php replaced it.
+ * Renamed rather than rewritten: page 7's post_content had been expanded inline and was
+ * byte-identical to this chain, so nothing was lost in the move. Its ten section patterns
+ * (hero, client-logos, worlds-best-talent, …) are still referenced from here and from
+ * nowhere else — leave them alone; they are this page's parts, not shared partials.
  */
 ?>
 <!-- wp:pattern {"slug":"remote-leverage/hero"} /-->

@@ -1207,6 +1207,95 @@ class BlockDefaults
         return self::patternBlock('client-logos-marquee', array_merge($data, $overrides), ['align' => 'full']);
     }
 
+    // --- HOME HERO (2026 homepage) ---
+
+    /**
+     * Resolve a homepage image only if it actually exists, otherwise an empty string.
+     *
+     * homeImg() always hands back a URL, 404 included, which is the right behaviour for art
+     * that is expected to be there. The hero's cutout portraits are the exception: they are
+     * supplied separately from the build, so the hero has to render cleanly without them
+     * rather than with two broken images in it.
+     */
+    public static function homeImgIfExists(string $file): string
+    {
+        $url = self::homeImg($file);
+
+        // homeImg() signals "found nothing" by returning its uploads/home fallback verbatim.
+        $miss = esc_url(set_url_scheme(self::imgBase().'/'.$file, 'https'));
+
+        return $url === $miss ? '' : $url;
+    }
+
+    /**
+     * The hero's six checklist items, in the single order that serves both breakpoints.
+     *
+     * @return array<int, string>
+     */
+    public static function homeHeroChecklist(): array
+    {
+        return [
+            'No Contracts, No Ongoing Fees',
+            'Interview Before You Hire',
+            '12-Month Replacement Guarantee',
+            '30% Discount on Future Hires',
+            'Hire Direct, No Middleman',
+            'Interview in 48 Hours',
+        ];
+    }
+
+    /**
+     * The four floating talent cards, in back-to-front order per side.
+     *
+     * The two cutout portraits are hero-specific art, not the grey-studio `con-*` set used by
+     * the talent marquee. Until they land in resources/images/pages/home/ the cards render
+     * without portraits rather than with broken images — see homeImgIfExists().
+     *
+     * @return array<int, array<string, string>>
+     */
+    public static function homeHeroCards(): array
+    {
+        return [
+            [
+                'name' => 'André Vilalobos',
+                'role' => 'Lead Generation (SDR)',
+                'rate' => '$7/hr',
+                'flag' => self::homeImg('mexico.png'),
+                'photo' => '',
+                'side' => 'left',
+            ],
+            [
+                'name' => 'Luana Dias',
+                'role' => 'Social Media Specialist',
+                'rate' => '$6/hr',
+                'flag' => self::homeImg('colombia.png'),
+                'photo' => self::homeImgIfExists('hero-luana.png'),
+                'side' => 'left',
+            ],
+            [
+                'name' => 'Mariana Costa',
+                'role' => 'Lead Generation (SDR)',
+                'rate' => '$6/hr',
+                'flag' => self::homeImg('argentina.png'),
+                'photo' => '',
+                'side' => 'right',
+            ],
+            [
+                'name' => 'Bruno Carvalho',
+                'role' => 'Sr Executive Assistant',
+                'rate' => '$6/hr',
+                'flag' => self::homeImg('brazil.png'),
+                'photo' => self::homeImgIfExists('hero-bruno.png'),
+                'side' => 'right',
+            ],
+        ];
+    }
+
+    public static function renderHomeHero(array $overrides = []): string
+    {
+        return self::patternBlock('home-hero', $overrides, ['align' => 'full']);
+    }
+
     // --- TALENT MARQUEE ---
     public static function talentCards(): array
     {

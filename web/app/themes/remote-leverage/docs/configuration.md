@@ -75,7 +75,7 @@ GTM, LinkedIn Insight and Meta Pixel are configured inside the Google Site Kit /
 | `STRIPE_CONNECT_CLIENT_ID` | Connect onboarding |
 | `STRIPE_WEBHOOK_SECRET` | `StripeWebhookController` signature verification |
 | `STRIPE_WEBHOOK_FORWARD_URL` | Where `payment_intent.succeeded` payloads are forwarded |
-| `STRIPE_DEFAULT_THANKYOU_URL` | Fallback post-payment redirect, read by `PaymentGatewayBlock`. **Unset renders `success-url=""` on the deposit page and strands the payer** — a cutover gate, see [production-cutover.md](production-cutover.md#funnel-urls-configured-outside-wordpress) |
+| `STRIPE_DEFAULT_THANKYOU_URL` | **Optional absolute override**, read by `PaymentGatewayBlock`. Blank falls back to `home_url(PaymentGatewayBlock::DEFAULT_THANKYOU_PATH)` — this site's own `/referral-program-thank-you-page-deposit/` — so it is correct on every host with no value set. Set it only to send payment to a *different* host. **Do not put a local host here:** `seed-staging-secrets.sh` copies it verbatim into staging (fixed 2026-09-15, it held a `.test` URL) |
 | `REFERRAL_WEBHOOK_URL` | `DispatchReferralWebhook` |
 | `REFERRAL_DEFAULT_REWARD_AMOUNT` | Default commission |
 

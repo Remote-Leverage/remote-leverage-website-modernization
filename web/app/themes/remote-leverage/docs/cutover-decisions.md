@@ -328,6 +328,29 @@ minutes if anyone wants it later.
 
 ---
 
+## Security and tracking
+
+### 31. WordFence is not ported — the edge WAF replaces it
+WordFence appears nowhere in this repo (zero references across every file), and it is **not
+being added**. v2 runs as an immutable container on ECS: WordFence's firewall optimization
+writes `.user.ini` / `auto_prepend_file` and its scanner expects a writable tree, so anything it
+configured on disk would be discarded by the next deploy. Staging already sits behind CloudFront
+and production behind Cloudflare, which is where request filtering now belongs.
+
+Production's own WordFence status was never confirmed — Cloudflare returns 403 for every
+`readme.txt` probe, including plugins known to be installed, so presence is not observable from
+outside. That check is moot under this decision.
+
+### 32. v2 inherits **both** production GTM containers
+Production serves two containers, `GTM-53JDTQCZ` and `GTM-P4KZNJWL` (read off its HTML,
+2026-09-15). Site Kit is connected to **both**, for straight parity: every tag already living in
+them — LinkedIn Insight, Meta Pixel and the rest — keeps firing exactly as it does today, so the
+cutover carries no ad-spend risk. Consolidating to one container is a separate, post-cutover
+question.
+*Refines* the "connect the GTM container" item, which assumed a single container.
+
+---
+
 ## Post-cutover checklist
 
 Things deliberately deferred to after the DNS flip, because they cannot be answered — or are not
@@ -350,7 +373,7 @@ worth answering — beforehand. **These are scheduled, not closed.**
 - **Secrets:** `STRIPE_WEBHOOK_SECRET`, `CALENDLY_WEBHOOK_SIGNING_KEY` (both now blocking),
   `SENTRY_LARAVEL_DSN`, `MAIL_*`, `HUBSPOT_ACCESS_TOKEN` + `HUBSPOT_PORTAL_ID` (leads silently
   never reach the CRM without these), `POSTHOG_API_KEY`, `SLACK_WEBHOOK_URL`.
-- **Admin:** activate Google Site Kit and connect the GTM container.
+- **Admin:** activate Google Site Kit and connect **both** GTM containers, `GTM-53JDTQCZ` and `GTM-P4KZNJWL` (decision 32).
 - **From the partners:** referral intake forms for Lexgo and Lano, a referral destination for
   Oyster, logos for all three. See `domains/partner-hub.md`.
 - **From whoever knows:** the real `legal_last_updated` revision dates for the privacy policy and
