@@ -39,6 +39,7 @@ All project documentation lives here. Start with the [repository README](../../.
 | [seo-meta-migration.md](seo-meta-migration.md) | Yoast install, and `content:import-seo` — carrying production's `_yoast_wpseo_*` meta onto v2 |
 | [page-migration-and-design-system-workflow.md](page-migration-and-design-system-workflow.md) | How to migrate a page: extract, dissect, build blocks, publish |
 | [performance-baseline.md](performance-baseline.md) | The Phase 8 performance gate: mobile Lighthouse, the `CaptureLeadAction` p95 rule, and Parts 3–5 covering the font subsetting, preload, Calendly preflight and blog image work of 2026-09-15 |
+| [mobile-parity-audit.md](mobile-parity-audit.md) | The 390px sweep of all 54 URLs against production (2026-09-15): the fixed-header occlusion that hit 10 pages, the 1,644px mobile footer, the invisible header on `/ecommerce-virtual-assistant/`, and the four things that look like defects but are not |
 | [adr-status.md](adr-status.md) | ADR compliance and WR-98–106 backlog status (2026-09-09; WR-100, WR-105, WR-106 and the ADR-0008 transport note re-verified 2026-09-15) |
 | [jira-adr-compliance-backlog.md](jira-adr-compliance-backlog.md) | The original backlog write-up |
 

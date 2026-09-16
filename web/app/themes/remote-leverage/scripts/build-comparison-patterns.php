@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\BlockDefaults;
+
 /**
  * Generates the per-page comparison patterns from the mother pattern.
  *
@@ -415,7 +417,7 @@ foreach ($pages as $slug => $cfg) {
             }
 
             if (! empty($cfg['faqSet']) && $k === 'faq') {
-                $block = rl_set_faqs($block, \App\Support\BlockDefaults::{$cfg['faqSet']}());
+                $block = rl_set_faqs($block, BlockDefaults::{$cfg['faqSet']}());
             }
 
             if (isset($cfg['overrides'][$k])) {

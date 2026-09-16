@@ -775,6 +775,21 @@ render as non-headings in v2 blocks, step numerals render as spans, Calendly emb
 are absent until the widget loads, and Elementor concatenates its A/B headline variants into
 one DOM node.
 
+**Steps 1–4 are desktop-only.** A 390px sweep of all 54 URLs was run on 2026-09-15 and is
+written up in
+[docs/mobile-parity-audit.md](web/app/themes/remote-leverage/docs/mobile-parity-audit.md).
+Nothing structural was broken (no horizontal overflow, no broken images, no overlapping text on
+any page), but **10 pages rendered their main headline underneath the fixed header** — two of
+them at 1440px as well, which a full-page desktop capture cannot show, because a headline tucked
+under a transparent header still looks like a headline. The mobile footer was also 1,644px,
+taller than most pages' own content. Both are fixed.
+
+Two cautions from that run before repeating it: raw `scrollHeight` ratios are dominated by our
+header and footer (production's landing pages ship neither — `/recruiterchecklists/` reads 271%
+while our body content is actually *shorter*), and running more than two Playwright workers
+against the local server makes it serve gateway pages, which reads as dozens of broken images
+that are fine.
+
 ## 6. Open questions
 
 1. ~~**The partner hub and Lexgo**~~ — **resolved 2026-09-14**: both the
