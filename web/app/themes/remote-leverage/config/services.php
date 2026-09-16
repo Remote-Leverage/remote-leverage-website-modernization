@@ -85,7 +85,21 @@ return [
     ],
 
     'slack' => [
+        /*
+         * Production posts through the Gravity Forms Slack add-on's bot token to a channel.
+         * v2 reuses that token as an interim measure until it has an app of its own (WR-186);
+         * `webhook_url` is the fallback for an environment with no token.
+         */
+        'bot_token' => env('SLACK_BOT_TOKEN'),
+        'channel' => env('SLACK_CHANNEL', 'new-appts'),
         'webhook_url' => env('SLACK_WEBHOOK_URL'),
+
+        /*
+         * The legacy Gravity Forms feed alerted on the **partial** submission only
+         * (`submission_type is not Final`), so sales sees leads that never finish booking.
+         * A second alert when a lead does book is a v2 addition, off by default.
+         */
+        'notify_on_booking' => filter_var(env('SLACK_NOTIFY_ON_BOOKING', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
     /*

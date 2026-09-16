@@ -281,6 +281,9 @@ describe('Lead Domain', function () {
 
     test('HandleLeadEventsForSlack dispatches and logs consumption for partial and final events', function () {
         config(['services.slack.webhook_url' => 'https://hooks.slack.com/services/test/123']);
+        // The booking alert is off by default for parity with the legacy Gravity Forms feed,
+        // which alerted on the partial only. This test covers both halves, so it opts in.
+        config(['services.slack.notify_on_booking' => true]);
         $activityLogger = new LeadActivityLogger;
         $listener = new HandleLeadEventsForSlack($activityLogger);
 
@@ -328,6 +331,38 @@ describe('Lead Domain', function () {
 
         expect($finalLog)->not->toBeNull()
             ->and($finalLog->outcome)->toBe('succeeded');
+    });
+
+    test('the Slack booking alert stays silent unless it is switched on', function () {
+        // Default behaviour: the legacy feed's condition is `submission_type is not Final`, so
+        // a completed booking produces no second alert and no consumption row.
+        config([
+            'services.slack.webhook_url' => 'https://hooks.slack.com/services/test/123',
+            'services.slack.notify_on_booking' => false,
+        ]);
+
+        $listener = new HandleLeadEventsForSlack(new LeadActivityLogger);
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Quiet Booking',
+            'email' => 'quiet@startup.com',
+            'source_type' => 'organic',
+            'status' => 'booked',
+        ]);
+
+        $listener->handleBookingCompleted(new LeadBookingCompleted(
+            lead: $lead,
+            meetingId: 'meet-quiet',
+            provider: 'calendly',
+            meetUrl: 'https://meet.google.com/quiet',
+            startTime: '2026-09-16T15:00:00Z',
+        ));
+
+        expect(LeadActivityLog::query()
+            ->where('lead_id', $lead->id)
+            ->where('actor_domain', 'Slack')
+            ->count())->toBe(0);
     });
 
     test('HandleLeadEventsForWebhook dispatches and logs consumption for partial and final events', function () {

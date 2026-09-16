@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Application\Livewire\Booking;
 
 use App\Domains\Lead\Actions\CaptureLeadAction;
-use App\Domains\Lead\Services\AttributionCollector;
 use App\Domains\Lead\Data\LeadCaptureData;
+use App\Domains\Lead\Services\AttributionCollector;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Scheduling\Actions\FetchAvailableSlotsAction;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
