@@ -83,7 +83,7 @@ Each image is pushed twice — `:staging` and `:<git sha>` — so a rollback is 
 
 ## Deploy production (`.github/workflows/deploy-production.yml`)
 
-Triggered only by a git tag matching **`v-YYYYMMDD-v{1,2,3,4}`** — for example `v-20260916-v1`. Same-day follow-ups are `v2`, `v3`, `v4`. Tags that do not match are ignored (and a matching glob that is not eight digits still fails the validate job).
+Triggered only by a git tag matching **`v-YYYYMMDD-v{1,2,3,4}`** — for example `v-20260916-v1`. Same-day follow-ups are `v2`, `v3`, `v4`. Tags that do not match are ignored; the validate job also rejects anything that is not eight digits and `v1`–`v4`.
 
 ```bash
 git tag v-20260916-v1
