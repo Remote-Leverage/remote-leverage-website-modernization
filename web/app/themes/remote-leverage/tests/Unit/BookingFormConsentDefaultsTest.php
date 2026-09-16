@@ -3,6 +3,12 @@
 declare(strict_types=1);
 
 use App\Application\Livewire\Booking\MultistepBookingWizard;
+use App\Domains\Lead\Actions\CaptureLeadAction;
+use App\Domains\Lead\Data\LeadCaptureData;
+use App\Domains\Lead\Models\Lead;
+use App\Domains\Lead\Services\LeadActivityLogger;
+use App\Domains\Lead\Services\PhoneValidationService;
+use App\Domains\Referral\Services\AttributionEngine;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -12,10 +18,12 @@ use Illuminate\Validation\ValidationException;
  * Neither was cosmetic. The revenue bracket drives Calendly routing via
  * isUnder10kMrr() and filters job applicants via isJobSeeker(), so a
  * pre-selected value silently misclassified every lead that never opened the
- * control. The consent box carried a hardcoded `checked` attribute, no binding
- * to any property, and a `required` attribute that never fired because the
- * wizard submits through wire:click rather than a native <form> — so it was
- * pre-ticked, unenforced, and never reached the server.
+ * control — it is therefore required.
+ *
+ * Consent is the opposite: recorded, never blocking. It previously carried a
+ * hardcoded `checked` attribute and no binding to any property, so it was
+ * pre-ticked and never reached the server. It now starts unticked and is
+ * persisted as `consent_at`, but an unticked box must never stop a booking.
  */
 describe('Booking form defaults express a real choice', function () {
     $arrange = function (MultistepBookingWizard $wizard): MultistepBookingWizard {
@@ -43,24 +51,40 @@ describe('Booking form defaults express a real choice', function () {
         expect(fn () => $wizard->goToStep(2))->toThrow(ValidationException::class);
     });
 
-    test('step one rejects unticked consent', function () use ($arrange) {
+    test('unticked consent never blocks the booking', function () use ($arrange) {
         $wizard = $arrange(new MultistepBookingWizard);
         $wizard->mount('test', 'glass');
         $wizard->monthlyRevenue = '$10k to $50k Per Month';
         $wizard->consent = false;
 
-        expect(fn () => $wizard->goToStep(2))->toThrow(ValidationException::class);
-    });
-
-    test('step one passes once both are answered', function () use ($arrange) {
-        $wizard = $arrange(new MultistepBookingWizard);
-        $wizard->mount('test', 'glass');
-        $wizard->monthlyRevenue = '$10k to $50k Per Month';
-        $wizard->consent = true;
-
         $wizard->goToStep(2);
 
         expect($wizard->currentStep)->toBe(2);
+    });
+
+    test('consent reaches the capture payload as given', function () {
+        expect(LeadCaptureData::fromArray(['email' => 'a@b.com', 'name' => 'A B'])->consent)->toBeFalse()
+            ->and(LeadCaptureData::fromArray(['email' => 'a@b.com', 'name' => 'A B', 'consent' => true])->consent)->toBeTrue();
+    });
+
+    test('the consent checkbox is not advertised as required', function () {
+        $blade = file_get_contents(
+            __DIR__.'/../../resources/views/livewire/booking/multistep-booking-wizard.blade.php'
+        );
+
+        foreach (explode('name="consent"', $blade) as $i => $chunk) {
+            if ($i === 0) {
+                continue;
+            }
+
+            expect(substr($chunk, 0, (int) strpos($chunk, '>')))->not->toMatch('/\brequired\b/');
+        }
+    });
+
+    test('the Alpine sub-step gate does not hold shut on unticked consent', function () {
+        $js = file_get_contents(__DIR__.'/../../resources/js/app.js');
+
+        expect($js)->not->toContain('return this.consentChecked === true;');
     });
 
     test('neither consent checkbox ships a hardcoded checked attribute', function () {
@@ -88,5 +112,53 @@ describe('Booking form defaults express a real choice', function () {
 
         expect($js)->toContain('consentChecked: false,')
             ->and($js)->not->toContain('consentChecked: true,');
+    });
+
+    test('consent is stamped once and never cleared by a later submission', function () {
+        Lead::truncate();
+
+        $action = new CaptureLeadAction(
+            new AttributionEngine,
+            new PhoneValidationService,
+            new LeadActivityLogger
+        );
+
+        $base = [
+            'name' => 'Sarah Jenkins',
+            'email' => 'sarah@growthco.io',
+            'monthly_revenue' => '$10k to $50k Per Month',
+        ];
+
+        // Step 1, consent given.
+        $lead = $action->execute(LeadCaptureData::fromArray($base + ['consent' => true]));
+        expect($lead->consent_at)->not->toBeNull();
+
+        $stampedAt = $lead->consent_at;
+
+        // A later submission that omits the tick must not erase it.
+        $again = $action->execute(LeadCaptureData::fromArray(
+            $base + ['consent' => false, 'extra_data' => ['lead_id' => $lead->id]]
+        ));
+
+        expect($again->id)->toBe($lead->id)
+            ->and($again->consent_at?->timestamp)->toBe($stampedAt->timestamp);
+    });
+
+    test('a lead who never ticks the box carries no consent record', function () {
+        Lead::truncate();
+
+        $action = new CaptureLeadAction(
+            new AttributionEngine,
+            new PhoneValidationService,
+            new LeadActivityLogger
+        );
+
+        $lead = $action->execute(LeadCaptureData::fromArray([
+            'name' => 'Marcus Aurelius',
+            'email' => 'marcus@rome.org',
+            'monthly_revenue' => '$10k to $50k Per Month',
+        ]));
+
+        expect($lead->consent_at)->toBeNull();
     });
 });

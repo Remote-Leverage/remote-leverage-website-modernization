@@ -162,7 +162,9 @@ export function rlBookingWizardIsolated(config = {}) {
         return typeof this.monthlyRevenueVal === 'string' && this.monthlyRevenueVal.trim().length > 0;
       }
       if (f === 'consent') {
-        return this.consentChecked === true;
+        // Recorded, not required: an unticked box must never hold the sub-step
+        // shut, or clearing its default would strand the isolated wizard.
+        return true;
       }
       return true;
     },

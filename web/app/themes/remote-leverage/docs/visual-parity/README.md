@@ -34,7 +34,7 @@ than on production.
 | `capture.mjs` | yes | the scraper |
 | `manifest.json` | yes | page inventory and local ↔ production mapping |
 | `index.html` | yes | side-by-side viewer |
-| `shots/` | **no** | ~230MB of PNG, regenerated in one command |
+| `shots/` | **no** | ~700MB of PNG, regenerated in one command |
 
 The pixels are deliberately not committed. They are large, they change on every deploy, and
 they are cheap to rebuild — the same reasoning that keeps the VSL out of git. A fresh clone
@@ -55,8 +55,9 @@ prices*. Where the two disagree, reproduce desktop and say so — see CLAUDE.md.
 ## Reading the output
 
 `index.html` pairs production (left) with v2 (right), toggles desktop/mobile, and can filter to
-pages whose two sides differ by more than 10% in height. That height gap is the cheap version of
-the geometry check CLAUDE.md insists on: **a blank area and a correctly-rendered white card are
+pages whose two sides differ by more than 10% in height. Treat that filter as a way to find
+pages worth opening, never as a verdict — see the run notes below for how badly height alone
+misranks this site. It is the cheap version of the geometry check CLAUDE.md insists on: **a blank area and a correctly-rendered white card are
 the same pixels**, so a screenshot that looks right is not evidence. The `/services/` miss was
 caught because card heights of 591px and 810px could not be explained by ~325px of content, not
 because anything looked wrong. `shots/results.json` carries the per-capture height, image count
@@ -89,33 +90,54 @@ separately as its own page.
 
 ## What the first full run showed (2026-09-15)
 
-322 captures, 81 surfaces, both viewports. Comparing page heights — the cheap proxy described
-above, not a pixel diff:
+322 captures, 81 surfaces, both viewports.
 
-| | pairs | over 10% apart | median gap | v2 taller |
-|---|---|---|---|---|
-| Desktop 1440 | 80 | 29 | 6.4% | 50 |
-| Mobile 390 | 80 | **49** | **14.0%** | 53 |
+**Height alone is a misleading measure, and the first pass of this section got it wrong.**
+Ranking pages by how far the two sides differ in height put `/services/`, `/payment/`,
+`/recruiterchecklists/`, `/saleschecklists/`, `/vaonboardingform/`, `/about-us/` and
+`/samples/` near the top — and none of them is a v2 regression. Measuring the *content* in
+each capture alongside its height is what separated them:
 
-**Desktop is broadly in shape; mobile is not.** Mobile has nearly twice as many pages out of
-tolerance and more than double the median gap. The worst cases are not subtle — `/` is 12,060px
-on production and 23,397px in v2 at 390px wide; `/terms-of-use/` is 6,535px against 23,100px.
+| page | content vs production | height vs production | what is actually happening |
+|---|---|---|---|
+| `services` | +198% | +129% | production hides 56% of its content on mobile |
+| `payment` | +517% | +84% | production renders 214 characters in total |
+| `recruiterchecklists` | +487% | +121% | production renders 239 characters |
+| `saleschecklists` | +292% | +120% | production renders 405 characters |
+| `vaonboardingform` | +523% | +94% | production renders 214 characters |
+| `about-us` | +84% | +98% | v2 carries more copy; height grows in proportion |
+| `samples` | — | — | production renders 0 characters at either width |
 
-This is real, not a capture artifact. Both sides were verified to match `(max-width: 767px)`,
-neither has horizontal overflow at 390px, and the only elements wider than the viewport are the
-intentional marquees. v2 simply stacks much taller on mobile.
+`/services/` is the cautionary one: production ships separate desktop and mobile Elementor
+stacks and its mobile stack drops more than half the page — the dual-stack problem CLAUDE.md
+documents, whose mobile copy also carries different prices. Matching production's mobile height
+there would mean *deleting content*.
 
-Several landing pages in the `hire-va` family land within a few hundred pixels of each other
-(~23,320px local against ~12,300px production), which points at one shared pattern rather than
-per-page drift — worth fixing once at the source.
+**Use the content-vs-height test, not height alone.** A page is a layout bug only when its
+content is roughly level with production's and its height is not. On that test exactly three
+pages qualified:
 
-The one page where v2 is *shorter* than production is the case-study archive, for the reason
-below.
+| page | content | height | cause |
+|---|---|---|---|
+| `vapricing` | +12% | +179% | talent grid: 8 portrait cards two-across cost 1,246px of a 1,746px hero. **Fixed** — `acf/talent-grid` gained a `swipe` layout (row on mobile, unchanged grid from `sm` up); hero now 957px. |
+| `home` | +10% | +91% | every card grid collapses to one column on mobile while keeping a full-width image. The largest is a 15-card grid at 6,532px; three more run 1,836-2,140px. |
+| `store` | +19% | +85% | one section: production fits 3,911 characters into 1,144px, v2 uses 3,309px for the same 3,906. |
 
-## Known issue this surfaced
+The `home` cause is not page-local — `grid-cols-1` on mobile appears in 41 blocks, and
+`acf/feature-cards` alone is used by 15 patterns. Changing the mobile column count is a
+site-wide design decision, not a page fix.
 
-`/case-study/` renders only **10** of the **23** published case studies. `archive-case_study.blade.php`
-loops the main query, which respects WordPress's default `posts_per_page = 10`, and the template
-has neither pagination nor a `pre_get_posts` override. Thirteen case studies are live but
-unreachable from the index. Production shows all 21 of its own. The archive capture in `shots/`
-reflects the bug, not the content — the posts exist.
+## Known issue this surfaced (fixed)
+
+`/case-study/` rendered only **10** of the **23** published case studies. The archive template
+loops the main query, which respects WordPress's default `posts_per_page = 10`, and it had
+neither pagination nor a `pre_get_posts` override — so 13 case studies were live but unreachable
+from the index, with no pager to hint anything had been cut.
+
+Fixed in `CaseStudyPostType::showEveryCaseStudyOnArchive()`: the main front-end query for the
+`case_study` archive is set to `posts_per_page = -1`, matching production, which also lists all
+of its own on one page with no pager. Admin list tables and secondary `WP_Query` calls keep
+their own paging. `/case-study/` now renders 23 of 23.
+
+Captures in `shots/` taken before that fix show the truncated archive; re-run with
+`--filter=case-study--archive --force` to refresh them.

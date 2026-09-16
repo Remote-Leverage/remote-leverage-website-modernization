@@ -89,6 +89,9 @@ class CaptureLeadAction
             'landing_url' => $data->landingUrl ?: $lead?->landing_url,
             'referrer_url' => $data->referrerUrl ?: $lead?->referrer_url,
             'session_id' => $data->sessionId ?: $lead?->session_id,
+            // Stamped once and never cleared: a later submission that omits the
+            // tick must not erase consent the lead already gave.
+            'consent_at' => $data->consent ? ($lead?->consent_at ?? now()) : $lead?->consent_at,
             'source_type' => $attribution['sourceType'] ?: ($lead?->source_type ?? 'organic'),
             'source_id' => $attribution['sourceID'] ?: $lead?->source_id,
             'status' => ! empty($data->preferredSlot) ? 'booking_pending' : ($lead?->status ?? 'captured'),

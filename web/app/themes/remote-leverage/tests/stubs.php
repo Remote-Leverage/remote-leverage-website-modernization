@@ -242,6 +242,7 @@ if (! Capsule::schema()->hasTable('rl_leads')) {
         $table->string('referral_code', 100)->nullable();
         $table->string('landing_url', 500)->nullable();
         $table->string('referrer_url', 500)->nullable();
+        $table->timestamp('consent_at')->nullable();
         $table->string('session_id', 100)->nullable();
         $table->string('source_type')->default('organic')->index();
         $table->string('source_id')->nullable()->index();

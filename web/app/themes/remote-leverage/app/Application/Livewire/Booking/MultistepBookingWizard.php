@@ -114,12 +114,14 @@ class MultistepBookingWizard extends Component
     public string $monthlyRevenue = '';
 
     /**
-     * Express written consent for SMS/phone/email contact. Starts false and is
-     * validated as `accepted`: the checkbox previously shipped with a hardcoded
-     * `checked` attribute and no binding at all, so it neither expressed a choice
-     * nor reached the server. Its `required` attribute was inert — the wizard
+     * Consent to SMS/phone/email contact. Recorded, never blocking — a lead who
+     * leaves it unticked still books; they just must not be enrolled in SMS.
+     *
+     * It starts false because it previously shipped with a hardcoded `checked`
+     * attribute and no binding to anything, so it neither expressed a choice nor
+     * reached the server. (Its `required` attribute was inert anyway: the wizard
      * submits through wire:click, not a native <form>, so constraint validation
-     * never ran.
+     * never ran.)
      */
     public bool $consent = false;
 
@@ -198,7 +200,6 @@ class MultistepBookingWizard extends Component
             'lastName' => 'required|string|min:1|max:60',
             'phone' => 'nullable|string|max:30',
             'monthlyRevenue' => 'required|string',
-            'consent' => 'accepted',
         ],
         2 => [
             'selectedDate' => 'required|string|date_format:Y-m-d',
@@ -465,6 +466,7 @@ class MultistepBookingWizard extends Component
                 'role_needed' => $this->roleNeeded,
                 'weekly_hours' => $this->hoursPerWeek,
                 'monthly_revenue' => $this->monthlyRevenue,
+                'consent' => $this->consent,
                 'referral_code' => $this->referralCode,
                 'utm_source' => $this->utmSource,
                 'utm_medium' => $this->utmMedium,
@@ -596,6 +598,7 @@ class MultistepBookingWizard extends Component
                 'role_needed' => $this->roleNeeded,
                 'weekly_hours' => $this->hoursPerWeek,
                 'monthly_revenue' => $this->monthlyRevenue,
+                'consent' => $this->consent,
                 'notes' => $this->notes,
                 'preferred_slot' => $this->selectedSlot,
                 'timezone' => $this->timezone,

@@ -32,6 +32,7 @@ readonly class LeadCaptureData
         public ?string $landingUrl = null,
         public ?string $referrerUrl = null,
         public ?string $sessionId = null,
+        public bool $consent = false,
         public array $extraData = [],
     ) {}
 
@@ -67,6 +68,7 @@ readonly class LeadCaptureData
             landingUrl: $data['landing_url'] ?? $data['landingUrl'] ?? null,
             referrerUrl: $data['referrer_url'] ?? $data['referrerUrl'] ?? null,
             sessionId: $data['session_id'] ?? $data['sessionId'] ?? null,
+            consent: (bool) ($data['consent'] ?? false),
             extraData: $data['extra_data'] ?? [],
         );
     }
@@ -99,6 +101,7 @@ readonly class LeadCaptureData
             'landing_url' => $this->landingUrl,
             'referrer_url' => $this->referrerUrl,
             'session_id' => $this->sessionId,
+            'consent' => $this->consent,
             'extra_data' => $this->extraData,
         ];
     }

@@ -144,7 +144,6 @@
                   id="booking-consent-checkbox"
                   name="consent"
                   aria-label="Consent to receive SMS appointment reminders"
-                  required
                   wire:model.live="consent"
                   class="mt-0.5 w-4 h-4 rounded bg-[#F0F3FA] text-brand-purple border-0 focus:ring-0 focus:ring-offset-0 shrink-0 cursor-pointer"
                 />
@@ -662,7 +661,6 @@
                         id="default-consent-checkbox"
                         name="consent"
                         aria-label="Consent to receive SMS appointment reminders"
-                        required
                         x-model="consentChecked"
                         wire:model.live="consent"
                         class="mt-0.5 w-4 h-4 rounded bg-[#E5E7EB] text-[#F8248A] border-slate-300 focus:ring-0 focus:ring-offset-0 shrink-0 cursor-pointer"

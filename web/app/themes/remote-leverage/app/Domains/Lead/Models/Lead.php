@@ -39,6 +39,7 @@ class Lead extends Model
         'referral_code',
         'landing_url',
         'referrer_url',
+        'consent_at',
         'session_id',
         'source_type',
         'source_id',
@@ -50,6 +51,7 @@ class Lead extends Model
 
     protected $casts = [
         'booking_next_retry_at' => 'datetime',
+        'consent_at' => 'datetime',
     ];
 
     /**
