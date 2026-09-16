@@ -76,7 +76,13 @@ return [
         // CDP (Data Pipelines) source write key — browser side only, used by the
         // `window.cioanalytics` snippet TrackingHooks injects. A different product and a
         // different credential from site_id above; they are not interchangeable.
-        'cdp_write_key' => env('CUSTOMERIO_CDP_WRITE_KEY'),
+        /*
+         * Publishable browser key — recovered from the `analytics.load("…")` argument in the
+         * page source of both remoteleverage.com and rl-testing.test, where it is served to
+         * every visitor. Defaulted here for the same reason as the Sentry DSN: it is not a
+         * secret, and holding it in Secrets Manager only made it unreachable.
+         */
+        'cdp_write_key' => env('CUSTOMERIO_CDP_WRITE_KEY', 'ebb5281c53e9fca6b1a5'),
     ],
 
     'posthog' => [

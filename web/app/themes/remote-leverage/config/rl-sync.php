@@ -1,5 +1,6 @@
 <?php
 
+use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
 use App\Domains\Scheduling\Services\CalendlyEventTypeDiscoveryService;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
@@ -76,6 +77,24 @@ return [
         'rl_slack_webhook_url',
         'rl_jlc_slack_webhook_url',
         'rl_custom_webhook_url',
+
+        /*
+         * The Lead settings blob (LeadSettingsService::OPTION_KEY).
+         *
+         * One row carrying every admin-set integration value: the Slack bot token and channel,
+         * the HubSpot access token and portal id, the ZeroBounce key, and the email
+         * domain/address lists. It is here because those are exactly the "environment-specific
+         * data that has no other way to reach staging" this whitelist exists for — ECS maps
+         * Secrets Manager keys to environment variables one at a time in the task definition,
+         * so a newly added credential cannot reach staging any other way today.
+         *
+         * **It carries live credentials.** That is a deliberate trade, not an oversight: the
+         * transport is HTTPS with an application-password credential, and the alternative is
+         * staging silently running without the integrations. Remove this key once the task
+         * definition reads the whole secret (see docker/entrypoint.sh) and the environment
+         * variables win on their own again.
+         */
+        LeadSettingsService::OPTION_KEY,
     ],
 
     /*

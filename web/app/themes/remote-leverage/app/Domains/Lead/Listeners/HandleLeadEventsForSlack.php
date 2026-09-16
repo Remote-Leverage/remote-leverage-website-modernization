@@ -8,6 +8,7 @@ use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
+use App\Domains\Lead\Services\LeadSettingsService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -158,8 +159,17 @@ class HandleLeadEventsForSlack
      */
     protected function send(string $text): bool
     {
-        $token = (string) (config('services.slack.bot_token') ?? '');
-        $channel = (string) (config('services.slack.channel') ?? '');
+        /*
+         * Environment first, admin setting second — the same precedence HubSpotGateway and the
+         * ZeroBounce check use. The setting exists because ECS maps Secrets Manager keys to
+         * environment variables one at a time in the task definition, so a newly added
+         * credential is unreachable until that changes; this lets an environment be wired
+         * without waiting on it.
+         */
+        $settings = (new LeadSettingsService)->get();
+
+        $token = (string) (config('services.slack.bot_token') ?: ($settings['slack_bot_token'] ?? ''));
+        $channel = (string) (config('services.slack.channel') ?: ($settings['slack_channel'] ?? ''));
 
         if ($token !== '' && $channel !== '') {
             $response = Http::withToken($token)

@@ -529,7 +529,7 @@
                       aria-label="Email"
                       aria-required="true"
                       x-model="emailVal"
-                      wire:model.blur="email"
+                      wire:model="email"
                       @input="onFieldInput('email', {{ $stepIdx }})"
                       @blur="advanceIfValid({{ $stepIdx }})"
                       @keydown.enter.prevent="advanceIfValid({{ $stepIdx }})"
@@ -745,15 +745,29 @@
             class="pt-3"
             style="{{ $enableIsolatedFields ? 'display: none;' : '' }}"
           >
+            {{-- This step is not instant: it validates, verifies the address with ZeroBounce
+                 and captures the partial lead, so it makes a network call before it can
+                 advance. Without a busy state the button reads as broken and gets clicked
+                 again, which is what the double-submit guard then has to absorb. --}}
             <button 
               type="button" 
               wire:click="goToStep(2)"
-              class="w-full py-3.5 sm:py-4 px-6 rounded-full bg-[#F8248A] hover:bg-[#D81575] text-white font-bold text-sm sm:text-base tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg cursor-pointer"
+              wire:loading.attr="disabled"
+              wire:target="goToStep"
+              class="w-full py-3.5 sm:py-4 px-6 rounded-full bg-[#F8248A] hover:bg-[#D81575] text-white font-bold text-sm sm:text-base tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg cursor-pointer disabled:opacity-70 disabled:cursor-wait"
             >
-              <span>{{ $buttonText ?: 'Find me an Assistant' }}</span>
-              <svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+              <span wire:loading.remove wire:target="goToStep">{{ $buttonText ?: 'Find me an Assistant' }}</span>
+              <svg wire:loading.remove wire:target="goToStep" class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
               </svg>
+
+              <span wire:loading wire:target="goToStep" class="inline-flex items-center gap-2">
+                <svg class="w-4 h-4 animate-spin shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"></path>
+                </svg>
+                Checking your details…
+              </span>
             </button>
           </div>
         </div>

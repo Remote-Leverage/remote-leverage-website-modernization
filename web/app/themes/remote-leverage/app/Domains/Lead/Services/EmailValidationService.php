@@ -121,18 +121,13 @@ class EmailValidationService
         }
 
         /*
-         * A configured key means on.
+         * A configured key means on unless someone has explicitly switched it off.
          *
-         * This previously required `zerobounce_enabled` to be ticked as well, defaulting to
-         * false — so an environment with a valid key and 1,289 credits verified nothing, and
-         * looked exactly like one where verification had passed. Two switches for one
-         * capability is one too many: the key is the switch, and the checkbox now only exists
-         * to turn it *off* without removing the credential.
+         * `zerobounce_enabled` defaults to true (LeadSettingsService::defaults). It defaulted to
+         * false, which meant a valid key with credits verified nothing and looked identical to
+         * verification passing — the failure mode this whole service exists to avoid.
          */
-        if (array_key_exists('zerobounce_enabled', $settings)
-            && $settings['zerobounce_enabled'] !== ''
-            && ! filter_var($settings['zerobounce_enabled'], FILTER_VALIDATE_BOOLEAN)
-            && $settings['zerobounce_enabled'] !== null) {
+        if (! filter_var($settings['zerobounce_enabled'] ?? true, FILTER_VALIDATE_BOOLEAN)) {
             return $this->accept(null);
         }
 

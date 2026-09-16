@@ -8,7 +8,18 @@
 return [
 
     // @see https://docs.sentry.io/concepts/key-terms/dsn-explainer/
-    'dsn' => env('SENTRY_LARAVEL_DSN', env('SENTRY_DSN')),
+    /*
+     * Default committed deliberately.
+     *
+     * A Sentry DSN is a write-only ingestion endpoint and is public by design — ours is already
+     * emitted into every page as `window.SENTRY_DSN` for the browser SDK. Treating it as a
+     * secret bought nothing and cost everything: it sat in Secrets Manager, unreachable because
+     * ECS maps secrets to environment variables one at a time in the task definition, so error
+     * reporting was silently off while looking configured.
+     *
+     * The environment variable still wins where one is set.
+     */
+    'dsn' => env('SENTRY_LARAVEL_DSN', env('SENTRY_DSN', 'https://5150bfcf91536a09c6ecaa0e5de93129@o4511615073517568.ingest.us.sentry.io/4511814218285056')),
 
     // @see https://spotlightjs.com/
     // 'spotlight' => env('SENTRY_SPOTLIGHT', false),

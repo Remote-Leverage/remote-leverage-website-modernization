@@ -181,3 +181,51 @@ describe('list parsing', function () {
             ->and($validator->toList("a.com\n\n\n"))->toBe(['a.com']);
     });
 });
+
+describe('configuration defaults', function () {
+    test('ZeroBounce is ON by default, so a configured key actually verifies', function () {
+        // The regression this pins: `zerobounce_enabled` defaulted to false, so a valid key
+        // with credits verified nothing — and an unverified address looked exactly like a
+        // verified one. A capability that silently does nothing is worse than one that is off.
+        expect(LeadSettingsService::defaults()['zerobounce_enabled'])
+            ->toBeTrue();
+    });
+
+    test('an explicit opt-out still disables it', function () {
+        $result = emailValidator([
+            'zerobounce_enabled' => false,
+            'zerobounce_api_key' => 'k',
+        ])->validate('someone@example.com');
+
+        expect($result['valid'])->toBeTrue()
+            ->and($result['checked_by'])->toBeNull();
+    });
+});
+
+describe('form field binding', function () {
+    test('no booking input syncs mid-typing', function () {
+        // Every `.live` text field adds a request that can be in flight while the visitor types
+        // or ticks something else; that response is built from a stale snapshot and the DOM
+        // patch reverts their input. Deferred fields sync with the button click instead, which
+        // is the only moment their value is needed.
+        $blade = file_get_contents(
+            __DIR__.'/../../resources/views/livewire/booking/multistep-booking-wizard.blade.php'
+        );
+
+        foreach (['email', 'firstName', 'lastName', 'phone', 'consent'] as $field) {
+            expect($blade)->not->toContain('wire:model.live="'.$field.'"')
+                ->and($blade)->not->toContain('wire:model.live.debounce.300ms="'.$field.'"');
+        }
+    });
+
+    test('the fields that drive server-side routing stay live', function () {
+        // monthlyRevenue selects the Calendly event type and the pricing warning; timezone
+        // reloads availability. Those must round-trip when they change.
+        $blade = file_get_contents(
+            __DIR__.'/../../resources/views/livewire/booking/multistep-booking-wizard.blade.php'
+        );
+
+        expect($blade)->toContain('wire:model.live="monthlyRevenue"')
+            ->and($blade)->toContain('wire:model.live="timezone"');
+    });
+});

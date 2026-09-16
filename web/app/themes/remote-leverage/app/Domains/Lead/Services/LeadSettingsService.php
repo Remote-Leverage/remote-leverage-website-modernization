@@ -23,6 +23,15 @@ class LeadSettingsService
             'retention_days' => self::MINIMUM_RETENTION_DAYS,
             'hubspot_access_token' => '',
             'hubspot_portal_id' => '',
+            /*
+             * Slack bot token and channel.
+             *
+             * Genuinely secret, unlike the Sentry DSN and Customer.io write key which are now
+             * committed config defaults. Settable here so an environment can be wired before
+             * the ECS task definition exposes SLACK_BOT_TOKEN — the env value still wins.
+             */
+            'slack_bot_token' => '',
+            'slack_channel' => '',
             'slack_webhook_url' => '',
             'lead_webhook_url' => '',
 
@@ -30,7 +39,12 @@ class LeadSettingsService
              * Email gatekeeping, ported from three Gravity Forms plugins over one field.
              * See EmailValidationService for why the order and the fail-open behaviour matter.
              */
-            'zerobounce_enabled' => false,
+            /*
+             * On by default. Off here meant a valid key with credits verified nothing while
+             * looking exactly like verification passing — the checkbox exists to switch it off
+             * without deleting the credential, not to be a second thing to remember.
+             */
+            'zerobounce_enabled' => true,
             'zerobounce_api_key' => '',
             'domain_validator_mode' => 'none',   // none | allow | block
             'email_domains' => '',               // one per line
@@ -112,6 +126,8 @@ class LeadSettingsService
             'email_domains' => trim((string) ($input['email_domains'] ?? '')),
             'blacklisted_emails' => trim((string) ($input['blacklisted_emails'] ?? '')),
             'email_validation_message' => trim((string) ($input['email_validation_message'] ?? '')),
+            'slack_bot_token' => trim((string) ($input['slack_bot_token'] ?? '')),
+            'slack_channel' => trim((string) ($input['slack_channel'] ?? '')),
             'slack_webhook_url' => $this->sanitizeUrl((string) ($input['slack_webhook_url'] ?? '')),
             'lead_webhook_url' => $this->sanitizeUrl((string) ($input['lead_webhook_url'] ?? '')),
         ];
