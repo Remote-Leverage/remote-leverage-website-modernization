@@ -58,7 +58,7 @@ $pages = [
         'competitor' => ['from' => 'Wing Assistant', 'to' => 'Athena', 'short' => ['Wing' => 'Athena']],
         // Athena's own table data, keyed by section. Captured from the page before
         // it was converted; see scripts/comparison-athena-tables.json.
-        'tables' => ['at-a-glance' => 0, 'comparing-costs' => 1, 'money-goes' => 2],
+        'tables' => ['at-a-glance' => 0, 'comparing-costs' => 1, 'money-goes' => 2, 'full-picture' => 3],
         'tableSource' => 'comparison-athena-tables.json',
         // Athena runs the guarantee before the talent sections and states the
         // placement-fee pair twice — once under "hiring easy", once after the steps.
