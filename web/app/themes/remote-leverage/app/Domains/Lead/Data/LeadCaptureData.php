@@ -34,6 +34,26 @@ readonly class LeadCaptureData
         public ?string $sessionId = null,
         public bool $consent = false,
         public array $extraData = [],
+
+        /**
+         * Attribution that maps to a first-class column, as `column => value`.
+         *
+         * Deliberately an array rather than a constructor parameter per field: the set grows
+         * whenever marketing adds a parameter, and threading thirteen more nullable strings
+         * through this DTO, `fromArray()`, `toArray()` and every caller makes adding the
+         * fourteenth worse. Adding one is now a migration plus a line in
+         * `AttributionCollector::NAMED`.
+         *
+         * @var array<string, string>
+         */
+        public array $attributionNamed = [],
+
+        /**
+         * The HandL first-touch set, and any query parameter with no column of its own.
+         *
+         * @var array<string, mixed>
+         */
+        public array $attribution = [],
     ) {}
 
     public static function fromArray(array $data): self
@@ -70,6 +90,8 @@ readonly class LeadCaptureData
             sessionId: $data['session_id'] ?? $data['sessionId'] ?? null,
             consent: (bool) ($data['consent'] ?? false),
             extraData: $data['extra_data'] ?? [],
+            attributionNamed: is_array($data['attribution_named'] ?? null) ? $data['attribution_named'] : [],
+            attribution: is_array($data['attribution'] ?? null) ? $data['attribution'] : [],
         );
     }
 
@@ -103,6 +125,8 @@ readonly class LeadCaptureData
             'session_id' => $this->sessionId,
             'consent' => $this->consent,
             'extra_data' => $this->extraData,
+            'attribution_named' => $this->attributionNamed,
+            'attribution' => $this->attribution,
         ];
     }
 }

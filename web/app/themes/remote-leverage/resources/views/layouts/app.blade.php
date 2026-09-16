@@ -70,7 +70,9 @@
     <link rel="preload" as="font" type="font/woff2" crossorigin
           href="{{ Vite::asset('resources/fonts/inter-latin-wght-normal.woff2') }}">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    {{-- blog.css is only emitted on the pages that render its markup, and when it is, it has
+         to come before app.css. App\Support\BlogStyles owns both decisions. --}}
+    @vite(\App\Support\BlogStyles::entryPoints())
   </head>
 
   <body @php(body_class('min-h-full flex flex-col bg-bg-light text-text-body font-sans antialiased selection:bg-brand-purple selection:text-white'))>

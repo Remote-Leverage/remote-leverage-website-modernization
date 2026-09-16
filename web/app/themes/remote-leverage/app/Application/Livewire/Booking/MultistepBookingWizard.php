@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Livewire\Booking;
 
 use App\Domains\Lead\Actions\CaptureLeadAction;
+use App\Domains\Lead\Services\AttributionCollector;
 use App\Domains\Lead\Data\LeadCaptureData;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Scheduling\Actions\FetchAvailableSlotsAction;
@@ -161,6 +162,23 @@ class MultistepBookingWizard extends Component
 
     /** Whether `form_started` has already been emitted for this component instance. */
     public bool $formStartedTracked = false;
+
+    /**
+     * Attribution with a first-class Lead column, as `column => value`.
+     *
+     * Held as one array rather than a property per parameter so a new tracking parameter is a
+     * line in `AttributionCollector::NAMED` plus a migration — not another public property to
+     * add here, hydrate on every Livewire round trip, and thread into the DTO.
+     *
+     * @var array<string, string>
+     */
+    public array $attributionNamed = [];
+
+    /** @var array<string, mixed> The HandL set plus any query parameter without a column. */
+    public array $attribution = [];
+
+    /** Client IP, taken from the forwarded header because this sits behind a CDN. */
+    public ?string $ipAddress = null;
 
     public ?string $referralCode = null;
 
@@ -345,6 +363,19 @@ class MultistepBookingWizard extends Component
         $this->referrerUrl = (string) ($req?->header('referer') ?: $req?->cookie('handl_ref', ''));
         $this->sessionId = (string) Str::uuid();
 
+        /*
+         * Everything the legacy Gravity Form's hidden fields carried. The five UTMs, gclid and
+         * fbclid are read above for backwards compatibility with callers that pass them
+         * explicitly; the collector fills in the rest, and crucially keeps any query parameter
+         * it does not recognise so a new ad platform's click id is never silently dropped.
+         */
+        $collector = app(AttributionCollector::class);
+        $collected = $collector->collect($req);
+
+        $this->attributionNamed = $collected['named'];
+        $this->attribution = $collected['attribution'];
+        $this->ipAddress = $collector->ipAddress($req);
+
         $this->trackStepEvent('form_loaded');
     }
 
@@ -507,6 +538,8 @@ class MultistepBookingWizard extends Component
                     'submission_type' => 'Partial',
                     'event_uri' => $this->getActiveEventTypeUri(),
                 ],
+                'attribution_named' => $this->attributionNamedFor('Partial'),
+                'attribution' => $this->attribution,
             ]);
 
             $lead = $captureAction->execute($leadData);
@@ -651,6 +684,8 @@ class MultistepBookingWizard extends Component
                     'event_uri' => $this->getActiveEventTypeUri(),
                     'lead_id' => $this->leadId,
                 ],
+                'attribution_named' => $this->attributionNamedFor('Final'),
+                'attribution' => $this->attribution,
             ]);
 
             // Execute lead capture and event-driven booking
@@ -871,6 +906,30 @@ class MultistepBookingWizard extends Component
      * `sessionId` is a per-instance UUID that is always present after mount, so it is a better
      * anonymous handle than a session id the container may not offer at all.
      */
+    /**
+     * The attribution columns to stamp on the Lead, for either capture point.
+     *
+     * Built in one place so a partial capture and a completed booking cannot disagree about
+     * what was collected — the partial is what survives when someone abandons at step 2, and
+     * it carried none of this before.
+     *
+     * @return array<string, string>
+     */
+    protected function attributionNamedFor(string $submissionType): array
+    {
+        return array_filter(array_merge($this->attributionNamed, [
+            'ip_address' => $this->ipAddress,
+            'timezone' => $this->timezone,
+            'submission_type' => $submissionType,
+
+            // Mirrors the legacy form's two constant hidden fields (GF 50 and 51). `source`
+            // in HubSpot is fed from data_source, so it is what separates leads that came
+            // through this site from every other feed into the portal.
+            'intake_form' => 'yes',
+            'data_source' => (string) config('services.lead.data_source', 'Remote Leverage v2'),
+        ]), static fn ($value) => $value !== null && $value !== '');
+    }
+
     protected function resolveDistinctId(): string
     {
         if ($this->email !== '') {

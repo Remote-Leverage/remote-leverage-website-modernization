@@ -6,7 +6,13 @@
 @source "../../patterns/**/*.php";
 @source "../patterns/**/*.php";
 
-@import "./blog.css";
+/* `./blog.css` used to be imported here. It is production's rl-elementor-blocks stylesheet,
+   ported verbatim for the blog index and article pages, and importing it put 21.6 KB
+   minified — 4.5 KB gzipped, ~10% of the render-blocking stylesheet — on every marketing
+   page for markup those pages never render.
+
+   It is now its own Vite entry, emitted only where its classes appear. App\Support\BlogStyles
+   decides that and explains why it must be emitted *before* this file. */
 
 /* "Inter Display" is not a separate typeface: `InterVariable.ttf` reported its own
    family name as "Inter Variable" (Inter 4.000) with axes opsz 14-32 and wght 100-900.

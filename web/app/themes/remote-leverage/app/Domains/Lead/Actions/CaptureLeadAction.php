@@ -97,6 +97,28 @@ class CaptureLeadAction
             'status' => ! empty($data->preferredSlot) ? 'booking_pending' : ($lead?->status ?? 'captured'),
         ];
 
+        /*
+         * The rest of the attribution, applied with the same first-write-wins rule as the
+         * fields above: a later submission that arrives without a click id must not erase the
+         * one the first touch carried. `AttributionCollector` decides which columns exist here,
+         * so a new parameter needs no change in this action.
+         */
+        foreach ($data->attributionNamed as $column => $value) {
+            if (! array_key_exists($column, $leadAttributes)) {
+                $leadAttributes[$column] = ($value !== '' && $value !== null)
+                    ? $value
+                    : ($lead?->{$column} ?? null);
+            }
+        }
+
+        // Merge rather than replace, so the JSON blob accumulates across touches. Existing keys
+        // win for the same reason: the first value seen is the acquisition one.
+        $existingAttribution = is_array($lead?->attribution) ? $lead->attribution : [];
+
+        if ($data->attribution !== [] || $existingAttribution !== []) {
+            $leadAttributes['attribution'] = array_replace($data->attribution, $existingAttribution);
+        }
+
         if ($lead) {
             $lead->update($leadAttributes);
         } else {

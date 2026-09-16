@@ -1,5 +1,12 @@
 @import "./app.css";
 
+/* The editor keeps blog.css, which app.css no longer carries. Splitting it out was a
+   front-end decision — 4.5 KB gzipped off the render-blocking stylesheet on every page
+   that renders no blog markup (see App\Support\BlogStyles) — and none of that reasoning
+   applies to an admin-only stylesheet. Dropping it here would only make post previews
+   in the editor stop matching the front end. */
+@import "./blog.css";
+
 .editor-styles-wrapper {
   font-family: var(--font-display);
   color: var(--color-text-body);

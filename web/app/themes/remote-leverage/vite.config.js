@@ -20,6 +20,10 @@ export default defineConfig({
         'resources/js/app.js',
         'resources/css/editor.css',
         'resources/js/editor.js',
+        // Blog index + article styles, ported verbatim from production. A separate entry
+        // rather than an @import into app.css so it only loads on the pages that render
+        // its markup — see App\Support\BlogStyles.
+        'resources/css/blog.css',
         // Social Media Kit — the ported rl-social-kit dashboard. Its CSS and JS are
         // carried over verbatim from the plugin, so they stay separate entries rather
         // than being folded into app.css/app.js.

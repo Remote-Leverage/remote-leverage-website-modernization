@@ -41,6 +41,19 @@ class Lead extends Model
         'referrer_url',
         'consent_at',
         'session_id',
+        'utm_id',
+        'li_fat_id',
+        'fbc',
+        'oppref',
+        'partner',
+        'data_source',
+        'intake_form',
+        'ip_address',
+        'scheduler_link',
+        'landing_page_base',
+        'timezone',
+        'submission_type',
+        'attribution',
         'source_type',
         'source_id',
         'status',
@@ -52,6 +65,9 @@ class Lead extends Model
     protected $casts = [
         'booking_next_retry_at' => 'datetime',
         'consent_at' => 'datetime',
+        // The HandL first-touch set plus any query parameter without a column of its own.
+        // See App\Domains\Lead\Services\AttributionCollector.
+        'attribution' => 'array',
     ];
 
     /**

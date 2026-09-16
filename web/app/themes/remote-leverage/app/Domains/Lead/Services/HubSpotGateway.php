@@ -149,17 +149,51 @@ class HubSpotGateway
             'lastname' => $lead->last_name,
             'phone' => $lead->phone,
             'company' => $lead->company,
-            'rl_source_type' => $lead->source_type,
-            'rl_source_id' => $lead->source_id,
-            'rl_role_needed' => $lead->role_needed,
-            'rl_weekly_hours' => $lead->weekly_hours,
-            'rl_lead_status' => $lead->status,
+            'country' => $lead->phone_country,
+
+            // Attribution. Every key below was verified to exist in the portal on 2026-09-16;
+            // HubSpot rejects the whole request if one does not, so this list is not a place to
+            // guess. The previous `rl_*` names existed nowhere and would have 400'd every sync.
+            'utm_source' => $lead->utm_source,
+            'utm_medium' => $lead->utm_medium,
+            'utm_campaign' => $lead->utm_campaign,
+            'utm_term' => $lead->utm_term,
+            'utm_content' => $lead->utm_content,
+            'utm_id' => $lead->utm_id,
+            'gclid' => $lead->gclid,
+            'fbclid' => $lead->fbclid,
+            'fbc' => $lead->fbc,
+            'li_fat_id' => $lead->li_fat_id,
+            'oppref' => $lead->oppref,
+            'partner_name' => $lead->partner,
+            'referrer_rewardful_id' => $lead->referral_code,
+            'source' => $lead->data_source,
+            'intake_form' => $lead->intake_form,
+            'ip_address' => $lead->ip_address,
+            'schedule_link' => $lead->scheduler_link,
+            'landing_page' => $lead->landing_page_base ?: $lead->landing_url,
+
+            /*
+             * The MRR band the visitor selected, into HubSpot's **Annual** Revenue.
+             *
+             * That is the mapping the legacy Gravity Forms feed used, carried over deliberately
+             * so the field keeps one meaning across the cutover — but it is worth knowing the
+             * values are monthly ("$10k to $50k Per Month"), and the portal also has a
+             * `monthly_revenue` property that would fit them. Changing it is a reporting
+             * decision, not a code one: see docs/domains/lead.md.
+             */
+            'annualrevenue' => $lead->monthly_revenue,
         ];
 
         if ($includeEmail) {
             $properties = ['email' => $lead->email] + $properties;
         }
 
-        return $properties;
+        // HubSpot treats an explicit null as "clear this property". Sending one would let a
+        // later partial submission wipe attribution the first touch established.
+        return array_filter(
+            $properties,
+            static fn ($value) => $value !== null && $value !== '',
+        );
     }
 }

@@ -16,14 +16,18 @@ function loadIntlTelInput() {
   return itiLoadPromise;
 }
 
+/**
+ * There is deliberately no synchronous getBoundingClientRect() fast path here.
+ *
+ * Reading a rect during init forces the browser to lay out the whole document on the
+ * main thread before it would otherwise have to — on a page the size of the homepage
+ * (190 KB of markup, 76 images) that is tens of milliseconds, and it is what Lighthouse
+ * reports as "Forced reflow". IntersectionObserver costs nothing here: it delivers its
+ * first callback off the next natural layout, so an element that is already on screen
+ * still fires immediately, one frame later.
+ */
 function whenVisible(el, callback, rootMargin = '200px') {
-  if (!el) {
-    callback();
-    return;
-  }
-
-  const rect = el.getBoundingClientRect();
-  if (rect.top < window.innerHeight + 200 && rect.bottom > -200) {
+  if (!el || !('IntersectionObserver' in window)) {
     callback();
     return;
   }
@@ -432,18 +436,42 @@ function initCarousels() {
       return card ? card.offsetWidth + GAP : track.clientWidth * 0.8;
     };
 
+    // Every geometry read happens before the first write. markCentre() used to run first
+    // and toggle [data-rl-center] on the cards, which invalidates layout, so the
+    // maxScroll() read that followed forced a synchronous relayout — once at init and then
+    // once per scroll event, since sync() is also the scroll handler.
     const sync = () => {
-      markCentre();
-
       const max = maxScroll();
+      const left = track.scrollLeft;
+      const active = isCentre ? centreIndex() : -1;
+
+      paintCentre(active);
 
       if (prev) {
-        prev.disabled = track.scrollLeft <= 1;
+        prev.disabled = left <= 1;
       }
 
       if (next) {
-        next.disabled = max <= 1 || track.scrollLeft >= max - 1;
+        next.disabled = max <= 1 || left >= max - 1;
       }
+    };
+
+    // Scroll fires far more often than the screen repaints, and a smooth scroll or a drag
+    // emits a burst of them. Coalescing to one pass per frame keeps that from queueing a
+    // layout per event.
+    let syncQueued = false;
+
+    const queueSync = () => {
+      if (syncQueued) {
+        return;
+      }
+
+      syncQueued = true;
+
+      requestAnimationFrame(() => {
+        syncQueued = false;
+        sync();
+      });
     };
 
     const advance = (direction) => {
@@ -580,12 +608,17 @@ function initCarousels() {
       return rect.left + rect.width / 2 - trackCentre();
     };
 
+    // Pure read. The track's own rect is taken once rather than once per card — cardOffset()
+    // calls trackCentre(), so measuring this way was two rect reads per card.
     const centreIndex = () => {
+      const centre = trackCentre();
+
       let best = 0;
       let bestGap = Infinity;
 
       cards().forEach((card, i) => {
-        const gap = Math.abs(cardOffset(card));
+        const rect = card.getBoundingClientRect();
+        const gap = Math.abs(rect.left + rect.width / 2 - centre);
 
         if (gap < bestGap) {
           bestGap = gap;
@@ -596,12 +629,12 @@ function initCarousels() {
       return best;
     };
 
-    const markCentre = () => {
-      if (!isCentre) {
+    // Pure write. Kept separate from centreIndex() so sync() can do all of its reading
+    // before any of its writing.
+    const paintCentre = (active) => {
+      if (!isCentre || active < 0) {
         return;
       }
-
-      const active = centreIndex();
 
       cards().forEach((card, i) => {
         card.toggleAttribute('data-rl-center', i === active);
@@ -611,6 +644,8 @@ function initCarousels() {
         dot.setAttribute('aria-current', i === active ? 'true' : 'false');
       });
     };
+
+    const markCentre = () => paintCentre(isCentre ? centreIndex() : -1);
 
     const goToIndex = (i, behavior = 'smooth') => {
       const card = cards()[i];
@@ -626,11 +661,14 @@ function initCarousels() {
       dot.addEventListener('click', () => { hold(); goToIndex(i); });
     });
 
-    track.addEventListener('scroll', sync, { passive: true });
-    window.addEventListener('resize', sync, { passive: true });
+    track.addEventListener('scroll', queueSync, { passive: true });
+    window.addEventListener('resize', queueSync, { passive: true });
     document.addEventListener('visibilitychange', () => { document.hidden ? stop() : start(); });
 
-    sync();
+    // Deferred a frame for the same reason as the probes above: this runs inside
+    // DOMContentLoaded, and sync() reads geometry. The arrows are enabled for that one
+    // frame, which is not long enough to click.
+    queueSync();
 
     // Centre carousels open on the middle card, as the legacy slick config did.
     if (isCentre && cards().length) {
@@ -807,12 +845,11 @@ function scheduleLivewire() {
     return;
   }
 
-  const nearViewport = Array.from(targets).some((el) => {
-    const rect = el.getBoundingClientRect();
-    return rect.top < window.innerHeight + 800;
-  });
-
-  if (nearViewport || window.location.hash === '#booking-footer') {
+  // Same reasoning as whenVisible(): the rect probe that used to stand here ran inside
+  // DOMContentLoaded and forced the document's first full layout synchronously, for an
+  // answer the observer below gives for free one frame later. The observer's rootMargin
+  // is the same 800px the probe tested against, so what boots eagerly has not changed.
+  if (window.location.hash === '#booking-footer' || !('IntersectionObserver' in window)) {
     bootLivewire();
     return;
   }

@@ -88,6 +88,15 @@ return [
         'webhook_url' => env('SLACK_WEBHOOK_URL'),
     ],
 
+    /*
+     * Stamped on every Lead and mapped to HubSpot's `source` property. The legacy Gravity Form
+     * sent the constant 'Salvatori Forms'; v2 identifies itself instead, so the portal can tell
+     * which system a contact came through during and after the cutover.
+     */
+    'lead' => [
+        'data_source' => env('LEAD_DATA_SOURCE', 'Remote Leverage v2'),
+    ],
+
     'webhooks' => [
         'lead_webhook_url' => env('LEAD_WEBHOOK_URL'),
     ],
