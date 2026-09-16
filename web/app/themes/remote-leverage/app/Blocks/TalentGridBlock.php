@@ -48,6 +48,10 @@ class TalentGridBlock extends Block
             // the same profiles by scrolling them. Not the default: it changes mobile
             // layout, so pages opt in.
             'layout' => (string) ((function_exists('get_field') ? get_field('layout') : null) ?: 'grid'),
+            // Production's /reviews/ band runs these cards square (measured 299x302 on
+            // 2026-09-16); everywhere else they are the 5/8 portrait. Defaults to
+            // portrait so no existing page moves.
+            'aspect' => (string) ((function_exists('get_field') ? get_field('aspect') : null) ?: 'portrait'),
         ];
     }
 
@@ -64,6 +68,14 @@ class TalentGridBlock extends Block
                     'swipe' => 'Swipeable row on mobile, grid on desktop',
                 ],
                 'default_value' => 'grid',
+            ])
+            ->addSelect('aspect', [
+                'label' => 'Card shape',
+                'choices' => [
+                    'portrait' => 'Portrait 5:8 (default)',
+                    'square' => 'Square 1:1 (production /reviews/)',
+                ],
+                'default_value' => 'portrait',
             ])
             ->addRepeater('talent_cards', [
                 'label' => 'Talent Cards (Leave empty for default 8 cards)',

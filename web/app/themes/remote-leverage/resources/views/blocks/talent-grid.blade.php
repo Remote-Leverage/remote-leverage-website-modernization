@@ -5,8 +5,9 @@
     $layout = $layout ?? 'grid';
     $isRow = $layout === 'row';
     $isSwipe = $layout === 'swipe';
+    $isSquare = ($aspect ?? 'portrait') === 'square';
 @endphp
-<div class="w-full">
+<div @class(['w-full', 'rl-talent-grid--square' => $isSquare])>
     <h2 class="sr-only">Pre-Vetted Remote Professionals</h2>
     @if ($isRow)
         {{-- Marquee: the track is rendered twice so the loop is seamless, and the wrapper

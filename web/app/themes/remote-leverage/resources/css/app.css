@@ -702,6 +702,12 @@ body.admin-bar {
   background-color: var(--color-lavender-tint);
   transform: translateZ(0);
 }
+/* Production's /reviews/ band runs these cards square rather than the 5/8 portrait
+   used elsewhere — measured 299x302 there on 2026-09-16. Opt-in, so nothing else moves. */
+.rl-talent-grid--square .rl-talent-grid-card {
+  aspect-ratio: 1 / 1;
+}
+
 .rl-talent-grid-card .rl-department-card__bg {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
