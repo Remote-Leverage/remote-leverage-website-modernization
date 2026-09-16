@@ -22,6 +22,10 @@ web/.htaccess
 !.env.example
 /env
 
+# One-time production import artifacts (never commit)
+/uploads.zip
+/*.sql
+
 # Composer
 /vendor
 auth.json

@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
-"""Seed /wordpress-staging/app in Secrets Manager from the local env file.
+"""Seed wordpress-{staging,production}/app in Secrets Manager from the local env file.
 
-Does not upload local DB_* / WP_HOME / WP_SITEURL. Staging Stripe uses test keys.
+Does not upload local DB_* / WP_HOME / WP_SITEURL. Those come from the ECS task.
+
+Stripe:
+  STRIPE_MODE=test (default) — map STRIPE_TEST_* onto STRIPE_KEY / STRIPE_SECRET
+  STRIPE_MODE=live — keep live STRIPE_KEY / STRIPE_SECRET; do not copy test keys
+                     over them. STRIPE_WEBHOOK_SECRET is left empty unless
+                     SEED_STRIPE_WEBHOOK=1 (wait until a live-mode endpoint exists).
 
 Usage:
   APP_SECRET_ARN=arn:aws:secretsmanager:... AWS_REGION=us-east-1 \\
-    ./scripts/seed-staging-secrets.sh [path-to-env]
+    STRIPE_MODE=test ./scripts/seed-staging-secrets.sh [path-to-env]
+
+  APP_SECRET_ARN=arn:aws:secretsmanager:... AWS_REGION=us-east-1 \\
+    STRIPE_MODE=live ./scripts/seed-staging-secrets.sh [path-to-env]
 
 Default env path: repo-root file named env
 """
@@ -65,6 +74,11 @@ def parse_env(path: Path) -> dict[str, str]:
 def main() -> int:
     secret_arn = os.environ.get("APP_SECRET_ARN")
     region = os.environ.get("AWS_REGION", "us-east-1")
+    stripe_mode = os.environ.get("STRIPE_MODE", "test").strip().lower()
+    seed_webhook = os.environ.get("SEED_STRIPE_WEBHOOK", "") == "1"
+    if stripe_mode not in {"test", "live"}:
+        sys.stderr.write("STRIPE_MODE must be test or live\n")
+        return 1
     if not secret_arn:
         sys.stderr.write("APP_SECRET_ARN is required\n")
         return 1
@@ -95,12 +109,21 @@ def main() -> int:
             continue
         payload[key] = value
 
-    if source.get("STRIPE_TEST_KEY"):
-        payload["STRIPE_KEY"] = source["STRIPE_TEST_KEY"]
-    if source.get("STRIPE_TEST_SECRET"):
-        payload["STRIPE_SECRET"] = source["STRIPE_TEST_SECRET"]
-    payload.pop("STRIPE_TEST_KEY", None)
-    payload.pop("STRIPE_TEST_SECRET", None)
+    if stripe_mode == "test":
+        if source.get("STRIPE_TEST_KEY"):
+            payload["STRIPE_KEY"] = source["STRIPE_TEST_KEY"]
+        if source.get("STRIPE_TEST_SECRET"):
+            payload["STRIPE_SECRET"] = source["STRIPE_TEST_SECRET"]
+        payload.pop("STRIPE_TEST_KEY", None)
+        payload.pop("STRIPE_TEST_SECRET", None)
+    else:
+        if not source.get("STRIPE_KEY") or not source.get("STRIPE_SECRET"):
+            sys.stderr.write("STRIPE_MODE=live requires STRIPE_KEY and STRIPE_SECRET in the env file\n")
+            return 1
+        payload["STRIPE_KEY"] = source["STRIPE_KEY"]
+        payload["STRIPE_SECRET"] = source["STRIPE_SECRET"]
+        if not seed_webhook:
+            payload["STRIPE_WEBHOOK_SECRET"] = ""
 
     subprocess.run(
         [
@@ -116,7 +139,7 @@ def main() -> int:
         ],
         check=True,
     )
-    print(f"Seeded {len(payload)} keys into {secret_arn}")
+    print(f"Seeded {len(payload)} keys into {secret_arn} (STRIPE_MODE={stripe_mode})")
     return 0
 
 

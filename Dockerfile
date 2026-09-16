@@ -85,7 +85,11 @@ RUN --mount=type=secret,id=composer_auth,required=false \
 
 FROM php-base AS runtime
 
-RUN apt-get update && apt-get install -y --no-install-recommends nginx procps \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      nginx \
+      procps \
+      default-mysql-client \
+      awscli \
     && rm -rf /var/lib/apt/lists/* \
     && curl -fsSL -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
     && chmod +x /usr/local/bin/wp \
