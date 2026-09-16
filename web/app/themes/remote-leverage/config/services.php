@@ -91,7 +91,11 @@ return [
          * `webhook_url` is the fallback for an environment with no token.
          */
         'bot_token' => env('SLACK_BOT_TOKEN'),
-        'channel' => env('SLACK_CHANNEL', 'new-appts'),
+        // #new-appts (C086BBKUXL5) — the channel the Gravity Forms lead feed posts to. Held as
+        // an ID rather than a name because a rename silently breaks a name and not an ID.
+        // NOT C09HXD9S76Z: that is #sales-meetings, which the legacy `rl_jlc_slack_channel`
+        // option points at for live-call alerts — a different notification entirely.
+        'channel' => env('SLACK_CHANNEL', 'C086BBKUXL5'),
         'webhook_url' => env('SLACK_WEBHOOK_URL'),
 
         /*
