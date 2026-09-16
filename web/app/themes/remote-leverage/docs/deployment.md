@@ -2,12 +2,14 @@
 
 Two AWS environments exist: **staging** (`staging.remoteleverage.com`) and a production **preview** host (`production.remoteleverage.com`). Apex `remoteleverage.com` stays on the legacy site until DNS is under our control and we cut over.
 
-Runtime secrets live in **Secrets Manager**, not GitHub. The only GitHub repo secret is `ACF_PRO_KEY` (Composer auth for CI and image builds). Pull requests have no AWS OIDC.
+Runtime secrets are **edited in GitHub Environment secrets** and copied into Secrets Manager. ECS still reads Secrets Manager at runtime. `ACF_PRO_KEY` is also a repository secret so pull-request CI can install ACF (PRs have no AWS OIDC).
 
 ```mermaid
 flowchart LR
     subgraph github [GitHub]
-      ACF[ACF_PRO_KEY secret]
+      EnvSecrets[Environment secrets]
+      ACF[ACF_PRO_KEY repo secret]
+      Sync[sync-app-secrets / deploy]
       CI[PR CI and image build]
     end
     subgraph aws [AWS]
@@ -16,6 +18,8 @@ flowchart LR
       RDS[Aurora MySQL]
       EFS[EFS uploads]
     end
+    EnvSecrets --> Sync
+    Sync --> SM
     ACF --> CI
     SM --> ECS
     ECS --> RDS
@@ -130,37 +134,26 @@ A task that cannot acquire the lock within `--timeout` (default 120s) logs and e
 
 ## Secrets
 
-Runtime configuration comes from AWS Secrets Manager (`/wordpress-staging/app` or `/wordpress-production/app`), injected into the task definition. Terraform creates the secret with empty placeholders; values never live in Terraform state.
+Runtime still comes from AWS Secrets Manager (`wordpress-staging/app` or `wordpress-production/app`), injected into the ECS task. **GitHub Environment secrets are the place you edit values.** A workflow copies them into Secrets Manager; ECS does not read GitHub at runtime.
 
-`scripts/seed-staging-secrets.sh` (a Python script despite the extension) pushes local env values up into that secret:
+GitHub does not fire an event when a secret value changes. After you edit secrets on the `staging` or `production` GitHub Environment:
 
-```bash
-# Staging — Stripe test keys
-APP_SECRET_ARN=arn:aws:secretsmanager:us-east-1:...:secret:/wordpress-staging/app \
-AWS_REGION=us-east-1 STRIPE_MODE=test ./scripts/seed-staging-secrets.sh env
+1. Run **Sync app secrets** (`sync-app-secrets.yml`) for that environment — production waits for the same environment approval as a deploy — **or**
+2. Deploy (staging push / production release tag). Both deploy workflows sync secrets before they roll ECS.
 
-# Production preview — Stripe live keys; webhook secret stays empty until a
-# live-mode endpoint exists for https://production.remoteleverage.com/api/webhooks/stripe
-APP_SECRET_ARN=arn:aws:secretsmanager:us-east-1:...:secret:/wordpress-production/app \
-AWS_REGION=us-east-1 STRIPE_MODE=live ./scripts/seed-staging-secrets.sh env
-```
+Empty GitHub secrets are skipped so they do not blank keys already in Secrets Manager. `DB_*`, `WP_HOME`, and `WP_SITEURL` are not GitHub secrets; they stay on the task definition.
 
-It deliberately skips `DB_*`, `WP_HOME` and `WP_SITEURL` — those are environment-specific and set in the task definition. Do not copy the staging secret into production.
+`ACF_PRO_KEY` remains a **repository** secret as well, because pull-request CI has no environment and no AWS OIDC.
 
-**Stripe, per environment (settled 2026-09-15).** Staging runs Stripe **test** keys with its own
-**test-mode** webhook signing secret; production runs the live Connect pair with its live secret.
-Stripe issues a separate signing secret per webhook endpoint, so `STRIPE_WEBHOOK_SECRET` is a
-genuinely different value in each environment — copying one between them produces a 403, not a
-subtle bug. This matters more than it used to: `/api/webhooks/stripe` and `/api/webhooks/calendly`
-now **fail closed**, returning 503 with no secret configured and 403 on a bad signature, so an
-environment missing its secret processes nothing at all rather than accepting unverified events.
-See [cutover-decisions.md](cutover-decisions.md) §5b and [known-issues.md](known-issues.md) #7.
+`scripts/seed-staging-secrets.sh` still exists for a one-time seed from the local `env` file. Day-to-day updates should go through GitHub secrets.
+
+**Stripe, per environment (settled 2026-09-15).** Staging GitHub Environment secrets should hold Stripe **test** keys (`STRIPE_KEY` / `STRIPE_SECRET` / test-mode `STRIPE_WEBHOOK_SECRET`); production Environment secrets hold the live pair. Stripe issues a separate signing secret per webhook endpoint, so copying one between environments produces a 403. `/api/webhooks/stripe` and `/api/webhooks/calendly` fail closed (503 with no secret, 403 on a bad signature). See [cutover-decisions.md](cutover-decisions.md) §5b and [known-issues.md](known-issues.md) #7.
 
 > **Note:** the secret is injected into the ECS **task definition**, so writing it into Secrets
 > Manager is not enough on its own — the service needs a new deployment (or a forced update)
-> before a running task sees it.
+> before a running task sees it. The sync workflow does that when **Restart ECS** is checked.
 
-**Do not add the `*_SYNC_*` keys to this script.** They point in the opposite direction: they are read *locally* so the sync commands can call out to a remote environment's REST API, and are never baked into a container. See [domains/sync.md](domains/sync.md#configuration).
+**Do not add the `*_SYNC_*` keys.** They point in the opposite direction: they are read *locally* so the sync commands can call out to a remote environment's REST API, and are never baked into a container. See [domains/sync.md](domains/sync.md#configuration).
 
 ## Infrastructure
 

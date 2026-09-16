@@ -41,6 +41,12 @@ jobs:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Sync GitHub secrets to Secrets Manager
+        env:
+          APP_SECRET_ARN: ${{ vars.APP_SECRET_ARN }}
+          GITHUB_SECRETS_JSON: ${{ toJSON(secrets) }}
+        run: python3 scripts/sync-app-secrets-from-env.py
+
       - name: Login to Amazon ECR
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
