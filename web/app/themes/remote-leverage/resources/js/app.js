@@ -45,6 +45,17 @@ function whenVisible(el, callback, rootMargin = '200px') {
 export function phoneInputComponent(config = {}) {
   return {
     iti: null,
+
+    /*
+     * The input's bound value.
+     *
+     * The template binds `x-model="phoneVal"`, but this component never declared it — so after
+     * a Livewire DOM patch (navigating back to step 1) Alpine resolved the name against
+     * whatever was in scope and wrote a non-string into the field, which the browser rendered
+     * as "[object Object]". Declaring it, and coercing on every write, makes that impossible
+     * regardless of what Alpine finds.
+     */
+    phoneVal: typeof config.phone === 'string' ? config.phone : '',
     getWire() {
       if (this.$wire) return this.$wire;
       const wireEl = this.$el?.closest('[wire\\:id]');
@@ -80,7 +91,13 @@ export function phoneInputComponent(config = {}) {
           wire.phoneCountry = country.iso2.toUpperCase();
         }
         if (wire) {
-          wire.phone = this.iti.getNumber() || input.value;
+          const number = this.iti.getNumber();
+          const nextPhone = typeof number === 'string' && number !== ''
+            ? number
+            : String(input.value ?? '');
+
+          this.phoneVal = nextPhone;
+          wire.phone = nextPhone;
         }
       };
 
@@ -123,6 +140,8 @@ export function phoneInputComponent(config = {}) {
       // Livewire hands this back as a reactive proxy, not always a plain string —
       // intl-tel-input calls .indexOf() on it and throws if it isn't one.
       const phone = wire && typeof wire.phone === 'string' ? wire.phone : '';
+
+      this.phoneVal = phone;
 
       if (phone && this.iti) {
         this.iti.setNumber(phone);

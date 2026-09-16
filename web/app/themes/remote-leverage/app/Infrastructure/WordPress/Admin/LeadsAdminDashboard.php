@@ -143,6 +143,12 @@ class LeadsAdminDashboard
                 'optional_fields' => $_POST['optional_fields'] ?? [],
                 'hubspot_access_token' => $_POST['hubspot_access_token'] ?? '',
                 'hubspot_portal_id' => $_POST['hubspot_portal_id'] ?? '',
+                'zerobounce_enabled' => $_POST['zerobounce_enabled'] ?? '',
+                'zerobounce_api_key' => $_POST['zerobounce_api_key'] ?? '',
+                'domain_validator_mode' => $_POST['domain_validator_mode'] ?? 'none',
+                'email_domains' => $_POST['email_domains'] ?? '',
+                'blacklisted_emails' => $_POST['blacklisted_emails'] ?? '',
+                'email_validation_message' => $_POST['email_validation_message'] ?? '',
                 'slack_webhook_url' => $_POST['slack_webhook_url'] ?? '',
                 'lead_webhook_url' => $_POST['lead_webhook_url'] ?? '',
             ]);
@@ -1987,6 +1993,65 @@ class LeadsAdminDashboard
                             <th scope="row"><label for="hubspot_portal_id">HubSpot portal ID</label></th>
                             <td><input type="text" id="hubspot_portal_id" name="hubspot_portal_id" class="regular-text"
                                     value="<?php echo esc_attr($settings['hubspot_portal_id']); ?>" /></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" colspan="2" style="padding-top: 24px;">
+                                <h3 style="margin: 0 0 4px;">Email validation</h3>
+                                <p style="font-weight: 400; color: #52525b; margin: 0;">
+                                    Checked in order: blacklisted address, then domain rule, then ZeroBounce.
+                                    The local lists cost nothing, so a known-bad address never spends a credit.
+                                    ZeroBounce <strong>fails open</strong> — if it is unreachable the address is
+                                    accepted, because rejecting a real buyer costs more than letting one through.
+                                </p>
+                            </th>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="domain_validator_mode">Domain validator</label></th>
+                            <td>
+                                <select id="domain_validator_mode" name="domain_validator_mode">
+                                    <?php foreach (['none' => 'None', 'allow' => 'Allow only these domains', 'block' => 'Block these domains'] as $value => $label) { ?>
+                                        <option value="<?php echo esc_attr($value); ?>" <?php selected($settings['domain_validator_mode'], $value); ?>><?php echo esc_html($label); ?></option>
+                                    <?php } ?>
+                                </select>
+                                <p class="description">Production runs <strong>Block</strong>, listing disposable-mailbox providers.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="email_domains">Email domains</label></th>
+                            <td>
+                                <textarea id="email_domains" name="email_domains" rows="6" class="large-text code"
+                                          placeholder="cuvox.de&#10;armyspy.com&#10;dayrep.com"><?php echo esc_textarea($settings['email_domains']); ?></textarea>
+                                <p class="description">One per line, domain only (no <code>@</code>).</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="blacklisted_emails">Blacklisted addresses</label></th>
+                            <td>
+                                <textarea id="blacklisted_emails" name="blacklisted_emails" rows="3" class="large-text code"><?php echo esc_textarea($settings['blacklisted_emails']); ?></textarea>
+                                <p class="description">Comma separated. Exact addresses only — use the domain list for whole providers.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="zerobounce_enabled">ZeroBounce</label></th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" id="zerobounce_enabled" name="zerobounce_enabled" value="1" <?php checked((bool) $settings['zerobounce_enabled']); ?> />
+                                    Verify the mailbox actually exists
+                                </label>
+                                <p><input type="password" id="zerobounce_api_key" name="zerobounce_api_key" class="regular-text"
+                                          value="<?php echo esc_attr($settings['zerobounce_api_key']); ?>" autocomplete="off"
+                                          placeholder="Falls back to ZEROBOUNCE_API_KEY" /></p>
+                                <p class="description">Rejects <code>invalid</code>, <code>spamtrap</code>, <code>abuse</code> and <code>do_not_mail</code>. <code>catch-all</code> and <code>unknown</code> pass — they mean undetermined, not bad.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="email_validation_message">Rejection message</label></th>
+                            <td>
+                                <input type="text" id="email_validation_message" name="email_validation_message" class="large-text"
+                                       value="<?php echo esc_attr($settings['email_validation_message']); ?>"
+                                       placeholder="Please use a valid business email address." />
+                                <p class="description">Shown for every rejection reason, so it must not reveal which list matched.</p>
+                            </td>
                         </tr>
                         <tr>
                             <th scope="row"><label for="slack_webhook_url">Slack webhook URL</label></th>

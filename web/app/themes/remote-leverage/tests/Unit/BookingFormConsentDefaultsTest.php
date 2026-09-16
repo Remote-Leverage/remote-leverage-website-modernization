@@ -103,7 +103,12 @@ describe('Booking form defaults express a real choice', function () {
             $input = substr($chunk, 0, (int) strpos($chunk, '>'));
 
             expect($input)->not->toMatch('/\bchecked\b/')
-                ->and($input)->toContain('wire:model.live="consent"');
+                // Bound, but deliberately NOT `.live`. Every `.live` field adds a request that
+                // can be in flight while the visitor ticks the box; that response is computed
+                // from a snapshot predating the tick and the DOM patch un-ticks it. Consent is
+                // only read at submit, so `.live` bought nothing and cost that race.
+                ->and($input)->toContain('wire:model="consent"')
+                ->and($input)->not->toContain('wire:model.live="consent"');
         }
     });
 

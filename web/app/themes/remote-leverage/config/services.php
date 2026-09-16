@@ -93,6 +93,14 @@ return [
         'app_host' => env('POSTHOG_APP_HOST', 'https://us.posthog.com'),
     ],
 
+    /*
+     * ZeroBounce mailbox verification. The admin-screen value wins; this is the fallback, and
+     * the same precedence every other credential in this file follows.
+     */
+    'zerobounce' => [
+        'api_key' => env('ZEROBOUNCE_API_KEY'),
+    ],
+
     'slack' => [
         /*
          * Production posts through the Gravity Forms Slack add-on's bot token to a channel.

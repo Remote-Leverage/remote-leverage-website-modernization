@@ -65,6 +65,7 @@ ALLOWLIST = [
     "STRIPE_CONNECT_CLIENT_ID",
     "STRIPE_WEBHOOK_FORWARD_URL",
     # Lead / CRM
+    "ZEROBOUNCE_API_KEY",
     "HUBSPOT_ACCESS_TOKEN",
     "HUBSPOT_PORTAL_ID",
     "SLACK_BOT_TOKEN",
@@ -86,7 +87,7 @@ ALLOWLIST = [
 ]
 
 # Deliberately NOT on the allowlist, so they are not resurrected by a stale GitHub secret:
-#   ZEROBOUNCE_API_KEY, REFERRAL_WEBHOOK_SECRET, NOTION_API_KEY, NOTION_PARTNERS_DATABASE_ID,
+#   REFERRAL_WEBHOOK_SECRET, NOTION_API_KEY, NOTION_PARTNERS_DATABASE_ID,
 #   GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET
 #     — nothing reads any of these; see docs/configuration.md "Keys removed from .env".
 #   STRIPE_DEFAULT_THANKYOU_URL

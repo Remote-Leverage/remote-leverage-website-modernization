@@ -1,5 +1,44 @@
 <div class="w-full">
-  @if ($skin === 'glass')
+  {{-- Revenue-band pricing warning. Sits between step 1 and the calendar: the visitor has
+       already been captured as a partial lead, so leaving here still produces a lead and a
+       Slack alert. See config/booking.php for the copy and which bands trigger it. --}}
+  @if ($showWarning && ($warning = $this->warningForBand()))
+    <div class="w-full max-w-[640px] mx-auto rounded-[28px] bg-brand-purple-deep/95 border border-white/10 p-7 sm:p-9 text-white shadow-2xl"
+         wire:key="pricing-warning">
+      <button type="button" wire:click="dismissWarning" aria-label="Go back"
+              class="w-11 h-11 rounded-full bg-white/90 hover:bg-white text-brand-purple-deep flex items-center justify-center mb-6 transition cursor-pointer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+      </button>
+
+      <h2 class="text-2xl sm:text-[28px] font-bold leading-snug mb-5 whitespace-pre-line">{{ $warning['warning_heading'] ?? '' }}</h2>
+
+      <div class="space-y-3 text-[15px] leading-relaxed text-white/90">
+        @foreach (($warning['warning_body'] ?? []) as $block)
+          @if (($block['type'] ?? '') === 'bullet')
+            <div class="flex gap-3 pl-1">
+              <span class="mt-2 w-1.5 h-1.5 rounded-full bg-white/70 shrink-0" aria-hidden="true"></span>
+              <p>{{ $block['text'] ?? '' }}</p>
+            </div>
+          @else
+            <p>
+              @isset($block['lead'])<strong class="font-semibold text-white">{{ $block['lead'] }}</strong> @endisset
+              {{ $block['text'] ?? '' }}
+            </p>
+          @endif
+        @endforeach
+      </div>
+
+      <button type="button" wire:click="acknowledgeWarning" wire:loading.attr="disabled"
+              class="mt-7 w-full py-4 px-6 rounded-full bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-bold text-base tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-60">
+        {{ $warning['warning_button'] ?? 'Continue' }}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
+    </div>
+  @elseif ($skin === 'glass')
     <div class="w-full max-w-[500px] mx-auto lg:ml-auto">
       <div class="w-full rounded-[28px] bg-white/[0.08] backdrop-blur-md border border-white/15 p-6 sm:p-8 md:p-9 shadow-2xl text-white">
 
@@ -144,7 +183,7 @@
                   id="booking-consent-checkbox"
                   name="consent"
                   aria-label="Consent to receive SMS appointment reminders"
-                  wire:model.live="consent"
+                  wire:model="consent"
                   class="mt-0.5 w-4 h-4 rounded bg-[#F0F3FA] text-brand-purple border-0 focus:ring-0 focus:ring-offset-0 shrink-0 cursor-pointer"
                 />
                 <span>
@@ -490,7 +529,7 @@
                       aria-label="Email"
                       aria-required="true"
                       x-model="emailVal"
-                      wire:model.live.debounce.300ms="email"
+                      wire:model.blur="email"
                       @input="onFieldInput('email', {{ $stepIdx }})"
                       @blur="advanceIfValid({{ $stepIdx }})"
                       @keydown.enter.prevent="advanceIfValid({{ $stepIdx }})"
@@ -664,7 +703,7 @@
                         name="consent"
                         aria-label="Consent to receive SMS appointment reminders"
                         x-model="consentChecked"
-                        wire:model.live="consent"
+                        wire:model="consent"
                         class="mt-0.5 w-4 h-4 rounded bg-[#E5E7EB] text-[#F8248A] border-slate-300 focus:ring-0 focus:ring-offset-0 shrink-0 cursor-pointer"
                       />
                       <span>

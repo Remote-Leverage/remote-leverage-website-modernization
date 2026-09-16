@@ -25,7 +25,31 @@ class LeadSettingsService
             'hubspot_portal_id' => '',
             'slack_webhook_url' => '',
             'lead_webhook_url' => '',
+
+            /*
+             * Email gatekeeping, ported from three Gravity Forms plugins over one field.
+             * See EmailValidationService for why the order and the fail-open behaviour matter.
+             */
+            'zerobounce_enabled' => false,
+            'zerobounce_api_key' => '',
+            'domain_validator_mode' => 'none',   // none | allow | block
+            'email_domains' => '',               // one per line
+            'blacklisted_emails' => '',          // comma separated
+            'email_validation_message' => '',
         ];
+    }
+
+    /**
+     * Coerce the domain validator mode to one this code understands.
+     *
+     * Anything unrecognised — including absent — becomes `none`. A validator that silently
+     * falls back to blocking would reject every lead the moment a form posted a typo.
+     */
+    protected function validatorMode(mixed $mode): string
+    {
+        $mode = is_string($mode) ? strtolower(trim($mode)) : '';
+
+        return in_array($mode, ['none', 'allow', 'block'], true) ? $mode : 'none';
     }
 
     /**
@@ -80,6 +104,14 @@ class LeadSettingsService
             'retention_days' => $retentionDays,
             'hubspot_access_token' => trim((string) ($input['hubspot_access_token'] ?? '')),
             'hubspot_portal_id' => trim((string) ($input['hubspot_portal_id'] ?? '')),
+            'zerobounce_enabled' => ! empty($input['zerobounce_enabled']),
+            'zerobounce_api_key' => trim((string) ($input['zerobounce_api_key'] ?? '')),
+            'domain_validator_mode' => $this->validatorMode($input['domain_validator_mode'] ?? null),
+            // Stored as typed, normalised on read: the admin pastes a list and should get the
+            // same list back, not a re-sorted, de-duplicated version of it.
+            'email_domains' => trim((string) ($input['email_domains'] ?? '')),
+            'blacklisted_emails' => trim((string) ($input['blacklisted_emails'] ?? '')),
+            'email_validation_message' => trim((string) ($input['email_validation_message'] ?? '')),
             'slack_webhook_url' => $this->sanitizeUrl((string) ($input['slack_webhook_url'] ?? '')),
             'lead_webhook_url' => $this->sanitizeUrl((string) ($input['lead_webhook_url'] ?? '')),
         ];

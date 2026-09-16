@@ -7,6 +7,7 @@ namespace App\Application\Livewire\Booking;
 use App\Domains\Lead\Actions\CaptureLeadAction;
 use App\Domains\Lead\Data\LeadCaptureData;
 use App\Domains\Lead\Services\AttributionCollector;
+use App\Domains\Lead\Services\EmailValidationService;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Scheduling\Actions\FetchAvailableSlotsAction;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
@@ -195,6 +196,27 @@ class MultistepBookingWizard extends Component
      * everything the browser captured — two half-people per visitor, and no funnel joins up.
      */
     public string $posthogDistinctId = '';
+
+    /**
+     * Whether the interstitial warning screen is showing.
+     *
+     * Its own flag rather than a `currentStep` value, because the warning sits *between* steps
+     * 1 and 2 without being one: the progress indicator must not count it, and going back from
+     * the calendar has to land on the warning rather than skip it — which is what the legacy
+     * form did.
+     */
+    public bool $showWarning = false;
+
+    /**
+     * Whether the visitor has already passed the warning.
+     *
+     * Separate from `showWarning`, and the reason the Continue button appeared to do nothing:
+     * `acknowledgeWarning()` cleared `showWarning` and called `goToStep(2)`, which re-ran the
+     * step-1 checks — including the one that decides whether to show the warning. It was
+     * immediately true again, so the visitor bounced straight back to the screen they had just
+     * dismissed. A flag that survives the trip is what breaks the loop.
+     */
+    public bool $warningAcknowledged = false;
 
     public ?string $referralCode = null;
 
@@ -421,6 +443,9 @@ class MultistepBookingWizard extends Component
 
     public function updatedMonthlyRevenue(): void
     {
+        // A different band is a different warning decision.
+        $this->warningAcknowledged = false;
+
         if (str_contains(strtolower($this->monthlyRevenue), 'job')) {
             $this->skipCalendar = true;
         } else {
@@ -469,8 +494,29 @@ class MultistepBookingWizard extends Component
                     }
                 }
 
+                $emailCheck = app(EmailValidationService::class)->validate($this->email, $this->ipAddress);
+
+                if (! $emailCheck['valid']) {
+                    $this->addError('email', (string) $emailCheck['message']);
+
+                    return;
+                }
+
                 // Parity with rl-testing capture_partial_lead on Step 1 completion
                 $this->capturePartialLead();
+
+                /*
+                 * The revenue-band warning, shown before the calendar rather than after booking.
+                 * The partial lead is captured first on purpose: someone who reads the pricing
+                 * and leaves is still a lead worth having, and is exactly who the Slack alert
+                 * exists to surface.
+                 */
+                if (! $this->warningAcknowledged && $this->warningForBand() !== null) {
+                    $this->showWarning = true;
+                    $this->trackStepEvent('pricing_warning_shown', ['band' => $this->monthlyRevenue]);
+
+                    return;
+                }
 
                 if ($this->skipCalendar) {
                     // Job applicant or calendar skip route
@@ -933,6 +979,70 @@ class MultistepBookingWizard extends Component
         } catch (\Throwable $e) {
             // Silently swallow analytics errors to avoid breaking booking UX
         }
+    }
+
+    /**
+     * The warning configured for the selected revenue band, or null when there is none.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function warningForBand(): ?array
+    {
+        /*
+         * Indexed, not dot-path: `config('booking.revenue_bands.'.$label)` splits the label on
+         * dots, so a band name containing one would silently resolve to nothing. The labels are
+         * marketing copy and will change without anyone thinking about Laravel's dot notation.
+         */
+        $bands = config('booking.revenue_bands', []);
+        $band = is_array($bands) ? ($bands[$this->monthlyRevenue] ?? null) : null;
+
+        if (! is_array($band) || empty($band['show_warning'])) {
+            return null;
+        }
+
+        return $band;
+    }
+
+    /**
+     * The visitor read the pricing and chose to continue.
+     */
+    public function acknowledgeWarning(): void
+    {
+        if (! $this->showWarning) {
+            return;
+        }
+
+        $this->trackStepEvent('pricing_warning_accepted', ['band' => $this->monthlyRevenue]);
+
+        $this->warningAcknowledged = true;
+        $this->showWarning = false;
+
+        /*
+         * Advance directly rather than through `goToStep(2)`.
+         *
+         * Step 1's gates — validation, phone formatting, email verification, partial capture —
+         * all ran before the warning was shown. Routing back through `goToStep()` would run
+         * them a second time: a second ZeroBounce credit spent on an address just verified, and
+         * a second partial capture for a lead already recorded. Reaching this method is proof
+         * they passed.
+         */
+        $this->currentStep = 2;
+        $this->loadMonthAvailability();
+        $this->trackStepEvent('step_date_selection');
+        $this->trackStepEvent('step_viewed', ['step' => 2]);
+    }
+
+    /**
+     * Back out of the warning to step 1, as the legacy form's arrow did.
+     */
+    public function dismissWarning(): void
+    {
+        $this->showWarning = false;
+        $this->currentStep = 1;
+
+        // Not acknowledged — backing out is the opposite of accepting. Someone who returns to
+        // change their revenue band must see the warning again if the new band warrants it.
+        $this->warningAcknowledged = false;
     }
 
     /**

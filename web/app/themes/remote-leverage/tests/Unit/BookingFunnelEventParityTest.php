@@ -159,3 +159,109 @@ describe('the legacy event vocabulary is still emitted somewhere in the componen
         expect(substr_count($source, "trackStepEvent('booking_finished'"))->toBe(2);
     });
 });
+
+describe('revenue-band pricing warning', function () {
+    // The test bootstrap starts with empty config, so load the file the application ships —
+    // these assertions are about the real copy, not a fixture of it.
+    beforeEach(function () {
+        config(['booking' => require __DIR__.'/../../config/booking.php']);
+    });
+
+    test('the $0-5k band shows a warning before the calendar', function () {
+        $wizard = new MultistepBookingWizard;
+        $wizard->monthlyRevenue = '$0 to $5k Per Month';
+
+        $warning = $wizard->warningForBand();
+
+        expect($warning)->not->toBeNull()
+            ->and($warning['warning_heading'])->toContain('too expensive')
+            ->and($warning['warning_button'])->toBe('Continue');
+    });
+
+    test('the pricing actually quoted matches production', function () {
+        // These numbers are the offer. A silent edit here misquotes every low-revenue lead.
+        $wizard = new MultistepBookingWizard;
+        $wizard->monthlyRevenue = '$0 to $5k Per Month';
+
+        $body = collect($wizard->warningForBand()['warning_body'])->pluck('text')->filter()->implode(' ');
+
+        expect($body)->toContain('40% of the annual VA salary')
+            ->and($body)->toContain('$4000 to $6000')
+            ->and($body)->toContain('pay your VA directly');
+    });
+
+    test('every other band goes straight through', function () {
+        foreach (['$5k to $10k Per Month', '$10k to $50k Per Month', '$50k-$100k Per Month', '$100k+ Per Month'] as $band) {
+            $wizard = new MultistepBookingWizard;
+            $wizard->monthlyRevenue = $band;
+
+            expect($wizard->warningForBand())->toBeNull();
+        }
+    });
+
+    test('an unrecognised band shows no warning rather than erroring', function () {
+        $wizard = new MultistepBookingWizard;
+        $wizard->monthlyRevenue = 'Something marketing added last week';
+
+        expect($wizard->warningForBand())->toBeNull();
+    });
+
+    test('dismissing the warning returns to step 1', function () {
+        $wizard = new MultistepBookingWizard;
+        $wizard->monthlyRevenue = '$0 to $5k Per Month';
+        $wizard->showWarning = true;
+        $wizard->currentStep = 1;
+
+        $wizard->dismissWarning();
+
+        expect($wizard->showWarning)->toBeFalse()
+            ->and($wizard->currentStep)->toBe(1);
+    });
+});
+
+describe('warning acknowledgement', function () {
+    beforeEach(function () {
+        config(['booking' => require __DIR__.'/../../config/booking.php']);
+    });
+
+    test('accepting the warning records it so the visitor is not bounced back', function () {
+        // The bug this pins: acknowledgeWarning() cleared showWarning and called goToStep(2),
+        // which re-ran the step-1 check and set showWarning straight back to true. Continue
+        // appeared to do nothing.
+        $wizard = new MultistepBookingWizard;
+        $wizard->monthlyRevenue = '$0 to $5k Per Month';
+        $wizard->showWarning = true;
+
+        expect($wizard->warningAcknowledged)->toBeFalse();
+
+        $wizard->acknowledgeWarning();
+
+        expect($wizard->warningAcknowledged)->toBeTrue()
+            ->and($wizard->showWarning)->toBeFalse()
+            // Advanced directly, without re-running step 1's gates.
+            ->and($wizard->currentStep)->toBe(2);
+    });
+
+    test('backing out is not acknowledgement', function () {
+        $wizard = new MultistepBookingWizard;
+        $wizard->monthlyRevenue = '$0 to $5k Per Month';
+        $wizard->showWarning = true;
+        $wizard->warningAcknowledged = true;
+
+        $wizard->dismissWarning();
+
+        expect($wizard->warningAcknowledged)->toBeFalse();
+    });
+
+    test('changing the revenue band re-arms the warning', function () {
+        // Otherwise someone who accepts on $0-5k, goes back, and picks a band with a different
+        // warning would never see it.
+        $wizard = new MultistepBookingWizard;
+        $wizard->warningAcknowledged = true;
+
+        $wizard->monthlyRevenue = '$10k to $50k Per Month';
+        $wizard->updatedMonthlyRevenue();
+
+        expect($wizard->warningAcknowledged)->toBeFalse();
+    });
+});
