@@ -23,9 +23,16 @@ function slackListener(): object
     {
         public array $sent = [];
 
-        protected function send(string $text): bool
+        /** @var array<int, array<int, array<string, mixed>>> */
+        public array $sentBlocks = [];
+
+        public ?string $sentColor = null;
+
+        protected function send(string $text, array $blocks = [], ?string $color = null): bool
         {
             $this->sent[] = $text;
+            $this->sentBlocks[] = $blocks;
+            $this->sentColor = $color;
 
             return true;
         }
@@ -57,6 +64,12 @@ function slackLead(array $attributes = []): Lead
 }
 
 describe('Slack lead alert', function () {
+    // The layout now lives in config/slack-notifications.php so it can be designed rather than
+    // coded. Load the file the application ships, so these assert against the real template.
+    beforeEach(function () {
+        config(['slack-notifications' => require __DIR__.'/../../config/slack-notifications.php']);
+    });
+
     test('fires on the partial submission', function () {
         $listener = slackListener();
         $listener->handleCreated(new LeadCreated(lead: slackLead(), context: []));
@@ -87,33 +100,67 @@ describe('Slack lead alert', function () {
         expect($listener->sent)->toHaveCount(1);
     });
 
-    test('the message matches the legacy feed, field for field', function () {
+    test('the fallback text stands alone, for the notification preview', function () {
+        // Slack shows this in the notification and on clients that cannot render blocks, so it
+        // must carry the lead itself rather than pointing at the blocks.
         $listener = slackListener();
         $listener->handleCreated(new LeadCreated(lead: slackLead(), context: []));
 
         $message = $listener->sent[0];
 
-        expect($message)->toContain('*NEW LEAD:*')
-            ->and($message)->toContain('*Name*: Ada Lovelace')
-            ->and($message)->toContain('*Email:* ada@example.com')
-            ->and($message)->toContain('*Phone:* +1 650 555 0100')
-            ->and($message)->toContain('*Company Revenue:* $10k to $50k Per Month')
-            ->and($message)->toContain('*Landing page:* https://remoteleverage.com/hire-va-4/');
+        expect($message)->toContain('New lead from LinkedIn: Ada Lovelace')
+            ->and($message)->toContain('ada@example.com')
+            ->and($message)->toContain('$10k to $50k Per Month');
     });
 
-    test('all five UTMs land on one Source line, in the feed order', function () {
+    test('no emoji reaches Slack, anywhere in the payload', function () {
+        // House rule. They read as unprofessional in a channel the sales team watches all day.
         $listener = slackListener();
         $listener->handleCreated(new LeadCreated(lead: slackLead(), context: []));
 
-        expect($listener->sent[0])
-            ->toContain('*Source:* linkedin va-q4 cpc variant-b virtual assistant');
+        $payload = $listener->sent[0].json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        expect(preg_match('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{2190}-\x{21FF}\x{25A0}-\x{25FF}]/u', $payload))
+            ->toBe(0);
     });
 
-    test('missing fields read as N/A rather than leaving a blank line', function () {
+    test('the UTMs render labelled, in grey, without code styling', function () {
+        // Backticks draw a chip outline but Slack renders inline code orange in dark themes and
+        // mrkdwn cannot recolour it. A context block gives small grey text instead.
+        $listener = slackListener();
+        $listener->handleCreated(new LeadCreated(lead: slackLead(), context: []));
+
+        $encoded = json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES);
+
+        expect($encoded)->toContain('source: linkedin')
+            ->and($encoded)->toContain('medium: cpc')
+            ->and($encoded)->toContain('campaign: va-q4')
+            ->and($encoded)->not->toContain('`source: linkedin`');
+    });
+
+    test('the message is not boxed', function () {
+        // An attachment colour draws a bar down the left; tried and reverted as too heavy.
+        $listener = slackListener();
+        $listener->handleCreated(new LeadCreated(lead: slackLead(), context: []));
+
+        expect($listener->sentColor)->toBeNull();
+    });
+
+    test('a long click id is truncated so it cannot swamp the row', function () {
         $listener = slackListener();
         $listener->handleCreated(new LeadCreated(lead: slackLead([
-            'phone' => null,
-            'monthly_revenue' => null,
+            'gclid' => str_repeat('A', 90),
+        ]), context: []));
+
+        $encoded = json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES);
+
+        expect($encoded)->toContain('gclid: ')
+            ->and($encoded)->not->toContain(str_repeat('A', 90));
+    });
+
+    test('absent attribution is omitted rather than rendered as a wall of dashes', function () {
+        $listener = slackListener();
+        $listener->handleCreated(new LeadCreated(lead: slackLead([
             'utm_source' => null,
             'utm_campaign' => null,
             'utm_medium' => null,
@@ -121,18 +168,112 @@ describe('Slack lead alert', function () {
             'utm_term' => null,
         ]), context: []));
 
-        expect($listener->sent[0])->toContain('*Phone:* N/A')
-            ->and($listener->sent[0])->toContain('*Source:* N/A')
-            ->and($listener->sent[0])->toContain('*Company Revenue:* N/A');
+        expect(json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES))->not->toContain('*Attribution*');
     });
 
-    test('landing_url is used when landing_page_base is absent', function () {
+    test('all three destinations are offered when each exists', function () {
+        config([
+            'services.posthog.project_id' => '282594',
+            'services.hubspot.portal_id' => '243484989',
+        ]);
+
+        $listener = slackListener();
+        $listener->handleCreated(new LeadCreated(lead: slackLead([
+            'posthog_session_id' => 'abc123',
+            'hubspot_contact_id' => '55501',
+        ]), context: []));
+
+        $encoded = json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES);
+
+        expect($encoded)->toContain('Open in portal')
+            ->and($encoded)->toContain('Watch session')
+            ->and($encoded)->toContain('Open in HubSpot')
+            ->and($encoded)->toContain('record/0-1/55501')
+            ->and($encoded)->toContain('"type":"actions"');
+    });
+
+    test('a destination that does not exist yet is not offered', function () {
+        // No recording and no CRM record — two buttons that would 404.
+        $listener = slackListener();
+        $listener->handleCreated(new LeadCreated(lead: slackLead(), context: []));
+
+        $encoded = json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES);
+
+        expect($encoded)->toContain('Open in portal')
+            ->and($encoded)->not->toContain('Watch session')
+            ->and($encoded)->not->toContain('Open in HubSpot');
+    });
+
+    test('the landing page is linked without unfurling into a preview card', function () {
         $listener = slackListener();
         $listener->handleCreated(new LeadCreated(lead: slackLead([
             'landing_page_base' => null,
             'landing_url' => 'https://remoteleverage.com/spanish/?utm_source=x',
         ]), context: []));
 
-        expect($listener->sent[0])->toContain('*Landing page:* https://remoteleverage.com/spanish/?utm_source=x');
+        // Angle-bracket link syntax; unfurl_links=false is asserted at the send() payload.
+        expect(json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES))
+            ->toContain('<https://remoteleverage.com/spanish/?utm_source=x|');
+    });
+
+    test('a session-replay button appears only when there is a recording', function () {
+        // A button that 404s costs a click and a moment of doubt about the tooling.
+        config(['services.posthog.project_id' => '282594']);
+
+        $without = slackListener();
+        $without->handleCreated(new LeadCreated(lead: slackLead(), context: []));
+        expect(json_encode($without->sentBlocks[0], JSON_UNESCAPED_SLASHES))->not->toContain('Watch session');
+
+        $with = slackListener();
+        $with->handleCreated(new LeadCreated(lead: slackLead(['posthog_session_id' => 'abc123']), context: []));
+        expect(json_encode($with->sentBlocks[0], JSON_UNESCAPED_SLASHES))->toContain('Watch session')
+            ->and(json_encode($with->sentBlocks[0], JSON_UNESCAPED_SLASHES))->toContain('replay/abc123');
+    });
+});
+
+describe('lead headline', function () {
+    beforeEach(function () {
+        config(['slack-notifications' => require __DIR__.'/../../config/slack-notifications.php']);
+    });
+
+    function headlineFor(array $attributes): string
+    {
+        $listener = slackListener();
+        $listener->handleCreated(new LeadCreated(lead: slackLead($attributes), context: []));
+
+        return $listener->sent[0];
+    }
+
+    test('names the channel in words the team uses, not the raw utm_source', function () {
+        // "fb", "facebook" and "meta" are one channel to a salesperson and three strings in
+        // the data.
+        expect(headlineFor(['utm_source' => 'fb', 'partner' => null]))->toContain('New lead from Facebook')
+            ->and(headlineFor(['utm_source' => 'Meta', 'partner' => null]))->toContain('New lead from Facebook')
+            ->and(headlineFor(['utm_source' => 'instagram', 'partner' => null]))->toContain('New lead from Instagram')
+            ->and(headlineFor(['utm_source' => 'linkedin', 'partner' => null]))->toContain('New lead from LinkedIn');
+    });
+
+    test('distinguishes paid search from organic search', function () {
+        expect(headlineFor(['utm_source' => 'google', 'utm_medium' => 'cpc', 'partner' => null]))
+            ->toContain('New lead from Google Ads')
+            ->and(headlineFor(['utm_source' => 'google', 'utm_medium' => 'organic', 'partner' => null]))
+            ->toContain('New lead from Google');
+    });
+
+    test('a lead with no attribution reads as organic, not as missing data', function () {
+        expect(headlineFor([
+            'utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null,
+            'utm_content' => null, 'utm_term' => null, 'partner' => null,
+        ]))->toContain('New organic lead');
+    });
+
+    test('a partner referral outranks the utm, because it names a relationship', function () {
+        expect(headlineFor(['partner' => 'oyster', 'utm_source' => 'google']))
+            ->toContain('New lead from Oyster');
+    });
+
+    test('an unmapped source still reads as a channel rather than being dropped', function () {
+        expect(headlineFor(['utm_source' => 'reddit', 'partner' => null]))
+            ->toContain('New lead from Reddit');
     });
 });

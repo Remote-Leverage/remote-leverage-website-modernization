@@ -42,6 +42,7 @@ class Lead extends Model
         'consent_at',
         'session_id',
         'posthog_session_id',
+        'hubspot_contact_id',
         'utm_id',
         'li_fat_id',
         'fbc',
@@ -93,6 +94,26 @@ class Lead extends Model
         $appHost = rtrim((string) config('services.posthog.app_host', 'https://us.posthog.com'), '/');
 
         return "{$appHost}/project/{$projectId}/replay/".rawurlencode($sessionId);
+    }
+
+    /**
+     * Link to this lead's HubSpot contact record, or null when it has not synced.
+     *
+     * Needs both halves: the contact id and the portal id. Returning null when either is
+     * missing keeps a dead link out of the Slack alert and the admin — a 404 there reads as a
+     * broken integration rather than as "this lead never reached the CRM".
+     */
+    public function hubspotContactUrl(): ?string
+    {
+        $contactId = trim((string) $this->hubspot_contact_id);
+        $portalId = trim((string) (config('services.hubspot.portal_id') ?: ''));
+
+        if ($contactId === '' || $portalId === '') {
+            return null;
+        }
+
+        // 0-1 is HubSpot's object-type id for contacts.
+        return "https://app.hubspot.com/contacts/{$portalId}/record/0-1/{$contactId}";
     }
 
     /**

@@ -103,6 +103,20 @@ return [
      * ZeroBounce mailbox verification. The admin-screen value wins; this is the fallback, and
      * the same precedence every other credential in this file follows.
      */
+    /*
+     * Portal id, used only to build links into the CRM. The access token lives in the Leads
+     * settings screen (admin first, env fallback) like every other credential here.
+     */
+    'hubspot' => [
+        /*
+         * `?:` rather than env()'s default argument. `HUBSPOT_PORTAL_ID=` sets the value to an
+         * empty string, which *overrides* a default instead of falling back to it — see
+         * docs/configuration.md. That silently emptied this and the CRM link vanished from
+         * every Slack alert with no error anywhere.
+         */
+        'portal_id' => env('HUBSPOT_PORTAL_ID') ?: '243484989',
+    ],
+
     'zerobounce' => [
         'api_key' => env('ZEROBOUNCE_API_KEY'),
     ],

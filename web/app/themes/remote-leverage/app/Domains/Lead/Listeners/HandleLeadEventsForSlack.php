@@ -9,6 +9,7 @@ use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\LeadSettingsService;
+use App\Domains\Lead\Services\SlackMessageRenderer;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -81,12 +82,14 @@ class HandleLeadEventsForSlack
     protected function dispatchSlackNotification(Lead $lead, string $type, array $context = []): void
     {
         $isFinal = $type === 'final';
-        $text = $isFinal
-            ? $this->bookedMessage($lead, $context)
-            : $this->newLeadMessage($lead);
+
+        $rendered = app(SlackMessageRenderer::class)->render(
+            $isFinal ? 'booked' : 'new_lead',
+            $this->valuesFor($lead, $context),
+        );
 
         try {
-            $success = $this->send($text);
+            $success = $this->send($rendered['text'], $rendered['blocks'], $rendered['color'] ?? null);
 
             $this->activityLogger->logConsumption(
                 leadId: $lead->id,
@@ -109,45 +112,217 @@ class HandleLeadEventsForSlack
      * Reproduced rather than redesigned: the sales team reads these at a glance all day, and
      * the order is the order they scan in.
      */
-    protected function newLeadMessage(Lead $lead): string
+    /**
+     * The values a template may reference.
+     *
+     * This is the seam that makes the layout designable: the listener's job is to say what is
+     * known about a lead, and `config/slack-notifications.php` decides how it looks. Adding a
+     * field to the message is a config edit; adding a new *fact* is a key here.
+     *
+     * @return array<string, string>
+     */
+    protected function valuesFor(Lead $lead, array $context = []): array
     {
         $name = trim(($lead->first_name ?: $lead->name).' '.(string) $lead->last_name);
+        $landing = (string) ($lead->landing_page_base ?: $lead->landing_url ?: '');
 
-        // The feed puts all five UTMs on one "Source" line, space separated.
-        $source = trim(implode(' ', array_filter([
-            $lead->utm_source,
-            $lead->utm_campaign,
-            $lead->utm_medium,
-            $lead->utm_content,
-            $lead->utm_term,
-        ])));
+        return [
+            'name' => $name,
+            'email' => (string) $lead->email,
+            'email_link' => $lead->email ? "<mailto:{$lead->email}|{$lead->email}>" : '',
+            'phone' => (string) $lead->phone,
+            'revenue' => (string) $lead->monthly_revenue,
+            'company' => (string) $lead->company,
 
-        return implode("\n", [
-            '*NEW LEAD:*',
-            '',
-            '*Name*: '.($name ?: 'N/A'),
-            '*Email:* '.($lead->email ?: 'N/A'),
-            '*Phone:* '.($lead->phone ?: 'N/A'),
-            '*Source:* '.($source !== '' ? $source : 'N/A'),
-            '*Company Revenue:* '.($lead->monthly_revenue ?: 'N/A'),
-            '*Landing page:* '.($lead->landing_page_base ?: $lead->landing_url ?: 'N/A'),
-        ]);
+            'source' => (string) $lead->utm_source,
+            'medium' => (string) $lead->utm_medium,
+            'campaign' => (string) $lead->utm_campaign,
+            'content' => (string) $lead->utm_content,
+            'term' => (string) $lead->utm_term,
+            'partner' => (string) $lead->partner,
+
+            /*
+             * Pre-joined so a template can put attribution on one line without rendering
+             * "linkedin ·  · va-q4" when a UTM is absent. The renderer substitutes values; it
+             * deliberately does not know how to join them, because that is a layout decision
+             * that differs per template.
+             */
+            'attribution_line' => implode(' · ', array_filter([
+                (string) $lead->utm_source,
+                (string) $lead->utm_medium,
+                (string) $lead->utm_campaign,
+                (string) $lead->utm_content,
+                (string) $lead->utm_term,
+            ])),
+
+            /*
+             * The same attribution as backtick chips, which Slack renders as small grey pills —
+             * the nearest thing it has to a tag. Each carries its label because a row of bare
+             * values gives no way to tell campaign from content, which is what made the original
+             * one-line version unreadable.
+             */
+            /*
+             * The same pairs without backticks, for rendering in a `context` block.
+             *
+             * Slack's inline-code styling is what draws the chip outline, and it is also what
+             * makes the text orange — mrkdwn has no colour control, so the box and the colour
+             * are the same decision. A context block gives small grey text instead, which is
+             * what secondary information should look like.
+             */
+            'attribution_labeled' => $this->tags([
+                'source' => (string) $lead->utm_source,
+                'medium' => (string) $lead->utm_medium,
+                'campaign' => (string) $lead->utm_campaign,
+                'content' => (string) $lead->utm_content,
+                'term' => (string) $lead->utm_term,
+                'id' => (string) $lead->utm_id,
+                'gclid' => (string) $lead->gclid,
+                'fbclid' => (string) $lead->fbclid,
+                'partner' => (string) $lead->partner,
+            ], code: false),
+
+            'attribution_tags' => $this->tags([
+                'source' => (string) $lead->utm_source,
+                'medium' => (string) $lead->utm_medium,
+                'campaign' => (string) $lead->utm_campaign,
+                'content' => (string) $lead->utm_content,
+                'term' => (string) $lead->utm_term,
+                'id' => (string) $lead->utm_id,
+                'gclid' => (string) $lead->gclid,
+                'fbclid' => (string) $lead->fbclid,
+                'partner' => (string) $lead->partner,
+            ]),
+            'contact_line' => implode('   ', array_filter([
+                $lead->email ? "<mailto:{$lead->email}|{$lead->email}>" : '',
+                (string) $lead->phone,
+            ])),
+
+            'landing_url' => $landing,
+            'landing_display' => $landing === '' ? '' : $this->shorten($landing),
+
+            'replay_url' => (string) ($lead->posthogReplayUrl() ?? ''),
+            'hubspot_url' => (string) ($lead->hubspotContactUrl() ?? ''),
+
+            /*
+             * The three destinations as one markdown line. Assembled here rather than as three
+             * template blocks because the separator between them only makes sense once you know
+             * which of them survived.
+             */
+            'channel_label' => $this->channelLabel($lead),
+            'headline' => $this->headline($lead),
+
+            'links_line' => implode('   ·   ', array_filter([
+                $lead->id && function_exists('admin_url')
+                    ? '<'.\admin_url('admin.php?page=rl-leads&view_lead='.$lead->id).'|Open in portal>'
+                    : '',
+                $lead->posthogReplayUrl() ? '<'.$lead->posthogReplayUrl().'|Watch session>' : '',
+                $lead->hubspotContactUrl() ? '<'.$lead->hubspotContactUrl().'|Open in HubSpot>' : '',
+            ])),
+            'admin_url' => $lead->id && function_exists('admin_url')
+                ? (string) \admin_url('admin.php?page=rl-leads&view_lead='.$lead->id)
+                : '',
+
+            'submission_type' => (string) $lead->submission_type,
+            'meeting_time' => (string) ($context['start_time'] ?? ''),
+            'meeting_url' => (string) ($context['meet_url'] ?? ''),
+        ];
     }
 
-    protected function bookedMessage(Lead $lead, array $context): string
+    /**
+     * A human name for where this lead came from.
+     *
+     * `utm_source` is raw and inconsistent — "fb", "facebook" and "Meta" are the same channel to
+     * a salesperson and three different strings in the data. This maps them onto the words the
+     * team actually uses, so the alert says "Facebook" rather than "fb".
+     *
+     * Returns an empty string when there is nothing to attribute, which is what makes the lead
+     * organic rather than unattributed-paid.
+     */
+    protected function channelLabel(Lead $lead): string
     {
-        $name = trim(($lead->first_name ?: $lead->name).' '.(string) $lead->last_name);
+        // A partner referral is the strongest signal: it names an actual relationship, where a
+        // UTM only names a platform.
+        if ($partner = trim((string) $lead->partner)) {
+            return ucfirst($partner);
+        }
 
-        return implode("\n", array_filter([
-            '*CALL BOOKED:*',
-            '',
-            '*Name*: '.($name ?: 'N/A'),
-            '*Email:* '.($lead->email ?: 'N/A'),
-            '*Phone:* '.($lead->phone ?: 'N/A'),
-            '*Company Revenue:* '.($lead->monthly_revenue ?: 'N/A'),
-            empty($context['start_time']) ? null : '*Meeting Time:* '.$context['start_time'],
-            empty($context['meet_url']) ? null : '*Meeting:* '.$context['meet_url'],
-        ]));
+        $source = strtolower(trim((string) $lead->utm_source));
+        $medium = strtolower(trim((string) $lead->utm_medium));
+
+        if ($source === '') {
+            return '';
+        }
+
+        $paid = in_array($medium, ['cpc', 'ppc', 'paid', 'paidsocial', 'paid_social', 'ads', 'display'], true);
+
+        return match (true) {
+            str_contains($source, 'facebook'), $source === 'fb', str_contains($source, 'meta') => 'Facebook',
+            str_contains($source, 'instagram'), $source === 'ig' => 'Instagram',
+            str_contains($source, 'linkedin') => 'LinkedIn',
+            str_contains($source, 'tiktok') => 'TikTok',
+            str_contains($source, 'youtube') => 'YouTube',
+            str_contains($source, 'twitter'), $source === 'x' => 'X',
+            str_contains($source, 'google') => $paid ? 'Google Ads' : 'Google',
+            str_contains($source, 'bing'), str_contains($source, 'microsoft') => $paid ? 'Microsoft Ads' : 'Bing',
+            str_contains($source, 'newsletter'), str_contains($source, 'email'), $medium === 'email' => 'Email',
+            default => ucfirst($source),
+        };
+    }
+
+    /**
+     * The line above the card.
+     *
+     * "New lead from Facebook" tells the team where to look before they read anything else;
+     * "New organic lead" says the same thing about the absence of a campaign, which is
+     * information rather than a gap.
+     */
+    protected function headline(Lead $lead): string
+    {
+        $channel = $this->channelLabel($lead);
+
+        return $channel === '' ? 'New organic lead' : "New lead from {$channel}";
+    }
+
+    /**
+     * Render a label => value map as backtick chips, skipping anything empty.
+     *
+     * Long click ids are truncated: a 90-character gclid on its own wraps the whole row and
+     * buries the campaign next to it, and nobody reads a click id off Slack anyway — it is
+     * there to say the click was attributed, not to be copied.
+     *
+     * @param  array<string, string>  $pairs
+     */
+    protected function tags(array $pairs, int $maxValue = 24, bool $code = true): string
+    {
+        $chips = [];
+
+        foreach ($pairs as $label => $value) {
+            $value = trim($value);
+
+            if ($value === '') {
+                continue;
+            }
+
+            if (mb_strlen($value) > $maxValue) {
+                $value = mb_substr($value, 0, $maxValue - 1).'…';
+            }
+
+            $chips[] = $code
+                ? '`'.$label.': '.$value.'`'
+                : $label.': '.$value;
+        }
+
+        return implode($code ? '  ' : '   ·   ', $chips);
+    }
+
+    /**
+     * Trim a URL for display without losing which page it was.
+     */
+    protected function shorten(string $url, int $max = 60): string
+    {
+        $display = preg_replace('#^https?://#', '', $url) ?? $url;
+
+        return mb_strlen($display) > $max ? mb_substr($display, 0, $max - 1).'…' : $display;
     }
 
     /**
@@ -157,7 +332,7 @@ class HandleLeadEventsForSlack
      * Both are supported because the webhook needs no Slack app, and a dedicated app is still
      * pending (WR-186).
      */
-    protected function send(string $text): bool
+    protected function send(string $text, array $blocks = [], ?string $color = null): bool
     {
         /*
          * Environment first, admin setting second — the same precedence HubSpotGateway and the
@@ -172,13 +347,40 @@ class HandleLeadEventsForSlack
         $channel = (string) (config('services.slack.channel') ?: ($settings['slack_channel'] ?? ''));
 
         if ($token !== '' && $channel !== '') {
+            $payload = [
+                'channel' => $channel,
+                'text' => $text,
+                'mrkdwn' => true,
+
+                /*
+                 * No link previews. The landing page is a marketing page, so Slack unfurls it
+                 * into a card with the hero copy and a reading time — several times taller than
+                 * the alert itself, and it buries the lead's details under an advert for our
+                 * own site.
+                 */
+                'unfurl_links' => false,
+                'unfurl_media' => false,
+            ];
+
+            if ($blocks !== []) {
+                /*
+                 * A colour means box it: blocks nested in an attachment render with a coloured
+                 * bar down the left and read as one unit rather than as loose blocks in the
+                 * channel. Without a colour they go at top level, unboxed.
+                 *
+                 * `text` stays on the message itself either way — it is the notification
+                 * preview, and Slack does not take it from an attachment.
+                 */
+                if ($color !== null) {
+                    $payload['attachments'] = [['color' => $color, 'blocks' => $blocks]];
+                } else {
+                    $payload['blocks'] = $blocks;
+                }
+            }
+
             $response = Http::withToken($token)
                 ->timeout(5)
-                ->post('https://slack.com/api/chat.postMessage', [
-                    'channel' => $channel,
-                    'text' => $text,
-                    'mrkdwn' => true,
-                ]);
+                ->post('https://slack.com/api/chat.postMessage', $payload);
 
             // Slack answers 200 with `ok: false` on an application error (bad token, missing
             // scope, bot not in channel), so the status code alone is not the outcome.
@@ -202,7 +404,11 @@ class HandleLeadEventsForSlack
             return false;
         }
 
-        $response = Http::timeout(5)->post($webhookUrl, ['text' => $text]);
+        $response = Http::timeout(5)->post($webhookUrl, array_filter([
+            'text' => $text,
+            'blocks' => $blocks ?: null,
+            'unfurl_links' => false,
+        ]));
 
         return $response->successful();
     }

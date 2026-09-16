@@ -92,6 +92,13 @@ class LeadServiceProvider extends ServiceProvider
 
                 $contactId = $gateway->syncContact($event->lead);
 
+                // Keep it. The id came back on every successful sync and was only ever written
+                // into the activity log, so nothing could link to the CRM record without
+                // someone reading a log line.
+                if ($contactId && $event->lead->hubspot_contact_id !== $contactId) {
+                    $event->lead->forceFill(['hubspot_contact_id' => $contactId])->saveQuietly();
+                }
+
                 $logger->logConsumption(
                     leadId: $event->lead->id,
                     eventType: 'LeadCreated',
