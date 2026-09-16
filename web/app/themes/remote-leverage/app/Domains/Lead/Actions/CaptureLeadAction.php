@@ -12,6 +12,7 @@ use App\Domains\Lead\Services\IdentityResolver;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Referral\Services\AttributionEngine;
+use App\Infrastructure\Observability\IntegrationCallRecorder;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 
@@ -138,6 +139,13 @@ class CaptureLeadAction
          */
         app(IdentityResolver::class)->resolve($lead);
         $lead->refresh();
+
+        /*
+         * Attach every outbound integration call made from here on to this lead, so the HubSpot
+         * sync and the Slack post that the event below triggers are recoverable from the lead's
+         * own timeline rather than only from a global firehose.
+         */
+        app(IntegrationCallRecorder::class)->forLead($lead->id);
 
         // 6. Dual Logging: Stage 1 (Dispatch log for LeadCreated)
         $this->activityLogger->logDispatch(

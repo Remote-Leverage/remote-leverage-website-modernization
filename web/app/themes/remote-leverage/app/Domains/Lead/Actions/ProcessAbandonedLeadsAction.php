@@ -7,6 +7,7 @@ namespace App\Domains\Lead\Actions;
 use App\Domains\Lead\Events\LeadAbandoned;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
+use App\Infrastructure\Observability\IntegrationCallRecorder;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Event;
 
@@ -34,6 +35,10 @@ class ProcessAbandonedLeadsAction
             ->get();
 
         foreach ($leads as $lead) {
+            // Re-point correlation per iteration: one cron run touches many leads, and a call
+            // recorded against whichever lead happened to be first is worse than none.
+            app(IntegrationCallRecorder::class)->forLead($lead->id);
+
             $previousStatus = $lead->status;
             $lead->update(['status' => 'abandoned']);
 

@@ -11,6 +11,7 @@ use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
 use App\Domains\Tracking\Data\AnalyticsEventData;
+use App\Infrastructure\Observability\IntegrationCallRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -80,6 +81,7 @@ class CalendlyWebhookController
             if ($email) {
                 $lead = Lead::query()->where('email', strtolower($email))->latest()->first();
                 if ($lead) {
+                    app(IntegrationCallRecorder::class)->forLead($lead->id);
                     $lead->update(['status' => 'booked']);
 
                     $this->activityLogger->logDispatch(
@@ -109,6 +111,7 @@ class CalendlyWebhookController
             if ($email) {
                 $lead = Lead::query()->where('email', strtolower($email))->latest()->first();
                 if ($lead) {
+                    app(IntegrationCallRecorder::class)->forLead($lead->id);
                     $lead->update(['status' => 'canceled']);
 
                     $this->activityLogger->logDispatch(

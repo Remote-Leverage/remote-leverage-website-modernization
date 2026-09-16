@@ -16,7 +16,13 @@ class CalendlyClient
      * That response is effectively static for the life of a token, so re-fetching
      * it on every booking submit was pure latency — see findExistingInvitee().
      */
-    protected const USER_IDENTITY_PREFIX = 'rl_calendly_user_identity_';
+    /*
+     * Versioned. Entries cached before the account email was captured satisfy the
+     * "has organization or user" guard below, so without a new prefix they would be
+     * returned for the next twelve hours with no email and the admin would show
+     * blanks for tokens that are working fine.
+     */
+    protected const USER_IDENTITY_PREFIX = 'rl_calendly_user_identity_v2_';
 
     protected const USER_IDENTITY_TTL_SECONDS = 43200; // 12h
 
@@ -73,10 +79,16 @@ class CalendlyClient
         foreach ($tokens as $item) {
             $token = $item['token'];
 
+            /*
+             * Name the account, not the slot. "token [Pool 2] rate-limited" starts a hunt
+             * through the pool to find out whose it is; naming the email ends it.
+             */
+            $who = $this->describeToken($item);
+
             try {
                 $response = $makeRequest($token);
             } catch (\Throwable $e) {
-                Log::error("CalendlyClient: connection error on token [{$item['label']}]: {$e->getMessage()}");
+                Log::error("CalendlyClient: connection error on token [{$who}]: {$e->getMessage()}");
 
                 return null;
             }
@@ -84,7 +96,7 @@ class CalendlyClient
             $status = $response->status();
 
             if ($status === 429) {
-                Log::warning("CalendlyClient: token [{$item['label']}] rate-limited, failing over to next token in pool");
+                Log::warning("CalendlyClient: token [{$who}] rate-limited, failing over to next token in pool");
                 $this->tokenPool->markRateLimited($token);
                 $lastResponse = $response;
 
@@ -92,7 +104,7 @@ class CalendlyClient
             }
 
             if ($status === 401 || $status === 403) {
-                Log::warning("CalendlyClient: token [{$item['label']}] returned {$status}, recording failure and failing over");
+                Log::warning("CalendlyClient: token [{$who}] returned {$status}, recording failure and failing over");
                 $this->tokenPool->recordFailure($token, $context ?? 'booking');
                 $lastResponse = $response;
 
@@ -100,14 +112,14 @@ class CalendlyClient
             }
 
             if ($status === 404) {
-                Log::warning("CalendlyClient: token [{$item['label']}] returned 404, may belong to a different account, failing over");
+                Log::warning("CalendlyClient: token [{$who}] returned 404, may belong to a different account, failing over");
                 $lastResponse = $response;
 
                 continue;
             }
 
             if ($status >= 500) {
-                Log::error("CalendlyClient: token [{$item['label']}] returned server error {$status}, halting pool iteration");
+                Log::error("CalendlyClient: token [{$who}] returned server error {$status}, halting pool iteration");
 
                 return $response;
             }
@@ -442,7 +454,7 @@ class CalendlyClient
      * per-event-type metadata; this is per-token identity, and the only caller
      * that needs it is the client itself.
      *
-     * @return array{organization: ?string, user: ?string}|null
+     * @return array{organization: ?string, user: ?string, email: ?string, name: ?string}|null
      */
     public function userIdentity(string $token, bool $forceRefresh = false): ?array
     {
@@ -471,6 +483,14 @@ class CalendlyClient
         $identity = [
             'organization' => $response->json('resource.current_organization'),
             'user' => $response->json('resource.uri'),
+
+            /*
+             * The account this token belongs to. Free on this call, and the only thing that
+             * makes a pool failure actionable: "a token is rate limited" prompts a hunt through
+             * four tokens, "admin@remoteleverage.com is rate limited" names who to contact.
+             */
+            'email' => $response->json('resource.email'),
+            'name' => $response->json('resource.name'),
         ];
 
         if (empty($identity['organization']) && empty($identity['user'])) {
@@ -480,6 +500,47 @@ class CalendlyClient
         Cache::put($key, $identity, now()->addSeconds(self::USER_IDENTITY_TTL_SECONDS));
 
         return $identity;
+    }
+
+    /**
+     * How a pooled token is named in logs: its account email where known, its label otherwise.
+     *
+     * @param  array{label: string, token: string}  $item
+     */
+    protected function describeToken(array $item): string
+    {
+        $email = $this->cachedAccountEmail((string) ($item['token'] ?? ''));
+        $label = trim((string) ($item['label'] ?? ''));
+
+        return match (true) {
+            $email !== null && $label !== '' => "{$email} / {$label}",
+            $email !== null => $email,
+            $label !== '' => $label,
+            default => 'unlabelled token',
+        };
+    }
+
+    /**
+     * The account email for a token, from cache only — never a network call.
+     *
+     * Deliberately non-fetching. Its callers are the logger that records outbound calls and the
+     * admin table that lists the pool; making either of those hit Calendly would mean an HTTP
+     * request triggering a log write that triggers an HTTP request. The value is populated as a
+     * side effect of the identity lookups the client already performs, so in practice it is warm
+     * for every token that has been used, and absent for one that never has — which is itself
+     * worth seeing.
+     */
+    public function cachedAccountEmail(string $token): ?string
+    {
+        $cached = Cache::get(self::userIdentityKey($token));
+
+        if (! is_array($cached)) {
+            return null;
+        }
+
+        $email = trim((string) ($cached['email'] ?? ''));
+
+        return $email === '' ? null : $email;
     }
 
     /**

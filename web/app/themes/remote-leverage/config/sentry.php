@@ -1,5 +1,15 @@
 <?php
 
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Session\TokenMismatchException;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
+
 /**
  * Sentry Laravel SDK configuration file.
  *
@@ -64,13 +74,53 @@ return [
     // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#send_default_pii
     'send_default_pii' => env('SENTRY_SEND_DEFAULT_PII', false),
 
-    // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#ignore_exceptions
-    // 'ignore_exceptions' => [],
+    /*
+     * Exceptions that are normal operation, not defects.
+     *
+     * Every one of these fires routinely in production on a public marketing site, and reporting
+     * them buries the exceptions that actually mean something. A 404 from a scanner probing
+     * `/wp-admin/setup-config.php` is not a bug; neither is a visitor failing validation.
+     *
+     * @see https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#ignore_exceptions
+     */
+    'ignore_exceptions' => [
+        // Unknown URL. Constant background noise from crawlers and stale links; the redirect
+        // map and MissingPathNotFoundMiddleware are where a genuine one gets fixed.
+        NotFoundHttpException::class,
+        ModelNotFoundException::class,
+
+        // A visitor filled a form in wrong. Expected, and already shown to them.
+        ValidationException::class,
+
+        // Not signed in, or not permitted. The portals are public-facing, so this is traffic.
+        AuthenticationException::class,
+        AuthorizationException::class,
+        AccessDeniedHttpException::class,
+
+        // An expired tab posting a stale nonce. Common and self-correcting.
+        TokenMismatchException::class,
+
+        // Rate limiter doing its job.
+        TooManyRequestsHttpException::class,
+
+        // Wrong HTTP verb against a real route — almost always a probe.
+        MethodNotAllowedHttpException::class,
+    ],
 
     // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#ignore_transactions
     'ignore_transactions' => [
         // Ignore Laravel's default health URL
         '/up',
+
+        /*
+         * Endpoints that are hit constantly and tell us nothing about a customer's experience.
+         * Tracing them dominates the performance data with traffic nobody is waiting on.
+         */
+        '/health',
+        '/favicon.ico',
+        '/robots.txt',
+        '/wp-cron.php',
+        '/wp-admin/admin-ajax.php',
     ],
 
     // Breadcrumb specific configuration

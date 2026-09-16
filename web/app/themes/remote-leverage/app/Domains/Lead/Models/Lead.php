@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Lead\Models;
 
+use App\Infrastructure\Observability\IntegrationCall;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -127,6 +128,17 @@ class Lead extends Model
     public function activityLogs(): HasMany
     {
         return $this->hasMany(LeadActivityLog::class, 'lead_id')->orderBy('created_at', 'asc');
+    }
+
+    /**
+     * Every outbound integration call made on this lead's behalf.
+     *
+     * The counterpart to `activityLogs`: that records what each domain decided to do, this
+     * records what actually crossed the wire when it did it.
+     */
+    public function integrationCalls(): HasMany
+    {
+        return $this->hasMany(IntegrationCall::class, 'lead_id')->orderBy('created_at', 'asc');
     }
 
     /**

@@ -994,15 +994,113 @@ if (document.readyState === 'loading') {
 window.Sentry = window.Sentry || null;
 window.posthog = window.posthog || null;
 
-// Dynamically load Sentry only if DSN is configured
+/*
+ * Browser error reporting.
+ *
+ * Unfiltered, this reports almost nothing useful. The overwhelming majority of front-end
+ * "errors" on a marketing site come from code we did not write and cannot fix: browser
+ * extensions injecting scripts, GTM tags referencing globals that never loaded, ad pixels,
+ * and bots running engines from 2016. Production's legacy Sentry is exactly this — a
+ * representative alert is `ReferenceError: oaiq is not defined`, a measurement global a GTM tag
+ * expects, from a page we do not control the tags on.
+ *
+ * An alert channel that is mostly noise is worse than none, because it trains people to ignore
+ * the one real error when it arrives. The filters below are ordered by how much they remove.
+ */
+
+// Errors that are known-benign, or are browser quirks with no action attached to them.
+const SENTRY_IGNORE = [
+  // Cross-origin script error with no stack. Nothing actionable is ever in it.
+  'Script error.',
+  'Script error',
+  // Fired by browsers when a ResizeObserver callback takes slightly too long. Harmless, and
+  // triggered by ordinary layout work.
+  /ResizeObserver loop/,
+  // A rejected promise whose reason is not an Error. Usually a third-party fetch.
+  'Non-Error promise rejection captured',
+  // The visitor navigated away, or the network dropped, mid-request.
+  /Failed to fetch/,
+  /NetworkError when attempting to fetch resource/,
+  /Load failed/,
+  /AbortError/,
+  'TypeError: cancelled',
+  'TypeError: Cancelled',
+  // Safari private mode and storage-blocked contexts.
+  /QuotaExceededError/,
+  /The operation is insecure/,
+  // Extension and injected-script noise that slips past denyUrls.
+  /^ResizeObserver/,
+  /Can't find variable: \$/,
+  /__firefox__/,
+  /webkitExitFullScreen/,
+  // Instagram and Facebook in-app browsers inject these.
+  /_AutofillCallbackHandler/,
+  /instantSearchSDKJSBridgeClearHighlight/,
+];
+
+// Scripts we will never be able to fix, so an error inside one is not a bug report.
+const SENTRY_DENY = [
+  /extensions\//i,
+  /^chrome:\/\//i,
+  /^chrome-extension:\/\//i,
+  /^moz-extension:\/\//i,
+  /^safari-(web-)?extension:\/\//i,
+  /googletagmanager\.com/i,
+  /google-analytics\.com/i,
+  /connect\.facebook\.net/i,
+  /snap\.licdn\.com/i,
+  /static\.hotjar\.com/i,
+  /cdp\.customer\.io/i,
+  /assets\.calendly\.com/i,
+  /js\.stripe\.com/i,
+];
+
+// Engines that are not people. A crawler hitting a JS error tells us nothing about a customer's
+// experience, and headless browsers generate a disproportionate share of the total.
+const SENTRY_BOT_UA = /bot|crawl|spider|slurp|headless|phantom|puppeteer|playwright|lighthouse|pagespeed|gtmetrix|pingdom|uptime|preview|scrape|curl|wget|python-requests|semrush|ahrefs|mj12|dotbot|petal|bytespider/i;
+
 const sentryDsn = window.SENTRY_DSN || import.meta.env.VITE_SENTRY_DSN;
-if (sentryDsn) {
+
+if (sentryDsn && !SENTRY_BOT_UA.test(navigator.userAgent || '')) {
   import('@sentry/browser').then((Sentry) => {
     window.Sentry = Sentry;
+
     Sentry.init({
       dsn: sentryDsn,
       environment: window.APP_ENV || 'production',
+
+      // Performance sampling is separate from error sampling and much cheaper to lose.
       tracesSampleRate: 0.1,
+
+      ignoreErrors: SENTRY_IGNORE,
+      denyUrls: SENTRY_DENY,
+
+      /*
+       * The single biggest filter: only report errors whose stack points at our own code.
+       *
+       * Everything a GTM tag, an extension or an embedded widget throws lands outside this and
+       * is dropped before it becomes an alert. `allowUrls` matches against the frames in the
+       * stack, so an error merely *triggered* on our page but thrown inside a third-party
+       * bundle does not qualify.
+       */
+      allowUrls: [new RegExp(window.location.host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))],
+
+      beforeSend(event) {
+        /*
+         * Drop events with no usable stack.
+         *
+         * A cross-origin script error arrives with an empty frame list, which Sentry groups
+         * into one enormous unactionable issue. If we cannot see where it happened we cannot
+         * fix it, so it is not worth waking anyone for.
+         */
+        const frames = event.exception?.values?.[0]?.stacktrace?.frames;
+
+        if (event.exception && (!frames || frames.length === 0)) {
+          return null;
+        }
+
+        return event;
+      },
     });
   }).catch((err) => console.error('Sentry initialization failed:', err));
 }

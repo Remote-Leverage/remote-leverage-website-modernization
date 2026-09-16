@@ -320,6 +320,27 @@ if (! Capsule::schema()->hasTable('rl_lead_activity_logs')) {
     });
 }
 
+if (! Capsule::schema()->hasTable('rl_integration_calls')) {
+    Capsule::schema()->create('rl_integration_calls', function ($table) {
+        $table->increments('id');
+        $table->integer('lead_id')->nullable()->index();
+        $table->string('integration', 32)->index();
+        $table->string('operation', 160)->nullable();
+        $table->string('method', 10);
+        $table->text('url');
+        $table->string('credential_label', 190)->nullable()->index();
+        $table->text('request_headers')->nullable();
+        $table->text('request_body')->nullable();
+        $table->integer('status_code')->nullable()->index();
+        $table->text('response_headers')->nullable();
+        $table->text('response_body')->nullable();
+        $table->integer('duration_ms')->nullable();
+        $table->string('outcome')->default('succeeded')->index();
+        $table->text('error_message')->nullable();
+        $table->timestamp('created_at')->nullable();
+    });
+}
+
 // WordPress core tables the environment-sync exporter reads. Only the columns
 // the sync actually touches — this is a shape for querying against, not a
 // faithful reproduction of WordPress's schema.
@@ -537,6 +558,61 @@ if (! function_exists('config')) {
         }
 
         return Arr::get($GLOBALS['_app_config'] ?? [], $key, $default);
+    }
+}
+
+/*
+ * WordPress' HTTP API, enough of it to exercise the outgoing webhook for real.
+ *
+ * Previously absent, which meant the webhook listener took its "no transport" branch and the
+ * test asserting a successful dispatch was asserting a code path that never sends anything.
+ * Tests set $GLOBALS['_wp_remote_post_response'] to steer the outcome.
+ */
+if (! class_exists('WP_Error')) {
+    class WP_Error
+    {
+        public function __construct(protected string $code = '', protected string $message = '') {}
+
+        public function get_error_message(): string
+        {
+            return $this->message;
+        }
+
+        public function get_error_code(): string
+        {
+            return $this->code;
+        }
+    }
+}
+
+if (! function_exists('is_wp_error')) {
+    function is_wp_error($thing)
+    {
+        return $thing instanceof WP_Error;
+    }
+}
+
+if (! function_exists('wp_remote_post')) {
+    function wp_remote_post($url, $args = [])
+    {
+        $GLOBALS['_wp_remote_post_calls'][] = ['url' => $url, 'args' => $args];
+
+        return $GLOBALS['_wp_remote_post_response']
+            ?? ['response' => ['code' => 200], 'body' => '{"ok":true}', 'headers' => []];
+    }
+}
+
+if (! function_exists('wp_remote_retrieve_response_code')) {
+    function wp_remote_retrieve_response_code($response)
+    {
+        return is_array($response) ? ($response['response']['code'] ?? 0) : 0;
+    }
+}
+
+if (! function_exists('wp_remote_retrieve_body')) {
+    function wp_remote_retrieve_body($response)
+    {
+        return is_array($response) ? ($response['body'] ?? '') : '';
     }
 }
 

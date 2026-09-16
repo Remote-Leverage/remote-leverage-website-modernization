@@ -6,6 +6,7 @@ namespace App\Infrastructure\Providers;
 
 use App\Infrastructure\Console\Commands\ApplyWordfenceConfigCommand;
 use App\Infrastructure\Console\Commands\PartnerSeedCommand;
+use App\Infrastructure\Console\Commands\PruneIntegrationCallsCommand;
 use App\Infrastructure\Console\Commands\RunDeployTasksCommand;
 use App\Infrastructure\WordPress\Admin\CalendlyAdminDashboard;
 use App\Infrastructure\WordPress\Admin\ContentAuditAdmin;
@@ -37,6 +38,7 @@ class DomainServiceProvider extends ServiceProvider
         RouteServiceProvider::class,
         SyncServiceProvider::class,
         AiServiceProvider::class,
+        ObservabilityServiceProvider::class,
     ];
 
     /**
@@ -65,6 +67,7 @@ class DomainServiceProvider extends ServiceProvider
                 RunDeployTasksCommand::class,
                 PartnerSeedCommand::class,
                 ApplyWordfenceConfigCommand::class,
+                PruneIntegrationCallsCommand::class,
             ]);
         }
     }

@@ -51,6 +51,14 @@ class HandleLeadEventsForWebhook
     }
 
     /**
+     * The activity-log event type for a webhook event name.
+     */
+    protected function eventTypeFor(string $eventName): string
+    {
+        return $eventName === 'lead.booking_completed' ? 'LeadBookingCompleted' : 'LeadCreated';
+    }
+
+    /**
      * Post JSON webhook payload to configured outgoing webhook endpoint.
      */
     protected function dispatchWebhook(Lead $lead, string $eventName, array $context = []): void
@@ -98,27 +106,57 @@ class HandleLeadEventsForWebhook
         ];
 
         try {
-            $success = true;
-            if (function_exists('\wp_remote_post')) {
-                $response = \wp_remote_post($webhookUrl, [
-                    'headers' => ['Content-Type' => 'application/json'],
-                    'body' => json_encode($payload),
-                    'timeout' => 5,
-                ]);
-                $success = ! \is_wp_error($response) && \wp_remote_retrieve_response_code($response) < 300;
+            /*
+             * `skipped`, not `succeeded`, when there is no HTTP transport.
+             *
+             * This previously defaulted to success and logged a dispatch that never left the
+             * process. A log that reports a delivery it did not make is worse than no log: it
+             * ends the investigation at the wrong place.
+             */
+            if (! function_exists('\wp_remote_post')) {
+                $this->activityLogger->logConsumption(
+                    leadId: $lead->id,
+                    eventType: $this->eventTypeFor($eventName),
+                    actorDomain: 'OutgoingWebhook',
+                    outcome: 'skipped',
+                    description: "No HTTP transport available; {$eventName} webhook was not sent",
+                    payload: ['event' => $eventName, 'webhook_url' => $webhookUrl]
+                );
+
+                return;
             }
 
+            $response = \wp_remote_post($webhookUrl, [
+                'headers' => ['Content-Type' => 'application/json'],
+                'body' => json_encode($payload),
+                'timeout' => 5,
+            ]);
+
+            $isError = \is_wp_error($response);
+            $statusCode = $isError ? null : (int) \wp_remote_retrieve_response_code($response);
+            $success = ! $isError && $statusCode !== null && $statusCode < 300;
+
+            /*
+             * The response is recorded here as well as in the integration call log, because the
+             * status code is what turns "we tried" into a diagnosis and it costs one line to
+             * have it on the entry someone is already looking at.
+             */
             $this->activityLogger->logConsumption(
                 leadId: $lead->id,
-                eventType: $eventName === 'lead.booking_completed' ? 'LeadBookingCompleted' : 'LeadCreated',
+                eventType: $this->eventTypeFor($eventName),
                 actorDomain: 'OutgoingWebhook',
                 outcome: $success ? 'succeeded' : 'failed',
                 description: $success
-                    ? "Dispatched {$eventName} outgoing webhook"
+                    ? "Dispatched {$eventName} outgoing webhook (HTTP {$statusCode})"
                     : "Failed to dispatch {$eventName} outgoing webhook",
                 payload: [
                     'event' => $eventName,
-                    'webhook_url' => substr((string) $webhookUrl, 0, 30).'...',
+                    'webhook_url' => $webhookUrl,
+                    'status_code' => $statusCode,
+                    'error' => $isError ? $response->get_error_message() : null,
+                    'response_body' => $isError
+                        ? null
+                        : mb_substr((string) \wp_remote_retrieve_body($response), 0, 1000),
                 ]
             );
         } catch (\Throwable $e) {

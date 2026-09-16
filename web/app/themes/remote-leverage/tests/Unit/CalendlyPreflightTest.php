@@ -39,6 +39,8 @@ function usersMeResponse(string $suffix): array
     return ['resource' => [
         'uri' => "https://api.calendly.com/users/user-{$suffix}",
         'current_organization' => "https://api.calendly.com/organizations/org-{$suffix}",
+        'email' => "{$suffix}@remoteleverage.com",
+        'name' => "Account {$suffix}",
     ]];
 }
 
@@ -128,7 +130,15 @@ it('caches the token identity under a key derived from the token itself', functi
     expect($identity)->toBe([
         'organization' => "https://api.calendly.com/organizations/org-{$suffix}",
         'user' => "https://api.calendly.com/users/user-{$suffix}",
+
+        // Captured from the same call, so a pool failure can name the account it belongs to
+        // rather than a slot number.
+        'email' => "{$suffix}@remoteleverage.com",
+        'name' => "Account {$suffix}",
     ]);
+
+    // And readable without a network call, which is what the logger and the admin table use.
+    expect($client->cachedAccountEmail("tok1-{$suffix}"))->toBe("{$suffix}@remoteleverage.com");
 
     expect($client->userIdentity("tok1-{$suffix}"))->toBe($identity);
     Http::assertSentCount(1);

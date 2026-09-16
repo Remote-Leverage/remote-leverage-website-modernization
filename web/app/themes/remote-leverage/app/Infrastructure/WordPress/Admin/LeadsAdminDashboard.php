@@ -1578,33 +1578,95 @@ class LeadsAdminDashboard
                                 </div>
                             </div>
                             <span class="rl-count-badge">
-                                <?php echo esc_html((string) $lead->activityLogs->count()); ?> events
+                                <?php echo esc_html((string) ($lead->activityLogs->count() + $lead->integrationCalls->count())); ?> events
                             </span>
                         </div>
 
-                        <?php if ($lead->activityLogs->isEmpty()) { ?>
+                        <?php $timeline = $this->mergedTimeline($lead); ?>
+
+                        <?php if ($timeline === []) { ?>
                             <p style="color: #a1a1aa; font-size: 13px;">No activity logged yet for this lead.</p>
                         <?php } else { ?>
+                            <?php
+                                /*
+                                 * The icon sprite, printed once. Not escaped because it is static
+                                 * author-controlled SVG from IntegrationIcons, and escaping it
+                                 * would render the markup as text.
+                                 */
+                                echo IntegrationIcons::sprite();
+                            ?>
                             <div class="rl-timeline">
-                                <?php foreach ($lead->activityLogs as $log) { ?>
+                                <?php foreach ($timeline as $entry) { ?>
+                                    <?php $row = $entry['model']; ?>
                                     <div class="rl-timeline-item">
-                                        <div class="rl-timeline-dot dot-<?php echo esc_attr($log->outcome); ?>"></div>
+                                        <div class="rl-timeline-dot dot-<?php echo esc_attr($entry['outcome']); ?>"></div>
                                         <div class="rl-timeline-content">
                                             <div class="rl-timeline-meta">
-                                                <span style="font-weight: 600; color: #09090b; font-size: 12px;"><?php echo esc_html($log->actor_domain); ?></span>
-                                                <span class="rl-badge rl-badge-<?php echo esc_attr($log->stage); ?>"><?php echo esc_html(strtoupper($log->stage)); ?></span>
-                                                <span class="rl-badge rl-badge-<?php echo esc_attr($log->outcome); ?>"><span class="rl-status-dot"></span><?php echo esc_html($log->outcome); ?></span>
+                                                <?php echo IntegrationIcons::icon($entry['icon_key'], $entry['label']); ?>
+                                                <span style="font-weight: 600; color: #09090b; font-size: 12px;"><?php echo esc_html($entry['label']); ?></span>
+
+                                                <?php if ($entry['type'] === 'log') { ?>
+                                                    <span class="rl-badge rl-badge-<?php echo esc_attr($row->stage); ?>"><?php echo esc_html(strtoupper($row->stage)); ?></span>
+                                                <?php } else { ?>
+                                                    <span class="rl-badge rl-badge-consumption">HTTP</span>
+                                                    <?php if ($row->status_code) { ?>
+                                                        <span class="rl-badge rl-badge-<?php echo esc_attr($entry['outcome']); ?>"><?php echo esc_html((string) $row->status_code); ?></span>
+                                                    <?php } ?>
+                                                <?php } ?>
+
+                                                <span class="rl-badge rl-badge-<?php echo esc_attr($entry['outcome']); ?>"><span class="rl-status-dot"></span><?php echo esc_html($entry['outcome']); ?></span>
+
+                                                <?php if ($entry['type'] === 'call' && $row->duration_ms !== null) { ?>
+                                                    <span style="color: #a1a1aa; font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;"><?php echo esc_html((string) $row->duration_ms); ?>ms</span>
+                                                <?php } ?>
+
                                                 <span style="color: #a1a1aa; margin-left: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;">
-                                                    <?php echo esc_html($log->created_at?->format('H:i:s')); ?> (<?php echo esc_html($log->created_at?->diffForHumans()); ?>)
+                                                    <?php echo esc_html($entry['at']?->format('H:i:s')); ?> (<?php echo esc_html($entry['at']?->diffForHumans()); ?>)
                                                 </span>
                                             </div>
+
                                             <div style="font-size: 13px; font-weight: 500; color: #09090b; margin-bottom: 4px;">
-                                                <?php echo esc_html($log->description); ?>
+                                                <?php echo esc_html($entry['description']); ?>
                                             </div>
-                                            <?php if (! empty($log->payload)) { ?>
+
+                                            <?php if ($entry['type'] === 'log') { ?>
+                                                <?php if (! empty($row->payload)) { ?>
+                                                    <details style="margin-top: 6px;">
+                                                        <summary style="font-size: 11px; color: #71717a; cursor: pointer; font-weight: 500;">View Event Payload JSON</summary>
+                                                        <div class="rl-json-box"><?php echo esc_html(json_encode($row->payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></div>
+                                                    </details>
+                                                <?php } ?>
+                                            <?php } else { ?>
+                                                <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: #71717a; margin-bottom: 6px; word-break: break-all;">
+                                                    <?php echo esc_html($row->url); ?>
+                                                </div>
+
+                                                <?php if ($row->credential_label) { ?>
+                                                    <div style="font-size: 11px; color: #71717a; margin-bottom: 6px;">
+                                                        as <strong style="color: #3f3f46;"><?php echo esc_html($row->credential_label); ?></strong>
+                                                    </div>
+                                                <?php } ?>
+
+                                                <?php if ($row->error_message) { ?>
+                                                    <div style="font-size: 12px; color: #b91c1c; margin-bottom: 6px;">
+                                                        <?php echo esc_html($row->error_message); ?>
+                                                    </div>
+                                                <?php } ?>
+
                                                 <details style="margin-top: 6px;">
-                                                    <summary style="font-size: 11px; color: #71717a; cursor: pointer; font-weight: 500;">View Event Payload JSON</summary>
-                                                    <div class="rl-json-box"><?php echo esc_html(json_encode($log->payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></div>
+                                                    <summary style="font-size: 11px; color: #71717a; cursor: pointer; font-weight: 500;">View request</summary>
+                                                    <div class="rl-json-box"><?php echo esc_html(json_encode($row->request_headers ?: [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></div>
+                                                    <?php if ($row->request_body) { ?>
+                                                        <div class="rl-json-box"><?php echo esc_html($row->prettyBody($row->request_body)); ?></div>
+                                                    <?php } ?>
+                                                </details>
+
+                                                <details style="margin-top: 6px;">
+                                                    <summary style="font-size: 11px; color: #71717a; cursor: pointer; font-weight: 500;">View response</summary>
+                                                    <div class="rl-json-box"><?php echo esc_html(json_encode($row->response_headers ?: [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></div>
+                                                    <?php if ($row->response_body) { ?>
+                                                        <div class="rl-json-box"><?php echo esc_html($row->prettyBody($row->response_body)); ?></div>
+                                                    <?php } ?>
                                                 </details>
                                             <?php } ?>
                                         </div>
@@ -2262,6 +2324,64 @@ class LeadsAdminDashboard
     protected function iconBuilding(): string
     {
         return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M8 10h.01"/><path d="M16 10h.01"/><path d="M8 14h.01"/><path d="M16 14h.01"/></svg>';
+    }
+
+    /**
+     * The lead's activity log and its integration calls, interleaved in time.
+     *
+     * Two sources rather than one because they answer different questions, and reading them in
+     * separate lists loses the thing that makes them useful together: a HubSpot 400 sits
+     * immediately under the "synced to HubSpot" entry that claimed success, and the ordering is
+     * what makes that visible.
+     *
+     * @return array<int, array{type: string, model: object, at: Carbon|null, outcome: string, icon_key: string, label: string, description: string}>
+     */
+    protected function mergedTimeline(Lead $lead): array
+    {
+        $entries = [];
+
+        foreach ($lead->activityLogs as $log) {
+            $entries[] = [
+                'type' => 'log',
+                'model' => $log,
+                'at' => $log->created_at,
+                'outcome' => (string) $log->outcome,
+                'icon_key' => (string) $log->actor_domain,
+                'label' => (string) $log->actor_domain,
+                'description' => (string) $log->description,
+            ];
+        }
+
+        foreach ($lead->integrationCalls as $call) {
+            $entries[] = [
+                'type' => 'call',
+                'model' => $call,
+                'at' => $call->created_at,
+                'outcome' => (string) $call->outcome,
+                'icon_key' => (string) $call->integration,
+                'label' => ucfirst((string) $call->integration),
+                'description' => (string) ($call->operation ?: $call->method.' '.$call->url),
+            ];
+        }
+
+        /*
+         * Stable sort. Several of these are written within the same second — the HubSpot call and
+         * the log entry announcing it, for instance — and an unstable comparison would let them
+         * swap between page loads, which reads as the call having happened before the decision.
+         */
+        usort($entries, function (array $a, array $b) {
+            $at = $a['at']?->getTimestamp() ?? 0;
+            $bt = $b['at']?->getTimestamp() ?? 0;
+
+            if ($at !== $bt) {
+                return $at <=> $bt;
+            }
+
+            // Within the same second, the decision precedes the call it caused.
+            return ($a['type'] === 'log' ? 0 : 1) <=> ($b['type'] === 'log' ? 0 : 1);
+        });
+
+        return $entries;
     }
 
     protected function extractMeetingDetails(Lead $lead): array

@@ -8,6 +8,7 @@ use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
 use App\Domains\Scheduling\Services\CalendlyEventTypeDiscoveryService;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
+use App\Infrastructure\Observability\CredentialRegistry;
 
 class CalendlyAdminDashboard
 {
@@ -70,6 +71,7 @@ class CalendlyAdminDashboard
             }
 
             app(CalendlyTokenPool::class)->replaceAll($rows);
+            app(CredentialRegistry::class)->flush();
             wp_safe_redirect(admin_url('admin.php?page=rl-calendly&tokens_saved=1'));
             exit;
         }
@@ -79,6 +81,7 @@ class CalendlyAdminDashboard
             $index = absint($_GET['index'] ?? -1);
             $enabled = ($_GET['enabled'] ?? '') === '1';
             app(CalendlyTokenPool::class)->setEnabled($index, $enabled);
+            app(CredentialRegistry::class)->flush();
             wp_safe_redirect(admin_url('admin.php?page=rl-calendly&token_toggled=1'));
             exit;
         }
@@ -87,6 +90,7 @@ class CalendlyAdminDashboard
             check_admin_referer('rl_remove_calendly_token_nonce');
             $index = absint($_GET['index'] ?? -1);
             app(CalendlyTokenPool::class)->removeToken($index);
+            app(CredentialRegistry::class)->flush();
             wp_safe_redirect(admin_url('admin.php?page=rl-calendly&token_removed=1'));
             exit;
         }
@@ -158,6 +162,7 @@ class CalendlyAdminDashboard
                     <thead>
                         <tr>
                             <th>Label</th>
+                            <th>Account</th>
                             <th>Token</th>
                             <th>Enabled</th>
                             <th>Rate Limited</th>
@@ -173,6 +178,13 @@ class CalendlyAdminDashboard
                             ?>
                             <tr>
                                 <td><?php echo esc_html($row['label']); ?></td>
+                                <td>
+                                    <?php if ($accountEmail = app(CalendlyClient::class)->cachedAccountEmail($row['token'])) { ?>
+                                        <?php echo esc_html($accountEmail); ?>
+                                    <?php } else { ?>
+                                        <span style="color: #a1a1aa;" title="Resolved from Calendly the first time this token is used.">Not yet known</span>
+                                    <?php } ?>
+                                </td>
                                 <td><code><?php echo esc_html(CalendlyTokenPool::maskToken($row['token'])); ?></code></td>
                                 <td>
                                     <span class="rl-badge <?php echo $row['enabled'] ? 'rl-badge-succeeded' : 'rl-badge-failed'; ?>">
@@ -196,7 +208,7 @@ class CalendlyAdminDashboard
                             </tr>
                         <?php } ?>
                         <?php if (empty($rows)) { ?>
-                            <tr><td colspan="6">No tokens configured yet.</td></tr>
+                            <tr><td colspan="7">No tokens configured yet.</td></tr>
                         <?php } ?>
                     </tbody>
                 </table>
