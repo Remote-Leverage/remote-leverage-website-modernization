@@ -12,6 +12,9 @@
         'center' => 'text-center',
         default => 'text-left',
     };
+    // The split only makes sense when nothing occupies the media cell.
+    $splitHeading = ($headingBesideBody ?? false) && empty($videoUrl) && empty($image);
+
     $headingTone = ($headingColor ?? 'default') === 'navy'
         ? 'text-brand-navy'
         : ($isDark ? 'text-white' : 'text-black');
@@ -46,8 +49,16 @@
                     </div>
                 @endif
 
+                @if ($splitHeading && $headline)
+                    <div @class(['flex flex-col', $alignText])>
+                        <h2 @class(['font-display font-bold text-3xl sm:text-4xl lg:text-section', $headingTone])>
+                            {!! $headline !!}
+                        </h2>
+                    </div>
+                @endif
+
                 <div @class(['flex flex-col', $alignText, 'lg:order-1' => $imagePosition === 'right'])>
-                    @if ($headline)
+                    @if ($headline && ! $splitHeading)
                         <h2 @class(['font-display font-bold text-3xl sm:text-4xl lg:text-section mb-6', $headingTone])>
                             {!! $headline !!}
                         </h2>

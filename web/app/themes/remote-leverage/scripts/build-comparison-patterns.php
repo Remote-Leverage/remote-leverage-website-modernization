@@ -165,6 +165,9 @@ $pages = [
                     'image' => '',
                     'cta_text' => '',
                     'cta_url' => '#booking-footer',
+                    // Production runs this band dark, with the heading in its own column.
+                    'tone' => 'dark',
+                    'heading_beside_body' => 1,
                 ],
             ],
             'more-affordable' => [

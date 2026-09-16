@@ -52,6 +52,10 @@ class MediaCopyBlock extends Block
             'ctaUrl' => $field('cta_url') ?: '#booking-footer',
             // Production uses this shape on both a pale and a dark surface.
             'tone' => $field('tone') ?: 'light',
+            // With no media, production's text-only bands (Athena's "roles supported")
+            // put the heading in one column and the copy in the other. Off by default,
+            // so every existing usage keeps heading-above-copy in a single cell.
+            'headingBesideBody' => (bool) $field('heading_beside_body'),
             // /referral-program/ aligns each row's copy toward its artwork and sets the
             // heading in brand-navy. Both default to today's behaviour everywhere else.
             'textAlign' => $field('text_align') ?: 'left',
@@ -95,6 +99,12 @@ class MediaCopyBlock extends Block
                 'label' => 'Heading colour',
                 'choices' => ['default' => 'Default', 'navy' => 'Brand navy'],
                 'default_value' => 'default',
+            ])
+            ->addTrueFalse('heading_beside_body', [
+                'label' => 'Heading in its own column',
+                'instructions' => 'Only applies when there is no image or video. Splits the heading and the copy across the two columns.',
+                'ui' => 1,
+                'default_value' => 0,
             ])
             ->addSelect('tone', [
                 'label' => 'Surface',

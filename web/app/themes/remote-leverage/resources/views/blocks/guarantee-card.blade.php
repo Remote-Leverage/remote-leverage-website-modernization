@@ -31,7 +31,9 @@
         </h2>
 
         @if ($prose !== '')
-        <div class="max-w-2xl mb-10 space-y-5 text-white/80 text-base sm:text-lg leading-relaxed [&_p]:mb-0 [&_strong]:text-white [&_a]:underline">
+        {{-- space-y gives the 20px inter-paragraph gap production sets; don't add a
+             [&_p]:mb-0 reset here, it outranks space-y's :where() rule and closes it. --}}
+        <div class="max-w-2xl mb-10 space-y-5 text-white/80 text-sm sm:text-base leading-relaxed [&_strong]:text-white [&_a]:underline">
           {!! $prose !!}
         </div>
         @endif
