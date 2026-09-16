@@ -22,8 +22,11 @@
                             $posterSrc = $card['poster_url'];
                         }
                     }
-                    $videoSrc = $card['video_url'] ?? '';
-                    $resumeUrl = !empty($card['resume_url']) ? $card['resume_url'] : '#booking-footer';
+                    $videoSrc = \App\Support\BlockDefaults::mediaUrl($card['video_url'] ?? '');
+                    $resumeRaw = $card['resume_url'] ?? '';
+                    $resumeUrl = str_starts_with($resumeRaw, '#')
+                        ? $resumeRaw
+                        : (\App\Support\BlockDefaults::mediaUrl($resumeRaw) ?: '#booking-footer');
 
                     $countryName = $card['country'] ?? '';
                     $flagSlug = strtolower(trim(preg_replace('/[^a-zA-Z0-9]+/', '-', $countryName), '-'));

@@ -115,17 +115,43 @@ there would mean *deleting content*.
 
 **Use the content-vs-height test, not height alone.** A page is a layout bug only when its
 content is roughly level with production's and its height is not. On that test exactly three
-pages qualified:
+pages qualified, and only two of them turned out to be ours to fix:
 
-| page | content | height | cause |
+| page | content | height | outcome |
 |---|---|---|---|
-| `vapricing` | +12% | +179% | talent grid: 8 portrait cards two-across cost 1,246px of a 1,746px hero. **Fixed** — `acf/talent-grid` gained a `swipe` layout (row on mobile, unchanged grid from `sm` up); hero now 957px. |
-| `home` | +10% | +91% | every card grid collapses to one column on mobile while keeping a full-width image. The largest is a 15-card grid at 6,532px; three more run 1,836-2,140px. |
-| `store` | +19% | +85% | one section: production fits 3,911 characters into 1,144px, v2 uses 3,309px for the same 3,906. |
+| `vapricing` | +12% | +179% | **Fixed.** Talent grid: 8 portrait cards two-across cost 1,246px of a 1,746px hero. `acf/talent-grid` gained a `swipe` layout — a snapping row below `sm`, the unchanged four-across grid from `sm` up. Hero 1,746 → 957px. |
+| `home` | +10% | +91% | **Fixed.** Every card deck collapsed to one column on mobile while keeping a full-width image. `acf/feature-cards` and `acf/department-cards` now start at two across, with type stepped down below `sm`. Page 23,397 → 21,312px; desktop unchanged. |
+| `store` | +19% | +85% | **Not a bug — do not "fix".** See below. |
 
-The `home` cause is not page-local — `grid-cols-1` on mobile appears in 41 blocks, and
-`acf/feature-cards` alone is used by 15 patterns. Changing the mobile column count is a
-site-wide design decision, not a page fix.
+### `/store/`: production sets body copy at 10px
+
+The section where production looks three times denser renders its paragraphs and list items at
+`font-size: 10px` / `line-height: 15px` on a 390px screen. v2 renders the same 3,892 characters
+at 16px / 27.2px. Production has no accordion, no tabs, no carousel and nothing hidden there —
+it is simply 10px text.
+
+Closing that gap would mean shrinking body copy to 10px on mobile, well under the ~16px both
+platform guidelines recommend. **v2 is correct here and production is not.** The height
+difference is the intended outcome, and `/store/` should be read as passing.
+
+This is the same shape of trap as `/services/`, and the reason the content measure matters: the
+metric says "v2 is 85% taller", and the right response is to leave it alone.
+
+### What the two fixes changed site-wide
+
+`acf/feature-cards` is used by 15 patterns, so its default is genuinely a site-wide change:
+
+- Card decks are two across below `sm` instead of one (a one-column deck stays one column).
+- Card title steps 20px → 17px and body 14px → 13px below `sm` only; at `sm` and above nothing
+  moves. Without that step a title wrapped to four ragged lines in a ~163px column.
+- `acf/department-cards` got the same treatment plus a shorter `min-height` below `sm`, since a
+  420px photo on a 163px-wide card is disproportionate.
+
+Measured effect on the homepage: the six-card deck 2,140 → 1,160px, the four-card deck
+1,908 → 803px, department cards 1,836 → 912px. Desktop height is byte-identical.
+
+The 15-card testimonial grid on the homepage (6,532px) was deliberately left alone — its content
+is 87% larger than production's for 97% more height, so it is proportional, not a layout bug.
 
 ## Known issue this surfaced (fixed)
 

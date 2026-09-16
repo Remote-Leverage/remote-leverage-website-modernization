@@ -5,8 +5,11 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
             @foreach ($items as $item)
                 @php
-                    $audioSrc = $item['audio_url'] ?? '';
-                    $resumeUrl = !empty($item['resume_url']) ? $item['resume_url'] : '#booking-footer';
+                    $audioSrc = \App\Support\BlockDefaults::mediaUrl($item['audio_url'] ?? '');
+                    $resumeRaw = $item['resume_url'] ?? '';
+                    $resumeUrl = str_starts_with($resumeRaw, '#')
+                        ? $resumeRaw
+                        : (\App\Support\BlockDefaults::mediaUrl($resumeRaw) ?: '#booking-footer');
                     $duration = !empty($item['duration']) ? $item['duration'] : '0:45';
                 @endphp
 

@@ -363,6 +363,118 @@ class BlockDefaults
     }
 
     /**
+     * Basename => attachment ID for every file in the media library.
+     *
+     * Built once per request from a single query rather than one lookup per
+     * asset: the samples presets alone resolve ~109 paths on one page render.
+     *
+     * @var array<string, int>|null
+     */
+    private static ?array $attachmentsByFilename = null;
+
+    /**
+     * Resolve a legacy production uploads path to this environment's real URL.
+     *
+     * The sample-applicant and case-study presets carry paths captured from
+     * production in Bedrock form (`/app/uploads/2025/08/Victor-Mexico.mp3`).
+     * Production is a classic install serving `/wp-content/uploads/`, and v2's
+     * media library was never given these files — so the literal strings
+     * resolved on neither host, which is why five pages lost their audio,
+     * video and CV links at once.
+     *
+     * Matching is by filename, not by full path, so a file re-uploaded under a
+     * different year/month folder still resolves. Returns '' when nothing is
+     * found: an empty src is detectable by both the caller and a parity
+     * screenshot, whereas a dead URL renders as a silently broken player.
+     */
+    public static function mediaUrl(string $path): string
+    {
+        if ($path === '') {
+            return '';
+        }
+
+        // Paths are stored URL-encoded ("...at-4.40.37%20PM.png"); the media
+        // library stores the decoded filename.
+        $relative = ltrim((string) (parse_url($path, PHP_URL_PATH) ?: $path), '/');
+        $relative = preg_replace('#^(app|wp-content)/uploads/#', '', $relative) ?? $relative;
+        $relative = rawurldecode($relative);
+        $filename = basename($relative);
+
+        $id = self::attachmentsByFilename()[$filename] ?? null;
+
+        if ($id !== null && function_exists('wp_get_attachment_url')) {
+            $url = wp_get_attachment_url($id);
+
+            if (is_string($url) && $url !== '') {
+                return $url;
+            }
+        }
+
+        // Present on disk but not registered as an attachment — still servable.
+        // This is the branch that actually carries the sample-applicant media:
+        // those files were synced into uploads/ without being registered as
+        // attachments, so the library lookup above finds nothing.
+        if (defined('WP_CONTENT_DIR') && is_file(WP_CONTENT_DIR.'/uploads/'.$relative)) {
+            // Re-encode per segment: $relative was decoded for the filesystem
+            // probe, and filenames here really do contain spaces.
+            $encoded = implode('/', array_map('rawurlencode', explode('/', $relative)));
+
+            return content_url('/uploads/'.$encoded);
+        }
+
+        return '';
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private static function attachmentsByFilename(): array
+    {
+        if (self::$attachmentsByFilename !== null) {
+            return self::$attachmentsByFilename;
+        }
+
+        self::$attachmentsByFilename = [];
+
+        global $wpdb;
+
+        if (! isset($wpdb) || ! is_object($wpdb) || ! method_exists($wpdb, 'get_results')) {
+            return self::$attachmentsByFilename;
+        }
+
+        // One query returning both columns: two separate get_col() calls are not
+        // guaranteed to come back in the same order, so zipping them by index
+        // would pair filenames with the wrong IDs.
+        $rows = $wpdb->get_results(
+            "SELECT post_id, meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_wp_attached_file' ORDER BY post_id ASC"
+        );
+
+        foreach ((array) $rows as $row) {
+            $file = is_object($row) ? ($row->meta_value ?? '') : ($row['meta_value'] ?? '');
+
+            if (! is_string($file) || $file === '') {
+                continue;
+            }
+
+            $id = (int) (is_object($row) ? ($row->post_id ?? 0) : ($row['post_id'] ?? 0));
+
+            // Lowest ID wins, so an original beats a later duplicate upload that
+            // WordPress suffixed with -1, -2 and so on.
+            self::$attachmentsByFilename[basename($file)] ??= $id;
+        }
+
+        return self::$attachmentsByFilename;
+    }
+
+    /**
+     * Drop the cached attachment map. Tests only.
+     */
+    public static function flushMediaCache(): void
+    {
+        self::$attachmentsByFilename = null;
+    }
+
+    /**
      * Resolve an image value (attachment ID, URL string, or ACF image array) to a valid URL string.
      */
     public static function resolveImageUrl(mixed $image): string
