@@ -105,7 +105,23 @@ class MultistepBookingWizard extends Component
 
     public string $hoursPerWeek = '40';
 
-    public string $monthlyRevenue = '$10k to $50k Per Month';
+    /**
+     * No default on purpose. This field is not decorative: isUnder10kMrr() and
+     * HandleLeadCreatedForBooking pick the Calendly event type from it, and
+     * isJobSeeker() filters job applicants out of the sales funnel. A pre-selected
+     * bracket silently classified every lead that never opened the control.
+     */
+    public string $monthlyRevenue = '';
+
+    /**
+     * Express written consent for SMS/phone/email contact. Starts false and is
+     * validated as `accepted`: the checkbox previously shipped with a hardcoded
+     * `checked` attribute and no binding at all, so it neither expressed a choice
+     * nor reached the server. Its `required` attribute was inert — the wizard
+     * submits through wire:click, not a native <form>, so constraint validation
+     * never ran.
+     */
+    public bool $consent = false;
 
     public bool $skipCalendar = false;
 
@@ -182,6 +198,7 @@ class MultistepBookingWizard extends Component
             'lastName' => 'required|string|min:1|max:60',
             'phone' => 'nullable|string|max:30',
             'monthlyRevenue' => 'required|string',
+            'consent' => 'accepted',
         ],
         2 => [
             'selectedDate' => 'required|string|date_format:Y-m-d',

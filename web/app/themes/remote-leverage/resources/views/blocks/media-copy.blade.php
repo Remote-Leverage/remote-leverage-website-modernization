@@ -27,7 +27,15 @@
 ])>
     <div class="w-full px-4 sm:px-6 lg:px-8">
         <div class="rl-container">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 lg:items-center">
+            <div @class([
+                'grid grid-cols-1 gap-10',
+                'lg:grid-cols-2 lg:gap-16 lg:items-center' => ! $splitHeading,
+                // Production's text-only band, measured off /compare-athena/ on
+                // 2026-09-15: a 196px heading column, a 160px gutter and a 714px
+                // measure for the copy, top-aligned. The copy measure is what makes
+                // the paragraph wrap — and so the band stand — as production's does.
+                'lg:grid-cols-[196px_minmax(0,714px)] lg:gap-x-[160px] lg:items-start' => $splitHeading,
+            ])>
 
                 {{-- The media slot is an image, or a video player when `video_url` is set
                      (production's third "Real Businesses, Real Results" card is a video
@@ -51,7 +59,7 @@
 
                 @if ($splitHeading && $headline)
                     <div @class(['flex flex-col', $alignText])>
-                        <h2 @class(['font-display font-bold text-3xl sm:text-4xl lg:text-section', $headingTone])>
+                        <h2 @class(['font-display font-bold text-3xl sm:text-4xl lg:text-[42px] lg:leading-[48px] lg:max-w-[146px]', $headingTone])>
                             {!! $headline !!}
                         </h2>
                     </div>
@@ -68,7 +76,15 @@
                         {{-- Body follows $isDark like the heading does. It hard-coded text-black
                              until 2026-09-15, so selecting tone: dark rendered black copy on a
                              dark band — invisible, with nothing in the editor to warn you. --}}
-                        <div class="text-card {{ $isDark ? 'text-white' : 'text-black' }} [&_p]:mb-4 [&_p:last-child]:mb-0 [&_strong]:font-bold">
+                        {{-- The split band sets copy 16px/24px, as production does there;
+                             every other usage keeps the shared 15px `text-card` step. --}}
+                        <div @class([
+                            'text-card' => ! $splitHeading,
+                            'text-[16px] leading-[24px]' => $splitHeading,
+                            'text-white' => $isDark,
+                            'text-black' => ! $isDark,
+                            '[&_p]:mb-4 [&_p:last-child]:mb-0 [&_strong]:font-bold' => true,
+                        ])>
                             {!! $body !!}
                         </div>
                     @endif

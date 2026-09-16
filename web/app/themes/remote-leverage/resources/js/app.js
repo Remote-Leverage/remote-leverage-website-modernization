@@ -145,7 +145,7 @@ export function rlBookingWizardIsolated(config = {}) {
     lastNameVal: config.lastName || '',
     phoneVal: config.phone || '',
     monthlyRevenueVal: config.monthlyRevenue || '',
-    consentChecked: true,
+    consentChecked: false,
 
     isFieldValid(f) {
       if (f === 'email') {

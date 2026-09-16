@@ -74,6 +74,7 @@ describe('Booking Wizard MRR Routing & Tracking Parity', function () {
         $wizard->phone = '+1 305 555 0199';
         $wizard->phoneCountry = 'US';
         $wizard->monthlyRevenue = '$10k to $50k Per Month';
+        $wizard->consent = true;
 
         $wizard->goToStep(2);
 
@@ -222,6 +223,7 @@ describe('Booking Wizard MRR Routing & Tracking Parity', function () {
         $wizard->firstName = 'John';
         $wizard->lastName = 'Doe';
         $wizard->monthlyRevenue = '$10k to $25k Per Month';
+        $wizard->consent = true;
         $wizard->roleNeeded = 'Executive Assistant';
 
         $wizard->goToStep(2);
@@ -318,6 +320,7 @@ describe('Booking Wizard MRR Routing & Tracking Parity', function () {
         $wizard->phone = '+1 305 555 0199';
         $wizard->phoneCountry = 'US';
         $wizard->monthlyRevenue = '$10k to $25k Per Month';
+        $wizard->consent = true;
 
         $wizard->goToStep(2);
         expect($wizard->currentStep)->toBe(2);

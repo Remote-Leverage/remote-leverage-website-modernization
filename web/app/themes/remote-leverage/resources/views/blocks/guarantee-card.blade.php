@@ -18,6 +18,14 @@
   // Prose copy (the comparison pages) takes the place of the icon trio.
   $prose = trim($body ?? '');
   $showReassurance = $prose === '' && (! isset($showReassuranceItems) || $showReassuranceItems);
+
+  // Production sets this heading 42px on every page that carries the band, and holds it
+  // to a narrow measure so it wraps: 424px on the radial-purple pages, 326px on the flat
+  // #250D4A one. Measured 2026-09-15 across hire-va-4, hire-for-less, the three comparison
+  // pages and /ecommerce-virtual-assistant/.
+  $headingMeasure = ($background ?? 'radial-purple') === 'flat-midnight'
+      ? 'lg:max-w-[326px]'
+      : 'lg:max-w-[424px]';
 @endphp
 
 <section class="pt-12 sm:pt-16 lg:pt-20 pb-16 sm:pb-20 lg:pb-24 text-white relative overflow-hidden" style="{{ $bg }}">
@@ -26,7 +34,7 @@
       
       {{-- Left Column: Guarantee Details --}}
       <div class="lg:col-span-7 pt-4 sm:pt-6">
-        <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold font-display text-white tracking-tight leading-[1.1] mb-10">
+        <h2 class="text-3xl sm:text-4xl lg:text-[42px] lg:leading-[48px] font-bold font-display text-white tracking-tight leading-[1.1] mb-10 {{ $headingMeasure }}">
           {{ $headline }}
         </h2>
 

@@ -12,6 +12,30 @@ class CaseStudyPostType
     public function register(): void
     {
         add_action('init', [$this, 'registerPostType']);
+        add_action('pre_get_posts', [$this, 'showEveryCaseStudyOnArchive']);
+    }
+
+    /**
+     * Put every published case study on /case-study/, with no pager.
+     *
+     * The archive template renders the loop straight through, so without this it inherits
+     * the site's default `posts_per_page` of 10 and silently truncates — 10 of 23 studies
+     * rendered, the other 13 live but unreachable from the index, and no pager to hint that
+     * anything was cut. Production lists all of its own on one page with no pagination, so
+     * an unbounded query is the parity behaviour as well as the correct one.
+     *
+     * Guarded on the main front-end query: leaving admin list tables and any secondary
+     * WP_Query (related studies, REST) on their own paging.
+     */
+    public function showEveryCaseStudyOnArchive(\WP_Query $query): void
+    {
+        if (is_admin() || ! $query->is_main_query()) {
+            return;
+        }
+
+        if ($query->is_post_type_archive('case_study')) {
+            $query->set('posts_per_page', -1);
+        }
     }
 
     public function registerPostType(): void
