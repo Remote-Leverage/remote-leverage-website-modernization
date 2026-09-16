@@ -126,6 +126,55 @@ final class PageSectionEditor
     }
 
     /**
+     * The pattern slugs a page still references, read before any expansion.
+     *
+     * Every write path in this class calls resolve() first, which replaces a `wp:pattern`
+     * reference with the blocks it stands for. That is unavoidable — a reference carries no
+     * content of its own, so overrides would have nothing to attach to — but it has a
+     * consequence worth surfacing rather than discovering later: the page stops being a
+     * pointer at a file in git and becomes expanded markup in the database. CLAUDE.md is
+     * explicit that such a page is lost on the next database refresh.
+     *
+     * The abilities call this before applying an edit so the response can name the pattern
+     * file the change should eventually be promoted back into.
+     *
+     * @return array<int, string>
+     */
+    public function patternReferences(string $content): array
+    {
+        $slugs = [];
+
+        $this->collectPatternSlugs(parse_blocks($content), 0, $slugs);
+
+        return array_values(array_unique($slugs));
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $blocks
+     * @param  array<int, string>  $slugs
+     */
+    private function collectPatternSlugs(array $blocks, int $depth, array &$slugs): void
+    {
+        if ($depth > 5) {
+            return;
+        }
+
+        foreach ($blocks as $block) {
+            if (($block['blockName'] ?? null) === 'core/pattern') {
+                $slug = $block['attrs']['slug'] ?? null;
+
+                if (is_string($slug) && $slug !== '') {
+                    $slugs[] = $slug;
+                }
+            }
+
+            if (! empty($block['innerBlocks'])) {
+                $this->collectPatternSlugs($block['innerBlocks'], $depth + 1, $slugs);
+            }
+        }
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $blocks
      */
     private function expandPatterns(array &$blocks, int $depth): void

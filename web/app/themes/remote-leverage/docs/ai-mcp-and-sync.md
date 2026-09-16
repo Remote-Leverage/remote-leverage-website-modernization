@@ -343,3 +343,56 @@ staying out of general ability listings and MCP's `public`-keyed
 default-server auto-discovery. Actual authorization is still enforced by each
 ability's own `permission()` check against `rl_manage_ai_sync` — `show_in_rest`
 only controls whether the endpoint exists at all, not who may call it.
+
+## Onboarding a non-technical editor
+
+[docs/claude-desktop-for-editors.md](claude-desktop-for-editors.md) is the hand-to-the-colleague
+guide: Claude Desktop, the Automattic STDIO proxy, and an `ai-content-agent` application
+password. It is written for someone who does not know WordPress, and it deliberately does not
+explain anything they cannot act on.
+
+**A claude.ai custom connector is not an option here, and it is worth recording why** so nobody
+spends a day rediscovering it. Custom connectors authenticate as authless or OAuth; the
+`static_headers` beta is org-admin-only and the HTTP Basic case — which is exactly what a
+WordPress Application Password is — is an open, unresolved bug ([claude-ai-mcp#990][mcp990], and
+duplicates #112, #240, #506, #644, #690): the configured header is not sent on the initial
+request and the connector falls back to OAuth discovery, 401ing. Claude Desktop with the STDIO
+proxy sidesteps this entirely because the proxy holds the credential locally.
+
+If the connector experience is wanted later, the path is the
+[Enable Abilities for MCP][enable-abilities] plugin, which ships an embedded OAuth 2.1 server
+with CIMD and **coexists with** `wordpress/mcp-adapter` rather than replacing it. Two caveats
+before reaching for it: it enables all 112 of its own abilities by default and would need
+locking down to this theme's nine, and it does nothing about the session-header requirement
+below.
+
+[mcp990]: https://github.com/anthropics/claude-ai-mcp/issues/990
+[enable-abilities]: https://wordpress.org/plugins/enable-abilities-for-mcp/
+
+### Three prerequisites, none of which the editor can do themselves
+
+All three fail as "Claude has no tools", so check them in order rather than guessing.
+
+1. **CloudFront must forward `Mcp-Session-Id`** — the behavior described above. Measured again
+   on 2026-09-16: `/wp-json/` answers 200 and the MCP endpoint answers **401** unauthenticated,
+   which confirms the `Authorization` half now reaches the origin. The session half was still
+   outstanding at the time of writing. `scripts/verify-mcp.sh` distinguishes them.
+2. **The credential must exist.** `wp acorn rl:ai:agent --rotate` on staging, printed once.
+   As of 2026-09-16 the repo's `.env` carried `STAGING_SYNC_*` but no `STAGING_MCP_*`.
+3. **The agent must be allowed to edit published pages.** Every capability flag defaults to
+   `false`, and `AI_AGENT_CAN_EDIT_PUBLISHED` appears nowhere in `scripts/`, `docker/`,
+   `.github/` or `config/`. Without it the agent can only draft, and every edit to a live page
+   returns `forbidden`. Set it on the **staging** task definition only.
+
+### What an edit does to a pattern-backed page
+
+`update-page-sections` resolves `wp:pattern` references before applying overrides — it has to,
+because a reference carries no content for an override to attach to — and writes the expanded
+result back. **The first edit therefore converts a git-backed page into database-resident
+markup**, with the same "lost on the next refresh" consequence documented above for
+`clone-page`.
+
+The ability now detects this and returns `detached_from_patterns` plus a `warning` naming the
+`patterns/<slug>.php` file the change should be ported into, and its description instructs the
+model to relay that warning verbatim. The editor-facing guide tells them to forward it. Treat an
+incoming forward as a small, real task: the alternative is silently losing their work.

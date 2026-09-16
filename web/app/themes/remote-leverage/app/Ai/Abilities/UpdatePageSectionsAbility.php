@@ -35,7 +35,9 @@ class UpdatePageSectionsAbility extends Ability
             'Use this to iterate on a page — including one made by clone-page — without rebuilding it. '.
             'Call describe-page first for valid section and field names. Editing a page that is already '.
             'published changes the live site immediately and requires the edit_published_pages capability. '.
-            'Overrides naming a section or field that does not exist are reported in "skipped", not applied.';
+            'Overrides naming a section or field that does not exist are reported in "skipped", not applied. '.
+            'If the response contains a "warning" key, relay it to the user verbatim: it means this edit '.
+            'detached the page from its pattern file in git and the change needs a developer to make permanent.';
     }
 
     public function execute(array $input): mixed
@@ -61,6 +63,11 @@ class UpdatePageSectionsAbility extends Ability
             return new WP_Error('no_overrides', 'No overrides were supplied; the page was not changed.');
         }
 
+        // Read this before apply(), which resolves pattern references away. If the page was a
+        // bare `wp:pattern` pointer, this edit is what converts it into expanded markup in the
+        // database — see the warning assembled below.
+        $patterns = $this->editor->patternReferences($post->post_content);
+
         $result = $this->editor->apply($post->post_content, $overrides);
 
         if ($result['applied'] === []) {
@@ -73,7 +80,7 @@ class UpdatePageSectionsAbility extends Ability
 
         $this->composer->updatePage($postId, $result['content']);
 
-        return [
+        $response = [
             'post_id' => $postId,
             'status' => $post->post_status,
             'edit_url' => admin_url("post.php?post={$postId}&action=edit"),
@@ -82,6 +89,41 @@ class UpdatePageSectionsAbility extends Ability
             'skipped' => $result['skipped'],
             'audit' => $this->composer->auditBlocks($result['content']),
         ];
+
+        if ($patterns !== []) {
+            $response['detached_from_patterns'] = $patterns;
+            $response['warning'] = sprintf(
+                'This page was a reference to the pattern %s, which lives in git. Applying an '.
+                'edit expanded it into full markup stored in the database, so the page is no '.
+                'longer pattern-backed: it is now outside version control and will be lost the '.
+                'next time this environment is refreshed from another one. The edit itself is '.
+                'saved and live. To make it permanent, port the change into %s and point the '.
+                'page back at the pattern. Report this to the person who maintains the theme.',
+                implode(', ', $patterns),
+                self::patternFiles($patterns),
+            );
+        }
+
+        return $response;
+    }
+
+    /**
+     * Name the pattern source files behind a set of slugs.
+     *
+     * `remote-leverage/comparison-full` is authored as `patterns/comparison-full.php`, so the
+     * mapping is a prefix strip. Naming the file rather than the slug is the point: the person
+     * reading this warning is being asked to find it.
+     *
+     * @param  array<int, string>  $slugs
+     */
+    private static function patternFiles(array $slugs): string
+    {
+        $files = array_map(
+            fn (string $slug): string => 'patterns/'.substr($slug, (int) strrpos($slug, '/') + 1).'.php',
+            $slugs
+        );
+
+        return implode(', ', $files);
     }
 
     public function permission(): bool|WP_Error

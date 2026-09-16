@@ -287,11 +287,16 @@ return [
     'vainterview' => 'vacalendar',
     'vainterview2' => 'vacalendar',
 
-    // Internal "meet a manager" booking pages -> the v2 booking funnel route.
-    // These are not the public VA-hiring calendar; they book a call with an HR / hiring manager
+    // Internal "meet a manager" booking page -> the v2 booking funnel route.
+    // This is not the public VA-hiring calendar; it books a call with an HR / hiring manager
     // about Contractor-of-Record services.
+    //
+    // 'service-hiring' was freed 2026-09-16 when it became a real v2 page (page 1000192,
+    // patterns/service-hiring-full.php). It books the post-deposit "Onboarding + Applicant
+    // Criteria" meeting, which /book-consultation/ does not — that route's wizard resolves its
+    // Calendly event type from the lead's revenue tier, so the 301 was sending bookings to a
+    // different meeting than the one this page's copy describes.
     'service-cor' => 'book-consultation',
-    'service-hiring' => 'book-consultation',
 
     // Retired confirmation / thank-you pages -> /vathankyou/, the canonical confirmation page.
     'cor-thank-you' => 'vathankyou',

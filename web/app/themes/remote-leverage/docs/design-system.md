@@ -273,3 +273,33 @@ in a block; `product-hero` was superseded by the per-page hero blocks above.
 Note when auditing usage: a block reached through a `BlockDefaults::render*` helper has its
 slug only inside `BlockDefaults`, so grepping patterns for `acf/<slug>` alone under-reports
 and will call a well-used block unused.
+
+## Per-instance design controls (`App\Support\BlockDesign`)
+
+Every `acf/*` block in the `remote-leverage` category gains a **Design** panel in the editor:
+spacing above/below, background, hide-on-mobile/desktop, an anchor ID, extra classes, and a
+scoped Custom CSS box. This exists so a marketing edit does not need a deploy — it is not an
+invitation to restyle blocks per page. Rule 3 of "Reuse before you build" still governs: a
+treatment that recurs belongs in the block as an option, not in six copies of the CSS box.
+
+Three things about it are worth knowing before touching it.
+
+**It emits literal CSS, not Tailwind classes.** Tailwind v4 only compiles classes it finds in
+the `@source` globs, so a utility typed into the editor lives in the database, is never compiled,
+and silently does nothing. Every control therefore writes real declarations into a scoped
+`<style>`. The extra-classes field is a hook for that CSS, not a styling shortcut — its field
+instructions say so, because an editor would otherwise reasonably assume the opposite.
+
+**Rules are scoped to the block instance.** A generated `.rl-d-{hash}` class goes on the
+wrapper, and the bare `selector` keyword (Elementor's idiom) expands to it, so nothing an editor
+writes can reach the rest of the page. The hash derives from the design payload, so two blocks
+configured alike share one class and one rule.
+
+**It applies through `render_block`, not the Blade views.** None of the 57 views render ACF
+Composer's attribute bag — they all open with a hardcoded `<section class="…">` — which is also
+why Gutenberg's built-in "Additional CSS class(es)" field silently did nothing until now. One
+filter covers every block that exists and every block added later; the alternative was 57 view
+edits plus remembering the 58th.
+
+`tests/Unit/BlockDesignTest.php` pins the scoping and the sanitiser. Both fail silently when
+broken, and on a different page from the edit that broke them.

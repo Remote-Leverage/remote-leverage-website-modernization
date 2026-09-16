@@ -7,6 +7,7 @@
 namespace App;
 
 use App\Support\BlockDefaults;
+use App\Support\BlockDesign;
 
 /**
  * Add "… Continued" to the excerpt.
@@ -19,6 +20,10 @@ add_filter('excerpt_more', function () {
 
 // Initialize default demo content hooks for ACF blocks and patterns
 BlockDefaults::init();
+
+// Per-instance spacing, background, visibility and scoped CSS on every acf/* block, plus
+// Gutenberg's own "Additional CSS class(es)" field, which the block views otherwise discard.
+BlockDesign::init();
 
 /**
  * Blog listing page sizes, matching production: 60 articles on the posts page and

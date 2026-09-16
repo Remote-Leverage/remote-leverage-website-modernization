@@ -206,6 +206,10 @@ describe('config/redirects.php targets resolve to something real', function () {
             // 'onboardingguide' above despite the near-identical slug and title: production
             // serves 3435px / 6 Vimeo embeds here against 10946px / 28 there.
             'vaonboardingguide',
+            // Freed 2026-09-16: the "Meeting With Hiring Manager" booking page. It was 301ing
+            // to 'book-consultation', whose wizard resolves its Calendly event type from the
+            // lead's revenue tier and so booked a different meeting than this page describes.
+            'service-hiring',
         ] as $liveSlug) {
             expect(array_key_exists($liveSlug, $config))->toBeFalse(
                 "'{$liveSlug}' is a live v2 page slug; a redirect key of the same name would 301 the page away."
