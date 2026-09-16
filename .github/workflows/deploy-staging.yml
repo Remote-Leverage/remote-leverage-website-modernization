@@ -77,11 +77,3 @@ jobs:
           aws ecs wait services-stable \
             --cluster "$ECS_CLUSTER" \
             --services "$ECS_SERVICE"
-
-      # Runs only when the deploy above failed. `wait services-stable` reports
-      # that it stopped waiting and nothing about why, so without this a failed
-      # deploy costs a trip to the ECS console before anyone can tell whether the
-      # application refused to start or the task never got placed.
-      - name: Explain the failed deploy
-        if: failure()
-        run: bash scripts/ecs-deploy-diagnostics.sh

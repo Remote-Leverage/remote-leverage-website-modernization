@@ -96,9 +96,3 @@ jobs:
           aws ecs wait services-stable \
             --cluster "$ECS_CLUSTER" \
             --services "$ECS_SERVICE"
-
-      # See deploy-staging.yml: turns a bare "waiter timed out" into the task's
-      # stopped reason, the container exit code, and the lines it logged.
-      - name: Explain the failed deploy
-        if: failure()
-        run: bash scripts/ecs-deploy-diagnostics.sh
