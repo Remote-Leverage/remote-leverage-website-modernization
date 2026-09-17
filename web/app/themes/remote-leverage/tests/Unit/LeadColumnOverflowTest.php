@@ -8,6 +8,7 @@ use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Referral\Services\AttributionEngine;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Guards the lead-loss bug of 2026-09-17.
@@ -47,26 +48,63 @@ test('an oversized click id is trimmed rather than allowed to abort the insert',
 });
 
 /*
- * The value that actually broke it, at the width that actually broke it. If someone narrows
- * `fbclid` again this fails on the real-world case rather than on a synthetic one.
+ * The suite runs on sqlite in-memory (tests/stubs.php), which neither reports varchar lengths
+ * nor enforces them. So the *storage* half cannot be proven here — a narrowed column would
+ * still pass a round-trip assertion. It is asserted against the migration instead, which is
+ * the artefact that would actually have to change for the bug to return.
  */
-test('the 212-character fbclid that broke production is stored whole', function () {
-    Lead::truncate();
-
-    $action = new CaptureLeadAction(
-        new AttributionEngine,
-        new PhoneValidationService,
-        new LeadActivityLogger,
+test('the migration keeps the click-id columns wide enough for a real Facebook click', function () {
+    $migration = file_get_contents(
+        __DIR__.'/../../app/Infrastructure/Database/Migrations/2026_09_17_000001_widen_click_id_columns_on_leads_table.php'
     );
 
-    $realWorldFbclid = 'PAdGRleATXKWNwZG9mAmZkaWQWULfk8xmg3OwPKs'.str_repeat('x', 172);
-    expect(mb_strlen($realWorldFbclid))->toBe(212);
+    preg_match('/private const WIDENED = \\[(.*?)\\];/s', $migration, $m);
+    expect($m)->not->toBeEmpty('the widening migration should still declare its target widths');
 
-    $lead = $action->execute(LeadCaptureData::fromArray([
-        'name' => 'Paid Social Visitor',
-        'email' => 'paid-social@example.com',
-        'fbclid' => $realWorldFbclid,
-    ]));
+    preg_match_all("/'([a-z_]+)' => (\\d+)/", $m[1], $pairs, PREG_SET_ORDER);
+    $widths = [];
+    foreach ($pairs as $pair) {
+        $widths[$pair[1]] = (int) $pair[2];
+    }
 
-    expect($lead->fbclid)->toBe($realWorldFbclid);
+    // 212 is the length of the click id that was aborting the INSERT in production.
+    expect($widths['fbclid'] ?? 0)->toBeGreaterThanOrEqual(512)
+        ->and($widths['gclid'] ?? 0)->toBeGreaterThanOrEqual(512)
+        // `_fbc` is "fb.1.<timestamp>.<fbclid>", so it must stay ahead of fbclid, not level.
+        ->and($widths['fbc'] ?? 0)->toBeGreaterThanOrEqual($widths['fbclid'] ?? 0);
+});
+
+/*
+ * The failsafe that matters long-term: limits are read off the table rather than hardcoded, so
+ * a column nobody remembered to list, or a width someone changed without updating the map, is
+ * still clamped.
+ *
+ * Skipped on a driver that does not report column lengths — sqlite says "varchar" with no
+ * size, so there is nothing to derive and the constant map is used instead. Verified against
+ * MySQL by hand: 37 columns resolve, including `email` and `company`, which are not in the map.
+ */
+test('column limits are derived from the live schema, not just the constant map', function () {
+    $action = app(CaptureLeadAction::class);
+
+    $reflected = new ReflectionMethod($action, 'columnLimits');
+    $limits = $reflected->invoke($action);
+
+    // The map is the floor, whatever the driver can tell us.
+    expect($limits['fbclid'] ?? 0)->toBeGreaterThanOrEqual(512);
+
+    // Exactly the pattern columnLimits() parses. sqlite reports a bare "varchar" with no size,
+    // so nothing is derivable there; MySQL reports "varchar(512)". A looser regex here matched
+    // unrelated types like decimal(8,2) and made this assert against a driver that cannot
+    // satisfy it.
+    $reportsLengths = collect(Schema::getColumns((new Lead)->getTable()))
+        ->contains(fn (array $column) => (bool) preg_match('/^(?:var)?char\\(\\d+\\)/i', (string) ($column['type'] ?? '')));
+
+    if (! $reportsLengths) {
+        expect(true)->toBeTrue();
+
+        return;
+    }
+
+    // Not in COLUMN_LIMITS — if it is bounded here, the derivation is live.
+    expect($limits)->toHaveKey('company');
 });

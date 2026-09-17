@@ -1542,19 +1542,19 @@ class LeadsAdminDashboard
                                 <tr><td>Referral Code:</td><td><code><?php echo esc_html($lead->referral_code); ?></code></td></tr>
                             <?php } ?>
                             <?php if ($lead->gclid) { ?>
-                                <tr><td>Google Click ID:</td><td><code><?php echo esc_html($lead->gclid); ?></code></td></tr>
+                                <tr><td>Google Click ID:</td><td><?php echo $this->renderLongToken($lead->gclid); ?></td></tr>
                             <?php } ?>
                             <?php if ($lead->fbclid) { ?>
-                                <tr><td>Facebook Click ID:</td><td><code><?php echo esc_html($lead->fbclid); ?></code></td></tr>
+                                <tr><td>Facebook Click ID:</td><td><?php echo $this->renderLongToken($lead->fbclid); ?></td></tr>
                             <?php } ?>
                             <?php if ($lead->utm_id) { ?>
                                 <tr><td>UTM ID:</td><td><code><?php echo esc_html($lead->utm_id); ?></code></td></tr>
                             <?php } ?>
                             <?php if ($lead->li_fat_id) { ?>
-                                <tr><td>LinkedIn Click ID:</td><td><code><?php echo esc_html($lead->li_fat_id); ?></code></td></tr>
+                                <tr><td>LinkedIn Click ID:</td><td><?php echo $this->renderLongToken($lead->li_fat_id); ?></td></tr>
                             <?php } ?>
                             <?php if ($lead->fbc) { ?>
-                                <tr><td>Meta _fbc:</td><td><code style="font-size: 10px;"><?php echo esc_html($lead->fbc); ?></code></td></tr>
+                                <tr><td>Meta _fbc:</td><td><?php echo $this->renderLongToken($lead->fbc); ?></td></tr>
                             <?php } ?>
                             <?php if ($lead->partner) { ?>
                                 <tr><td>Partner:</td><td><?php echo esc_html($lead->partner); ?></td></tr>
@@ -2392,6 +2392,45 @@ class LeadsAdminDashboard
     protected function iconArrowRight(): string
     {
         return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
+    }
+
+    /**
+     * Render an opaque vendor token without letting it wreck the layout.
+     *
+     * Ad-platform click ids are long and getting longer — a real `fbclid` arrives at 212
+     * characters and `_fbc` wraps it in another 20 — so printed raw they took two full-width
+     * lines each and pushed the rest of the attribution card out of alignment.
+     *
+     * Truncated rather than wrapped, and collapsed behind a `<details>` rather than cut off
+     * for good: nobody reads these, but they do get pasted into Meta's Events Manager when
+     * attribution is being chased, so the full value has to stay selectable. No JS — the admin
+     * page has none and this does not warrant starting.
+     */
+    protected function renderLongToken(?string $value, int $visible = 32): string
+    {
+        $value = (string) $value;
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (mb_strlen($value) <= $visible * 2) {
+            return '<code>'.esc_html($value).'</code>';
+        }
+
+        // Head and tail both shown: the head identifies the token, the tail is what differs
+        // between two clicks from the same campaign.
+        $preview = mb_substr($value, 0, $visible).'…'.mb_substr($value, -8);
+
+        return '<details style="display:inline-block; max-width:100%; vertical-align:top;">'
+            .'<summary style="cursor:pointer; list-style:none; outline:none;">'
+            .'<code style="font-size:11px;" title="'.esc_attr($value).'">'.esc_html($preview).'</code>'
+            .'<span style="color:#71717a; font-size:10px; margin-left:6px;">'.mb_strlen($value).' chars</span>'
+            .'</summary>'
+            .'<code style="font-size:10px; display:block; margin-top:4px; word-break:break-all; white-space:normal; color:#3f3f46;">'
+            .esc_html($value)
+            .'</code>'
+            .'</details>';
     }
 
     protected function iconArrowLeft(): string

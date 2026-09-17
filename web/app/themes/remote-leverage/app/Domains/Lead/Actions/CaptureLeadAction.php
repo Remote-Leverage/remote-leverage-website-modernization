@@ -14,6 +14,7 @@ use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Referral\Services\AttributionEngine;
 use App\Infrastructure\Observability\IntegrationCallRecorder;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class CaptureLeadAction
@@ -30,6 +31,10 @@ class CaptureLeadAction
      * The 2026_09_17_000001 migration widens these; clamping here is the half that keeps
      * working when the next value outgrows the new width too. Losing the tail of a click id
      * costs one attribution join. Losing the row costs the lead.
+     *
+     * This map is only the fallback floor — `columnLimits()` reads the real widths off the
+     * table and prefers those, so widening a column later needs no edit here and a column
+     * added without being listed here is still protected.
      *
      * Only bounded columns appear here. `landing_url`, `referrer_url`, `notes`,
      * `scheduler_link` and `landing_page_base` are TEXT and cannot overflow this way.
@@ -69,6 +74,50 @@ class CaptureLeadAction
     ) {}
 
     /**
+     * Resolved once per process, because it costs an information_schema query.
+     *
+     * @var array<string, int>|null
+     */
+    private static ?array $resolvedColumnLimits = null;
+
+    /**
+     * The real character limit of every bounded column on the leads table.
+     *
+     * Read from the table rather than hardcoded, so this cannot drift away from the schema —
+     * which is the failure mode that produced the original bug in a slower form: the code knew
+     * `fbclid` existed and had no idea how much of it would fit. Whatever the column actually
+     * is today is what gets enforced, so widening it again later needs no change here, and a
+     * new attribution column is covered the moment it is added.
+     *
+     * Falls back to the constant map where introspection is unavailable — notably the bare
+     * container the unit tests build, which has no live connection.
+     *
+     * @return array<string, int>
+     */
+    private function columnLimits(): array
+    {
+        if (self::$resolvedColumnLimits !== null) {
+            return self::$resolvedColumnLimits;
+        }
+
+        $limits = self::COLUMN_LIMITS;
+
+        try {
+            foreach (Schema::getColumns((new Lead)->getTable()) as $column) {
+                // MySQL reports the full type, e.g. "varchar(512)". TEXT columns have no
+                // length here and need no clamp.
+                if (preg_match('/^(?:var)?char\((\d+)\)/i', (string) ($column['type'] ?? ''), $matches)) {
+                    $limits[(string) $column['name']] = (int) $matches[1];
+                }
+            }
+        } catch (\Throwable) {
+            // Introspection is best-effort; the constant map is the floor, not the only source.
+        }
+
+        return self::$resolvedColumnLimits = $limits;
+    }
+
+    /**
      * Trim every bounded column to what its schema can actually hold.
      *
      * Multibyte-aware: the limits are column *character* lengths, and `mb_substr` is what
@@ -80,7 +129,7 @@ class CaptureLeadAction
      */
     private function clampToColumnLimits(array $attributes): array
     {
-        foreach (self::COLUMN_LIMITS as $column => $limit) {
+        foreach ($this->columnLimits() as $column => $limit) {
             if (! isset($attributes[$column]) || ! is_string($attributes[$column])) {
                 continue;
             }
