@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -84,9 +85,9 @@ return new class extends Migration
     {
         foreach (self::ORIGINAL as $column => $length) {
             if (Schema::hasColumn('rl_leads', $column)) {
-                \Illuminate\Support\Facades\DB::table('rl_leads')
+                DB::table('rl_leads')
                     ->whereNotNull($column)
-                    ->update([$column => \Illuminate\Support\Facades\DB::raw("LEFT(`{$column}`, {$length})")]);
+                    ->update([$column => DB::raw("LEFT(`{$column}`, {$length})")]);
             }
         }
 
