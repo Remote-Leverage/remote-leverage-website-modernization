@@ -556,8 +556,13 @@ class LeadsAdminDashboard
             }
 
             /* --- Attribution Cell (truncated: long UTM campaigns blow out the table) --- */
+            .rl-lead-table th.rl-col-attr,
+            .rl-lead-table td.rl-col-attr {
+                width: 180px;
+                max-width: 180px;
+            }
             .rl-attr-cell {
-                max-width: 220px;
+                max-width: 180px;
             }
             .rl-attr-source,
             .rl-attr-campaign {
@@ -617,6 +622,13 @@ class LeadsAdminDashboard
                 font-size: 12px;
                 color: #71717a;
                 text-decoration: none;
+            }
+            .rl-contact-info .rl-contact-email {
+                display: block;
+                max-width: 260px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
             .rl-contact-email:hover {
                 color: #09090b;
@@ -690,6 +702,7 @@ class LeadsAdminDashboard
                 background: #18181b;
                 color: #fafafa;
                 border: 1px solid #18181b;
+                white-space: nowrap;
             }
             .rl-pill-t0 {
                 display: inline-flex;
@@ -702,6 +715,7 @@ class LeadsAdminDashboard
                 background: #f4f4f5;
                 color: #52525b;
                 border: 1px solid #e4e4e7;
+                white-space: nowrap;
             }
 
             /* --- Meet Button --- */
@@ -739,6 +753,7 @@ class LeadsAdminDashboard
                 border: 1px solid #e4e4e7;
                 text-decoration: none;
                 transition: all 0.15s ease;
+                white-space: nowrap;
             }
             .rl-audit-pill:hover {
                 background: #e4e4e7;
@@ -1135,7 +1150,7 @@ class LeadsAdminDashboard
                             <th>Revenue (MRR)</th>
                             <th>Status</th>
                             <th>Scheduled Consultation</th>
-                            <th>Attribution</th>
+                            <th class="rl-col-attr">Attribution</th>
                             <th>Audit Logs</th>
                             <th style="text-align: right;">Action</th>
                         </tr>
@@ -1170,7 +1185,7 @@ class LeadsAdminDashboard
                                                         <span class="rl-badge rl-badge-va" title="<?php echo esc_attr((string) $audience->note()); ?>"><?php echo esc_html($audience->label()); ?></span>
                                                     <?php } ?>
                                                 </span>
-                                                <a href="mailto:<?php echo esc_attr($lead->email); ?>" class="rl-contact-email"><?php echo esc_html($lead->email); ?></a>
+                                                <a href="mailto:<?php echo esc_attr($lead->email); ?>" class="rl-contact-email" title="<?php echo esc_attr($lead->email); ?>"><?php echo esc_html($lead->email); ?></a>
                                                 <div class="rl-contact-sub">
                                                     <?php if ($lead->phone) { ?>
                                                         <a href="tel:<?php echo esc_attr($lead->phone); ?>" style="color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 3px;">
@@ -1218,7 +1233,7 @@ class LeadsAdminDashboard
                                             <span style="color: #a1a1aa; font-size: 11px;">Not Scheduled</span>
                                         <?php } ?>
                                     </td>
-                                    <td>
+                                    <td class="rl-col-attr">
                                         <div class="rl-attr-cell">
                                             <?php if ($lead->utm_source || $lead->utm_campaign) { ?>
                                                 <span class="rl-attr-source" title="<?php echo esc_attr($lead->utm_source ?: 'direct'); ?>"><?php echo esc_html($lead->utm_source ?: 'direct'); ?></span>
@@ -1513,13 +1528,13 @@ class LeadsAdminDashboard
                                         <?php foreach ($values as $key => $value) { ?>
                                             <tr>
                                                 <td style="font-size: 11px;"><?php echo esc_html((string) $key); ?>:</td>
-                                                <td style="word-break: break-all; font-size: 11px;"><code><?php echo esc_html((string) $value); ?></code></td>
+                                                <td style="word-break: break-all; font-size: 11px;"><code><?php echo esc_html($this->attributionScalar($value)); ?></code></td>
                                             </tr>
                                         <?php } ?>
                                     <?php } else { ?>
                                         <tr>
                                             <td style="font-size: 11px;"><?php echo esc_html((string) $group); ?>:</td>
-                                            <td style="word-break: break-all; font-size: 11px;"><code><?php echo esc_html((string) $values); ?></code></td>
+                                            <td style="word-break: break-all; font-size: 11px;"><code><?php echo esc_html($this->attributionScalar($values)); ?></code></td>
                                         </tr>
                                     <?php } ?>
                                 <?php } ?>
@@ -2465,6 +2480,40 @@ class LeadsAdminDashboard
      * attribution is being chased, so the full value has to stay selectable. No JS — the admin
      * page has none and this does not warrant starting.
      */
+    /**
+     * Flatten an attribution value to a displayable string.
+     *
+     * Full Capture shows whatever the visit carried, so it cannot assume the payload is two
+     * levels of scalars. The Gravity import writes lists (gravity.forms, gravity.entry_ids);
+     * casting one to string raises E_WARNING, which Acorn promotes to an ErrorException and
+     * takes the whole detail page down.
+     */
+    protected function attributionScalar(mixed $value): string
+    {
+        if (is_array($value)) {
+            $flat = array_filter($value, static fn ($item): bool => ! is_array($item) && ! is_object($item));
+
+            // A plain list reads better comma-joined than as JSON; anything deeper keeps its shape.
+            return count($flat) === count($value)
+                ? implode(', ', array_map(static fn ($item): string => (string) $item, $flat))
+                : (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        if ($value === null) {
+            return '';
+        }
+
+        if (is_object($value)) {
+            return (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
+
+        return (string) $value;
+    }
+
     protected function renderLongToken(?string $value, int $visible = 32): string
     {
         $value = (string) $value;

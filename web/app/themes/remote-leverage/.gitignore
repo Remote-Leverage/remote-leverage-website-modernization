@@ -2,6 +2,11 @@
 /vendor
 /public/*
 !/public/.gitkeep
+
+# Gravity Forms entry exports, tracked on purpose. Everything else under public/ is a build
+# output that every deploy wipes and regenerates; these are inputs to `wp acorn
+# lead:import-gravity` and are the only copy of the pre-migration lead history.
+!/public/exports/
 .env
 npm-debug.log
 *.sql

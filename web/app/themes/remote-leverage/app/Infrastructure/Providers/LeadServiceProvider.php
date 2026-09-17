@@ -7,6 +7,7 @@ namespace App\Infrastructure\Providers;
 use App\Domains\Lead\Actions\CaptureLeadAction;
 use App\Domains\Lead\Actions\ProcessAbandonedLeadsAction;
 use App\Domains\Lead\Actions\PurgeOldLeadsAction;
+use App\Domains\Lead\Commands\ImportGravityLeadsCommand;
 use App\Domains\Lead\Commands\ProcessAbandonedLeadsCommand;
 use App\Domains\Lead\Commands\PurgeLeadsCommand;
 use App\Domains\Lead\Events\LeadBookingCanceled;
@@ -49,6 +50,7 @@ class LeadServiceProvider extends ServiceProvider
             $this->commands([
                 PurgeLeadsCommand::class,
                 ProcessAbandonedLeadsCommand::class,
+                ImportGravityLeadsCommand::class,
             ]);
         }
     }
