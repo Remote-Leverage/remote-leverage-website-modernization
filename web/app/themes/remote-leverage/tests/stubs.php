@@ -966,6 +966,10 @@ if (! defined('ARRAY_A')) {
     define('ARRAY_A', 'ARRAY_A');
 }
 
+if (! defined('DAY_IN_SECONDS')) {
+    define('DAY_IN_SECONDS', 86400);
+}
+
 if (! function_exists('add_filter')) {
     function add_filter($hook, $callback, $priority = 10, $accepted_args = 1)
     {

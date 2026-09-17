@@ -499,7 +499,7 @@ Two caveats found alongside it. Files with no attachment row (nine orphaned
 achieves nothing. And `.webp` siblings of uploads are absent from `_wp_attachment_metadata`,
 so the manifest never carries them either — only the original and its registered sizes travel.
 
-### 20. `Mcp-Session-Id` is still stripped, so MCP dies after `initialize`
+### 20. `Mcp-Session-Id` is still stripped, so MCP dies after `initialize` — **WORKED AROUND 2026-09-16, root cause still open**
 
 **Measured against staging 2026-09-15.** The `Authorization` half of the CloudFront problem is
 fixed — a header-only call to `app/export-syncable-settings` returns **200**, and the same call
@@ -514,18 +514,48 @@ The **session** header does not survive:
 | `tools/list` echoing that id back | **400 — `Invalid Request: Missing Mcp-Session-Id header`** |
 
 `docker/nginx.conf` cannot explain it: it touches only `HTTP_AUTHORIZATION` and `HTTP_X_LIVEWIRE`
-and does nothing per-path. The adapter reads the header straight off the request with no
-query-string or body fallback and has no stateless mode, so there is no application-side
-workaround — the `_rl_sync_auth` body bridge solves credentials, not sessions, and only matches
-the abilities path.
+and does nothing per-path.
+
+~~The adapter reads the header straight off the request with no query-string or body fallback and
+has no stateless mode, so there is no application-side workaround.~~ **Corrected 2026-09-16.** All
+three facts are true — `HttpRequestContext::__construct` reads `$request->get_header()`, and the
+only session filters the adapter exposes are `session_max_per_user`,
+`session_inactivity_timeout` and `session_activity_update_interval` — but the conclusion does not
+follow, because the fallback does not have to live in the adapter:
+
+- `HttpRequestContext` reads the header off the `WP_REST_Request` object, not off `$_SERVER`.
+- `rest_pre_dispatch` receives that same object, after `check_authentication()` has resolved the
+  application password and before the route callback constructs the context.
+- Sessions are keyed per user and `SessionManager::get_all_user_sessions()` is public.
+
+So a request that lost its header can have it restored from the authenticated user's own live
+session. That is `web/app/mu-plugins/rl-mcp-session-bridge.php`, added 2026-09-16 and pinned by
+`tests/Unit/McpSessionBridgeTest.php`. It restores only a session the user already established —
+it never mints one, so a client that skipped `initialize` still gets the adapter's own error and
+reinitializes rather than continuing against a session invented for it.
+
+The bridge does not make the distribution correct, and it carries one real cost: because sessions
+are per user, two clients authenticating as the same WordPress user now share a transport session.
+Sessions carry only the `initialize` handshake parameters, so this is tolerable for
+`ai-content-agent` — it is not a reason to stop wanting the fix below.
+
+The `_rl_sync_auth` body bridge remains unrelated: it solves credentials, not sessions, and only
+matches the abilities path.
 
 **What this looks like from a Claude session:** the tool list is simply empty, with no error. That
 is the same symptom as a missing capability or a wrong password, which is why
 `scripts/verify-mcp.sh` exists — it fails at the session step by name instead.
 
-**Fix:** extend whatever origin request policy now forwards `Authorization` on the abilities and
-MCP paths so it also forwards `Mcp-Session-Id`. The two headers were evidently fixed separately
-and only one landed.
+**Real fix, still wanted:** extend whatever origin request policy now forwards `Authorization` on
+the abilities and MCP paths so it also forwards `Mcp-Session-Id`. The two headers were evidently
+fixed separately and only one landed. Alternatively set that `/wp-json/*` behavior to
+`Managed-AllViewer` with `Managed-CachingDisabled` — the cache must be disabled, because
+forwarding `Authorization` on a cached behavior serves one user's authenticated response to
+another.
+
+When it lands, delete `rl-mcp-session-bridge.php` and its test along with the two workarounds
+listed below. The bridge goes inert on its own the moment a real header arrives — it only acts
+when the header is absent — so the ordering is safe either way.
 
 **Adjacent cleanup this unblocks:** `STAGING_SYNC_BODY_AUTH` and
 `web/app/mu-plugins/rl-sync-body-auth.php` are now dead weight — see

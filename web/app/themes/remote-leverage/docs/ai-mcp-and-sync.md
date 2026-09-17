@@ -267,9 +267,23 @@ distribution that forwards only the obvious one still fails:
 `Mcp-Session-Id` is read straight off the request
 (`HttpRequestContext::__construct`) with no query-string or body fallback, and
 the adapter has no stateless mode — the only session filters it exposes are
-limits and timeouts. So **MCP cannot be tunnelled past a distribution that
-strips custom headers.** The `_rl_sync_auth` body bridge in
-`web/app/mu-plugins/rl-sync-body-auth.php` does not help here either: it solves
+limits and timeouts.
+
+This was previously read as meaning MCP cannot be tunnelled past a distribution
+that strips custom headers. It does not: the adapter reads the header off the
+`WP_REST_Request`, and `rest_pre_dispatch` hands WordPress that same object after
+authentication has resolved and before the route callback runs.
+`web/app/mu-plugins/rl-mcp-session-bridge.php` uses that window to restore the
+header from the authenticated user's own live session
+(`SessionManager::get_all_user_sessions()`), so calls after `initialize` resolve
+normally. It never mints a session — only restores one the client already
+established — and it goes inert as soon as a real header arrives. See
+[known-issues.md](known-issues.md) item 20 for the cost: clients sharing a
+WordPress user share a transport session.
+
+**The bridge is a stopgap, not the fix.** Configure the distribution as below and
+delete it. The `_rl_sync_auth` body bridge in
+`web/app/mu-plugins/rl-sync-body-auth.php` is a separate thing again: it solves
 credentials, not the session header, and it only matches the
 `/wp-json/wp-abilities/` path.
 
@@ -369,20 +383,37 @@ below.
 [mcp990]: https://github.com/anthropics/claude-ai-mcp/issues/990
 [enable-abilities]: https://wordpress.org/plugins/enable-abilities-for-mcp/
 
-### Three prerequisites, none of which the editor can do themselves
+### Four prerequisites, none of which the editor can do themselves
 
-All three fail as "Claude has no tools", so check them in order rather than guessing.
+All four fail as "Claude has no tools", so check them in order rather than guessing.
 
-1. **CloudFront must forward `Mcp-Session-Id`** — the behavior described above. Measured again
-   on 2026-09-16: `/wp-json/` answers 200 and the MCP endpoint answers **401** unauthenticated,
-   which confirms the `Authorization` half now reaches the origin. The session half was still
-   outstanding at the time of writing. `scripts/verify-mcp.sh` distinguishes them.
-2. **The credential must exist.** `wp acorn rl:ai:agent --rotate` on staging, printed once.
-   As of 2026-09-16 the repo's `.env` carried `STAGING_SYNC_*` but no `STAGING_MCP_*`.
-3. **The agent must be allowed to edit published pages.** Every capability flag defaults to
-   `false`, and `AI_AGENT_CAN_EDIT_PUBLISHED` appears nowhere in `scripts/`, `docker/`,
-   `.github/` or `config/`. Without it the agent can only draft, and every edit to a live page
-   returns `forbidden`. Set it on the **staging** task definition only.
+1. **The session header must reach the origin.** Measured again on 2026-09-16: `/wp-json/`
+   answers 200 and the MCP endpoint answers **401** unauthenticated, which confirms the
+   `Authorization` half reaches the origin. The session half is still stripped by CloudFront, and
+   is covered in the meantime by `rl-mcp-session-bridge.php` — so this no longer blocks an
+   editor, but the distribution should still be fixed and the bridge deleted.
+   `scripts/verify-mcp.sh` distinguishes the failure modes.
+2. **Application Passwords must be available site-wide.** WordFence disables them by default and
+   turned every machine-to-machine credential off on 2026-09-16; see
+   [known-issues.md](known-issues.md) item 22. The reliable test, because core adds this key only
+   when they are available:
+   ```bash
+   curl -s "https://staging.remoteleverage.com/wp-json/" | jq .authentication
+   # {"application-passwords": {...}}  -> available
+   # {}                                -> disabled; nothing can authenticate
+   ```
+3. **The credential must exist.** For a colleague, create it in the admin — Users →
+   `ai-content-agent` → Edit → Application Passwords — and **name it anything except
+   `mcp-client`**. That string is `ContentAgentProvisioner::PASSWORD_NAME`, and `--rotate` revokes
+   every password carrying it, so `wp acorn rl:ai:agent --rotate` would silently cut off whoever
+   was issued one before. A distinctly-named password (`claude-desktop-<name>`) is invisible to
+   that sweep and stays individually revocable. Reserve `--rotate` for the shared credential in
+   `.mcp.json`.
+4. **The agent must be allowed to edit published pages.** Every capability flag defaults to
+   `false`. `AI_AGENT_CAN_EDIT_PUBLISHED` and `AI_AGENT_CAN_READ_LEADS` are now staging
+   environment secrets and are on the allowlist in `scripts/sync-app-secrets-from-env.py` — the
+   allowlist is what `main()` iterates, so a key missing from it is dropped in silence. They
+   reach the container only when the **Sync app secrets** workflow runs. Staging only.
 
 ### What an edit does to a pattern-backed page
 

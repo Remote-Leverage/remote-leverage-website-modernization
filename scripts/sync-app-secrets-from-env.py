@@ -77,6 +77,12 @@ ALLOWLIST = [
     "SENTRY_LARAVEL_DSN",
     # AI
     "GEMINI_API_KEY",
+    # ai-content-agent capability flags (config/ai-wordpress.php). Not secrets, but they ride
+    # with the rest of the container env, and ContentAgentProvisioner reconciles against them
+    # on every deploy — so leaving one unset actively revokes the capability rather than
+    # leaving an earlier grant in place.
+    "AI_AGENT_CAN_EDIT_PUBLISHED",
+    "AI_AGENT_CAN_READ_LEADS",
     # Mail
     "MAIL_HOST",
     "MAIL_PORT",
