@@ -56,15 +56,20 @@ Route::get('referrer-register', function () {
 })->name('referrer.register');
 
 // Legacy URL compatibility: rl-referral-program served login/signup as tabs of a single
-// "/referral-dashboard/" page (default tab: signup; "?tab=login" or "?logged_out"/"?action=login"
-// switched to login/dashboard). Preserved here so old bookmarks/emails/backlinks to that URL
+// "/referral-dashboard/" page. Preserved here so old bookmarks/emails/backlinks to that URL
 // keep working without a redirect rule.
+//
+// The bare URL resolves to LOGIN. It used to default to signup, which left the login form
+// reachable only through "?tab=login" — a URL nobody types — so anyone who opened
+// /referral-dashboard/ had no way to sign in; the only link out was in the site footer.
+// Signup is now one click away on the switcher rendered by both Livewire components
+// (partials/referrer-auth-tabs), and ReferralProgramHeroBlock's "?tab=sign-up" CTA still
+// lands on the application form. "?logged_out" and "?action=login" no longer need special
+// casing — they fall through to the login default.
 Route::get('referral-dashboard', function (Request $request) {
-    $isLoginTab = $request->query('tab') === 'login'
-        || $request->has('logged_out')
-        || $request->query('action') === 'login';
+    $isSignUpTab = in_array($request->query('tab'), ['sign-up', 'signup', 'register'], true);
 
-    return $isLoginTab ? view('pages.referrer-portal') : view('pages.referrer-register');
+    return $isSignUpTab ? view('pages.referrer-register') : view('pages.referrer-portal');
 })->name('referrer.dashboard.legacy');
 
 // The partner directory's CTAs point here. There is no separate partner portal — partners

@@ -2,50 +2,54 @@
   
   {{-- Referrer Authentication Login Screen --}}
   @if (! $isAuthenticated)
-    <div class="max-w-md mx-auto my-12 bg-surface-white rounded-card-lg border border-slate-200/80 p-8 shadow-card text-center">
-      <div class="w-12 h-12 rounded-full bg-brand-purple/10 text-brand-purple mx-auto flex items-center justify-center mb-4">
-        {!! app(\App\Infrastructure\WordPress\Admin\WordPressAdminTheme::class)->getIsoSvg('currentColor', 26) !!}
-      </div>
+    <div class="max-w-md mx-auto my-12">
+      @include('partials.referrer-auth-tabs', ['active' => 'login'])
 
-      <h2 class="text-2xl font-bold font-display text-brand-hero tracking-tight">Referrer Portal Login</h2>
-      <p class="text-xs text-text-muted mt-2 mb-6">Enter your registered referral code or referrer email address to access your live attribution dashboard.</p>
-
-      @if ($loginError)
-        <div class="mb-4 p-3 rounded-card bg-red-50 border border-red-200 text-status-alert text-xs text-left">
-          {{ $loginError }}
-        </div>
-      @endif
-
-      <form wire:submit.prevent="authenticateReferrer" class="space-y-4">
-        <div>
-          <input
-            type="text"
-            wire:model="lookupCode"
-            placeholder="e.g. RL-REFERRER-123 or referrer@agency.com"
-            class="w-full h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
-          />
+      <div class="bg-surface-white rounded-card-lg border border-slate-200/80 p-8 shadow-card text-center">
+        <div class="w-12 h-12 rounded-full bg-brand-purple/10 text-brand-purple mx-auto flex items-center justify-center mb-4">
+          {!! app(\App\Infrastructure\WordPress\Admin\WordPressAdminTheme::class)->getIsoSvg('currentColor', 26) !!}
         </div>
 
-        <div>
-          <input
-            type="password"
-            wire:model="password"
-            placeholder="Password"
-            class="w-full h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
-          />
+        <h2 class="text-2xl font-bold font-display text-brand-hero tracking-tight">Referrer Portal Login</h2>
+        <p class="text-xs text-text-muted mt-2 mb-6">Enter your registered referral code or referrer email address to access your live attribution dashboard.</p>
+
+        @if ($loginError)
+          <div class="mb-4 p-3 rounded-card bg-red-50 border border-red-200 text-status-alert text-xs text-left">
+            {{ $loginError }}
+          </div>
+        @endif
+
+        <form wire:submit.prevent="authenticateReferrer" class="space-y-4">
+          <div>
+            <input
+              type="text"
+              wire:model="lookupCode"
+              placeholder="e.g. RL-REFERRER-123 or referrer@agency.com"
+              class="w-full h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
+            />
+          </div>
+
+          <div>
+            <input
+              type="password"
+              wire:model="password"
+              placeholder="Password"
+              class="w-full h-11 px-3.5 rounded-lg bg-[#F0F3FA] text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple transition-all duration-200"
+            />
+          </div>
+
+          <button
+            type="submit"
+            class="w-full btn-primary cursor-pointer text-xs"
+          >
+            Access Dashboard
+          </button>
+        </form>
+
+        <div class="mt-6 pt-6 border-t border-slate-100 text-xs text-text-muted">
+          Don't have a referrer account yet?
+          <a href="{{ route('referrer.register') }}" class="font-bold text-brand-purple hover:underline">Apply here</a>.
         </div>
-
-        <button
-          type="submit"
-          class="w-full btn-primary cursor-pointer text-xs"
-        >
-          Access Dashboard
-        </button>
-      </form>
-
-      <div class="mt-6 pt-6 border-t border-slate-100 text-xs text-text-muted">
-        Don't have a referrer account yet?
-        <a href="{{ route('referrer.register') }}" class="font-bold text-brand-purple hover:underline">Apply here</a>.
       </div>
     </div>
 
