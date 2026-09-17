@@ -159,8 +159,8 @@ class LeadExportPanel
 
         $this->styles();
         ?>
-        <div class="rl-export-backdrop" id="rl-export-modal" hidden>
-            <div class="rl-export-dialog" role="dialog" aria-modal="true" aria-labelledby="rl-export-title">
+        <div class="rl-export-scrim" id="rl-export-modal" hidden>
+            <aside class="rl-export-flyout" role="dialog" aria-modal="true" aria-labelledby="rl-export-title">
                 <div class="rl-export-head">
                     <div>
                         <h2 id="rl-export-title">Export leads to CSV</h2>
@@ -269,7 +269,7 @@ class LeadExportPanel
                     <button type="button" class="rl-btn rl-btn-primary" id="rl-export-run">Start export</button>
                     <a class="rl-btn rl-btn-primary" id="rl-export-download" hidden>Download CSV</a>
                 </div>
-            </div>
+            </aside>
         </div>
         <script>
         (function () {
@@ -399,13 +399,23 @@ class LeadExportPanel
                 });
             }
 
+            /*
+             * `hidden` cannot be animated away — an element that is display:none on the frame the
+             * class lands never transitions. So the panel is shown first, then opened on the next
+             * frame, and on the way out it keeps its box until the slide has finished.
+             */
+            var closeTimer = null;
+
             function open() {
+                window.clearTimeout(closeTimer);
                 modal.hidden = false;
+                window.requestAnimationFrame(function () { modal.classList.add('is-open'); });
                 refreshCount();
             }
 
             function close() {
-                modal.hidden = true;
+                modal.classList.remove('is-open');
+                closeTimer = window.setTimeout(function () { modal.hidden = true; }, 260);
             }
 
             document.getElementById('rl-export-open').addEventListener('click', open);
@@ -514,25 +524,49 @@ class LeadExportPanel
     {
         ?>
         <style>
-            .rl-export-backdrop {
+            /*
+             * A flyout off the right edge rather than a centred dialog.
+             *
+             * The form is long — eleven column groups, four filters and a slider — and a centred
+             * box that tall either scrolls the page behind it or has to shrink its own contents.
+             * Anchored full height, the head and the footer buttons stay put while only the
+             * options scroll, and the leads list stays visible beside it, which is what someone
+             * checks when they are deciding what to export.
+             */
+            .rl-export-scrim {
                 position: fixed;
                 inset: 0;
                 z-index: 100050;
-                background: rgba(9, 9, 11, 0.45);
+                background: rgba(9, 9, 11, 0);
                 display: flex;
-                align-items: flex-start;
-                justify-content: center;
-                padding: 48px 16px;
-                overflow-y: auto;
+                justify-content: flex-end;
+                transition: background 0.25s ease;
             }
-            .rl-export-backdrop[hidden] { display: none; }
-            .rl-export-dialog {
+            .rl-export-scrim[hidden] { display: none; }
+            .rl-export-scrim.is-open { background: rgba(9, 9, 11, 0.45); }
+            .rl-export-flyout {
                 background: #ffffff;
-                border: 1px solid #e4e4e7;
-                border-radius: 14px;
-                box-shadow: 0 20px 50px rgba(9, 9, 11, 0.25);
+                border-left: 1px solid #e4e4e7;
+                box-shadow: -18px 0 50px rgba(9, 9, 11, 0.18);
                 width: 100%;
-                max-width: 620px;
+                max-width: 520px;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                transform: translateX(100%);
+                transition: transform 0.25s ease;
+            }
+            .rl-export-scrim.is-open .rl-export-flyout { transform: translateX(0); }
+
+            /* Only the options scroll; the title and the buttons are always reachable. */
+            .rl-export-flyout .rl-export-body { overflow-y: auto; }
+            .rl-export-flyout .rl-export-head,
+            .rl-export-flyout .rl-export-recent,
+            .rl-export-flyout .rl-export-foot { flex: 0 0 auto; }
+
+            @media (prefers-reduced-motion: reduce) {
+                .rl-export-scrim,
+                .rl-export-flyout { transition: none; }
             }
             .rl-export-head {
                 display: flex;
@@ -554,10 +588,14 @@ class LeadExportPanel
             .rl-export-field legend,
             .rl-export-label { font-size: 12px; font-weight: 600; color: #09090b; padding: 0; }
             .rl-export-label strong { font-weight: 600; color: #6b21a8; margin-left: 4px; }
+            /*
+             * One column, not two: the flyout trades width for height, and each group carries a
+             * line of explanation that wraps to three lines in half of 476px.
+             */
             .rl-export-groups {
                 display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 6px 14px;
+                grid-template-columns: 1fr;
+                gap: 10px;
                 margin-top: 8px;
             }
             .rl-export-check { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; }
@@ -566,7 +604,7 @@ class LeadExportPanel
             .rl-export-check strong { font-weight: 500; color: #09090b; }
             .rl-export-check em { font-style: normal; font-size: 11px; color: #71717a; }
             .rl-export-hint { margin: 0; font-size: 11px; color: #71717a; }
-            .rl-export-dialog input[type="range"] { width: 100%; accent-color: #6b21a8; }
+            .rl-export-flyout input[type="range"] { width: 100%; accent-color: #6b21a8; }
             .rl-export-status { margin: 0; font-size: 13px; font-weight: 500; color: #09090b; }
             .rl-export-bar {
                 height: 8px;
@@ -599,6 +637,10 @@ class LeadExportPanel
                 border-top: 1px solid #f4f4f5;
             }
             .rl-export-foot [hidden] { display: none; }
+
+            @media screen and (max-width: 782px) {
+                .rl-export-flyout { max-width: 100%; }
+            }
 
             @media screen and (max-width: 600px) {
                 .rl-export-row,
