@@ -1808,12 +1808,16 @@ h2.wp-block-heading,
       currently declares widths summing to exactly 100% (55/45, 60/40, 52/48, 50/50, 38/62), so
       grow never engages and this changes nothing. The day someone writes a 45% column beside an
       undeclared one, core gives 621/727px and this theme would give 985/364px.
-   2. `aligncenter` on an image. Only the centring half of core's rule is taken: core also sets
-      `display:table` on `.alignleft`/`.alignright`, which would collide with the hand-written
-      `.rl-guarantee-group` figure rules, and nothing here needs the float behaviour.
+   Core's `.wp-block-image.aligncenter{text-align:center}` is deliberately NOT included. It is
+   equally missing, but it is not inert: the only 16 `aligncenter` images on the site are all on
+   `/comparison/`, which reproduces an unfinished production page verbatim under the
+   strict-fidelity rule and is noindexed. Moving them is a content decision, not a CSS cleanup.
 
-   Both verified against wp-includes/blocks/{columns,image}/style.css and confirmed by a
-   before/after geometry diff over 57 pages at 414px and 1440px: 0 changed boxes. */
+   Verified against wp-includes/blocks/columns/style.css. Inertness is measured, not assumed:
+   across all 57 pages every columns block that declares widths sums to exactly 100% with no
+   undeclared sibling, so there is no slack for flex-grow to distribute. (A whole-page geometry
+   diff was tried first and abandoned — the marquee animations put its noise floor at ~13k
+   changed boxes, well above any signal.) */
 @media (min-width: 782px) {
   .wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-block-column[style*="flex-basis"] {
     flex-grow: 0;
@@ -1822,15 +1826,6 @@ h2.wp-block-heading,
 
 .wp-block-columns.is-not-stacked-on-mobile > .wp-block-column[style*="flex-basis"] {
   flex-grow: 0;
-}
-
-.wp-block-image.aligncenter {
-  text-align: center;
-}
-
-.wp-block-image .aligncenter {
-  margin-left: auto;
-  margin-right: auto;
 }
 
 /* The canonical gutter, for bare core blocks sitting directly in a constrained group.
