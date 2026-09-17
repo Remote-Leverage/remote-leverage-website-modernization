@@ -3,10 +3,10 @@
 use App\Support\RolePages;
 
 /**
- * Title: Full Page - Administrative Virtual Assistants
- * Slug: remote-leverage/admin-virtual-assistants-full
+ * Title: Full Page - Lead Generation Virtual Assistants
+ * Slug: remote-leverage/lead-generation-virtual-assistants-full
  * Categories: remote-leverage
- * Description: The /admin-virtual-assistants/ role page. Hero and task cards come from the shared role map; everything below is the site-wide set.
+ * Description: The /lead-generation-virtual-assistants/ role page. Hero and task cards come from the shared role map; everything below is the site-wide set.
  *
  * One of fourteen role pages that are the same page with different words. The hero and the
  * "World's Best ... Talent" band are rendered from App\Support\RolePages, so the layout exists
@@ -16,8 +16,8 @@ use App\Support\RolePages;
  * To change this page's copy, edit its entry in RolePages::all() — not this file.
  */
 ?>
-<?= RolePages::renderHero('admin-virtual-assistants') ?>
-<?= RolePages::renderTalent('admin-virtual-assistants') ?>
+<?= RolePages::renderHero('lead-generation-virtual-assistants') ?>
+<?= RolePages::renderTalent('lead-generation-virtual-assistants') ?>
 <!-- wp:pattern {"slug":"remote-leverage/role-why-hire"} /-->
 <!-- wp:pattern {"slug":"remote-leverage/homepage-comparison-table"} /-->
 <!-- wp:pattern {"slug":"remote-leverage/homepage-process"} /-->

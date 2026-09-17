@@ -3,10 +3,10 @@
 use App\Support\BlockDefaults;
 
 /**
- * Title: Admin VA Why Hire - Why Hire Through Remote Leverage?
- * Slug: remote-leverage/admin-virtual-assistants-why-hire
+ * Title: Role Pages Why Hire - Why Hire Through Remote Leverage?
+ * Slug: remote-leverage/role-why-hire
  * Categories: remote-leverage
- * Description: Full-width purple proof banner over a 2x2 grid of four reasons to hire through Remote Leverage.
+ * Description: Full-width purple proof banner over a 2x2 grid of four reasons to hire through Remote Leverage. Shared by all fourteen role pages.
  *
  * Same four reasons as the homepage, word for word, so they come from the shared helper rather
  * than being restated. What differs is the arrangement: the role comps run the proof card the

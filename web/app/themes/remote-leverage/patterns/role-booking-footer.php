@@ -1,12 +1,13 @@
 <?php
 
 use App\Support\BlockDefaults;
+use App\Support\RolePages;
 
 /**
- * Title: Admin VA Booking Footer - Book a free consultation
- * Slug: remote-leverage/admin-virtual-assistants-booking-footer
+ * Title: Role Pages Booking Footer - Book a free consultation
+ * Slug: remote-leverage/role-booking-footer
  * Categories: remote-leverage
- * Description: The purple booking band that closes the role pages, with the rating pill and hire checkpoints beside the wizard.
+ * Description: The purple booking band that closes the role pages, with the rating pill and hire checkpoints beside the wizard. Shared by all fourteen.
  *
  * Identical to remote-leverage/homepage-booking-footer except that the role comps put a Google
  * rating pill and the six hire checkpoints under the description, which the homepage comp has
@@ -15,18 +16,11 @@ use App\Support\BlockDefaults;
  */
 
 /*
- * Same six checkpoints as this page's hero, in the same single-column order the comp reads them
- * in. Deliberately not BlockDefaults::homeHeroChecklist(), whose order is interleaved to make
- * the homepage hero's two-column desktop grid agree with its mobile column.
+ * The same six checkpoints the role hero carries, from the same helper, so the two can never
+ * disagree. Deliberately not BlockDefaults::homeHeroChecklist(), whose order is interleaved to
+ * make the homepage hero's two-column desktop grid agree with its mobile column.
  */
-$checklist = array_map(fn ($item) => ['item' => $item], [
-    'No Contracts, No Ongoing Fees',
-    '12-Month Replacement Guarantee',
-    'Hire Direct, No Middleman',
-    'Interview Before You Hire',
-    '30% Discount on Future Hires',
-    'Interview in 48 Hours',
-]);
+$checklist = array_map(fn ($item) => ['item' => $item], RolePages::checklist());
 
 $data = BlockDefaults::withFieldKeys('booking_footer', [
     'background' => 'gradient',

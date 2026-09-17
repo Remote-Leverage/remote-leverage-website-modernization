@@ -1754,17 +1754,21 @@ h2.wp-block-heading,
   color: var(--color-surface-white) !important;
 }
 
-/* Core columns */
+/* Core columns.
+   The `!important` on flex-wrap is load-bearing and matches core. WordPress's layout engine
+   emits an inline `.wp-container-core-columns-is-layout-*{flex-wrap:nowrap}` rule for every
+   `wp:columns`; it has the same specificity as `.wp-block-columns` but lands later in the
+   document, so without `!important` it forces nowrap at every width and columns never stack. */
 .wp-block-columns {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: wrap !important;
   gap: 2rem;
   box-sizing: border-box;
 }
 
 @media (min-width: 782px) {
   .wp-block-columns {
-    flex-wrap: nowrap;
+    flex-wrap: nowrap !important;
   }
 }
 
@@ -1772,6 +1776,22 @@ h2.wp-block-heading,
   flex: 1 1 0;
   min-width: 0;
   word-break: break-word;
+}
+
+/* Core stacks columns below 782px. That rule ships in wp-block-library, which the theme
+   dequeues (app/setup.php), so without it every `wp:columns` stayed side by side on mobile:
+   a 60/40 split still renders 60/40 at 414px, because the inline flex-basis values sum to
+   100% and never wrap. 43 `wp:columns` across 21 pattern files were affected — the same
+   class of bug as the `has-text-align-*` no-op fixed on 2026-09-15. Mirrors core exactly,
+   including the `is-not-stacked-on-mobile` opt-out. */
+@media (max-width: 781px) {
+  .wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-block-column {
+    flex-basis: 100% !important;
+  }
+}
+
+.wp-block-columns.is-not-stacked-on-mobile {
+  flex-wrap: nowrap !important;
 }
 
 /* VA Pricing Hero: stack the text/grid split below tablet */
