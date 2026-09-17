@@ -722,6 +722,18 @@ class LeadsAdminDashboard
             .rl-badge-abandoned .rl-status-dot, .rl-badge-canceled .rl-status-dot, .rl-badge-failed .rl-status-dot { background: #dc2626; }
             .rl-badge-succeeded .rl-status-dot { background: #18181b; }
 
+            /*
+             * "Possible VA" — a phone number from outside the US and Canada, which is usually
+             * someone applying for work rather than hiring. Amber rather than red: it is a
+             * prompt to look, not a judgement, and a real international client wears it too.
+             */
+            .rl-badge-va {
+                background: #fffbeb;
+                color: #92400e;
+                border-color: #fde68a;
+                cursor: help;
+            }
+
             /* --- Revenue Pills --- */
             .rl-pill-t10 {
                 display: inline-flex;
@@ -790,6 +802,65 @@ class LeadsAdminDashboard
             }
 
             /* --- Timeline & Detail --- */
+
+            /*
+             * The timeline column scrolls on its own; the left column rides the page.
+             *
+             * The left column is a fixed set of cards that ends. The right one is an unbounded
+             * audit timeline that routinely runs several screens long, so scrolled together,
+             * reading an event near its end means the contact details it refers to are long
+             * gone off the top. Pinning the timeline and giving it its own scrollbar keeps both
+             * readable against each other without turning the page into two windows.
+             *
+             * `overscroll-behavior: contain` stops the timeline, once it has hit its end, from
+             * handing the scroll on to the page — without it, reaching the bottom drags the
+             * whole screen, which is the exact jump this removes.
+             */
+            .rl-detail-grid {
+                display: grid;
+                grid-template-columns: 1fr 2fr;
+                gap: 20px;
+                align-items: start;
+            }
+            .rl-timeline-col {
+                position: sticky;
+                top: 46px;                       /* 32px admin bar + 14px breathing room */
+                max-height: calc(100vh - 62px);
+                overflow-y: auto;
+                overscroll-behavior: contain;
+                padding-right: 6px;              /* keeps the scrollbar off the card borders */
+            }
+            .rl-timeline-col::-webkit-scrollbar {
+                width: 8px;
+            }
+            .rl-timeline-col::-webkit-scrollbar-thumb {
+                background: #d4d4d8;
+                border-radius: 9999px;
+            }
+            .rl-timeline-col::-webkit-scrollbar-thumb:hover {
+                background: #a1a1aa;
+            }
+            .rl-timeline-col::-webkit-scrollbar-track {
+                background: transparent;
+            }
+
+            /*
+             * Below this the grid is a single column, so a viewport-height scroll box would be a
+             * short window stacked under the details rather than beside them. The page scrolls
+             * normally instead.
+             */
+            @media screen and (max-width: 1100px) {
+                .rl-detail-grid {
+                    grid-template-columns: 1fr;
+                }
+                .rl-timeline-col {
+                    position: static;
+                    max-height: none;
+                    overflow-y: visible;
+                    padding-right: 0;
+                }
+            }
+
             .rl-detail-card {
                 background: #ffffff;
                 border: 1px solid #e4e4e7;
@@ -1214,7 +1285,13 @@ class LeadsAdminDashboard
                                         <div class="rl-contact-cell">
                                             <div class="rl-avatar-initials"><?php echo esc_html($this->getInitials($lead->name, $lead->email)); ?></div>
                                             <div class="rl-contact-info">
-                                                <span class="rl-contact-name"><?php echo esc_html($lead->name ?: 'Partial Contact'); ?></span>
+                                                <span class="rl-contact-name">
+                                                    <?php echo esc_html($lead->name ?: 'Partial Contact'); ?>
+                                                    <?php $audience = $lead->audience(); ?>
+                                                    <?php if ($audience->label()) { ?>
+                                                        <span class="rl-badge rl-badge-va" title="<?php echo esc_attr((string) $audience->note()); ?>"><?php echo esc_html($audience->label()); ?></span>
+                                                    <?php } ?>
+                                                </span>
                                                 <a href="mailto:<?php echo esc_attr($lead->email); ?>" class="rl-contact-email"><?php echo esc_html($lead->email); ?></a>
                                                 <div class="rl-contact-sub">
                                                     <?php if ($lead->phone) { ?>
@@ -1354,6 +1431,10 @@ class LeadsAdminDashboard
                             <span class="rl-status-dot"></span>
                             <?php echo esc_html(ucfirst($lead->status)); ?>
                         </span>
+                        <?php $audience = $lead->audience(); ?>
+                        <?php if ($audience->label()) { ?>
+                            <span class="rl-badge rl-badge-va" title="<?php echo esc_attr((string) $audience->note()); ?>"><?php echo esc_html($audience->label()); ?></span>
+                        <?php } ?>
                     </div>
                     <div style="color: #71717a; font-size: 13px; margin-top: 6px;">
                         Captured: <strong><?php echo esc_html($lead->created_at?->format('F j, Y \a\t g:i:s A')); ?></strong> &bull; 
@@ -1386,9 +1467,46 @@ class LeadsAdminDashboard
             </div>
 
             <!-- Detail Grid -->
-            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px;">
-                <!-- Left Column: Contact, Qualification, Meeting & Attribution -->
+            <div class="rl-detail-grid">
+                <!-- Left Column: Session Replay, Contact, Qualification, Meeting & Attribution -->
                 <div>
+                    <!-- Session Replay -->
+                    <?php
+                        /*
+                         * Always offer a way into PostHog, even without a session id.
+                         *
+                         * The card used to render only when the lead carried `posthog_session_id`,
+                         * which is the minority of leads — the browser stamp does not survive a
+                         * blocked or slow PostHog. A missing card reads as "PostHog has nothing on
+                         * this person", which is a different and usually wrong claim. The email
+                         * search is the honest fallback: it cannot 404, and it says plainly that
+                         * the exact session is what we are missing.
+                         */
+                        $replayUrl = $lead->posthogReplayUrl();
+        $personUrl = $lead->posthogPersonUrl();
+        ?>
+                    <?php if ($replayUrl || $personUrl) { ?>
+                        <div class="rl-detail-card">
+                            <h3 class="rl-detail-title">Session Replay</h3>
+                            <?php if ($replayUrl) { ?>
+                                <p style="margin: 0 0 10px; color: #52525b; font-size: 12px;">
+                                    Watch what this person actually did — which step they stalled on, what they
+                                    re-read, where they left.
+                                </p>
+                                <a href="<?php echo esc_url($replayUrl); ?>" target="_blank" rel="noopener noreferrer"
+                                   class="button button-secondary">Open in PostHog &rarr;</a>
+                            <?php } else { ?>
+                                <p style="margin: 0 0 10px; color: #52525b; font-size: 12px;">
+                                    This lead reached us without a PostHog session id, so there is no direct
+                                    replay link — PostHog was blocked, or had not loaded when the form was
+                                    submitted. Search by email for whatever it did record.
+                                </p>
+                                <a href="<?php echo esc_url($personUrl); ?>" target="_blank" rel="noopener noreferrer"
+                                   class="button button-secondary">Find in PostHog &rarr;</a>
+                            <?php } ?>
+                        </div>
+                    <?php } ?>
+
                     <!-- Contact Details Card -->
                     <div class="rl-detail-card">
                         <h3 class="rl-detail-title">Contact & Qualification</h3>
@@ -1519,19 +1637,6 @@ class LeadsAdminDashboard
                         </div>
                     <?php } ?>
 
-                    <!-- Session Replay -->
-                    <?php if ($replayUrl = $lead->posthogReplayUrl()) { ?>
-                        <div class="rl-detail-card">
-                            <h3 class="rl-detail-title">Session Replay</h3>
-                            <p style="margin: 0 0 10px; color: #52525b; font-size: 12px;">
-                                Watch what this person actually did — which step they stalled on, what they
-                                re-read, where they left.
-                            </p>
-                            <a href="<?php echo esc_url($replayUrl); ?>" target="_blank" rel="noopener noreferrer"
-                               class="button button-secondary">Open in PostHog &rarr;</a>
-                        </div>
-                    <?php } ?>
-
                     <!-- Attribution & UTM Data Card -->
                     <div class="rl-detail-card">
                         <h3 class="rl-detail-title">Attribution & UTM Data</h3>
@@ -1585,7 +1690,7 @@ class LeadsAdminDashboard
                 </div>
 
                 <!-- Right Column: Dual-Logging Execution & Integration Timeline -->
-                <div>
+                <div class="rl-timeline-col">
                     <div class="rl-detail-card">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #f4f4f5; padding-bottom: 10px;">
                             <div>
@@ -1598,12 +1703,12 @@ class LeadsAdminDashboard
                             </div>
                             <span class="rl-count-badge">
                                 <?php
-                                    /*
-                                     * Counted off the same guarded load the timeline below uses, so a
-                                     * source that could not be read cannot report a count it did not fetch.
-                                     */
-                                    $eventCount = $this->timelineSource($lead, 'activityLogs')->count()
-                                        + $this->timelineSource($lead, 'integrationCalls')->count();
+                                        /*
+                                         * Counted off the same guarded load the timeline below uses, so a
+                                         * source that could not be read cannot report a count it did not fetch.
+                                         */
+                                        $eventCount = $this->timelineSource($lead, 'activityLogs')->count()
+                                            + $this->timelineSource($lead, 'integrationCalls')->count();
         ?>
                                 <?php echo esc_html((string) $eventCount); ?> events
                             </span>

@@ -149,6 +149,52 @@ two kinds because they mean completely different things:
   *every* visitor until someone acts, so they get their own headline and a note saying so.
   Rendering them the same as a quiet afternoon is how one survives a week.
 
+## An empty value used to cost the whole message
+
+Slack refuses an **entire** `chat.postMessage` with `invalid_blocks` if any text object carries
+an empty string. Not the block that used it — the message. So one unbound placeholder is the
+difference between a full alert and total silence, and the only trace is a `WARNING` in the
+Acorn log.
+
+That is not hypothetical: `referrer_registered` bound its card subtitle to `{{ company }}`, which
+the public registration form never collects, so **every referrer registration went unannounced**
+for as long as the feature existed. Found 2026-09-17 by reading the log after a registration
+produced nothing.
+
+Three layers now stand between a blank value and a lost notification:
+
+1. **`_when` guards**, which drop a whole block, the `accessory`, or an item inside
+   `fields`/`elements` when the placeholders it names are empty. This is the right tool when a
+   block is genuinely optional, and it is the only one that predates the incident.
+2. **Optional-key pruning** — `SlackMessageRenderer::OPTIONAL_TEXT_KEYS` removes an empty
+   `subtitle` or `description`. `_when` cannot reach these: a card's own properties are not a
+   block, an accessory, a field or an element.
+3. **`hasEmptyTextObject()`**, the net: any block *still* holding an empty text object after
+   substitution is dropped rather than sent. Losing one card is visibly worse than a complete
+   one and enormously better than silence.
+
+**The net is not the fix.** A dropped card fails invisibly — the message posts looking like a
+rendering glitch and nothing logs it. The actual fix is a fallback where the value is built, so
+the card renders with something true in it: `'Unnamed visitor'`, `'Confidential Contact'`,
+`'No contact details captured'`, `'No referrals listed'`, `'Unknown referrer'`. Prefer that, and
+let the net catch what you did not think of.
+
+`tests/Unit/SlackEmptyBlockTest.php` renders **every** template with every value blank and fails
+if any block would still carry an empty text object, or if a template would send neither blocks
+nor fallback text. A new template is covered by it automatically.
+
+Two things that guard does **not** cover, so check them by hand when adding a template:
+
+- **Button `url`.** It inspects `type`+`text` pairs only. An empty or relative `url` is also
+  rejected — and that failure takes the whole message with it, exactly like an empty text
+  object. Every button in the config today is `_when`-guarded on its URL, which covers *empty*
+  but not *relative*: `Lead::posthogReplayUrl()` builds on `services.posthog.app_host`, so
+  `POSTHOG_APP_HOST=us.posthog.com` (no scheme) would have produced a relative one. It now
+  returns null instead. Any new button built from a configurable host needs the same check.
+- **Length caps.** 3000 characters for section text, 150 for a header, 50 blocks per message.
+  Nothing in the config approaches these — there are no `header` blocks at all — but an
+  interpolated value with no length bound could.
+
 ## Adding an alert
 
 1. A template in `config/slack-notifications.php`.

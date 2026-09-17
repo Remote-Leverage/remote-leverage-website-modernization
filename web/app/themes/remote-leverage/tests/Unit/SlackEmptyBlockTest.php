@@ -65,3 +65,78 @@ describe('booking alerts', function () {
         expect(config('services.slack.notify_on_booking'))->toBeTrue();
     });
 });
+
+describe('no template can lose a message to an empty text object', function () {
+    beforeEach(function () {
+        config(['slack-notifications' => require __DIR__.'/../../config/slack-notifications.php']);
+    });
+
+    /**
+     * The guarantee, asserted against every template at once rather than one at a time.
+     *
+     * Slack refuses an ENTIRE message when any text object carries an empty string, so a single
+     * unbound placeholder costs the whole notification rather than the block that used it.
+     * Rendering each template with every value blank is the worst case that can reach it.
+     */
+    it('renders every template with all values empty and emits nothing Slack would refuse', function () {
+        $templates = require __DIR__.'/../../config/slack-notifications.php';
+        $renderer = new SlackMessageRenderer;
+
+        $placeholders = function (array $node) use (&$placeholders): array {
+            $found = [];
+
+            foreach ($node as $value) {
+                if (is_array($value)) {
+                    $found = array_merge($found, $placeholders($value));
+                } elseif (is_string($value) && preg_match_all('/\{\{\s*([a-z0-9_]+)\s*\}\}/i', $value, $m)) {
+                    $found = array_merge($found, $m[1]);
+                }
+            }
+
+            return $found;
+        };
+
+        $emptyTextObjects = function (array $node) use (&$emptyTextObjects): bool {
+            if (isset($node['type'], $node['text'])
+                && in_array($node['type'], ['mrkdwn', 'plain_text'], true)
+                && is_string($node['text'])
+                && trim($node['text']) === ''
+            ) {
+                return true;
+            }
+
+            foreach ($node as $value) {
+                if (is_array($value) && $emptyTextObjects($value)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        $checked = 0;
+
+        foreach ($templates as $name => $template) {
+            if (! is_array($template) || ! isset($template['blocks'])) {
+                continue;
+            }
+
+            $checked++;
+
+            $rendered = $renderer->render($name, array_fill_keys($placeholders($template), ''));
+
+            foreach ($rendered['blocks'] as $index => $block) {
+                expect($emptyTextObjects($block))->toBeFalse(
+                    "Template '{$name}' block {$index} carries an empty text object; Slack would reject the whole message."
+                );
+            }
+
+            // A message with no blocks is still valid as long as it has fallback text, but one
+            // with neither is refused — and would be silence rather than a degraded alert.
+            expect(trim($rendered['text']))->not->toBe('', "Template '{$name}' would send nothing at all.");
+        }
+
+        // Guards against the loop silently matching nothing if the config shape ever changes.
+        expect($checked)->toBeGreaterThan(8);
+    });
+});

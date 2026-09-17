@@ -127,10 +127,17 @@ class HandleLiveCallEventsForSlack
             'email' => $email,
             'email_link' => $email !== '' ? "<mailto:{$email}|{$email}>" : '',
             'phone' => $phone,
+            /*
+             * Never empty. This is bound to the card's `body`, and Slack rejects an entire
+             * message over one empty text object — so a request with no contact details, which
+             * includes every configuration failure and every anonymous visitor, was announced
+             * to nobody. The incident alert ("every live call request fails until it is fixed")
+             * is precisely the one that must not be the one that goes missing.
+             */
             'contact_line' => implode('   ', array_filter([
                 $email !== '' ? "<mailto:{$email}|{$email}>" : '',
                 $phone,
-            ])),
+            ])) ?: 'No contact details captured',
 
             'headline' => $event->wasDeclined()
                 ? ($ourFault ? 'Live call request failed' : 'Live call requested, nobody available')

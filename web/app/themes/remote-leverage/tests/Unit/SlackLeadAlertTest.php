@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Listeners\HandleLeadEventsForSlack;
 use App\Domains\Lead\Models\Lead;
@@ -244,6 +245,83 @@ describe('Slack lead alert', function () {
         $with->handleCreated(new LeadCreated(lead: slackLead(['posthog_session_id' => 'abc123']), context: []));
         expect(json_encode($with->sentBlocks[0], JSON_UNESCAPED_SLASHES))->toContain('Watch session')
             ->and(json_encode($with->sentBlocks[0], JSON_UNESCAPED_SLASHES))->toContain('replay/abc123');
+    });
+
+    test('a phone from outside the US and Canada adds a line of small print', function () {
+        // So whoever picks the lead up knows to check before booking an hour for it.
+        $listener = slackListener();
+        $listener->handleCreated(new LeadCreated(lead: slackLead([
+            'phone' => '+573115002018',
+            'phone_country' => 'CO',
+        ]), context: []));
+
+        expect(json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))
+            ->toContain('Phone number is from CO');
+    });
+
+    test('an ordinary lead carries no such line', function () {
+        // The alert is unchanged for everyone the offer is actually sold to.
+        $listener = slackListener();
+        $listener->handleCreated(new LeadCreated(lead: slackLead(['phone_country' => 'US']), context: []));
+
+        expect(json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES))
+            ->not->toContain('looking for VA work');
+    });
+
+    test('a referred lead is never called a possible VA', function () {
+        // A referrer introduced them; the phone country says nothing about that.
+        $listener = slackListener();
+        $listener->handleCreated(new LeadCreated(lead: slackLead([
+            'phone' => '+573115002018',
+            'phone_country' => 'CO',
+            'source_type' => 'referral_hub',
+            'referral_code' => 'adrian-salvatori-8oue',
+        ]), context: []));
+
+        expect(json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES))
+            ->not->toContain('looking for VA work');
+    });
+});
+
+describe('values that can be blank', function () {
+    beforeEach(function () {
+        config(['slack-notifications' => require __DIR__.'/../../config/slack-notifications.php']);
+    });
+
+    test('a booked lead with no phone omits the field rather than heading a blank one', function () {
+        config(['services.slack.notify_on_booking' => true]);
+
+        $listener = slackListener();
+        $lead = slackLead(['phone' => null, 'monthly_revenue' => null]);
+
+        $listener->handleBookingCompleted(new LeadBookingCompleted($lead, 'meeting-1', 'calendly'));
+
+        $encoded = json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES);
+
+        /*
+         * The literal `*Phone*` label keeps the text object non-empty, so this was never fatal
+         * — it rendered a bold heading with nothing under it, which reads as a bug. Leads from
+         * gated downloads and instant-call requests have no phone, and both can go on to book.
+         */
+        expect($encoded)->not->toContain('*Phone*')
+            ->and($encoded)->toContain('Call booked');
+    });
+
+    test('a lead with no name keeps its card instead of losing it entirely', function () {
+        $listener = slackListener();
+
+        $listener->handleCreated(new LeadCreated(
+            lead: slackLead(['name' => '', 'first_name' => '', 'last_name' => '']),
+            context: [],
+        ));
+
+        $encoded = json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES);
+
+        // The card title cannot be `_when` guarded, so an empty name used to cost the whole
+        // card — name, revenue and contact details — leaving only the headline behind it.
+        expect(collect($listener->sentBlocks[0])->pluck('type'))->toContain('card')
+            ->and($encoded)->toContain('Unnamed lead')
+            ->and($encoded)->not->toContain('"text":""');
     });
 });
 

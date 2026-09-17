@@ -102,8 +102,30 @@ return [
             [
                 'type' => 'card',
                 'title' => ['type' => 'mrkdwn', 'text' => '{{ name }}', 'verbatim' => false],
+                /*
+                 * Absent on most alerts by design. Only the booking wizard collects revenue;
+                 * gated downloads, instant-call requests and referrer-submitted leads do not,
+                 * so this is pruned (SlackMessageRenderer::OPTIONAL_TEXT_KEYS) and the card
+                 * ships without a subtitle. That is correct — there is no revenue to report —
+                 * and better than inventing a "not given" line on the majority of cards.
+                 */
                 'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ revenue }}', 'verbatim' => false],
                 'body' => ['type' => 'mrkdwn', 'text' => '{{ contact_line }}', 'verbatim' => false],
+            ],
+
+            /*
+             * Small print directly under the card when the lead may not be a client at all —
+             * a phone number from outside the US and Canada, see LeadAudience. It sits against
+             * the name and phone it is about rather than down with the attribution, and it is
+             * deliberately quiet: a reason to look twice before booking a call, not a reason to
+             * skip the lead. `_when` gates it, so every other alert is unchanged.
+             */
+            [
+                'type' => 'context',
+                '_when' => ['audience_note'],
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => '{{ audience_note }}'],
+                ],
             ],
             [
                 'type' => 'context',
@@ -220,8 +242,12 @@ return [
             [
                 'type' => 'section',
                 'fields' => [
-                    ['type' => 'mrkdwn', 'text' => "*Email*\n{{ email_link }}"],
-                    ['type' => 'mrkdwn', 'text' => "*Phone*\n{{ phone }}"],
+                    // Guarded like the two below them. The literal `*Email*` / `*Phone*` label
+                    // keeps the text object non-empty, so an unset value is never fatal — it
+                    // renders a bold heading with nothing under it, which reads as a bug. A
+                    // lead captured by gated download or instant call has no phone.
+                    ['type' => 'mrkdwn', 'text' => "*Email*\n{{ email_link }}", '_when' => ['email_link']],
+                    ['type' => 'mrkdwn', 'text' => "*Phone*\n{{ phone }}", '_when' => ['phone']],
                     ['type' => 'mrkdwn', 'text' => "*Revenue*\n{{ revenue }}", '_when' => ['revenue']],
                     ['type' => 'mrkdwn', 'text' => "*When*\n{{ meeting_time }}", '_when' => ['meeting_time']],
                 ],

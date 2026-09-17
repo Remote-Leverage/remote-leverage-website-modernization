@@ -222,7 +222,13 @@ class HandleLeadEventsForSlack
         $landing = (string) ($lead->landing_page_base ?: $lead->landing_url ?: '');
 
         return [
-            'name' => $name,
+            /*
+             * Bound to the card's title, which cannot be `_when` guarded and is not an optional
+             * key — so an empty name costs the whole card (name, revenue and contact details),
+             * leaving only the headline. Every capture path validates a name today, so this is
+             * a guard against a lead blanked in wp-admin or a future caller, not a live bug.
+             */
+            'name' => $name !== '' ? $name : 'Unnamed lead',
             'email' => (string) $lead->email,
             'email_link' => $lead->email ? "<mailto:{$lead->email}|{$lead->email}>" : '',
             'phone' => (string) $lead->phone,
@@ -294,6 +300,13 @@ class HandleLeadEventsForSlack
 
             'landing_url' => $landing,
             'landing_display' => $landing === '' ? '' : $this->shorten($landing),
+
+            /*
+             * A line of small print when the lead does not look like a client — a phone number
+             * from outside the US and Canada. It resolves empty for everyone else and the block
+             * that carries it is `_when`-gated, so a normal lead's alert is unchanged.
+             */
+            'audience_note' => (string) ($lead->audience()->note() ?? ''),
 
             'replay_url' => (string) ($lead->posthogReplayUrl() ?? ''),
             'hubspot_url' => (string) ($lead->hubspotContactUrl() ?? ''),

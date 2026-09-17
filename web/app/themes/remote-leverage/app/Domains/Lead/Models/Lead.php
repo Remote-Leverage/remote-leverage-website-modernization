@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Lead\Models;
 
+use App\Domains\Lead\Data\LeadAudience;
 use App\Infrastructure\Observability\IntegrationCall;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -90,6 +91,18 @@ class Lead extends Model
     ];
 
     /**
+     * Who this lead appears to be — a prospective client, or a possible VA applicant.
+     *
+     * The judgement itself lives in {@see LeadAudience}, which is also what carries the reason
+     * the admin and the Slack alert print. Nothing routes on it; it is there so a human looks
+     * twice at a lead the offer was never sold to.
+     */
+    public function audience(): LeadAudience
+    {
+        return LeadAudience::for($this);
+    }
+
+    /**
      * Link to this lead's PostHog session replay, or null when there is nothing to link to.
      *
      * Built from PostHog's own session id — `session_id` on this model is a UUID minted here
@@ -110,7 +123,45 @@ class Lead extends Model
 
         $appHost = rtrim((string) config('services.posthog.app_host', 'https://us.posthog.com'), '/');
 
+        /*
+         * A host configured without a scheme yields a relative URL, and Slack rejects a button
+         * whose `url` is not absolute — taking the whole message with it, since that failure is
+         * not an empty text object and so is not caught by SlackMessageRenderer's guard. The
+         * default carries a scheme; this covers `POSTHOG_APP_HOST=us.posthog.com`.
+         */
+        if (! preg_match('#^https?://#i', $appHost)) {
+            return null;
+        }
+
         return "{$appHost}/project/{$projectId}/replay/".rawurlencode($sessionId);
+    }
+
+    /**
+     * Link to this lead's person in PostHog, searched by email.
+     *
+     * The fallback for `posthogReplayUrl()`: a lead only carries a `posthog_session_id` when
+     * the browser handed one over before submission, which it does not when PostHog is blocked,
+     * loads slowly, or the visitor submits from a page load where the stamp never resolved — at
+     * the time of writing that is most leads. Hiding the admin's PostHog card entirely in that
+     * case reads as "this lead has no PostHog data", when what is true is "we do not know which
+     * session it was". Searching by email lands on whatever PostHog does hold, including the
+     * person's recordings.
+     *
+     * Unlike the replay link this cannot 404 on a bad id — a search with no match is an empty
+     * result, not a broken link — so it only needs the project id.
+     */
+    public function posthogPersonUrl(): ?string
+    {
+        $email = trim((string) $this->email);
+        $projectId = trim((string) config('services.posthog.project_id', ''));
+
+        if ($email === '' || $projectId === '') {
+            return null;
+        }
+
+        $appHost = rtrim((string) config('services.posthog.app_host', 'https://us.posthog.com'), '/');
+
+        return "{$appHost}/project/{$projectId}/persons?q=".rawurlencode($email);
     }
 
     /**

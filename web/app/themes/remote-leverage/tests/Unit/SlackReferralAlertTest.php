@@ -135,6 +135,39 @@ describe('referral alerts', function () {
             ->and($encoded)->toContain('tr_12345');
     });
 
+    test('a referral with no name or contact still posts a complete card', function () {
+        $referrer = makeReferrer();
+
+        /*
+         * Both of these are reachable: `rl_referrals.lead_name` is NOT NULL with no default and
+         * is copied from `leads.name`, which a partial capture leaves empty, and a phone-only
+         * direct submission deliberately stores a blank `lead_email`.
+         *
+         * They sit in the card's title and body, which cannot be `_when` guarded. Before the
+         * fallbacks below existed this dropped the card — and before the renderer's empty-text
+         * guard existed, Slack refused the entire message.
+         */
+        $referral = Referral::query()->create([
+            'referrer_id' => $referrer->id,
+            'lead_name' => '',
+            'lead_email' => '',
+            'lead_phone' => '',
+            'status' => 'qualified',
+        ]);
+
+        $listener = referralSlackListener();
+        $listener->handleReferralRecorded(new ReferralRecorded($referral));
+
+        $encoded = json_encode($listener->sentBlocks[0], JSON_UNESCAPED_SLASHES);
+
+        expect($listener->sentBlocks[0])->not->toBeEmpty()
+            ->and($encoded)->toContain('Confidential Contact')
+            ->and($encoded)->toContain('No contact details captured')
+            // The card must survive, not merely the section above it.
+            ->and(collect($listener->sentBlocks[0])->pluck('type'))->toContain('card')
+            ->and($encoded)->not->toContain('"text":""');
+    });
+
     test('a non-USD payout says which currency, rather than looking like dollars', function () {
         $payout = Payout::query()->create([
             'referrer_id' => makeReferrer()->id,

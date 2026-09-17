@@ -238,4 +238,26 @@ describe('PostHog session replay link', function () {
 
         expect($lead->posthogReplayUrl())->not->toContain('ours-must-not-appear');
     });
+
+    test('falls back to an email search when there is no session id', function () {
+        // The admin card renders this instead of vanishing: most leads carry no session id,
+        // and no card reads as "PostHog has nothing on this person" rather than "we do not
+        // know which session was theirs".
+        config(['services.posthog.project_id' => '282594']);
+
+        $lead = new Lead;
+        $lead->forceFill(['posthog_session_id' => null, 'email' => 'someone+tag@example.com']);
+
+        expect($lead->posthogPersonUrl())
+            ->toBe('https://us.posthog.com/project/282594/persons?q=someone%2Btag%40example.com');
+    });
+
+    test('has no person search to offer without an email', function () {
+        config(['services.posthog.project_id' => '282594']);
+
+        $lead = new Lead;
+        $lead->forceFill(['email' => '']);
+
+        expect($lead->posthogPersonUrl())->toBeNull();
+    });
 });

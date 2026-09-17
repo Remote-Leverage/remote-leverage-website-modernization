@@ -58,14 +58,26 @@ class HandleReferralEventsForSlack
         $referral = $event->referral;
 
         $this->dispatch('referral_recorded', [
-            'name' => (string) $referral->lead_name,
+            /*
+             * Both of these are bound to the card's title and body, which cannot be `_when`
+             * guarded, so an empty one costs the card — and before the renderer's guard existed,
+             * the entire message.
+             *
+             * `lead_name` really can be blank: the column is NOT NULL with no default, and the
+             * booking path copies it from `leads.name`, which a partial capture leaves empty.
+             * The portal already assumes this and shows "Confidential Contact"; matching that
+             * wording means the alert and the dashboard call the same person the same thing.
+             */
+            'name' => trim((string) $referral->lead_name) ?: 'Confidential Contact',
             'email' => (string) $referral->lead_email,
             'email_link' => $referral->lead_email ? "<mailto:{$referral->lead_email}|{$referral->lead_email}>" : '',
             'phone' => (string) $referral->lead_phone,
+            // Same fallback as HandleLiveCallEventsForSlack::valuesFor(); a phone-only direct
+            // submission deliberately stores a blank `lead_email`, so this is reachable.
             'contact_line' => implode('   ', array_filter([
                 $referral->lead_email ? "<mailto:{$referral->lead_email}|{$referral->lead_email}>" : '',
                 (string) $referral->lead_phone,
-            ])),
+            ])) ?: 'No contact details captured',
             'referrer_name' => $this->referrerName($referral),
             'referral_code' => (string) ($referral->referrer?->referral_code ?? ''),
             'source' => (string) $referral->source,
@@ -165,7 +177,16 @@ class HandleReferralEventsForSlack
         $ids = $payout->referral_ids;
 
         if (! is_array($ids) || $ids === []) {
-            return '';
+            /*
+             * An empty string here used to cost the entire notification. This value is bound to
+             * the card's `body`, and Slack refuses a whole message over one empty text object —
+             * so a payout recorded without referral ids (which is what ProcessPayoutAction
+             * creates when called with none) was announced to nobody.
+             *
+             * Saying so is also more useful than a blank: a payout that settles no listed
+             * referral is exactly the one worth a second look.
+             */
+            return 'No referrals listed';
         }
 
         $count = count($ids);

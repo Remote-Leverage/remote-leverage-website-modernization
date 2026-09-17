@@ -143,7 +143,49 @@ class SlackMessageRenderer
             $block[$collection] = $collection === 'fields' ? array_slice($kept, 0, 10) : $kept;
         }
 
-        return $this->substituteDeep($block, $values);
+        $block = $this->substituteDeep($block, $values);
+
+        /*
+         * Last line of defence: never emit a block still carrying an empty text object.
+         *
+         * Slack refuses the WHOLE message with `invalid_blocks` over one empty `text`, so the
+         * cost of a stray unbound placeholder is the entire notification rather than the block
+         * that used it. Pruning the optional keys above is not enough on its own — a card's
+         * `title` and `body` are required, and an empty one there is still fatal.
+         *
+         * Dropping the block is the conservative trade: losing one card is visibly worse than
+         * a complete card and enormously better than silence, which is what this cost before —
+         * every referrer registration went unannounced for as long as the feature existed.
+         */
+        if ($this->hasEmptyTextObject($block)) {
+            return null;
+        }
+
+        return $block;
+    }
+
+    /**
+     * Does any text object anywhere in this block carry an empty string?
+     *
+     * @param  array<string, mixed>  $node
+     */
+    protected function hasEmptyTextObject(array $node): bool
+    {
+        if (isset($node['type'], $node['text'])
+            && in_array($node['type'], ['mrkdwn', 'plain_text'], true)
+            && is_string($node['text'])
+            && trim($node['text']) === ''
+        ) {
+            return true;
+        }
+
+        foreach ($node as $value) {
+            if (is_array($value) && $this->hasEmptyTextObject($value)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
