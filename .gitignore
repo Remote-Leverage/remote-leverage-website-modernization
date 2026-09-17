@@ -30,8 +30,17 @@ web/.htaccess
 /uploads.zip
 /*.sql
 
-# Release artifacts built by scripts/release.sh (DB dump + uploads zip)
-/releases/
+# Release artifacts built by scripts/release.sh (DB dump + uploads zip). Ignored per-child
+# rather than wholesale, so the exports directory below can be carved out of it — git does not
+# descend into an ignored directory, so `/releases/` would make the negation unreachable.
+/releases/*
+
+# Gravity Forms entry exports, tracked on purpose: they are the inputs to
+# `wp acorn lead:import-gravity` and the only copy of the pre-migration lead history. Unlike
+# their neighbours they are small (22MB of CSV packs to 1.6MB) and are not regenerable from
+# anything in this repo. release.sh only ever probes for exact v-YYYYMMDD-vN directory names,
+# so this sibling is never mistaken for a release.
+!/releases/exports/
 
 # Composer
 /vendor
