@@ -38,6 +38,14 @@ class CalendlyClient
      */
     protected const PREFLIGHT_BUDGET_SECONDS = 8.0;
 
+    /**
+     * How many pages of `/scheduled_events` a utilization count will walk before giving up.
+     *
+     * A four-day window on this account is one page. The cap exists so a mis-set window cannot
+     * turn a background health check into a walk of the account's entire booking history.
+     */
+    protected const SCHEDULED_EVENTS_PAGE_CAP = 5;
+
     protected CalendlyTokenPool $tokenPool;
 
     protected ?string $userUri;
@@ -320,6 +328,166 @@ class CalendlyClient
 
             return null;
         }
+    }
+
+    /**
+     * How many active meetings are on the books for one event type inside a time window.
+     *
+     * This is the denominator the availability API will not give you. `event_type_available_times`
+     * only ever returns what is still open, so "four slots left" is a number with no scale — four
+     * out of forty is a tier filling up, four out of five is a tier nobody wants. Counting the
+     * booked side is the only way to tell those apart from outside Calendly, and it is what
+     * AvailabilityHealthMonitor's 90%/95% thresholds are measured against.
+     *
+     * `/scheduled_events` has no `event_type` filter, so this pulls the window for the whole
+     * account and matches on the `event_type` URI in PHP.
+     *
+     * Returns **null rather than 0** when it could not find out. Those mean opposite things: 0 is
+     * an empty calendar, which is the healthiest reading there is, so handing it back for a failed
+     * lookup would report a tier that is about to sell out as wide open. Callers must treat null
+     * as "no opinion" and skip the check.
+     */
+    public function countBookedEvents(string $eventTypeUri, string $minStartIso, string $maxStartIso): ?int
+    {
+        $deadline = microtime(true) + self::PREFLIGHT_BUDGET_SECONDS;
+
+        foreach ($this->tokenPool->getEligibleTokens(null) as $item) {
+            if (microtime(true) >= $deadline) {
+                Log::warning('CalendlyClient: utilization count exceeded its time budget, reporting no opinion');
+
+                return null;
+            }
+
+            $token = (string) $item['token'];
+            $who = $this->describeToken($item);
+
+            $identity = $this->userIdentity($token);
+
+            if ($identity === null) {
+                Log::warning("CalendlyClient: utilization count could not resolve identity for token [{$who}], failing over");
+
+                continue;
+            }
+
+            $booked = $this->walkScheduledEvents($token, $identity, $eventTypeUri, $minStartIso, $maxStartIso, $who);
+
+            if ($booked !== null) {
+                return $booked;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Page through `/scheduled_events` for one token, counting events on one event type.
+     *
+     * Scoped to the organization first and retried against the user on a 403, the same order
+     * queryScheduledEvents() uses — a token that can read its own calendar but not the org's is
+     * normal, and is not a broken token.
+     *
+     * @param  array{organization: ?string, user: ?string}  $identity
+     */
+    protected function walkScheduledEvents(
+        string $token,
+        array $identity,
+        string $eventTypeUri,
+        string $minStartIso,
+        string $maxStartIso,
+        string $who
+    ): ?int {
+        $base = [
+            'status' => 'active',
+            'count' => 100,
+            'min_start_time' => $minStartIso,
+            'max_start_time' => $maxStartIso,
+        ];
+
+        $scopes = [];
+
+        if (! empty($identity['organization'])) {
+            $scopes[] = ['organization' => $identity['organization']];
+        }
+
+        if (! empty($identity['user'])) {
+            $scopes[] = ['user' => $identity['user']];
+        }
+
+        foreach ($scopes as $i => $scope) {
+            $url = 'https://api.calendly.com/scheduled_events';
+            $query = $scope + $base;
+            $booked = 0;
+
+            for ($page = 0; $page < self::SCHEDULED_EVENTS_PAGE_CAP; $page++) {
+                $response = $this->getForToken(
+                    $token,
+                    $url,
+                    $query,
+                    self::PREFLIGHT_TIMEOUT_SECONDS,
+                    self::PREFLIGHT_CONNECT_TIMEOUT_SECONDS
+                );
+
+                if ($response === null) {
+                    return null;
+                }
+
+                $status = $response->status();
+
+                // The org scope is refused for this token but it has a user scope left to try.
+                if ($status === 403 && isset($scopes[$i + 1])) {
+                    continue 2;
+                }
+
+                if ($status === 429) {
+                    Log::warning("CalendlyClient: utilization count token [{$who}] rate-limited, failing over");
+                    $this->tokenPool->markRateLimited($token);
+
+                    return null;
+                }
+
+                if ($status === 401 || $status === 403) {
+                    Log::warning("CalendlyClient: utilization count token [{$who}] returned {$status}, failing over");
+                    $this->forgetUserIdentity($token);
+                    $this->tokenPool->recordFailure($token, 'booking');
+
+                    return null;
+                }
+
+                if (! $response->successful()) {
+                    Log::warning("CalendlyClient: utilization count token [{$who}] returned {$status}", [
+                        'body' => $response->body(),
+                    ]);
+
+                    return null;
+                }
+
+                foreach ((array) $response->json('collection', []) as $event) {
+                    if (is_array($event) && ($event['event_type'] ?? null) === $eventTypeUri) {
+                        $booked++;
+                    }
+                }
+
+                $next = $response->json('pagination.next_page');
+
+                if (! is_string($next) || $next === '') {
+                    return $booked;
+                }
+
+                // next_page is a full URL carrying its own query string; see getForToken().
+                $url = $next;
+                $query = [];
+            }
+
+            /*
+             * A partial count is worse than none. It would read as a tier with room left on
+             * precisely the busiest calendar, which is the one case this whole check exists for.
+             */
+            Log::warning('CalendlyClient: scheduled_events pagination hit its page cap, discarding a partial utilization count');
+
+            return null;
+        }
+
+        return null;
     }
 
     /**

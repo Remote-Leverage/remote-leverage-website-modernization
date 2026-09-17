@@ -8,6 +8,7 @@ use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Tracking\Gateways\CustomerIOClient;
 use App\Domains\Tracking\Gateways\PostHogClient;
 use App\Domains\Tracking\Listeners\HandleLeadCreatedForTracking;
+use App\Infrastructure\WordPress\Hooks\MarketingPixelHooks;
 use App\Infrastructure\WordPress\Hooks\SiteKitHooks;
 use App\Infrastructure\WordPress\Hooks\TrackingHooks;
 use Illuminate\Support\Facades\Event;
@@ -24,6 +25,7 @@ class TrackingServiceProvider extends ServiceProvider
         $this->app->singleton(PostHogClient::class, fn () => new PostHogClient);
         $this->app->singleton(TrackingHooks::class, fn () => new TrackingHooks);
         $this->app->singleton(SiteKitHooks::class, fn () => new SiteKitHooks);
+        $this->app->singleton(MarketingPixelHooks::class, fn () => new MarketingPixelHooks);
         $this->app->singleton(HandleLeadCreatedForTracking::class);
     }
 
@@ -41,6 +43,14 @@ class TrackingServiceProvider extends ServiceProvider
          * rather than by Site Kit.
          */
         $this->app->make(SiteKitHooks::class)->register();
+
+        /*
+         * Last of the three, so a GTM tag that ever starts doing one of these jobs defines
+         * `fbq` (or `uetq`) first and this becomes the visible duplicate rather than the hidden
+         * one. See MarketingPixelHooks for the ordering rationale and config/pixels.php for why
+         * these are not simply tags in the container.
+         */
+        $this->app->make(MarketingPixelHooks::class)->register();
 
         // Deferred: Customer.io + PostHog are both live API calls that nothing
         // in the request depends on — see LeadServiceProvider::boot() for why

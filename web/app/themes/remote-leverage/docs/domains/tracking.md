@@ -50,7 +50,10 @@ Both destinations receive the same DTO. `RecordBehaviorEventAction` is the only 
 | `CUSTOMERIO_SITE_ID`, `CUSTOMERIO_API_KEY` | `CustomerIOClient` (Track API v1, server side). Region is **us** (`track.customer.io`), confirmed against the legacy `rl_cio_region` option. |
 | `CUSTOMERIO_CDP_WRITE_KEY` | The browser `cioanalytics` snippet only. A **different credential** from the site id above — CDP source write key vs Track API site id. Blank -> no snippet is emitted. Value recovered 2026-09-15 from the `analytics.load("…")` argument in the page source of `remoteleverage.com` and `rl-testing.test`, identical on both; it is a publishable browser key, not a secret. |
 
-LinkedIn Insight and Meta Pixel are **not** injected by this domain — they are tags inside the GTM containers. GTM itself is delivered by `SiteKitHooks` (`app/Infrastructure/WordPress/Hooks`) from `config/site-kit.php`.
+LinkedIn Insight is a tag inside the GTM container. **Meta Pixel, Microsoft UET and the HubSpot
+tracking code are not** — production hardcodes all three into the page, outside GTM, so nothing
+carried them across the cutover. They are emitted by `MarketingPixelHooks` from
+`config/pixels.php`. See the container audit below. GTM itself is delivered by `SiteKitHooks` (`app/Infrastructure/WordPress/Hooks`) from `config/site-kit.php`.
 
 **This reverses the earlier plan of having Site Kit ship the snippet.** Site Kit's Tag Manager module holds exactly one container: `Modules\Tag_Manager::register_tag()` builds `new Web_Tag($settings['containerID'])` from a single value, and `ampContainerID` is a separate AMP-only render path, not a second container on the same page (verified against Site Kit 1.187.0). Production serves **two** containers ([cutover-decisions.md §32](../cutover-decisions.md)), so connecting Site Kit to one would have silently stopped every tag in the other — exactly the ad-spend parity that decision exists to protect.
 
@@ -67,6 +70,68 @@ Site Kit stays installed and is still *configured* from the same file: `SiteKitH
 Production-only by default for the same reason Site Kit's `Tag_Environment_Type_Guard` is: the containers hold Meta and LinkedIn conversion pixels, and a test booking on staging fires them against the same ad accounts as a real one.
 
 `tests/Unit/SiteKitConfigTest.php` pins all of it.
+
+
+## Container audit, 2026-09-17
+
+Read from the containers' published payloads (`googletagmanager.com/gtm.js?id=…`, public) and
+production's live HTML.
+
+**`GTM-P4KZNJWL` is empty and was never live.** Its payload is version 1 with `"tags":[],
+"predicates":[], "rules":[]`, and production's snippet for it sits inside an HTML comment reading
+*"Deprecated: unused Google Tag Manager script tag"*. Decision 32 read two container ids out of the
+HTML without noticing the second was commented out. Only `GTM-53JDTQCZ` (version 46, 21 live tags,
+5 paused) has ever run.
+
+### What fires, and on what
+
+| Trigger | Tags |
+| :--- | :--- |
+| `gtm.init_consent` | Consent default (`ad_storage` + `analytics_storage` **granted**, no CMP behind it); **PostHog init** |
+| `gtm.init` | Google tag `AW-11406183013`, `send_to: G-SCP464C5EH` |
+| All Pages | Conversion Linker; TikTok `CPMB51BC77U75I0QMMAG`; LinkedIn Insight `9514236`; OpenAI `GtXTy8ihLz5qrMUanZ3fqf`; StatCounter `13176576`; Rewardful `39ea7a`; Calendly inline widget |
+| Click text contains "Book a Consultation" | GA4 `Book a Consultation Click`; Ads conversion `oEXvCN-QnpcbEOWU8r4q` |
+| Path contains `VAThankYou` | GA4 `appointment_booked`; Ads conversions `AyW6CJHZnr8ZEOWU8r4q` and `pTbrCP6-_dIbEOWU8r4q`; PostHog `appointment_booked_web` |
+| `form_submit` | GA4 `generate_lead`; Ads conversion `oqW3CP3jnJcbEOWU8r4q` |
+| Click class has `e-eicon-play` | GA4 `watched_testimonial_video` |
+
+`/vathankyou/` carries no inline tracking of its own — every conversion on it comes from the
+container's path trigger. v2 has the page (ID 126) and `MultistepBookingWizard` redirects to it, so
+that path survives intact.
+
+### Tags that cannot work on v2
+
+| Tag | Why |
+| :--- | :--- |
+| Calendly inline widget | Calls `jQuery(document).ready(...)`; v2 loads no jQuery, so it throws and takes the Calendly→dataLayer bridge in the same script block with it. Its target element does not exist either. |
+| GA4 `watched_testimonial_video` | Triggers on the Elementor class `e-font-icon-svg e-eicon-play`. No Elementor in v2. |
+| GA4 `generate_lead` + Ads `oqW3CP3jnJcbEOWU8r4q` | Fired on `form_submit`, which came from gtag.js detecting a **native** Gravity Forms submit — the container has no form-submit listener tag. Livewire never submits natively. **Fixed** by `MultistepBookingWizard::pushToDataLayer()`. |
+
+### Duplicated with different ids
+
+Production runs both of these twice, from the page *and* from the container, into different
+accounts.
+
+| Vendor | Hardcoded in page | In GTM |
+| :--- | :--- | :--- |
+| LinkedIn Insight | `6411876` | `9514236` |
+| OpenAI pixel | `7QY9HDVocGyeNvMMW1gLWb` | `GtXTy8ihLz5qrMUanZ3fqf` |
+
+Which id is the live ad account **could not be determined from outside**, and all three available
+signals came up empty: LinkedIn's beacon returns 302 for any partner id including invented ones,
+not one of the 3,969 imported leads carries an `li_fat_id`, and neither id appears in any option
+or postmeta row. The container tells us only that its LinkedIn and OpenAI tags (`tag_id` 64 and
+65) are the most recently created in it — consistent with a half-finished migration, but
+circumstantial. The answer is in LinkedIn Campaign Manager under Account Assets -> Insight Tag,
+and in the OpenAI ads account.
+
+**Both are therefore kept firing**, which is exactly what production does today: the page-hardcoded
+id comes from `config/pixels.php`, the other keeps arriving from the container. Dropping the wrong
+one would take an ad account dark with no error anywhere; keeping both changes nothing.
+
+`config/pixels.php` declares what the container already delivers in `delivered_by_gtm`, and
+`MarketingPixelTest` fails the build if an id ever appears in both places — which is the mistake
+production made twice.
 
 ## PostHog is initialised exactly once
 
@@ -87,9 +152,9 @@ loaded two copies of the SDK and captured every pageview twice. Removed 2026-09-
 > pageview twice — the same bug that was fixed on 2026-09-15 by removing `posthog-js` from
 > `app.js`, arriving from the other direction.
 >
-> It is invisible today only because `POSTHOG_API_KEY` has never been set in any environment, so
-> the theme's snippet renders nothing. **It surfaces the moment that key is filled in**, which is
-> on the cutover list. Before then, remove the PostHog init tag from both containers and leave
+> **`POSTHOG_API_KEY` is now set**, and it is byte-identical to the key inside the container
+> (`phc_3Pbasn…`), so v2 already initialises PostHog client-side today. The duplicate lands the
+> moment GTM is switched on — this is live, not hypothetical. Before then, remove the PostHog init tag from both containers and leave
 > `TrackingHooks` as the sole owner: a container tag can be edited by anyone with GTM access and
 > no deploy, so the theme is the side that can be reasoned about. GTM tags that *call*
 > `posthog.capture()` are fine and need no change — the snippet's queueing stub accepts calls

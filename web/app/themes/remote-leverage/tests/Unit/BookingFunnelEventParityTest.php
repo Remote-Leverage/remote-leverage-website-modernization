@@ -265,3 +265,36 @@ describe('warning acknowledgement', function () {
         expect($wizard->warningAcknowledged)->toBeFalse();
     });
 });
+
+/*
+ * The thank-you redirect's capitalisation is part of the same contract.
+ *
+ * GTM container GTM-53JDTQCZ fires GA4 `appointment_booked`, Google Ads conversions
+ * `AyW6CJHZnr8ZEOWU8r4q` and `pTbrCP6-_dIbEOWU8r4q`, and a PostHog `appointment_booked_web`
+ * capture off a `Page Path contains VAThankYou` trigger. The predicate compiles to a bare `_cn`
+ * with no ignore-case flag, so it is case-sensitive.
+ *
+ * Gravity Forms redirected to `/VAThankYou`, which WordPress serves with the capitals intact.
+ * Lowercase serves the byte-identical page and matches nothing — so "tidying" this to
+ * `/vathankyou/` silently switches off the primary conversion event and two live Ads
+ * conversions, with no error anywhere. Audited 2026-09-17.
+ */
+test('the post-booking redirect keeps the capitalisation the GTM trigger matches on', function () {
+    $source = file_get_contents(
+        __DIR__.'/../../app/Application/Livewire/Booking/MultistepBookingWizard.php'
+    );
+
+    preg_match_all("/redirect\(home_url\('([^']+)'\)\)/", (string) $source, $matches);
+
+    expect($matches[1])->not->toBeEmpty('the wizard should still redirect after a booking');
+
+    $thankYou = array_values(array_filter(
+        $matches[1],
+        static fn (string $path): bool => stripos($path, 'thankyou') !== false,
+    ));
+
+    expect($thankYou)->not->toBeEmpty()
+        ->and($thankYou[0])->toContain('VAThankYou')
+        // Not merely case-insensitively present: the literal the trigger compares against.
+        ->and(str_contains($thankYou[0], 'vathankyou'))->toBeFalse();
+});

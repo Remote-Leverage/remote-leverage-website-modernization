@@ -12,6 +12,7 @@ use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Scheduling\Actions\FetchAvailableSlotsAction;
 use App\Domains\Scheduling\Services\AvailabilityHealthMonitor;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
+use App\Domains\Scheduling\Services\TierUtilizationProbe;
 use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
 use App\Domains\Tracking\Data\AnalyticsEventData;
 use Carbon\Carbon;
@@ -831,10 +832,25 @@ class MultistepBookingWizard extends Component
                 ]);
             }
 
-            // A successful booking now navigates to a dedicated thank-you page
-            // (with its own "confirm via email" steps and social proof) rather
-            // than rendering a confirmation state inline in the widget.
-            $this->redirect(home_url('/vathankyou/'));
+            /*
+             * A successful booking now navigates to a dedicated thank-you page (with its own
+             * "confirm via email" steps and social proof) rather than rendering a confirmation
+             * state inline in the widget.
+             *
+             * **The capitalisation is load-bearing.** GTM container GTM-53JDTQCZ fires GA4
+             * `appointment_booked`, Google Ads conversions `AyW6CJHZnr8ZEOWU8r4q` and
+             * `pTbrCP6-_dIbEOWU8r4q`, and the PostHog `appointment_booked_web` capture off a
+             * `Page Path contains VAThankYou` trigger. That predicate compiles to a bare `_cn`
+             * with no ignore-case flag, so it is case-sensitive.
+             *
+             * Gravity Forms redirected to `/VAThankYou`, which WordPress serves as
+             * `/VAThankYou/` with the capitals intact — so the trigger has always matched. A
+             * lowercase `/vathankyou/` serves the identical page and silently matches nothing,
+             * taking the primary conversion event and two live Ads conversions with it.
+             *
+             * Audited 2026-09-17. See `docs/domains/tracking.md`.
+             */
+            $this->redirect(home_url('/VAThankYou/'));
 
             return;
         } catch (\Throwable $e) {
@@ -895,13 +911,27 @@ class MultistepBookingWizard extends Component
              * on a real fetch, so a cached empty does not re-report a sell-out on every pageview.
              */
             if ($fetched) {
+                $role = $this->activeTierRole();
+
                 app(AvailabilityHealthMonitor::class)->record(
-                    $this->activeTierRole(),
+                    $role,
                     $this->getActiveEventTypeUri(),
                     $this->availableDates,
                     $monthKey,
                     $this->nextAvailableDate
                 );
+
+                /*
+                 * The leading indicator, measured off the same visit but never in front of it.
+                 * Counting how full the window is means paging Calendly's scheduled_events, and
+                 * the booking widget is the last request on the site that should wait on one —
+                 * so it goes after the response, like the live-call Slack alerts do. The probe
+                 * throttles itself, so a busy hour measures once rather than once per visitor.
+                 *
+                 * Static closure, no `$this`: serializing a Livewire component into a deferred
+                 * job would drag the whole form state along with it.
+                 */
+                dispatch(static fn () => app(TierUtilizationProbe::class)->probe($role))->afterResponse();
             }
         } catch (\Throwable $e) {
             Log::warning('Failed to load month availability: '.$e->getMessage());
@@ -1171,8 +1201,71 @@ class MultistepBookingWizard extends Component
             );
 
             $this->deferTracking(static fn () => app(RecordBehaviorEventAction::class)->execute($event));
+
+            $this->pushToDataLayer($eventName, $properties);
         } catch (\Throwable $e) {
             // Silently swallow analytics errors to avoid breaking booking UX
+        }
+    }
+
+    /**
+     * Mirror a funnel event into the browser's `dataLayer`, for GTM.
+     *
+     * ## Why this exists at all
+     *
+     * The container has a trigger on `{{Event}} equals form_submit` firing GA4 `generate_lead`
+     * and Google Ads conversion `oqW3CP3jnJcbEOWU8r4q`. On the Elementor site that event came
+     * from gtag.js noticing a **native** Gravity Forms submission — there is no form-submit
+     * listener tag in the container, so nothing else could have produced it.
+     *
+     * A Livewire wizard never submits a form natively. Without this, that trigger simply never
+     * fires again and a live Google Ads conversion goes quiet at cutover with no error anywhere.
+     * Audited 2026-09-17; see `docs/domains/tracking.md`.
+     *
+     * ## Why every event, not just that one
+     *
+     * The legacy names are already the contract that PostHog funnels and Customer.io campaigns
+     * are keyed to (see {@see trackStepEvent}). Publishing the whole set to `dataLayer` means a
+     * new GTM trigger on any funnel step is a change someone makes in the container, not a
+     * deploy — which is the entire reason for having a tag manager. Pushing only the one event
+     * we happen to need today guarantees this method gets edited again.
+     *
+     * The server-side dispatch above stays the source of truth: it is immune to ad-blockers.
+     * This is additive, and deliberately carries no personal data — the properties here are the
+     * same funnel metadata, and `email`/`phone` are never among them.
+     *
+     * @param  array<string, mixed>  $properties
+     */
+    protected function pushToDataLayer(string $eventName, array $properties = []): void
+    {
+        /*
+         * `form_submit` is the legacy alias, not a rename. `partial_form_submitted` is the
+         * moment the visitor completed step 1 and a lead row was written, which is exactly when
+         * the Gravity form used to submit natively — so it is the honest equivalent of what the
+         * container's trigger has always meant by a form submission.
+         */
+        $names = $eventName === 'partial_form_submitted'
+            ? [$eventName, 'form_submit']
+            : [$eventName];
+
+        $payload = array_merge([
+            'form_id' => (string) $this->getId(),
+            'form_type' => 'multistep',
+            'step' => $this->currentStep,
+        ], array_filter(
+            $properties,
+            static fn ($value, string $key): bool => is_scalar($value) && ! in_array($key, ['email', 'phone'], true),
+            ARRAY_FILTER_USE_BOTH,
+        ));
+
+        foreach ($names as $name) {
+            $this->js(sprintf(
+                'window.dataLayer = window.dataLayer || []; window.dataLayer.push(%s);',
+                json_encode(
+                    array_merge(['event' => $name], $payload),
+                    JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+                ),
+            ));
         }
     }
 

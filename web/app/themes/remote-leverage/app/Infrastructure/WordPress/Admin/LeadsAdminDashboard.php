@@ -2069,20 +2069,53 @@ class LeadsAdminDashboard
                                     <?php } else { ?>
                                         <span class="rl-badge rl-badge-succeeded"><span class="rl-status-dot"></span>Bookable<?php echo $stale ? ' (stale)' : ''; ?></span>
                                     <?php } ?>
+                                    <?php
+                                    /*
+                                     * "Bookable" is true right up to the moment it is not, which is what made the
+                                     * 2026-09-17 sell-out invisible until it had already cost a night of bookings.
+                                     * The fill percentage is the part of this row that can be read early, so it sits
+                                     * next to the badge rather than in the small print below it.
+                                     */
+                                    $fill = $seen['fill'] ?? null;
+
+            if (is_numeric($fill)) {
+                $band = (int) ($seen['band'] ?? AvailabilityHealthMonitor::BAND_OK);
+                $fillClass = match (true) {
+                    $band >= AvailabilityHealthMonitor::BAND_CRITICAL => 'rl-badge-failed',
+                    $band === AvailabilityHealthMonitor::BAND_WARNING => 'rl-badge-pending',
+                    default => 'rl-badge-succeeded',
+                };
+                ?>
+                                        <span class="rl-badge <?php echo esc_attr($fillClass); ?>" style="margin-left:4px;">
+                                            <span class="rl-status-dot"></span><?php echo esc_html(number_format(((float) $fill) * 100, 1)); ?>% full
+                                        </span>
+                                        <?php
+            }
+            ?>
                                     <?php if ($seen !== null) { ?>
                                         <br><span style="font-size: 11px; color: #71717a;">
                                             <?php
-                                            /*
-                                             * The soonest bookable date is the number worth surfacing. "3 open days
-                                             * in 2026-09" says nothing about whether a lead can book today, and these
-                                             * calendars only publish a rolling few days, so the count swings for
-                                             * reasons that are not health.
-                                             */
-                                            if (! empty($seen['next_available'])) {
-                                                echo 'Next opening '.esc_html(Carbon::parse($seen['next_available'])->format('M j'));
-                                            } else {
-                                                echo 'No bookable dates';
-                                            }
+                                                /*
+                                                 * The soonest bookable date is the number worth surfacing. "3 open days
+                                                 * in 2026-09" says nothing about whether a lead can book today, and these
+                                                 * calendars only publish a rolling few days, so the count swings for
+                                                 * reasons that are not health.
+                                                 */
+                                                if (! empty($seen['next_available'])) {
+                                                    echo 'Next opening '.esc_html(Carbon::parse($seen['next_available'])->format('M j'));
+                                                } else {
+                                                    echo 'No bookable dates';
+                                                }
+
+                                        /*
+                                         * The counts behind the percentage. "93% full" is the alarm; "3 of 42 slots left"
+                                         * is what tells you whether that is one cancellation away from fine.
+                                         */
+                                        if (isset($seen['open_slots'], $seen['booked_slots'])) {
+                                            $capacity = (int) $seen['open_slots'] + (int) $seen['booked_slots'];
+                                            echo ' &middot; '.esc_html((string) (int) $seen['open_slots']).' of '.esc_html((string) $capacity)
+                                                .' slots free in the next '.esc_html((string) (int) ($seen['window_days'] ?? 4)).'d';
+                                        }
                                         ?>
                                             &middot; checked <?php echo esc_html(Carbon::parse($seen['checked_at'])->diffForHumans()); ?>
                                         </span>

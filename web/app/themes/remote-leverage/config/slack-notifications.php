@@ -549,6 +549,62 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Calendly tier filling up
+    |--------------------------------------------------------------------------
+    |
+    | The leading indicator for the sell-out below: a tier's rolling booking
+    | window has crossed 90% or 95% full. Sent once per crossing rather than on
+    | a repeat, because unlike a sell-out this is a heads-up and not an active
+    | revenue stop — see the band ladder in AvailabilityHealthMonitor.
+    |
+    | One template for both thresholds. They differ only in wording, and two
+    | near-identical templates drift apart the first time one is edited.
+    |
+    | `remaining` leads the card because it is the number that decides what to
+    | do: "6 slots left" is actionable in a way "91.2% full" is not.
+    */
+    'availability_filling_up' => [
+        'color' => null,
+        'fallback' => "Calendly {{ tier_label }} is {{ fill_label }}\n{{ remaining }} in the {{ window_label }}",
+        'blocks' => [
+            [
+                'type' => 'section',
+                'text' => ['type' => 'mrkdwn', 'text' => '*{{ headline }}*'],
+            ],
+            [
+                'type' => 'card',
+                'title' => ['type' => 'mrkdwn', 'text' => 'Calendly {{ tier_label }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ remaining }} in the {{ window_label }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ fill_label }} — {{ counts }}.', 'verbatim' => false],
+            ],
+            [
+                'type' => 'context',
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => '{{ severity }}. Nothing is broken yet — extend the date range or open host availability on the event type before it sells out.'],
+                ],
+            ],
+            [
+                'type' => 'actions',
+                '_when' => ['admin_url'],
+                'elements' => [
+                    [
+                        'type' => 'button',
+                        'text' => ['type' => 'plain_text', 'text' => 'Open diagnostics', 'emoji' => false],
+                        'url' => '{{ admin_url }}',
+                    ],
+                    [
+                        'type' => 'button',
+                        '_when' => ['event_type_url'],
+                        'text' => ['type' => 'plain_text', 'text' => 'Open in Calendly', 'emoji' => false],
+                        'url' => '{{ event_type_url }}',
+                    ],
+                ],
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Calendly tier sold out
     |--------------------------------------------------------------------------
     |

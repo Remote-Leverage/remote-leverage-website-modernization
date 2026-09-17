@@ -17,6 +17,7 @@ use App\Domains\Scheduling\Listeners\HandleLiveCallEventsForSlack;
 use App\Domains\Scheduling\Services\CalendlyEventTypeDiscoveryService;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use App\Domains\Scheduling\Services\LiveCallAvailabilityRouter;
+use App\Domains\Scheduling\Services\TierUtilizationProbe;
 use App\Infrastructure\Observability\CredentialRegistry;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -35,6 +36,7 @@ class SchedulingServiceProvider extends ServiceProvider
         $this->app->singleton(CalendlyEventTypeRoleResolver::class);
         $this->app->singleton(GoogleCalendarClient::class, fn () => new GoogleCalendarClient);
         $this->app->singleton(LiveCallAvailabilityRouter::class, fn () => new LiveCallAvailabilityRouter);
+        $this->app->singleton(TierUtilizationProbe::class);
         $this->app->singleton(HandleLeadCreatedForBooking::class);
         $this->app->singleton(HandleLiveCallEventsForSlack::class);
     }
@@ -111,6 +113,23 @@ class SchedulingServiceProvider extends ServiceProvider
 
             add_action('rl_calendly_warm_cache_cron', function () {
                 app(WarmCalendlyMetadataCacheAction::class)->execute();
+            });
+
+            /*
+             * The floor under the utilization probe. In traffic the probe runs after the
+             * response on real availability fetches, which is both faster and free; this is
+             * what covers the case the 2026-09-17 sell-out actually happened in — overnight,
+             * with nobody on the site to trigger a check, so the tier filled up and crossed
+             * every threshold unobserved.
+             */
+            add_action('init', function () {
+                if (! wp_next_scheduled('rl_calendly_probe_utilization')) {
+                    wp_schedule_event(time(), 'hourly', 'rl_calendly_probe_utilization');
+                }
+            });
+
+            add_action('rl_calendly_probe_utilization', function () {
+                app(TierUtilizationProbe::class)->probeAll();
             });
 
             add_action('rl_calendly_refresh_questions', function (string $eventUri) {

@@ -79,7 +79,7 @@ flowchart TB
 
 | Class | Does |
 | :--- | :--- |
-| `CalendlyClient` | The API surface: `getAvailableSlots`, `getEventType`, `getEventQuestions`, `createInvitee`, `findExistingInvitee`, `cancelScheduledEvent`, `getScheduledEvent`, `getInvitee`, `pollForMeetLocation`. Token selection goes through the pool; `getForToken()` exists for calls that must use a specific one. |
+| `CalendlyClient` | The API surface: `getAvailableSlots`, `countBookedEvents`, `getEventType`, `getEventQuestions`, `createInvitee`, `findExistingInvitee`, `cancelScheduledEvent`, `getScheduledEvent`, `getInvitee`, `pollForMeetLocation`. Token selection goes through the pool; `getForToken()` exists for calls that must use a specific one. |
 | `CalendlyMetadataCache` | Caches event types and questions; `warm()`, `forget()`, `forgetAll()`. Schedules `rl_calendly_refresh_questions` as a single WP-Cron event rather than refetching inline. |
 | `CalendlyTokenPool` | Above. |
 | `GoogleCalendarClient` | `createAppointment()` — the alternative provider; creates an event with a Meet link and attendees. |
@@ -92,11 +92,45 @@ flowchart TB
 | :--- | :--- |
 | `CalendlyEventTypeDiscoveryService` | Lists the account's event types, and backs them up to `rl_calendly_event_types_backup` so the admin screen can still render if the API is down |
 | `CalendlyEventTypeRoleResolver` | Role → event-type URI mapping |
+| `AvailabilityHealthMonitor` | Whether a tier still has anything to sell. `record()` on a pageview, `recordUtilization()` from the probe. Owns the alert bands and writes `rl_availability_health` for the diagnostics panel |
+| `TierUtilizationProbe` | Measures how full a tier's rolling booking window is. Self-throttled (`booking.availability.probe_ttl`); runs after the response on a real availability fetch and hourly on `rl_calendly_probe_utilization` |
 | `LiveCallAvailabilityRouter` | `isAvailable()`, `setAvailability($bool, $ttlMinutes = 30)`, `getStatus()`. Cache key `rl_live_call_availability`, default room `https://meet.google.com/rl-instant-consult`. |
 
 ### Model
 
 `LiveCallSession` → `rl_live_call_sessions`.
+
+## Availability alerts
+
+Three thresholds on one ladder, per tier: **90%** and **95%** full, then sold out.
+
+Fill is `booked / (booked + open)` over the rolling booking window, because
+`event_type_available_times` only ever returns what is still open and never says how much there
+was. The booked side comes from `CalendlyClient::countBookedEvents()`, which pages
+`/scheduled_events` for the window and matches the event-type URI in PHP — that endpoint has no
+`event_type` filter.
+
+Tuned in `config/booking.php` under `availability`:
+
+| Key | Default | Why it is that |
+| :--- | :--- | :--- |
+| `window_days` | `4` | Mirrors the date range set on the event type in Calendly, which **the API does not expose** — so it is kept in step by hand. Four is what T10/T0 published during the 2026-09-17 sell-out. Capped at 7; Calendly rejects a longer availability range |
+| `warning_threshold` | `0.90` | |
+| `critical_threshold` | `0.95` | |
+| `min_sample` | `8` | Below this many slots in the window, no percentage is reported at all. Zero open and one booked is arithmetically 100% full, and is far more often a calendar with no hours published |
+| `probe_ttl` | `300` | How long a measurement is reused, so a busy hour measures once rather than once per visitor |
+
+**90% and 95% alert on crossing, not on being there.** A tier hovering at 91% all afternoon is
+one message. Coming back down is silent; filling up again is a new episode and alerts again.
+
+**Sold out is the exception** and keeps its own hourly repeat. It is not a heads-up but an
+active revenue stop, and the repeat is what leaves a trail across an overnight incident instead
+of one 2am message. Its throttle is independent of the ladder, so 92% → sold out inside an hour
+produces both messages.
+
+Watch for: `countBookedEvents()` returns **null, not 0**, when it could not find out. Zero booked
+is the healthiest reading there is, so coercing the two together would report a tier one booking
+from selling out as wide open. A null skips the check entirely.
 
 ## Webhooks
 
@@ -119,7 +153,7 @@ curl -X POST https://remoteleverage-v2.test/api/webhooks/calendly \
 
 ## Tests
 
-`tests/Unit/BookingWizardRoutingTest.php` (tier routing, month navigation, applicant bypass) and `tests/Feature/CalendlyWebhookTest.php` (both webhook events).
+`tests/Unit/BookingWizardRoutingTest.php` (tier routing, month navigation, applicant bypass), `tests/Unit/AvailabilitySellOutTest.php` and `tests/Unit/AvailabilityUtilizationTest.php` (the alert ladder and the booked-side count), and `tests/Feature/CalendlyWebhookTest.php` (both webhook events).
 
 ## Known gaps
 

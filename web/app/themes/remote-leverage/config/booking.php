@@ -13,6 +13,47 @@
  * HubSpot both store — matching on anything derived would drift the moment a band is renamed.
  */
 return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Availability health
+    |--------------------------------------------------------------------------
+    |
+    | Thresholds for AvailabilityHealthMonitor's leading indicator. Fill is
+    | measured as booked / (booked + open) across the rolling booking window,
+    | because Calendly's availability API only ever returns what is still open
+    | and never says how much there was to begin with.
+    |
+    | `window_days` mirrors the date range set on the event type in Calendly,
+    | which the API does not expose — so it is a number kept in step by hand,
+    | and wrong here means a fill percentage measured over the wrong horizon
+    | rather than an error. Four is what the T10/T0 event types published during
+    | the 2026-09-17 sell-out. The ceiling is seven: Calendly rejects a longer
+    | range on event_type_available_times.
+    */
+    'availability' => [
+        'enabled' => true,
+
+        'window_days' => 4,
+
+        'warning_threshold' => 0.90,
+
+        'critical_threshold' => 0.95,
+
+        /*
+         * Below this many slots in the window, no percentage is reported. A tier with three
+         * slots published moves a third of its range on one booking, and zero-open-one-booked
+         * reads as 100% full when the real problem is that nobody published any hours.
+         */
+        'min_sample' => 8,
+
+        /*
+         * How long a measurement is reused. The probe runs after the response on real
+         * availability fetches, so without this a traffic spike measures once per visitor.
+         */
+        'probe_ttl' => 300,
+    ],
+
     'revenue_bands' => [
 
         '$0 to $5k Per Month' => [
