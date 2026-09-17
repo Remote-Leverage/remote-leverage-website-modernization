@@ -9,6 +9,7 @@ use App\Domains\Lead\Actions\PurgeOldLeadsAction;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Models\LeadProfile;
+use App\Domains\Lead\Services\LeadSearch;
 use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Scheduling\Actions\RetryFailedBookingAction;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
@@ -111,9 +112,13 @@ class LeadsAdminDashboard
 
         $action = sanitize_text_field($_REQUEST['rl_action'] ?? '');
 
-        if ($action === 'export_csv') {
-            check_admin_referer('rl_export_leads_nonce');
-            $this->exportLeadsCsv();
+        /*
+         * Serving a finished export, not building one. The build happens in batches over AJAX
+         * (see LeadExportPanel) because a single request that walks the whole lead table is a
+         * request that dies on a timeout and leaves a truncated file looking complete.
+         */
+        if ($action === 'download_export') {
+            app(LeadExportPanel::class)->handleDownload(sanitize_text_field($_GET['job'] ?? ''));
             exit;
         }
 
@@ -227,95 +232,6 @@ class LeadsAdminDashboard
                 exit;
             }
         }
-    }
-
-    protected function exportLeadsCsv(): void
-    {
-        $filename = 'remoteleverage-leads-'.gmdate('Y-m-d-His').'.csv';
-
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="'.$filename.'"');
-        header('Pragma: no-cache');
-        header('Expires: 0');
-
-        $output = fopen('php://output', 'w');
-        fputcsv($output, [
-            'ID',
-            'UUID',
-            'Created Date (UTC)',
-            'Full Name',
-            'First Name',
-            'Last Name',
-            'Email',
-            'Phone',
-            'Phone Country',
-            'Company',
-            'Role Needed',
-            'Monthly Revenue',
-            'Status',
-            'Scheduled Time',
-            'Google Meet URL',
-            'Source Type',
-            'UTM Source',
-            'UTM Medium',
-            'UTM Campaign',
-            'UTM Term',
-            'UTM Content',
-            'GCLID',
-            'FBCLID',
-            'Referral Code',
-            'Landing URL',
-            'Referrer URL',
-            'Notes',
-            'Activity Logs Count',
-        ]);
-
-        $query = Lead::query()->latest();
-
-        if (! empty($_GET['status'])) {
-            $query->where('status', sanitize_text_field($_GET['status']));
-        }
-        if (! empty($_GET['s'])) {
-            $this->applyOptimizedSearch($query, sanitize_text_field($_GET['s']));
-        }
-
-        $query->chunkById(100, function ($leads) use ($output) {
-            foreach ($leads as $lead) {
-                $meeting = $this->extractMeetingDetails($lead);
-                fputcsv($output, [
-                    $lead->id,
-                    $lead->uuid,
-                    $lead->created_at?->toDateTimeString(),
-                    $lead->name,
-                    $lead->first_name,
-                    $lead->last_name,
-                    $lead->email,
-                    $lead->phone,
-                    $lead->phone_country,
-                    $lead->company,
-                    $lead->role_needed,
-                    $lead->monthly_revenue,
-                    $lead->status,
-                    $meeting['start_time'] ?? '',
-                    $meeting['meet_url'] ?? '',
-                    $lead->source_type,
-                    $lead->utm_source,
-                    $lead->utm_medium,
-                    $lead->utm_campaign,
-                    $lead->utm_term,
-                    $lead->utm_content,
-                    $lead->gclid,
-                    $lead->fbclid,
-                    $lead->referral_code,
-                    $lead->landing_url,
-                    $lead->referrer_url,
-                    $lead->notes,
-                    $lead->activityLogs()->count(),
-                ]);
-            }
-        });
-
-        fclose($output);
     }
 
     public function enqueueAdminStyles(string $hook): void
@@ -977,78 +893,18 @@ class LeadsAdminDashboard
     }
 
     /**
-     * Apply high-performance smart search routing to the Lead query.
-     * Uses B-tree indexed lookups for emails and phones, MySQL FULLTEXT inverted index
-     * for general text search across (name, email, company, phone), and falls back
-     * cleanly to indexed LIKE queries.
+     * Apply the lead search to a query.
+     *
+     * The routing itself moved to {@see LeadSearch} when the CSV export gained its own filters:
+     * an export that honours the toolbar's search term has to resolve it exactly as the screen
+     * does, and a second copy of this would quietly hand back a different set of leads than the
+     * list it was started from.
      *
      * @param  Builder  $query
      */
     protected function applyOptimizedSearch($query, string $search): void
     {
-        $search = trim($search);
-
-        if ($search === '') {
-            return;
-        }
-
-        // 1. Email Lookup: user typed an email or prefix (contains '@')
-        // Uses the indexed `wp_rl_leads_email_index` B-tree index
-        if (str_contains($search, '@')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('email', $search)
-                    ->orWhere('email', 'LIKE', $search.'%');
-            });
-
-            return;
-        }
-
-        // 2. Phone Lookup: search contains only digits, +, -, (, ) and spaces
-        // Uses `wp_rl_leads_phone_index` B-tree index
-        if (preg_match('/^[+0-9\s\-()]{4,}$/', $search)) {
-            $cleanPhone = preg_replace('/[^0-9+]/', '', $search);
-            $query->where(function ($q) use ($search, $cleanPhone) {
-                $q->where('phone', $search)
-                    ->orWhere('phone', 'LIKE', '%'.$cleanPhone.'%');
-            });
-
-            return;
-        }
-
-        // 3. MySQL FULLTEXT Inverted Index Search
-        // Sub-millisecond inverted-index lookup across (name, email, company, phone)
-        $driver = $query->getConnection()->getDriverName();
-        if ($driver === 'mysql' && mb_strlen($search) >= 3) {
-            // Strip MySQL boolean operators to sanitize input
-            $sanitized = preg_replace('/[+\-><()~*\"@]+/', ' ', $search);
-            $tokens = array_filter(explode(' ', trim((string) $sanitized)));
-
-            if (! empty($tokens)) {
-                // Suffix wildcard for each word: e.g. "+acme* +john*"
-                $booleanExpr = implode(' ', array_map(fn ($token) => '+'.$token.'*', $tokens));
-
-                $query->where(function ($q) use ($booleanExpr, $search) {
-                    $q->whereRaw(
-                        'MATCH(name, email, company, phone) AGAINST(? IN BOOLEAN MODE)',
-                        [$booleanExpr],
-                    )
-                        ->orWhere('utm_campaign', 'LIKE', $search.'%')
-                        ->orWhere('referral_code', 'LIKE', $search.'%');
-                });
-
-                return;
-            }
-        }
-
-        // 4. Fallback for SQLite / short terms: standard substring query
-        $query->where(function ($q) use ($search) {
-            $q->where('name', 'LIKE', "%{$search}%")
-                ->orWhere('email', 'LIKE', "%{$search}%")
-                ->orWhere('phone', 'LIKE', "%{$search}%")
-                ->orWhere('company', 'LIKE', "%{$search}%")
-                ->orWhere('utm_campaign', 'LIKE', "%{$search}%")
-                ->orWhere('referral_code', 'LIKE', "%{$search}%");
-        });
+        LeadSearch::apply($query, $search);
     }
 
     public function renderDashboard(): void
@@ -1137,18 +993,12 @@ class LeadsAdminDashboard
                 </div>
                 <div class="rl-actions-group">
                     <?php
-                    $exportUrl = wp_nonce_url(
-                        admin_url('admin.php?page=rl-leads&rl_action=export_csv&status='.urlencode($statusFilter).'&s='.urlencode($search)),
-                        'rl_export_leads_nonce',
+                    $purgeUrl = wp_nonce_url(
+                        admin_url('admin.php?page=rl-leads&rl_action=purge_leads'),
+                        'rl_purge_leads_nonce',
                     );
-        $purgeUrl = wp_nonce_url(
-            admin_url('admin.php?page=rl-leads&rl_action=purge_leads'),
-            'rl_purge_leads_nonce',
-        );
         ?>
-                    <a href="<?php echo esc_url($exportUrl); ?>" class="rl-btn rl-btn-outline">
-                        <?php echo $this->iconDownload(); ?> Export Leads (CSV)
-                    </a>
+                    <?php app(LeadExportPanel::class)->renderTrigger(); ?>
                     <a href="<?php echo esc_url($purgeUrl); ?>" 
                        onclick="return confirm('Purge un-booked partial leads older than 30 days? This action cannot be undone.');" 
                        class="rl-btn rl-btn-destructive">
@@ -1383,6 +1233,16 @@ class LeadsAdminDashboard
                     <?php } ?>
                 </div>
             </div>
+
+            <?php
+                /*
+                 * The export modal ships with the list, inside the wrap, so its markup is on the
+                 * page before anyone presses the button. It carries the toolbar's search term,
+                 * because an export started from a filtered list should cover what the list was
+                 * showing — the term is resolved through the same LeadSearch the screen uses.
+                 */
+                app(LeadExportPanel::class)->renderModal($search, $statusFilter);
+        ?>
         </div>
         <?php
     }

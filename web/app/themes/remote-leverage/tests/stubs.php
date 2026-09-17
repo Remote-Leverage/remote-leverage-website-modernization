@@ -466,6 +466,13 @@ if (! function_exists('wp_upload_dir')) {
     }
 }
 
+if (! function_exists('wp_mkdir_p')) {
+    function wp_mkdir_p($target)
+    {
+        return is_dir($target) || mkdir($target, 0777, true);
+    }
+}
+
 if (! function_exists('home_url')) {
     function home_url($path = '')
     {

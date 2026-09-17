@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Providers;
 
+use App\Domains\Lead\Export\LeadExportJobStore;
+use App\Domains\Lead\Export\LeadExportRunner;
 use App\Infrastructure\Console\Commands\ApplyWordfenceConfigCommand;
 use App\Infrastructure\Console\Commands\PartnerSeedCommand;
 use App\Infrastructure\Console\Commands\PruneIntegrationCallsCommand;
 use App\Infrastructure\Console\Commands\RunDeployTasksCommand;
 use App\Infrastructure\WordPress\Admin\CalendlyAdminDashboard;
 use App\Infrastructure\WordPress\Admin\ContentAuditAdmin;
+use App\Infrastructure\WordPress\Admin\LeadExportPanel;
 use App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
 use App\Infrastructure\WordPress\Admin\MarketingDashboard;
 use App\Infrastructure\WordPress\Admin\PartnerHubAdmin;
@@ -55,6 +58,10 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(PartnerPostType::class, fn () => new PartnerPostType);
         $this->app->singleton(CaseStudyPostType::class, fn () => new CaseStudyPostType);
         $this->app->singleton(LeadsAdminDashboard::class, fn () => new LeadsAdminDashboard);
+        $this->app->singleton(LeadExportPanel::class, fn ($app) => new LeadExportPanel(
+            $app->make(LeadExportJobStore::class),
+            $app->make(LeadExportRunner::class),
+        ));
         $this->app->singleton(WordPressAdminTheme::class, fn () => new WordPressAdminTheme);
         $this->app->singleton(MarketingDashboard::class, fn () => new MarketingDashboard);
         $this->app->singleton(ContentAuditAdmin::class, fn () => new ContentAuditAdmin);
@@ -85,6 +92,7 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->make(PartnerPostType::class)->register();
         $this->app->make(CaseStudyPostType::class)->register();
         $this->app->make(LeadsAdminDashboard::class)->register();
+        $this->app->make(LeadExportPanel::class)->register();
         $this->app->make(WordPressAdminTheme::class)->register();
         $this->app->make(MarketingDashboard::class)->register();
         $this->app->make(ContentAuditAdmin::class)->register();
