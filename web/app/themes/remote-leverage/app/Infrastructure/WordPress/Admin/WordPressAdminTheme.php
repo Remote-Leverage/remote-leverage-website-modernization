@@ -19,6 +19,7 @@ class WordPressAdminTheme
         if (function_exists('add_action')) {
             add_action('admin_enqueue_scripts', [$this, 'enqueueGlobalAdminStyles'], 99);
             add_action('admin_enqueue_scripts', [$this, 'recolorRedisCacheChart'], 100);
+            add_action('wp_head', [$this, 'ensureAdminBarInitialized'], 0);
             add_action('wp_enqueue_scripts', [$this, 'enqueueSiteAdminBarStyles'], 99);
             add_action('wp_head', [$this, 'printSiteAdminBarStylesFallback'], 99);
             add_action('admin_bar_menu', [$this, 'customizeAdminBarLogo'], 999);
@@ -562,6 +563,44 @@ class WordPressAdminTheme
     {
         if (function_exists('wp_add_inline_style')) {
             \wp_add_inline_style('login', $this->getLoginCss());
+        }
+    }
+
+    /**
+     * Initialise the admin bar on Acorn-routed requests.
+     *
+     * WordPress hooks `_wp_admin_bar_init()` to `template_redirect`
+     * (wp-includes/default-filters.php). Acorn dispatches a matched route on `parse_request`
+     * and exits without ever reaching `template_redirect`
+     * (vendor/roots/acorn/src/Roots/Acorn/Application/Concerns/Bootable.php), so on every
+     * routes/web.php page — /referral-dashboard/, /referrer-portal/, /book-consultation/,
+     * /social-media-kit/ — `$wp_admin_bar` stayed null. `wp_admin_bar_render()` on
+     * `wp_body_open` then printed nothing, and the `html { margin-top: 32px }` bump that
+     * `WP_Admin_Bar::initialize()` registers was never added.
+     *
+     * Those pages still *claimed* the toolbar was there: `is_admin_bar_showing()` is true, so
+     * body_class() adds `admin-bar` and the sticky header offsets itself by --rl-admin-bar-h.
+     * The result was a 32px dead strip at the top of every route page with no toolbar in it,
+     * and page content sitting where the toolbar belongs.
+     *
+     * Priority 0 on `wp_head` is deliberate. It is early enough that `_admin_bar_bump_cb`
+     * (added by initialize() at `wp_head` priority 10) is still picked up by the running
+     * do_action, early enough for `wp_enqueue_scripts` at priority 1, and well before the
+     * layout reaches wp_body_open where core renders the bar. An ordinary WordPress request,
+     * which initialised the bar back at template_redirect, falls straight through.
+     */
+    public function ensureAdminBarInitialized(): void
+    {
+        if (! function_exists('is_admin_bar_showing') || ! \is_admin_bar_showing()) {
+            return;
+        }
+
+        if (isset($GLOBALS['wp_admin_bar']) && is_object($GLOBALS['wp_admin_bar'])) {
+            return;
+        }
+
+        if (function_exists('_wp_admin_bar_init')) {
+            \_wp_admin_bar_init();
         }
     }
 
