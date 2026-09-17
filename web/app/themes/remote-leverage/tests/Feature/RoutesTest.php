@@ -68,6 +68,24 @@ describe('config/redirects.php targets resolve to something real', function () {
      * hand against `wp post list --post_type=page`; the date below is that check.
      */
     $wordPressPageTargets = [
+        // The fourteen 2026 role landing pages. Each renders patterns/<slug>-full.php off the
+        // shared App\Support\RolePages map; created and verified 2026-09-16. The long tail of
+        // role aliases now redirects to these rather than to /hire-va-4/.
+        'admin-virtual-assistants' => 'page ID 1000195 — created and verified 2026-09-16',
+        'executive-virtual-assistants' => 'page ID 1000196 — created and verified 2026-09-16',
+        'customer-support-virtual-assistants' => 'page ID 1000197 — created and verified 2026-09-16',
+        'sales-virtual-assistants' => 'page ID 1000198 — created and verified 2026-09-16',
+        'lead-generation-virtual-assistants' => 'page ID 1000199 — created and verified 2026-09-16',
+        'social-media-virtual-assistants' => 'page ID 1000200 — created and verified 2026-09-16',
+        'marketing-virtual-assistants' => 'page ID 1000201 — created and verified 2026-09-16',
+        'graphic-design-virtual-assistants' => 'page ID 1000202 — created and verified 2026-09-16',
+        'medical-virtual-assistants' => 'page ID 1000203 — created and verified 2026-09-16',
+        'legal-virtual-assistants' => 'page ID 1000204 — created and verified 2026-09-16',
+        'insurance-virtual-assistants' => 'page ID 1000205 — created and verified 2026-09-16',
+        'real-estate-virtual-assistants' => 'page ID 1000206 — created and verified 2026-09-16',
+        'ecommerce-virtual-assistants' => 'page ID 1000207 — created and verified 2026-09-16',
+        'bookkeeping-virtual-assistants' => 'page ID 1000208 — created and verified 2026-09-16',
+
         'vathankyou' => 'page ID 126, page-vathankyou.blade.php — verified 2026-09-14',
         'hire-va-4' => 'page ID 1000000, renders patterns/hire-va-4-full.php — created and verified 2026-09-14',
 

@@ -67,34 +67,19 @@
                                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
                                         </svg>
                                       </a>
-                                      <ul class="sub-menu absolute left-0 top-full mt-2 min-w-[320px] bg-white rounded-2xl p-2.5 shadow-xl border border-slate-100 z-50 flex-col gap-1 max-h-[480px] overflow-y-auto">
-                                        <li><a href="' .
-                                home_url('/admin-virtual-assistants/') .
-                                '" class="block px-4 py-2 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Admin Virtual Assistants</a></li>
-                                        <li><a href="' .
-                                home_url('/executive-virtual-assistants/') .
-                                '" class="block px-4 py-2 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Executive Virtual Assistants</a></li>
-                                        <li><a href="' .
-                                home_url('/customer-support-virtual-assistants/') .
-                                '" class="block px-4 py-2 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Customer Support Virtual Assistants</a></li>
-                                        <li><a href="' .
-                                home_url('/sales-virtual-assistants/') .
-                                '" class="block px-4 py-2 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Sales Virtual Assistants</a></li>
-                                        <li><a href="' .
-                                home_url('/lead-generation-virtual-assistants/') .
-                                '" class="block px-4 py-2 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Lead Generation Virtual Assistants</a></li>
-                                        <li><a href="' .
-                                home_url('/socialmediavirtualassistants/') .
-                                '" class="block px-4 py-2 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Social Media Virtual Assistants</a></li>
-                                        <li><a href="' .
-                                home_url('/marketing-assistants-legacy/') .
-                                '" class="block px-4 py-2 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Marketing Virtual Assistants</a></li>
-                                        <li><a href="' .
-                                home_url('/graphic-design-virtual-assistants/') .
-                                '" class="block px-4 py-2 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Graphic Design Virtual Assistants</a></li>
-                                        <li><a href="' .
-                                home_url('/bookkeeping-accounting-virtual-assistants/') .
-                                '" class="block px-4 py-2 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Bookkeeping / Accounting Virtual Assistants</a></li>
+                                      <ul class="sub-menu absolute left-0 top-full mt-2 min-w-[320px] bg-white rounded-2xl p-2.5 shadow-xl border border-slate-100 z-50 flex-col gap-1 max-h-[min(72vh,560px)] overflow-y-auto">
+' .
+                                /* The fourteen role pages, straight off the shared map, so a role added to
+                                   App\Support\RolePages appears here without anyone remembering to edit the nav.
+                                   The nine hand-written items this replaced had drifted: Social Media, Marketing
+                                   and Bookkeeping pointed at legacy slugs that are now redirects, and Medical,
+                                   Legal, Insurance, Real Estate and ECommerce were missing entirely. */
+                                implode('', array_map(
+                                    fn ($slug) => '<li><a href="' . home_url('/' . $slug . '/') .
+                                        '" class="block px-4 py-2 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">' .
+                                        esc_html(\App\Support\RolePages::title($slug)) . '</a></li>',
+                                    \App\Support\RolePages::slugs()
+                                )) . '
                                       </ul>
                                     </li>
                     
@@ -167,9 +152,21 @@
                       <a href="' .
                         home_url('/case-study/') .
                         '" class="px-3 py-2 rounded-lg text-base font-semibold text-slate-800 hover:bg-slate-100">Case Studies</a>
-                      <a href="' .
-                        home_url('/admin-virtual-assistants/') .
-                        '" class="px-3 py-2 rounded-lg text-base font-semibold text-slate-800 hover:bg-slate-100">Virtual Assistant Roles</a>
+                      <details class="group">
+                        <summary class="flex cursor-pointer items-center justify-between px-3 py-2 rounded-lg text-base font-semibold text-slate-800 hover:bg-slate-100 [&::-webkit-details-marker]:hidden">
+                          <span>Virtual Assistant Roles</span>
+                          <svg class="h-4 w-4 shrink-0 transition-transform duration-200 group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </summary>
+                        <div class="mt-1 flex flex-col border-l border-slate-200 pl-3">' .
+                        implode('', array_map(
+                            fn ($slug) => '<a href="' . home_url('/' . $slug . '/') .
+                                '" class="px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">' .
+                                esc_html(\App\Support\RolePages::title($slug)) . '</a>',
+                            \App\Support\RolePages::slugs()
+                        )) . '</div>
+                      </details>
                       <a href="' .
                         home_url('/vapricing') .
                         '" class="px-3 py-2 rounded-lg text-base font-semibold text-slate-800 hover:bg-slate-100">Pricing</a>

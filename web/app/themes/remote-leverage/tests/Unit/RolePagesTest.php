@@ -8,6 +8,7 @@ use App\Blocks\BookingFooterBlock;
 use App\Blocks\HomeHeroBlock;
 use App\Blocks\WhyHireBlock;
 use App\Support\BlockDefaults;
+use App\Support\RolePages;
 
 /**
  * /admin-virtual-assistants/, the first of the fourteen 2026 role pages.
@@ -135,8 +136,8 @@ describe('the booking footer trust strip', function () {
         expect(trim(substr($strip, strrpos($strip, '</div>') + 6)))->toBe('@endif'.PHP_EOL.'</section>');
     });
 
-    test('the role page turns it on and the section padding still wraps the purple band', function () {
-        $src = (string) file_get_contents(dirname(__DIR__, 2).'/patterns/admin-virtual-assistants-booking-footer.php');
+    test('the role pages turn it on and the section padding still wraps the purple band', function () {
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/patterns/role-booking-footer.php');
         $blade = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/blocks/booking-footer.blade.php');
 
         expect($src)->toContain("'show_trust' => 1")
@@ -148,77 +149,95 @@ describe('the booking footer trust strip', function () {
     });
 });
 
-describe('the page is assembled from its own sections and the homepage shared ones', function () {
-    test('the hero asks for the composite, emerald ticks and an uncoloured accent line', function () {
-        $src = (string) file_get_contents(dirname(__DIR__, 2).'/patterns/admin-virtual-assistants-hero.php');
+describe('the fourteen role pages are one page with fourteen sets of words', function () {
+    test('every role carries a slug, a title, a heading noun and exactly six cards', function () {
+        $roles = RolePages::all();
 
-        expect($src)->toContain("'media' => 'image'")
-            ->and($src)->toContain("'tick_tone' => 'emerald'")
-            ->and($src)->toContain("'headline_accent_tone' => 'inherit'")
-            ->and($src)->toContain("pageImg('admin-virtual-assistants', 'hero.webp')")
-            // The checklist is passed, not inherited, and in the comp's column-major order:
-            // down the left desktop column, then down the right, which is also its mobile order.
-            ->and($src)->toContain('field_home_hero_checklist');
+        expect($roles)->toHaveCount(14);
 
-        preg_match('/\$checklist = array_map.*?\[(.*?)\]\);/s', $src, $m);
+        foreach ($roles as $slug => $role) {
+            expect($slug)->toMatch('/^[a-z0-9-]+$/')
+                ->and($role['role'])->not->toBe('')
+                ->and($role['noun'])->not->toBe('')
+                ->and($role['cards'])->toHaveCount(6, "{$slug} does not have six cards");
 
-        expect($m[1] ?? '')->toContain("'No Contracts, No Ongoing Fees',\n    '12-Month Replacement Guarantee',\n    'Hire Direct, No Middleman',");
-    });
-
-    test('the why-hire section asks for the banner, the measured ground and the role globe', function () {
-        $src = (string) file_get_contents(dirname(__DIR__, 2).'/patterns/admin-virtual-assistants-why-hire.php');
-
-        expect($src)->toContain("'layout' => 'banner'")
-            ->and($src)->toContain("'proof_background' => 'violet-deep'")
-            ->and($src)->toContain("'icon_set' => 'descriptive'")
-            ->and($src)->toContain("pageImg('admin-virtual-assistants', 'globe.png')")
-            ->and($src)->toContain('whyHire2026Cards');
-    });
-
-    test('the four reasons are shared with the homepage rather than restated', function () {
-        $role = (string) file_get_contents(dirname(__DIR__, 2).'/patterns/admin-virtual-assistants-why-hire.php');
-        $home = (string) file_get_contents(dirname(__DIR__, 2).'/patterns/homepage-why-hire.php');
-
-        // Fourteen role pages carry this copy verbatim; one helper, not fifteen literals.
-        expect($role)->toContain('BlockDefaults::whyHire2026Cards()')
-            ->and($home)->toContain('BlockDefaults::whyHire2026Cards()')
-            ->and($home)->not->toContain('No Recurring Fees - Hire Direct');
-    });
-
-    test('the full pattern owns three sections and reuses the homepage for the rest', function () {
-        $src = (string) file_get_contents(dirname(__DIR__, 2).'/patterns/admin-virtual-assistants-full.php');
-
-        foreach (['hero', 'talent', 'why-hire', 'booking-footer'] as $own) {
-            expect($src)->toContain("remote-leverage/admin-virtual-assistants-{$own}");
+            foreach ($role['cards'] as $i => $card) {
+                expect($card['title'] ?? '')->not->toBe('', "{$slug} card {$i} has no title")
+                    ->and($card['desc'] ?? '')->not->toBe('', "{$slug} card {$i} has no description");
+            }
         }
-
-        foreach ([
-            'comparison-table', 'process', 'headache', 'guarantee', 'reviews', 'faq',
-        ] as $shared) {
-            expect($src)->toContain("remote-leverage/homepage-{$shared}");
-        }
-
-        // The shared footer must stay off for everyone else.
-        expect($src)->not->toContain('remote-leverage/homepage-booking-footer');
     });
 
-    test('every section the page references exists on disk', function () {
+    test('no two roles share a card set, which is what a bad copy-paste would look like', function () {
+        $seen = [];
+
+        foreach (RolePages::all() as $slug => $role) {
+            $fingerprint = md5(serialize($role['cards']));
+            expect($seen)->not->toHaveKey($fingerprint, "{$slug} has the same six cards as ".($seen[$fingerprint] ?? ''));
+            $seen[$fingerprint] = $slug;
+        }
+    });
+
+    test('each role has a full pattern, and it renders from the shared map', function () {
         $dir = dirname(__DIR__, 2).'/patterns';
-        $src = (string) file_get_contents($dir.'/admin-virtual-assistants-full.php');
 
-        preg_match_all('#remote-leverage/([a-z0-9-]+)#', $src, $m);
+        foreach (RolePages::slugs() as $slug) {
+            $file = $dir."/{$slug}-full.php";
+            expect(is_file($file))->toBeTrue("Missing pattern for {$slug}");
 
-        expect($m[1])->not->toBeEmpty();
+            $src = (string) file_get_contents($file);
 
-        foreach (array_unique($m[1]) as $slug) {
-            expect(is_file($dir.'/'.$slug.'.php'))->toBeTrue("Missing pattern for {$slug}");
+            expect($src)->toContain("Slug: remote-leverage/{$slug}-full")
+                ->and($src)->toContain("RolePages::renderHero('{$slug}')")
+                ->and($src)->toContain("RolePages::renderTalent('{$slug}')")
+                // The role-specific sections are rendered; the rest are referenced.
+                ->and($src)->toContain('remote-leverage/role-why-hire')
+                ->and($src)->toContain('remote-leverage/role-booking-footer')
+                ->and($src)->toContain('remote-leverage/homepage-faq')
+                // The shared footer must stay off for every page that is not a role page.
+                ->and($src)->not->toContain('remote-leverage/homepage-booking-footer');
         }
     });
 
-    test('the page art is tracked source, not a stray file in public/', function () {
-        $src = dirname(__DIR__, 2).'/resources/images/pages/admin-virtual-assistants';
+    test('every pattern a role page references exists on disk', function () {
+        $dir = dirname(__DIR__, 2).'/patterns';
+
+        foreach (RolePages::slugs() as $slug) {
+            preg_match_all('#remote-leverage/([a-z0-9-]+)#', (string) file_get_contents($dir."/{$slug}-full.php"), $m);
+
+            foreach (array_unique($m[1]) as $ref) {
+                expect(is_file($dir.'/'.$ref.'.php'))->toBeTrue("{$slug} references a missing pattern: {$ref}");
+            }
+        }
+    });
+
+    test('none of the fourteen is still being redirected away', function () {
+        // A slug keeps its redirect until its page exists; leaving one in place after the page
+        // ships means the page is unreachable and nobody notices, because the redirect works.
+        $redirects = require dirname(__DIR__, 2).'/config/redirects.php';
+
+        foreach (RolePages::slugs() as $slug) {
+            expect($redirects)->not->toHaveKey($slug, "/{$slug}/ still redirects, so its page cannot be reached");
+        }
+    });
+
+    test('the navigation is generated from the same map, not a second hand-written list', function () {
+        $header = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/sections/header.blade.php');
+
+        expect($header)->toContain('RolePages::slugs()')
+            ->and($header)->toContain('RolePages::title($slug)')
+            // The legacy slugs the hand-written dropdown pointed at are now redirects.
+            ->and($header)->not->toContain('socialmediavirtualassistants')
+            ->and($header)->not->toContain('marketing-assistants-legacy')
+            ->and($header)->not->toContain('bookkeeping-accounting-virtual-assistants');
+    });
+
+    test('the page art is shared and tracked, not duplicated per role', function () {
+        $src = dirname(__DIR__, 2).'/resources/images/pages/role-pages';
 
         expect(is_file($src.'/hero.webp'))->toBeTrue()
-            ->and(is_file($src.'/globe.png'))->toBeTrue();
+            ->and(is_file($src.'/globe.png'))->toBeTrue()
+            // One copy, not fourteen.
+            ->and(is_dir(dirname(__DIR__, 2).'/resources/images/pages/admin-virtual-assistants'))->toBeFalse();
     });
 });

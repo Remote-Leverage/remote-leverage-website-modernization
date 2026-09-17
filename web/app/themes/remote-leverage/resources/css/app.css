@@ -1794,6 +1794,52 @@ h2.wp-block-heading,
   flex-wrap: nowrap !important;
 }
 
+/* The canonical gutter, for bare core blocks sitting directly in a constrained group.
+   WordPress prints the constrained *width* inline per group, but the horizontal padding that
+   normally comes with it ships in `global-styles`, which app/setup.php dequeues. Nothing
+   re-implemented it, so a `wp:heading` or `wp:columns` written straight into a pattern ran
+   edge-to-edge: at 414px its text touched both sides of the screen, and at 1440px it measured
+   1380px against the 1316px of every ACF section, so headings down a page did not line up.
+
+   Deliberately NOT `> *`: the theme's own wrappers (`w-full`, ACF block roots) already inset
+   their contents, and padding those would double the gutter to 32px. Only the core blocks the
+   patterns emit are listed, and the values are the canonical container's own
+   `px-4 sm:px-6 lg:px-8` (CLAUDE.md "Conventions" rule 1), so a block that already declares
+   them is set to the value it already had rather than added to. */
+.wp-block-group.is-layout-constrained > .wp-block-columns,
+.wp-block-group.is-layout-constrained > .wp-block-heading,
+.wp-block-group.is-layout-constrained > .wp-block-paragraph,
+.wp-block-group.is-layout-constrained > .wp-block-image,
+.wp-block-group.is-layout-constrained > .wp-block-list,
+.wp-block-group.is-layout-constrained > .wp-block-buttons {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .wp-block-group.is-layout-constrained > .wp-block-columns,
+  .wp-block-group.is-layout-constrained > .wp-block-heading,
+  .wp-block-group.is-layout-constrained > .wp-block-paragraph,
+  .wp-block-group.is-layout-constrained > .wp-block-image,
+  .wp-block-group.is-layout-constrained > .wp-block-list,
+  .wp-block-group.is-layout-constrained > .wp-block-buttons {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .wp-block-group.is-layout-constrained > .wp-block-columns,
+  .wp-block-group.is-layout-constrained > .wp-block-heading,
+  .wp-block-group.is-layout-constrained > .wp-block-paragraph,
+  .wp-block-group.is-layout-constrained > .wp-block-image,
+  .wp-block-group.is-layout-constrained > .wp-block-list,
+  .wp-block-group.is-layout-constrained > .wp-block-buttons {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
 /* VA Pricing Hero: stack the text/grid split below tablet */
 @media (max-width: 781px) {
   .rl-vapricing-hero-columns {

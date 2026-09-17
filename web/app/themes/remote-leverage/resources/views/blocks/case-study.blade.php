@@ -24,7 +24,20 @@
         .'[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-4 [&_ol]:space-y-2 [&_ol]:text-[#333333] [&_ol]:text-lg '
         .'[&_li]:leading-7 '
         .'[&_a]:text-brand-purple [&_a]:underline [&_a]:decoration-brand-purple/40 hover:[&_a]:decoration-brand-purple '
-        .'[&_strong]:font-bold [&_strong]:text-black [&_b]:font-bold [&_b]:text-black';
+        .'[&_strong]:font-bold [&_strong]:text-black [&_b]:font-bold [&_b]:text-black '
+        // A `table` section renders through the grid above, but a table pasted as raw HTML into a
+        // richtext section lands here instead, and until now inherited nothing: `table-layout:auto`
+        // with 0px cell padding put the second column flush against the container edge and ran it
+        // into the first with no gutter. Styled to match the `table` renderer so the two are
+        // indistinguishable. `table-fixed` + `w-1/2` is what stops a long cell sizing a column to
+        // its content, and `break-words` keeps a long unbroken token from reintroducing overflow.
+        .'[&_table]:w-full [&_table]:my-6 [&_table]:table-fixed [&_table]:border-collapse '
+        .'[&_th]:w-1/2 [&_th]:px-3 [&_th]:py-3 [&_th]:text-left [&_th]:align-top [&_th]:bg-black/[0.03] '
+        .'[&_th]:text-xs [&_th]:font-bold [&_th]:text-[#333333] [&_th]:uppercase [&_th]:tracking-wide '
+        .'sm:[&_th]:px-5 sm:[&_th]:text-sm '
+        .'[&_td]:px-3 [&_td]:py-3 [&_td]:text-left [&_td]:align-top [&_td]:text-sm [&_td]:leading-6 '
+        .'[&_td]:text-[#333333] [&_td]:border-b [&_td]:border-black/6 [&_td]:break-words '
+        .'sm:[&_td]:px-5';
 @endphp
 
 {{-- Hero: dark band matching production's case-study template family --}}
@@ -70,9 +83,14 @@
                     <div class="flex flex-col mb-10">
                         @foreach ($infoItems as $item)
                             @if (! empty($item['value']))
-                                <div class="flex items-baseline gap-4 text-lg leading-8">
-                                    <span class="font-medium text-white w-[193px] shrink-0">{{ $item['label'] }}:</span>
-                                    <span class="font-light text-white">{{ $item['value'] }}</span>
+                                {{-- The 193px label column is a desktop measurement and only holds from `sm`
+                                     up. At 414px it left 173px for the value, which a bare domain cannot
+                                     wrap into — `nativehawaiianphilanthropy.org` pushed the document to
+                                     485px wide. Stacked below `sm`, and `break-words` so a long unbroken
+                                     token breaks instead of widening the page. --}}
+                                <div class="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4 text-lg leading-8">
+                                    <span class="font-medium text-white sm:w-[193px] sm:shrink-0">{{ $item['label'] }}:</span>
+                                    <span class="font-light text-white min-w-0 break-words">{{ $item['value'] }}</span>
                                 </div>
                             @endif
                         @endforeach

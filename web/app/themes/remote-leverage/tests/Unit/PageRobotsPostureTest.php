@@ -29,8 +29,21 @@ $expected = [
     'spanish' => null,
     'hire-for-less' => null,
     'vaonboardingguide' => null,
-    // A role SEO landing page — the whole point is that it ranks.
+    // The fourteen role SEO landing pages — the whole point is that they rank.
     'admin-virtual-assistants' => null,
+    'executive-virtual-assistants' => null,
+    'customer-support-virtual-assistants' => null,
+    'sales-virtual-assistants' => null,
+    'lead-generation-virtual-assistants' => null,
+    'social-media-virtual-assistants' => null,
+    'marketing-virtual-assistants' => null,
+    'graphic-design-virtual-assistants' => null,
+    'medical-virtual-assistants' => null,
+    'legal-virtual-assistants' => null,
+    'insurance-virtual-assistants' => null,
+    'real-estate-virtual-assistants' => null,
+    'ecommerce-virtual-assistants' => null,
+    'bookkeeping-virtual-assistants' => null,
 ];
 
 describe('robots posture matches production per page', function () use ($expected) {
