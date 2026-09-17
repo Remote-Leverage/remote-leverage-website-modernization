@@ -30,6 +30,9 @@ web/.htaccess
 /uploads.zip
 /*.sql
 
+# Release artifacts built by scripts/release.sh (DB dump + uploads zip)
+/releases/
+
 # Composer
 /vendor
 auth.json

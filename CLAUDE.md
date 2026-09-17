@@ -119,6 +119,32 @@ Tailwind scans `patterns/`, `resources/patterns/`, `app/`, and `resources/**/*.b
 (see `@source` in `resources/css/app.css`). A class in a file outside those globs will not exist
 at runtime.
 
+## Release artifacts
+
+Release tags are `v-YYYYMMDD-vN` — a literal `v-` prefix, the date, then `-v1`, `-v2`… for each
+release cut that same day. The older `v2.x.x` semver tags are legacy; do not extend that series.
+
+`npm run release` (from the theme directory, like every other npm script) shells out to
+[`scripts/release.sh`](scripts/release.sh) and writes the content pair for one release into
+`releases/<tag>/`:
+
+```bash
+npm run release            # names the dir after HEAD's tag, or the next free v-YYYYMMDD-vN
+npm run release -- --force # overwrite an existing releases/<tag>/
+```
+
+It does **not** create or push a tag — tagging stays a separate, deliberate step.
+
+The pair is shaped for `scripts/import-production-content.sh`, which is the only consumer:
+a **plain, ungzipped** `db.sql` (`--add-drop-table`, so it imports over an existing database) and
+an `uploads.zip` whose entries sit under a top-level `uploads/` directory. Changing either shape
+breaks the importer silently — it will unzip into the wrong place rather than fail.
+
+Uploads are ~771MB of already-compressed JPEG/PNG/WebP, so the zip runs at level 1
+(`RELEASE_ZIP_LEVEL` overrides): the default level costs several times the wall clock to save a
+rounding error. Expect roughly a minute. `releases/` is gitignored — these artifacts are far too
+large for git and are moved around via S3.
+
 ## Assets
 
 Page art is **source in `resources/images/pages/<page>/`** (tracked in git) and **generated into

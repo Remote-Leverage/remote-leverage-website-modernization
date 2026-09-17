@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "release": "bash ../../../../scripts/release.sh",
     "db:dump": "wp db export --add-drop-table",
     "db:import": "wp db import",
     "dump-db": "npm run db:dump",
