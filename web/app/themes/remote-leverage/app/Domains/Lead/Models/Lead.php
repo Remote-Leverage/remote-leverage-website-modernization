@@ -44,6 +44,11 @@ class Lead extends Model
         'session_id',
         'posthog_session_id',
         'hubspot_contact_id',
+        // Local mirror of the HubSpot contact's lifecycle stage. See the 2026_09_17_000003
+        // migration and SyncHubSpotLifecycleAction.
+        'hubspot_lifecycle_stage',
+        'hubspot_lifecycle_changed_at',
+        'hubspot_lifecycle_synced_at',
         'device_id',
         'utm_id',
         'li_fat_id',
@@ -73,6 +78,8 @@ class Lead extends Model
     protected $casts = [
         'booking_next_retry_at' => 'datetime',
         'consent_at' => 'datetime',
+        'hubspot_lifecycle_changed_at' => 'datetime',
+        'hubspot_lifecycle_synced_at' => 'datetime',
         // The HandL first-touch set plus any query parameter without a column of its own.
         // See App\Domains\Lead\Services\AttributionCollector.
         'attribution' => 'array',

@@ -183,6 +183,8 @@ class LeadsAdminDashboard
                 'optional_fields' => $_POST['optional_fields'] ?? [],
                 'hubspot_access_token' => $_POST['hubspot_access_token'] ?? '',
                 'hubspot_portal_id' => $_POST['hubspot_portal_id'] ?? '',
+                'hubspot_lifecycle_property' => $_POST['hubspot_lifecycle_property'] ?? '',
+                'hubspot_lifecycle_fulfilled_value' => $_POST['hubspot_lifecycle_fulfilled_value'] ?? '',
                 'zerobounce_enabled' => $_POST['zerobounce_enabled'] ?? '',
                 'zerobounce_api_key' => $_POST['zerobounce_api_key'] ?? '',
                 'domain_validator_mode' => $_POST['domain_validator_mode'] ?? 'none',
@@ -2205,6 +2207,18 @@ class LeadsAdminDashboard
                             <th scope="row"><label for="hubspot_portal_id">HubSpot portal ID</label></th>
                             <td><input type="text" id="hubspot_portal_id" name="hubspot_portal_id" class="regular-text"
                                     value="<?php echo esc_attr($settings['hubspot_portal_id']); ?>" /></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="hubspot_lifecycle_property">Deal status property</label></th>
+                            <td><input type="text" id="hubspot_lifecycle_property" name="hubspot_lifecycle_property" class="regular-text"
+                                    value="<?php echo esc_attr($settings['hubspot_lifecycle_property']); ?>" />
+                                <p class="description">The HubSpot <strong>contact</strong> property that says where a deal stands &mdash; usually <code>lifecyclestage</code>, or <code>hs_lead_status</code> if your team works that field instead. Mirrored onto each referred lead hourly and shown to referrers as their referral&rsquo;s status. Getting this wrong means referrals never progress and no referrer is ever paid.</p></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="hubspot_lifecycle_fulfilled_value">Closing value</label></th>
+                            <td><input type="text" id="hubspot_lifecycle_fulfilled_value" name="hubspot_lifecycle_fulfilled_value" class="regular-text"
+                                    value="<?php echo esc_attr($settings['hubspot_lifecycle_fulfilled_value']); ?>" />
+                                <p class="description">The value of the property above that means the deal closed. Reaching it fulfils the attached referral and creates the reward automatically &mdash; no admin action needed. Default <code>customer</code>.</p></td>
                         </tr>
                         <tr>
                             <th scope="row" colspan="2" style="padding-top: 24px;">

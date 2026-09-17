@@ -6,15 +6,16 @@ namespace App\Domains\Referral\Listeners;
 
 use App\Domains\Lead\Events\LeadBookingCanceled;
 use App\Domains\Lead\Services\LeadActivityLogger;
-use App\Domains\Referral\Models\Referral;
 use App\Domains\Referral\Models\ReferralReward;
 use App\Domains\Referral\Models\Referrer;
+use App\Domains\Referral\Services\ReferralLeadMatcher;
 use Illuminate\Support\Facades\Log;
 
 class HandleLeadBookingCanceledForReferrer
 {
     public function __construct(
         protected LeadActivityLogger $activityLogger,
+        protected ReferralLeadMatcher $matcher,
     ) {}
 
     /**
@@ -43,10 +44,10 @@ class HandleLeadBookingCanceledForReferrer
                 return;
             }
 
-            $referral = Referral::query()
-                ->where('referrer_id', $referrer->id)
-                ->where('lead_email', $lead->email)
-                ->first();
+            // Same identity-graph resolution as the completion listener, and for the same
+            // reason: an email-keyed lookup here would fail to find the referral it is meant
+            // to reverse, leaving a canceled booking credited as qualified forever.
+            $referral = $this->matcher->findForLead($referrer, $lead);
 
             if (! $referral) {
                 return;

@@ -15,6 +15,14 @@ class ReferralSettingsService
     public const DEFAULT_REWARD_CURRENCY = 'USD';
 
     /**
+     * Days without a HubSpot lifecycle change before a referral is shown as stale.
+     *
+     * Five, because the lead lifecycle runs about four days: a referral still sitting on the
+     * same stage on day five has stopped moving rather than simply being early.
+     */
+    public const DEFAULT_STALE_DAYS = 5;
+
+    /**
      * Default settings applied when no admin-configured value exists.
      * Reward amount falls back to the env-configured value (config/services.php)
      * so a fresh install keeps working before any admin visits the settings screen.
@@ -26,6 +34,7 @@ class ReferralSettingsService
             'default_reward_currency' => self::DEFAULT_REWARD_CURRENCY,
             'default_reward_type' => self::DEFAULT_REWARD_TYPE,
             'cookie_days' => self::DEFAULT_COOKIE_DAYS,
+            'stale_days' => self::DEFAULT_STALE_DAYS,
             'landing_pages' => self::defaultLandingPages(),
         ];
     }
@@ -87,6 +96,14 @@ class ReferralSettingsService
             $errors[] = 'Cookie lifetime must be at least 1 day.';
         }
 
+        // Absent means "not on this form" — the settings screen predates this field, and
+        // defaulting an absent value to 0 would fail validation on every save made from the
+        // old markup. Only a submitted-and-invalid value is an error.
+        $staleDays = (int) ($input['stale_days'] ?? $this->get()['stale_days'] ?? self::DEFAULT_STALE_DAYS);
+        if ($staleDays < 1) {
+            $errors[] = 'Stale threshold must be at least 1 day.';
+        }
+
         $landingPages = $this->parseLandingPages((string) ($input['landing_pages'] ?? ''));
         if (empty($landingPages)) {
             $errors[] = 'At least one landing page is required (format: "Name = https://url", one per line).';
@@ -101,6 +118,7 @@ class ReferralSettingsService
             'default_reward_currency' => $currency,
             'default_reward_type' => trim((string) ($input['default_reward_type'] ?? self::DEFAULT_REWARD_TYPE)) ?: self::DEFAULT_REWARD_TYPE,
             'cookie_days' => $cookieDays,
+            'stale_days' => $staleDays,
             'landing_pages' => $landingPages,
         ];
 

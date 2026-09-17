@@ -12,6 +12,7 @@ use App\Domains\Referral\Listeners\HandleLeadBookingCompletedForReferrer;
 use App\Domains\Referral\Models\Referral;
 use App\Domains\Referral\Models\ReferralReward;
 use App\Domains\Referral\Models\Referrer;
+use App\Domains\Referral\Services\ReferralLeadMatcher;
 use App\Domains\Referral\Services\ReferralSettingsService;
 use Illuminate\Support\Str;
 
@@ -42,7 +43,7 @@ describe('HandleLeadBookingCompletedForReferrer qualification (booking != fulfil
         $referrer = makeRewardReferrer();
         $lead = makeAttributedLead($referrer);
 
-        $listener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger);
+        $listener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger, new ReferralLeadMatcher);
         $listener->handle(new LeadBookingCompleted($lead, 'meeting-1', 'calendly'));
 
         $referral = Referral::where('referrer_id', $referrer->id)->where('lead_email', $lead->email)->first();
@@ -56,7 +57,7 @@ describe('HandleLeadBookingCompletedForReferrer qualification (booking != fulfil
         $referrer = makeRewardReferrer();
         $lead = makeAttributedLead($referrer);
 
-        $listener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger);
+        $listener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger, new ReferralLeadMatcher);
         $listener->handle(new LeadBookingCompleted($lead, 'meeting-1', 'calendly'));
         $listener->handle(new LeadBookingCompleted($lead, 'meeting-1', 'calendly'));
 
@@ -67,7 +68,7 @@ describe('HandleLeadBookingCompletedForReferrer qualification (booking != fulfil
         $referrer = makeRewardReferrer();
         $lead = makeAttributedLead($referrer, ['email' => $referrer->email]);
 
-        $listener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger);
+        $listener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger, new ReferralLeadMatcher);
         $listener->handle(new LeadBookingCompleted($lead, 'meeting-1', 'calendly'));
 
         expect(Referral::where('referrer_id', $referrer->id)->where('lead_email', $lead->email)->count())->toBe(0);
@@ -82,7 +83,7 @@ describe('HandleLeadBookingCompletedForReferrer qualification (booking != fulfil
             'status' => 'booked',
         ]);
 
-        $listener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger);
+        $listener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger, new ReferralLeadMatcher);
         $listener->handle(new LeadBookingCompleted($lead, 'meeting-2', 'calendly'));
 
         expect(Referral::where('lead_email', $lead->email)->count())->toBe(0);
@@ -147,13 +148,13 @@ describe('HandleLeadBookingCanceledForReferrer reversal', function () {
         $referrer = makeRewardReferrer();
         $lead = makeAttributedLead($referrer);
 
-        $completedListener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger);
+        $completedListener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger, new ReferralLeadMatcher);
         $completedListener->handle(new LeadBookingCompleted($lead, 'meeting-3', 'calendly'));
 
         $referral = Referral::where('referrer_id', $referrer->id)->where('lead_email', $lead->email)->first();
         expect($referral->status)->toBe('qualified');
 
-        $canceledListener = new HandleLeadBookingCanceledForReferrer(new LeadActivityLogger);
+        $canceledListener = new HandleLeadBookingCanceledForReferrer(new LeadActivityLogger, new ReferralLeadMatcher);
         $canceledListener->handle(new LeadBookingCanceled($lead, 'Invitee canceled'));
 
         $referral->refresh();
@@ -166,14 +167,14 @@ describe('HandleLeadBookingCanceledForReferrer reversal', function () {
         $referrer = makeRewardReferrer();
         $lead = makeAttributedLead($referrer);
 
-        $completedListener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger);
+        $completedListener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger, new ReferralLeadMatcher);
         $completedListener->handle(new LeadBookingCompleted($lead, 'meeting-4', 'calendly'));
 
         $referral = Referral::where('referrer_id', $referrer->id)->where('lead_email', $lead->email)->first();
         (new FulfillReferralAction(new ReferralSettingsService))->execute($referral);
         expect(ReferralReward::where('referral_id', $referral->id)->where('status', 'due')->count())->toBe(1);
 
-        $canceledListener = new HandleLeadBookingCanceledForReferrer(new LeadActivityLogger);
+        $canceledListener = new HandleLeadBookingCanceledForReferrer(new LeadActivityLogger, new ReferralLeadMatcher);
         $canceledListener->handle(new LeadBookingCanceled($lead, 'Invitee canceled'));
 
         $referral->refresh();
@@ -186,14 +187,14 @@ describe('HandleLeadBookingCanceledForReferrer reversal', function () {
         $referrer = makeRewardReferrer();
         $lead = makeAttributedLead($referrer);
 
-        $completedListener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger);
+        $completedListener = new HandleLeadBookingCompletedForReferrer(new LeadActivityLogger, new ReferralLeadMatcher);
         $completedListener->handle(new LeadBookingCompleted($lead, 'meeting-5', 'calendly'));
 
         $referral = Referral::where('referrer_id', $referrer->id)->where('lead_email', $lead->email)->first();
         $reward = (new FulfillReferralAction(new ReferralSettingsService))->execute($referral);
         $reward->update(['status' => 'issued', 'issued_at' => now()]);
 
-        $canceledListener = new HandleLeadBookingCanceledForReferrer(new LeadActivityLogger);
+        $canceledListener = new HandleLeadBookingCanceledForReferrer(new LeadActivityLogger, new ReferralLeadMatcher);
         $canceledListener->handle(new LeadBookingCanceled($lead, 'Invitee canceled'));
 
         $referral->refresh();
@@ -206,7 +207,7 @@ describe('HandleLeadBookingCanceledForReferrer reversal', function () {
         $referrer = makeRewardReferrer();
         $lead = makeAttributedLead($referrer, ['email' => 'never-had-a-referral-'.uniqid().'@client.com']);
 
-        $canceledListener = new HandleLeadBookingCanceledForReferrer(new LeadActivityLogger);
+        $canceledListener = new HandleLeadBookingCanceledForReferrer(new LeadActivityLogger, new ReferralLeadMatcher);
         $canceledListener->handle(new LeadBookingCanceled($lead, 'Invitee canceled'));
 
         expect(Referral::where('referrer_id', $referrer->id)->where('lead_email', $lead->email)->count())->toBe(0);

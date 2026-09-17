@@ -6,11 +6,11 @@ namespace App\Application\Livewire\Referrer;
 
 use App\Domains\Lead\Actions\CaptureLeadAction;
 use App\Domains\Lead\Data\LeadCaptureData;
-use App\Domains\Referral\Models\Referral;
-use App\Domains\Referral\Models\ReferralClick;
 use App\Domains\Referral\Models\Referrer;
 use App\Domains\Referral\Repositories\ReferrerRepositoryInterface;
 use App\Domains\Referral\Services\ReferralSettingsService;
+use App\Domains\Referral\Support\DemoDashboardData;
+use App\Domains\Referral\Support\ReferrerDashboardPresenter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -21,6 +21,13 @@ class ReferrerPortalDashboard extends Component
     protected const MAX_LOGIN_ATTEMPTS = 5;
 
     protected const LOGIN_LOCKOUT_MINUTES = 15;
+
+    /**
+     * Referrals rendered per "Load more" step. The table used to be hard-capped at ten rows
+     * with no way to reach the eleventh, so a productive referrer simply could not see their
+     * own history.
+     */
+    protected const PAGE_SIZE = 10;
 
     // Authentication State
     public string $lookupCode = '';
@@ -35,12 +42,27 @@ class ReferrerPortalDashboard extends Component
 
     public ?string $loginError = null;
 
-    // KPI Metrics (matching rl-referral-program)
-    public int $reachCount = 0;
+    /**
+     * Table controls. The view model itself is rebuilt in render() rather than held in a
+     * public property: it carries a timeline per referral, and round-tripping that through
+     * Livewire's payload on every keystroke would dwarf the page it is rendering.
+     */
+    public string $statusFilter = 'all';
 
-    public int $recentReferralsCount = 0;
+    public string $search = '';
 
-    public int $dealsFulfilledCount = 0;
+    public int $visibleCount = self::PAGE_SIZE;
+
+    public ?int $expandedReferralId = null;
+
+    /**
+     * Render the bundled demo fixture instead of this referrer's real data.
+     *
+     * Administrator-only, and the check is repeated inside viewModel() on every render. This
+     * property arrives from the browser and is therefore attacker-controlled — gating only the
+     * toggle's visibility in the template would let a signed-in referrer flip it by hand.
+     */
+    public bool $demoMode = false;
 
     // Available Landing Pages for referral links
     public array $landingPages = [];
@@ -64,8 +86,6 @@ class ReferrerPortalDashboard extends Component
 
     public ?string $leadModalError = null;
 
-    public array $recentActivity = [];
-
     public function mount(?string $code = null): void
     {
         $this->landingPages = app(ReferralSettingsService::class)->get()['landing_pages'];
@@ -79,7 +99,6 @@ class ReferrerPortalDashboard extends Component
                 $this->referrerCode = $referrer->referral_code;
                 $this->isAuthenticated = true;
                 $this->updateSelectedLandingUrl();
-                $this->loadMetrics();
 
                 return;
             }
@@ -141,7 +160,6 @@ class ReferrerPortalDashboard extends Component
         session(['referrer_code' => $this->referrerCode]);
 
         $this->updateSelectedLandingUrl();
-        $this->loadMetrics();
     }
 
     /**
@@ -183,43 +201,141 @@ class ReferrerPortalDashboard extends Component
         $this->selectedLandingUrl = "{$cleanBase}?via={$this->referrerCode}";
     }
 
-    public function loadMetrics(): void
+    /**
+     * Whether the signed-in WordPress user may switch this portal into demo mode.
+     *
+     * `manage_options` rather than merely "is logged in": the referrer portal is a public page
+     * and any subscriber-level account would otherwise qualify. Outside WordPress (tests,
+     * console) there is no such thing as an administrator, so this is false — a fixture must
+     * never be reachable by default.
+     */
+    public function demoAllowed(): bool
     {
-        if (! $this->referrer) {
+        return function_exists('current_user_can') && current_user_can('manage_options');
+    }
+
+    /**
+     * Toggle the bundled demo fixture. Silently ignored for anyone not entitled to it.
+     */
+    public function toggleDemoMode(): void
+    {
+        if (! $this->demoAllowed()) {
+            $this->demoMode = false;
+
             return;
         }
 
-        try {
-            // 1. REACH: Count of total referral clicks
-            $this->reachCount = ReferralClick::query()->where('referrer_id', $this->referrer->id)->count();
+        $this->demoMode = ! $this->demoMode;
+        $this->resetTableControls();
+    }
 
-            // 2. RECENT REFERRALS: Total referrals submitted
-            $referralsQuery = $this->referrer->referrals();
-            $this->recentReferralsCount = $referralsQuery->count();
+    public function setStatusFilter(string $status): void
+    {
+        $this->statusFilter = $status;
+        $this->visibleCount = self::PAGE_SIZE;
+        $this->expandedReferralId = null;
+    }
 
-            // 3. DEALS FULFILLED: Referrals with qualified or closed status
-            $this->dealsFulfilledCount = $referralsQuery->whereIn('status', ['qualified', 'fulfilled', 'closed_won'])->count();
+    /**
+     * Reset paging whenever the search term changes, so filtering never lands the referrer on
+     * an empty page of a shorter result set.
+     */
+    public function updatedSearch(): void
+    {
+        $this->visibleCount = self::PAGE_SIZE;
+        $this->expandedReferralId = null;
+    }
 
-            // Load recent referrals table
-            $activity = $this->referrer->referrals()
-                ->with('rewards')
-                ->latest()
-                ->take(10)
-                ->get()
-                ->map(fn (Referral $ref) => [
-                    'id' => $ref->id,
-                    'date' => $ref->created_at ? $ref->created_at->format('M j, Y') : now()->format('M j, Y'),
-                    'name' => $ref->lead_name ?: 'Confidential Contact',
-                    'email' => $ref->lead_email ?: 'contact@domain.com',
-                    'status' => $ref->status ?? 'pending',
-                    'payout' => '$'.number_format((float) $ref->rewards->sum('amount'), 2),
-                ])
-                ->toArray();
+    public function loadMore(): void
+    {
+        $this->visibleCount += self::PAGE_SIZE;
+    }
 
-            $this->recentActivity = $activity;
-        } catch (\Throwable $e) {
-            Log::error('Error loading referrer metrics: '.$e->getMessage());
+    public function toggleTimeline(int $referralId): void
+    {
+        $this->expandedReferralId = $this->expandedReferralId === $referralId ? null : $referralId;
+    }
+
+    protected function resetTableControls(): void
+    {
+        $this->statusFilter = 'all';
+        $this->search = '';
+        $this->visibleCount = self::PAGE_SIZE;
+        $this->expandedReferralId = null;
+    }
+
+    /**
+     * Build the dashboard view model for this render.
+     *
+     * The demo entitlement is re-checked here, not trusted from the `$demoMode` property.
+     * That property is part of Livewire's client payload, so a referrer could set it to true
+     * in the browser; without this second check they would be served the fixture.
+     *
+     * @return array<string, mixed>
+     */
+    protected function viewModel(): array
+    {
+        if ($this->demoMode && $this->demoAllowed()) {
+            return DemoDashboardData::build(
+                (int) (app(ReferralSettingsService::class)->get()['stale_days'] ?? ReferralSettingsService::DEFAULT_STALE_DAYS)
+            );
         }
+
+        if (! $this->referrer) {
+            return $this->emptyViewModel();
+        }
+
+        try {
+            return app(ReferrerDashboardPresenter::class)->forReferrer($this->referrer) + ['is_demo' => false];
+        } catch (\Throwable $e) {
+            Log::error('Error building referrer dashboard: '.$e->getMessage(), ['exception' => $e]);
+
+            return $this->emptyViewModel();
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function emptyViewModel(): array
+    {
+        return [
+            'metrics' => ['reach' => 0, 'referrals' => 0, 'qualified' => 0, 'fulfilled' => 0, 'stale' => 0],
+            'earnings' => ['due' => 0.0, 'issued' => 0.0, 'total' => 0.0, 'currency' => 'USD'],
+            'referrals' => [],
+            'stale_days' => ReferralSettingsService::DEFAULT_STALE_DAYS,
+            'is_demo' => false,
+        ];
+    }
+
+    /**
+     * Apply the status filter and search term, then the "load more" window.
+     *
+     * @param  array<int, array<string, mixed>>  $referrals
+     * @return array<int, array<string, mixed>>
+     */
+    protected function filterReferrals(array $referrals): array
+    {
+        $needle = strtolower(trim($this->search));
+
+        $filtered = array_filter($referrals, function (array $row) use ($needle): bool {
+            if ($this->statusFilter === 'stale' && ! $row['is_stale']) {
+                return false;
+            }
+
+            if (! in_array($this->statusFilter, ['all', 'stale'], true) && $row['status'] !== $this->statusFilter) {
+                return false;
+            }
+
+            if ($needle === '') {
+                return true;
+            }
+
+            return str_contains(strtolower((string) $row['name']), $needle)
+                || str_contains(strtolower((string) $row['email']), $needle);
+        });
+
+        return array_values($filtered);
     }
 
     public function openSubmitLeadModal(): void
@@ -278,9 +394,18 @@ class ReferrerPortalDashboard extends Component
 
             $lead = $captureAction->execute($leadData);
 
-            // Record referral entry in rl_referrals table
+            // Record referral entry in rl_referrals table.
             if ($this->referrer) {
                 $this->referrer->referrals()->create([
+                    /*
+                     * The actual foreign key. This used to be recorded only in the note below,
+                     * as prose — so nothing could join on it, and when the prospect later
+                     * booked, the email-keyed lookup in HandleLeadBookingCompletedForReferrer
+                     * failed to find this row and inserted a duplicate referral beside it. A
+                     * phone-only submission missed every time, because the lead is given a
+                     * synthesised `@remoteleverage.internal` address that matches nothing.
+                     */
+                    'lead_id' => $lead->id,
                     'lead_name' => $this->leadModalName,
                     'lead_email' => $this->leadModalEmail,
                     'lead_phone' => $this->leadModalPhone,
@@ -296,8 +421,6 @@ class ReferrerPortalDashboard extends Component
             $this->leadModalEmail = '';
             $this->leadModalPhone = '';
             $this->leadModalNotes = '';
-
-            $this->loadMetrics();
         } catch (\Throwable $e) {
             Log::error('Failed to submit direct lead in referrer portal: '.$e->getMessage(), ['exception' => $e]);
             $this->leadModalError = 'Could not record lead at this time. Please verify details and try again.';
@@ -306,6 +429,19 @@ class ReferrerPortalDashboard extends Component
 
     public function render(): View
     {
-        return view('livewire.referrer.referrer-portal-dashboard');
+        $model = $this->viewModel();
+        $filtered = $this->filterReferrals($model['referrals']);
+
+        return view('livewire.referrer.referrer-portal-dashboard', [
+            'metrics' => $model['metrics'],
+            'earnings' => $model['earnings'],
+            'staleDays' => $model['stale_days'],
+            'isDemo' => (bool) ($model['is_demo'] ?? false),
+            'canToggleDemo' => $this->demoAllowed(),
+            'totalReferrals' => count($model['referrals']),
+            'filteredCount' => count($filtered),
+            'referrals' => array_slice($filtered, 0, $this->visibleCount),
+            'hasMore' => count($filtered) > $this->visibleCount,
+        ]);
     }
 }

@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\Log;
 
 class HubSpotGateway
 {
+    /**
+     * HubSpot's hard cap on `crm/v3/objects/contacts/batch/read` inputs.
+     */
+    public const BATCH_READ_LIMIT = 100;
+
     protected ?string $accessToken;
 
     protected string $portalId;
@@ -84,6 +89,85 @@ class HubSpotGateway
 
             return null;
         }
+    }
+
+    /**
+     * Read properties for up to `BATCH_READ_LIMIT` contacts in one call.
+     *
+     * Returns `contactId => [property => value]`, omitting any contact HubSpot did not return
+     * (deleted, merged away, or never ours). Callers must treat an absent id as "unknown",
+     * never as "the value is empty" — the difference decides whether a lead looks stale or
+     * looks unsynced.
+     *
+     * Batched because the alternative is one HTTP round trip per lead on every cron tick.
+     * HubSpot caps `batch/read` at 100 inputs, so the caller chunks and this asserts it.
+     *
+     * @param  array<int, string>  $contactIds
+     * @param  array<int, string>  $properties
+     * @return array<string, array<string, mixed>>
+     */
+    public function fetchContactProperties(array $contactIds, array $properties): array
+    {
+        $contactIds = array_values(array_unique(array_filter(array_map('strval', $contactIds))));
+
+        if ($contactIds === [] || $properties === []) {
+            return [];
+        }
+
+        if (! $this->accessToken) {
+            Log::warning('HubSpotGateway: no access token configured — contact properties were NOT read.');
+
+            return [];
+        }
+
+        if (count($contactIds) > self::BATCH_READ_LIMIT) {
+            throw new \InvalidArgumentException(
+                'HubSpotGateway::fetchContactProperties accepts at most '.self::BATCH_READ_LIMIT.' ids per call.'
+            );
+        }
+
+        try {
+            $response = Http::withToken($this->accessToken)
+                ->timeout(15)
+                ->post('https://api.hubapi.com/crm/v3/objects/contacts/batch/read', [
+                    'properties' => array_values($properties),
+                    'inputs' => array_map(static fn (string $id) => ['id' => $id], $contactIds),
+                ]);
+        } catch (\Throwable $e) {
+            Log::error('HubSpotGateway: exception reading contact properties: '.$e->getMessage());
+
+            return [];
+        }
+
+        /*
+         * 207 is the one that matters here. HubSpot answers a partially-successful batch with
+         * Multi-Status and a `results` array holding only the contacts it could read, which
+         * `Http::successful()` reports as failure — treating it as one would throw away every
+         * contact in a batch because one id had been deleted.
+         */
+        if (! $response->successful() && $response->status() !== 207) {
+            Log::warning('HubSpotGateway: batch read failed', [
+                'status' => $response->status(),
+                'body' => mb_substr((string) $response->body(), 0, 500),
+                'count' => count($contactIds),
+            ]);
+
+            return [];
+        }
+
+        $out = [];
+
+        foreach ((array) $response->json('results', []) as $result) {
+            if (! is_array($result) || empty($result['id'])) {
+                continue;
+            }
+
+            $out[(string) $result['id']] = is_array($result['properties'] ?? null)
+                ? $result['properties']
+                : [];
+        }
+
+        return $out;
     }
 
     /**

@@ -14,9 +14,13 @@ class DispatchReferralWebhook
     {
         $referral = $event->referral;
 
+        // `partner_id` used to be logged here. No such column exists on `rl_referrals` and
+        // none ever has, so Eloquent returned null for it on every dispatch — the log line
+        // read as "this referral has no partner" rather than as a typo.
         Log::info('Referral webhook dispatched', [
             'referral_id' => $referral->id,
-            'partner_id' => $referral->partner_id,
+            'referrer_id' => $referral->referrer_id,
+            'lead_id' => $referral->lead_id,
             'status' => $referral->status,
         ]);
 

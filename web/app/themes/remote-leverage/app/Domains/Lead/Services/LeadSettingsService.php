@@ -23,6 +23,22 @@ class LeadSettingsService
             'retention_days' => self::MINIMUM_RETENTION_DAYS,
             'hubspot_access_token' => '',
             'hubspot_portal_id' => '',
+
+            /*
+             * Which HubSpot contact property represents "where this deal stands", and the
+             * value of it that means the deal closed.
+             *
+             * Configurable rather than hard-coded because the answer is a portal convention,
+             * not a fact about the code: a team that works `hs_lead_status` and leaves
+             * `lifecyclestage` on its default needs a different property here, and getting it
+             * wrong means referrers are never paid. A settings change is the right size of fix
+             * for that; a redeploy is not.
+             *
+             * Read by SyncHubSpotLifecycleAction, which mirrors the value onto the lead and
+             * fulfils the attached referral when it reaches the value below.
+             */
+            'hubspot_lifecycle_property' => 'lifecyclestage',
+            'hubspot_lifecycle_fulfilled_value' => 'customer',
             /*
              * Slack bot token and channel.
              *
@@ -146,6 +162,12 @@ class LeadSettingsService
             'retention_days' => $retentionDays,
             'hubspot_access_token' => $keep('hubspot_access_token'),
             'hubspot_portal_id' => $keep('hubspot_portal_id'),
+            // Falling back to the default rather than storing '' matters: an empty property
+            // name would make every batch read return nothing, which presents as "no lead has
+            // moved in HubSpot for days" — indistinguishable from the thing staleness is
+            // supposed to detect.
+            'hubspot_lifecycle_property' => $keep('hubspot_lifecycle_property') ?: 'lifecyclestage',
+            'hubspot_lifecycle_fulfilled_value' => $keep('hubspot_lifecycle_fulfilled_value') ?: 'customer',
             'zerobounce_enabled' => ! empty($input['zerobounce_enabled']),
             'zerobounce_api_key' => $keep('zerobounce_api_key'),
             'domain_validator_mode' => $this->validatorMode($input['domain_validator_mode'] ?? null),

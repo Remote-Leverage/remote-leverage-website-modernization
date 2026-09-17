@@ -175,6 +175,9 @@ if (! Capsule::schema()->hasTable('rl_referrals')) {
         $table->increments('id');
         $table->integer('referrer_id')->nullable()->index();
         $table->integer('referrer_user_id')->nullable()->index();
+        // The real foreign key to rl_leads, added 2026-09-17. Referrals used to be joined to
+        // leads by email string only; see ReferralLeadMatcher.
+        $table->unsignedInteger('lead_id')->nullable()->index();
         $table->string('lead_name');
         $table->string('lead_email')->default('')->index();
         $table->string('lead_phone')->default('');
@@ -264,6 +267,9 @@ if (! Capsule::schema()->hasTable('rl_leads')) {
         $table->string('posthog_session_id', 100)->nullable();
         $table->string('device_id', 64)->nullable();
         $table->string('hubspot_contact_id', 50)->nullable();
+        $table->string('hubspot_lifecycle_stage', 100)->nullable()->index();
+        $table->timestamp('hubspot_lifecycle_changed_at')->nullable();
+        $table->timestamp('hubspot_lifecycle_synced_at')->nullable();
         $table->string('slack_message_ts', 32)->nullable();
         $table->string('slack_channel_id', 32)->nullable();
         $table->unsignedInteger('profile_id')->nullable()->index();
@@ -691,7 +697,16 @@ if (! function_exists('wp_verify_nonce')) {
 if (! function_exists('current_user_can')) {
     function current_user_can($capability, ...$args)
     {
-        return true;
+        /*
+         * Defaults to true, which is what the admin-screen tests assume. Steerable so the
+         * unprivileged path can be exercised too: set $GLOBALS['_wp_mock_capabilities'] to the
+         * list of capabilities the current user has ([] for none). The referrer portal's demo
+         * toggle is gated on `manage_options` and its guard is only meaningful if a test can
+         * actually be someone without it.
+         */
+        $capabilities = $GLOBALS['_wp_mock_capabilities'] ?? null;
+
+        return $capabilities === null || in_array($capability, (array) $capabilities, true);
     }
 }
 

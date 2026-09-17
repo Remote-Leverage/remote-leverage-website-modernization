@@ -180,6 +180,7 @@ class ReferralAdminDashboard
                 'default_reward_currency' => $_POST['default_reward_currency'] ?? '',
                 'default_reward_type' => $_POST['default_reward_type'] ?? '',
                 'cookie_days' => $_POST['cookie_days'] ?? '',
+                'stale_days' => $_POST['stale_days'] ?? '',
                 'landing_pages' => wp_unslash($_POST['landing_pages'] ?? ''),
             ]);
 
@@ -1272,6 +1273,14 @@ class ReferralAdminDashboard
                                 <input type="number" min="1" id="cookie_days" name="cookie_days" class="small-text"
                                     value="<?php echo esc_attr((string) $settings['cookie_days']); ?>" />
                                 <p class="description">How long the <code>rl_referrer</code> attribution cookie persists after a referrer link is visited.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="stale_days">Stale after (days)</label></th>
+                            <td>
+                                <input type="number" min="1" id="stale_days" name="stale_days" class="small-text"
+                                    value="<?php echo esc_attr((string) $settings['stale_days']); ?>" />
+                                <p class="description">Days without a HubSpot lifecycle change before a referral is flagged to its referrer as needing a nudge. The lead lifecycle runs about four days, so five catches deals that have genuinely stopped moving rather than ones that are simply early.</p>
                             </td>
                         </tr>
                     </table>

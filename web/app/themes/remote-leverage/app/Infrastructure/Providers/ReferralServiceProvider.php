@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Providers;
 
+use App\Domains\Referral\Actions\SyncHubSpotLifecycleAction;
+use App\Domains\Referral\Commands\SyncHubSpotLifecycleCommand;
 use App\Domains\Referral\Events\PayoutCompleted;
 use App\Domains\Referral\Events\ReferralRecorded;
 use App\Domains\Referral\Events\ReferrerRegistered;
@@ -13,6 +15,7 @@ use App\Domains\Referral\Listeners\SendReferrerWelcomeEmail;
 use App\Domains\Referral\Repositories\EloquentReferrerRepository;
 use App\Domains\Referral\Repositories\ReferrerRepositoryInterface;
 use App\Domains\Referral\Services\AttributionEngine;
+use App\Domains\Referral\Services\ReferralLeadMatcher;
 use App\Domains\Referral\Services\ReferralSettingsService;
 use App\Domains\Referral\Services\StripeConnectGateway;
 use Illuminate\Support\Facades\Event;
@@ -30,7 +33,14 @@ class ReferralServiceProvider extends ServiceProvider
         $this->app->singleton(StripeConnectGateway::class, fn () => new StripeConnectGateway);
         $this->app->singleton(AttributionEngine::class, fn () => new AttributionEngine);
         $this->app->singleton(ReferralSettingsService::class, fn () => new ReferralSettingsService);
+        $this->app->singleton(ReferralLeadMatcher::class, fn () => new ReferralLeadMatcher);
         $this->app->singleton(HandleReferralEventsForSlack::class);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                SyncHubSpotLifecycleCommand::class,
+            ]);
+        }
     }
 
     /**
@@ -59,6 +69,38 @@ class ReferralServiceProvider extends ServiceProvider
 
         Event::listen(PayoutCompleted::class, function (PayoutCompleted $event) {
             dispatch(static fn () => app(HandleReferralEventsForSlack::class)->handlePayoutCompleted($event))->afterResponse();
+        });
+
+        $this->scheduleHubSpotLifecycleSync();
+    }
+
+    /**
+     * Hourly WP-Cron: pull HubSpot lifecycle stages for leads with an open referral.
+     *
+     * Hourly rather than more often because the thing being measured moves over days — the
+     * lead lifecycle runs about four — so a tighter interval would spend HubSpot's rate limit
+     * to tell the dashboard the same thing it already said.
+     *
+     * This is the polling half of a deliberately two-part design. When the portal is
+     * configured to send webhooks, the receiver calls
+     * `SyncHubSpotLifecycleAction::applyStage()` and this schedule stays on as reconciliation
+     * for anything a webhook drops — a dropped delivery is otherwise invisible, and its cost
+     * is a referrer who is never paid.
+     */
+    protected function scheduleHubSpotLifecycleSync(): void
+    {
+        if (! function_exists('add_action')) {
+            return;
+        }
+
+        add_action('init', function () {
+            if (! wp_next_scheduled('rl_sync_hubspot_lifecycle')) {
+                wp_schedule_event(time(), 'hourly', 'rl_sync_hubspot_lifecycle');
+            }
+        });
+
+        add_action('rl_sync_hubspot_lifecycle', function () {
+            $this->app->make(SyncHubSpotLifecycleAction::class)->execute();
         });
     }
 }
