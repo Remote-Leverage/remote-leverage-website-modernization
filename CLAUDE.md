@@ -168,8 +168,22 @@ laravel-vite-plugin's `assets` glob, which content-hashes what it touches.
 The loose files directly in `resources/images/` are a separate thing: those go through Vite and
 are referenced with `Vite::asset()`.
 
-Homepage art resolves from EFS uploads first (`homeImg()`), falling back to the theme. `public/videos/`
-is still hand-maintained and untracked — the 64MB VSL does not belong in git.
+Homepage art resolves from EFS uploads first (`homeImg()`), falling back to the theme.
+
+**Video is split on size**, and `public/videos/` is an output of that split rather than a place to
+put things: `public/` is gitignored *and* excluded from the Docker build context, so a file dropped
+there by hand works locally and 404s in every deployed environment — which is exactly what happened
+to both embedded videos.
+
+- **Small clips** are source in `resources/videos/` (tracked in git) and copied verbatim into
+  `public/videos/` by the `themeVideos()` plugin in
+  [`vite/theme-videos.js`](web/app/themes/remote-leverage/vite/theme-videos.js), so every build and
+  every image has them.
+- **The 61MB VSL stays out of git** — a blob that size is paid for on every clone forever — and is
+  uploaded once per environment to `uploads/videos/` on EFS.
+
+Reference either through `BlockDefaults::video('home/clip.mp4')`, which prefers EFS uploads and falls
+back to the built `public/videos/`. Never hand-write a video URL.
 
 ## Conventions
 

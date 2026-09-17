@@ -79,9 +79,30 @@ The 404 response is the real template (49 KB, title *"Page not found"*, heading 
 
 **Consequence worth remembering:** before this fix, URL-existence checks against the local site were meaningless — everything answered 200. Audits done before 2026-09-14 that relied on curling the local site should be redone; ones that queried the database (`wp post list`) are sound. Production still has a narrower version of the same trap: it returns 200 for any path under `/tools/*`.
 
-### ~~3. `/robots.txt` returns 404~~ — ✅ **RESOLVED 2026-09-14** (file created; the 404 is a local Herd artifact)
+### ~~3. `/robots.txt` returns 404~~ — ✅ **RESOLVED 2026-09-14** (the 404 is a local Herd artifact) · **static file replaced by a generated one 2026-09-17**
 
-**A `robots.txt` now exists** at `web/robots.txt`, served as a static file from the Bedrock web root. It disallows `/wp/wp-admin/` (core lives under `/wp/` in this layout, not the web root), allows `admin-ajax.php`, disallows the authenticated portals and `/api/`, and points at `https://remoteleverage.com/wp-sitemap.xml`.
+**Update 2026-09-17: there is no static file any more, because it advertised the wrong host.**
+`web/robots.txt` hardcoded `Sitemap: https://remoteleverage.com/sitemap_index.xml` — the apex — so
+staging and the production preview host both pointed crawlers at the **legacy** site's sitemap. A
+physical file wins over WordPress's rewrite, so it was always the one answering, and no single
+value of that line can be right everywhere: a static file cannot know which host is serving it.
+
+The file is deleted. `App\Support\SiteRobotsTxt` now produces the same directives on the
+`robots_txt` filter, registered in `app/setup.php`. Yoast already appends the sitemap itself at
+priority 99999 using its own base URL, so the line is correct per environment with nothing
+hardcoded — verified locally, where it renders `https://remoteleverage-v2.test/sitemap_index.xml`.
+The disallow directives are unchanged.
+
+One behavioural change: when the site is not public (`DISALLOW_INDEXING` on dev, staging and the
+preview host) the filter returns core's output untouched instead of appending the `Allow:` line and
+the portal disallows. The static file served a permissive allow-list on hosts meant to be wholly
+excluded. This is not what keeps them out of the index — core does **not** emit `Disallow: /` (see
+#4), and the `noindex` meta is still doing that work — it just stops a non-public host publishing
+a crawl invitation it never meant to.
+
+**The original 2026-09-14 entry follows; its account of the local 404 is unchanged and still true.**
+
+~~**A `robots.txt` now exists** at `web/robots.txt`, served as a static file from the Bedrock web root.~~ It disallowed `/wp/wp-admin/` (core lives under `/wp/` in this layout, not the web root), allowed `admin-ajax.php`, disallowed the authenticated portals and `/api/`, and pointed at the sitemap (`/wp-sitemap.xml`, changed to Yoast's `/sitemap_index.xml` on 2026-09-15). `SiteRobotsTxt` carries every one of those directives forward.
 
 **The 404 was never an application bug.** Traced with a request-lifecycle probe: PHP reported `http_response_code() === 200` at `send_headers`, `template_redirect`, `do_robots` and `shutdown` — the full request — while nginx still returned 404 to the client. After adding the static file, nginx serves **our exact file** (correct bytes, `content-type: text/plain`, its own `etag`) and *still* reports 404.
 
@@ -115,7 +136,7 @@ Confirmed local-only:
 - `max-image-preview: large` is unaffected on production — WordPress core adds it itself via `wp_robots_max_image_preview_large()` (`wp-includes/robots-template.php:188`), gated on `blog_public`. The theme's copy was redundant.
 - `max-snippet: -1` and `max-video-preview: -1` are **gone**. These are snippet-length controls, not crawlability, and were part of the same removed block. If they are wanted back, they should be added on their own, gated on `blog_public`, not bundled with an indexability override.
 
-**Note on `robots.txt`:** the static `web/robots.txt` does not contradict any of this. Modern `do_robots()` never emits `Disallow: /` — it always outputs only the admin disallow/allow and passes `$public` to the `robots_txt` filter (`wp-includes/functions.php:1725-1739`). WordPress relies on the `noindex` meta tag, not robots.txt, to keep non-public sites out of the index, which is the mechanism now doing the work. Serving `noindex` while allowing the crawl is also the correct way round: a `Disallow` would stop crawlers ever seeing the `noindex`.
+**Note on `robots.txt`:** the generated robots.txt (issue #3 — a static file until 2026-09-17) does not contradict any of this. Modern `do_robots()` never emits `Disallow: /` — it always outputs only the admin disallow/allow and passes `$public` to the `robots_txt` filter (`wp-includes/functions.php:1725-1739`). WordPress relies on the `noindex` meta tag, not robots.txt, to keep non-public sites out of the index, which is the mechanism now doing the work. Serving `noindex` while allowing the crawl is also the correct way round: a `Disallow` would stop crawlers ever seeing the `noindex`.
 
 ### ~~5. Failed WebP conversion left a 0-byte file that was then served forever~~ — ✅ **FIXED 2026-09-15**
 
@@ -603,6 +624,86 @@ asserts that premise so the justification cannot silently rot.
 page, not Login Security — `admin.php?page=WordfenceWAF&subpage=waf_options#wf-option-loginSec-disableApplicationPasswords-label`.
 Passkeys, which *are* under Login Security, are an unrelated 2FA method and enabling them does not
 help.
+
+### ~~23. CloudFront handed every visitor the same Laravel session~~ — ✅ **FIXED 2026-09-17** (needs a deploy **and** an invalidation)
+
+Four routes — `/book-consultation`, `/referral-dashboard`, `/partners`, `/social-media-kit` — emitted
+`Set-Cookie: laravel-session=…` and `Cache-Control: public, s-maxage=60, stale-while-revalidate=30`
+in the same response. CloudFront stored that response, cookie included, and served it to everyone
+who arrived inside the TTL window. Verified live on **both** `production.remoteleverage.com` and
+`staging.remoteleverage.com` on 2026-09-17: independent requests came back carrying the **same**
+`laravel-session` value, with `x-cache: Hit from cloudfront` and a rising `age`.
+
+**Why a shared session is a shared login, not just a shared cache entry.**
+`App\Application\Livewire\Referrer\ReferrerPortalDashboard::mount()` restores a logged-in referrer
+straight from `session('referrer_code')` with no password re-check — that part is by design, so a
+returning referrer is not challenged twice — and `routes/web.php` serves `/referral-dashboard` from
+the same `pages.referrer-portal` view. Nothing calls `session()->regenerate()` on login. So handing
+out one session id hands out one referrer portal.
+
+**Root cause, both halves in `docker/nginx.conf`:**
+
+1. the cache-skip map keyed on the request path with `"~*^/referrer-"`. That matches
+   `/referrer-portal` and `/referrer-register` and **not** `/referral-dashboard`, which serves the
+   same view under a different prefix; the other three routes were never considered at all.
+2. the block does `fastcgi_hide_header Cache-Control` and then
+   `add_header Cache-Control $html_cache_control`, so whatever PHP said about the response was
+   discarded and replaced.
+
+nginx's own cache was never wrong about these. `Set-Cookie` is not in `fastcgi_ignore_headers`, so
+nginx refused to store them and they always reported `x-rl-cache: MISS`. It advertised them as
+publicly cacheable anyway, and the CDN believed the header rather than the behaviour.
+
+**Why it was never caught.** The bug does not exist at the origin and does not exist locally — it
+needs a CDN in front to appear at all. Every environment where it was reproducible is one nobody
+was curling during development, and every environment being curled during development was one that
+could not reproduce it.
+
+**Fix.** A new `map $upstream_http_set_cookie $has_set_cookie`, and `$html_cache_control` re-keyed on
+`"$skip_cache$has_set_cookie"`: `public, s-maxage=60, stale-while-revalidate=30` is emitted only when
+nginx did not skip the cache **and** the response sets no cookie; everything else is
+`private, no-store`. Keyed on the **response** rather than on a path list, precisely because a path
+list is how this failed — a future route that opens a session is covered with no edit. On a cache
+hit nginx never talks to the upstream, so the variable is empty and the response is marked
+cacheable, which is correct: a response nginx was allowed to store never carried a cookie.
+
+**Deploying the fix is not enough on its own.** Entries already cached keep their poisoned
+`Set-Cookie` until they age out, so the deploy must be followed by a CloudFront invalidation on
+**both** distributions. See [deployment.md](deployment.md) and
+[production-cutover.md](production-cutover.md).
+
+### ~~24. Both embedded videos 404'd in every deployed environment~~ — ✅ **FIXED 2026-09-17** (one upload still outstanding)
+
+`/about-us/` embeds the 61MB VSL and `/vathankyou/` a 1.6MB booking walkthrough. Both returned
+**404 on staging and on the production preview host** while working locally.
+
+The cause is structural rather than a wrong path. `public/` is gitignored, and `.dockerignore`
+excludes `web/app/themes/remote-leverage/public` from the build context, so the runtime image
+contains only what `npm run build` regenerates — and nothing generated videos. **Anything
+hand-placed in `public/` is local-only by construction**, which is the general lesson here; the
+videos were simply the first assets to sit there without a build step behind them.
+
+**Fixed by splitting on size, because the two ends fail in opposite directions.**
+
+| | Booking walkthrough (1.6MB) | VSL (61MB) |
+| :--- | :--- | :--- |
+| Lives in | `resources/videos/home/booking-confirmation-walkthrough.mp4`, tracked in git | not in git — a 61MB blob is paid for on every clone and every CI checkout, forever |
+| Reaches the image via | the `themeVideos()` Vite plugin (`vite/theme-videos.js`, registered in `vite.config.js`), which copies `resources/videos/**` verbatim into `public/videos/**` | uploaded once per environment to `uploads/videos/` on EFS |
+
+`BlockDefaults::video(string $file)` resolves either one: EFS uploads first, then the theme's built
+`public/videos/`, and when neither exists it returns the **uploads** URL — deliberately, because
+that is the location an operator can fix without a deploy. It reuses the zero-byte guard from #5.
+Call sites updated: `patterns/about-quote.php` and `resources/views/page-vathankyou.blade.php`.
+Filenames and directory names are preserved exactly for the same reason `themeImages()` preserves
+them — the URL is built by hand, so a content hash would break the call site.
+
+> **Still broken until a human acts.** `5-minute-VSL_Horizontal_V01.mp4` must be uploaded to
+> `uploads/videos/` on EFS in **staging and production**. Until it is, `/about-us/` renders a
+> broken player on both. The code change does not carry the file. See
+> [deployment.md](deployment.md) § Content import.
+
+**Renamed in passing:** the private helper `BlockDefaults::isUsableImage()` is now `isUsableFile()`
+— three call sites plus `tests/Unit/ZeroByteImageFallbackTest.php` — since a video now uses it.
 
 ## Stale documentation
 

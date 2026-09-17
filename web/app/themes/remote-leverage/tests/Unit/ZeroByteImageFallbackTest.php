@@ -69,7 +69,10 @@ describe('zero-byte files never shadow a working asset', function () {
         // failure that was not there.
         $lines = file(dirname(__DIR__, 2).'/app/Support/BlockDefaults.php');
 
-        foreach (['homeImg', 'themeImg', 'resolveImageUrl'] as $method) {
+        // video() joined the list on 2026-09-17: it searches uploads before the theme for the
+        // same reason homeImg() does, so a zero-byte upload would shadow the built copy there
+        // too — and an empty MP4 fails as a dead player, which reads as "has not started yet".
+        foreach (['homeImg', 'themeImg', 'resolveImageUrl', 'video'] as $method) {
             $r = new ReflectionMethod(BlockDefaults::class, $method);
             $body = implode('', array_slice(
                 $lines,

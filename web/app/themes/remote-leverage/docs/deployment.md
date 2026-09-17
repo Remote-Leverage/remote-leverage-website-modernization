@@ -132,6 +132,36 @@ Why a named lock and not `migrate --isolated`: ECS rolling deploys start several
 
 A task that cannot acquire the lock within `--timeout` (default 120s) logs and exits successfully: another container is running the same code, so the work will be done — this task just must not race it.
 
+## CloudFront invalidation after a cache-header change
+
+**A deploy does not clear CloudFront.** ECS rolls, the origin starts sending the new headers, and
+every object already in the distribution keeps serving its stored copy — and its stored *response
+headers* — until it ages out. For an ordinary code change that is harmless. For a change to what the
+origin says about cacheability it is not, because the bad entries are exactly the ones that outlive
+the fix.
+
+This is not hypothetical. The `Set-Cookie` fix in `docker/nginx.conf`
+([known-issues.md](known-issues.md) #23) stopped the origin advertising a session-bearing response as
+`public, s-maxage=60` — but the entries CloudFront had already cached still hold a
+`laravel-session` cookie, and go on handing it to every visitor until their TTL expires. **Deploy
+that change to an environment and then invalidate that environment's distribution**, on staging and
+production alike, before treating it as fixed.
+
+```bash
+# Find the distribution for a hostname, then invalidate everything.
+aws cloudfront list-distributions \
+  --query "DistributionList.Items[?contains(Aliases.Items, 'staging.remoteleverage.com')].Id" \
+  --output text
+
+aws cloudfront create-invalidation --distribution-id <ID> --paths '/*'
+```
+
+`--paths '/*'` is the right blunt instrument here: the poisoned entries are keyed by URL and there is
+no list of which ones were served while the bug was live. Verify with a pair of independent requests
+to `/book-consultation` and confirm that either no `Set-Cookie` is present or the value differs
+between them — and read `x-cache` back, since `Hit from cloudfront` is evidence about whenever the
+object was stored, not about now ([known-issues.md](known-issues.md) #19).
+
 ## Secrets
 
 Runtime still comes from AWS Secrets Manager (`wordpress-staging/app` or `wordpress-production/app`), injected into the ECS task. **GitHub Environment secrets are the place you edit values.** A workflow copies them into Secrets Manager; ECS does not read GitHub at runtime.
@@ -199,7 +229,11 @@ When you control DNS:
 Empty ECR will not stay healthy. Order:
 
 1. Apply Terraform + add ACM/CNAME for `production.remoteleverage.com`.
-2. Seed Secrets Manager (`STRIPE_MODE=live`; webhook secret can wait — Stripe webhooks 503 until set).
+2. Seed Secrets Manager. **There is no `STRIPE_MODE` key** — an earlier version of this list said to
+   seed one and nothing reads it. The code reads **`STRIPE_TEST_MODE`** (`config/services.php`,
+   `stripe.test_mode`), and *live* is that being absent or false, with `STRIPE_KEY` / `STRIPE_SECRET`
+   holding the live pair — live mode reuses those rather than a parallel `STRIPE_LIVE_*` pair. The
+   webhook secret can wait — Stripe webhooks 503 until it is set.
 3. Push a release tag (`v-YYYYMMDD-v1`) and approve the production environment job.
 4. Import SQL + extract uploads (below).
 5. Smoke-test the booking form, media, and admin on the preview host.
@@ -235,3 +269,41 @@ Also set `home` / `siteurl` to `https://production.remoteleverage.com` and `http
 Do **not** rewrite `https://remoteleverage.com` in post body during the preview period — those are live-site links and still resolve.
 
 `wp acorn rl:deploy` already runs on container start and applies migrations after the import. Leftover `.test` / localhost hosts in `the_content` still get rewritten by `BlockDefaults::rewriteLocalAbsoluteUrls`.
+
+### Videos on EFS (per environment) — **outstanding on staging and production**
+
+One video is deliberately **not** in the image and **not** in the database dump, so nothing in the
+pipeline above puts it on a host. It has to be uploaded by hand, once per environment.
+
+| File | Destination | Used by |
+| :--- | :--- | :--- |
+| `5-minute-VSL_Horizontal_V01.mp4` (61MB) | `uploads/videos/` on the EFS mount | `/about-us/` |
+
+Everything smaller travels on its own: `resources/videos/**` is tracked in git and the
+`themeVideos()` Vite plugin copies it into `public/videos/**` during the `assets` build stage, so the
+1.6MB walkthrough on `/vathankyou/` is already in every image. The VSL is excluded because a 61MB
+blob in git is paid for on every clone and every CI checkout, forever — see
+[known-issues.md](known-issues.md) #24 for why both videos 404'd before this split existed.
+
+`BlockDefaults::video()` looks in `uploads/videos/` first, then the theme's built `public/videos/`,
+and when neither has the file it returns the uploads URL anyway — so **the page renders a broken
+player rather than an error**, and the fix is an upload rather than a deploy. That is the current
+state of `/about-us/` on staging and on the production preview host.
+
+EFS is reachable from tasks only, not from the VPN, so the upload takes the same route as the
+uploads zip: put the file on the backups bucket and have a task copy it onto the mount.
+`scripts/import-production-content.sh` does **not** do this — it only handles `db.sql` and
+`uploads.zip` — so run it as a one-off, either through ECS Exec on a running task or a `RunTask`
+shaped like the import script's:
+
+```sh
+aws s3 cp 5-minute-VSL_Horizontal_V01.mp4 s3://remote-leverage-wordpress-backups/tmp/
+# then, on a task with the EFS mount:
+mkdir -p web/app/uploads/videos
+aws s3 cp s3://remote-leverage-wordpress-backups/tmp/5-minute-VSL_Horizontal_V01.mp4 web/app/uploads/videos/
+chown www-data:www-data web/app/uploads/videos/5-minute-VSL_Horizontal_V01.mp4
+```
+
+Delete the S3 copy afterwards. Verify by loading `/about-us/` rather than by listing the directory:
+a zero-byte file passes `ls` and fails `BlockDefaults::video()`'s usability check, which is the
+failure mode [known-issues.md](known-issues.md) #5 describes for images.
