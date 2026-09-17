@@ -555,6 +555,34 @@ class LeadsAdminDashboard
                 border-bottom: none;
             }
 
+            /* --- Attribution Cell (truncated: long UTM campaigns blow out the table) --- */
+            .rl-attr-cell {
+                max-width: 220px;
+            }
+            .rl-attr-source,
+            .rl-attr-campaign {
+                display: block;
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .rl-attr-source {
+                font-weight: 600;
+                color: #09090b;
+                font-size: 12px;
+            }
+            .rl-attr-campaign {
+                font-size: 11px;
+                color: #71717a;
+            }
+            .rl-attr-cell .rl-badge {
+                display: inline-block;
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
             /* --- Contact Cell Layout --- */
             .rl-contact-cell {
                 display: flex;
@@ -1191,16 +1219,18 @@ class LeadsAdminDashboard
                                         <?php } ?>
                                     </td>
                                     <td>
-                                        <?php if ($lead->utm_source || $lead->utm_campaign) { ?>
-                                            <div style="font-weight: 600; color: #09090b; font-size: 12px;"><?php echo esc_html($lead->utm_source ?: 'direct'); ?></div>
-                                            <?php if ($lead->utm_campaign) { ?>
-                                                <div style="font-size: 11px; color: #71717a;">cmp: <?php echo esc_html($lead->utm_campaign); ?></div>
+                                        <div class="rl-attr-cell">
+                                            <?php if ($lead->utm_source || $lead->utm_campaign) { ?>
+                                                <span class="rl-attr-source" title="<?php echo esc_attr($lead->utm_source ?: 'direct'); ?>"><?php echo esc_html($lead->utm_source ?: 'direct'); ?></span>
+                                                <?php if ($lead->utm_campaign) { ?>
+                                                    <span class="rl-attr-campaign" title="<?php echo esc_attr($lead->utm_campaign); ?>">cmp: <?php echo esc_html($lead->utm_campaign); ?></span>
+                                                <?php } ?>
+                                            <?php } elseif ($lead->referral_code) { ?>
+                                                <span class="rl-badge" title="<?php echo esc_attr($lead->referral_code); ?>">via: <?php echo esc_html($lead->referral_code); ?></span>
+                                            <?php } else { ?>
+                                                <span style="color: #a1a1aa; font-size: 11px;">Direct Organic</span>
                                             <?php } ?>
-                                        <?php } elseif ($lead->referral_code) { ?>
-                                            <span class="rl-badge">via: <?php echo esc_html($lead->referral_code); ?></span>
-                                        <?php } else { ?>
-                                            <span style="color: #a1a1aa; font-size: 11px;">Direct Organic</span>
-                                        <?php } ?>
+                                        </div>
                                     </td>
                                     <td>
                                         <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads&view_lead='.$lead->id)); ?>" class="rl-audit-pill">
