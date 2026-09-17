@@ -1952,6 +1952,35 @@ h2.wp-block-heading,
   display: block;
 }
 
+/* Mobile: the medals lead the section and bleed off its top edge.
+   Stacked in source order the badge trailed a long block of copy and read as an orphan at the
+   very bottom of the section. Reversing it on mobile puts the image first, and pulling it up
+   past the group's `padding-top:0` lets `overflow:hidden` on .rl-guarantee-group crop it, so it
+   reads as art bleeding in from the top rather than a picture sitting in a box. The negative
+   inline margins cancel the constrained-group gutter so the bleed reaches both screen edges.
+   Desktop is untouched: above 782px the columns are side by side and order is irrelevant. */
+@media (max-width: 781px) {
+  .rl-guarantee-group .wp-block-columns {
+    row-gap: 0 !important;
+  }
+
+  .rl-guarantee-group .wp-block-column:last-child {
+    order: -1;
+    justify-content: center;
+    margin-top: -4.5rem;
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+
+  .rl-guarantee-group .wp-block-column:first-child {
+    padding-top: 1.5rem;
+  }
+
+  .rl-guarantee-group figure.wp-block-image {
+    max-width: none;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════ */
 /* LEGAL DOCUMENTS (Privacy Policy, Terms of Use)              */
 /* ═══════════════════════════════════════════════════════════ */
@@ -2194,5 +2223,31 @@ h2.wp-block-heading,
 @media (min-width: 1024px) {
   .rl-header-over-hero .rl-partner-hero {
     padding-top: 8rem;
+  }
+}
+
+/* Mobile nav accordion: animate the disclosure with no JavaScript.
+   <details> does not render its content when closed, so the usual grid-rows 0fr->1fr trick
+   cannot animate it without JS holding the panel open. ::details-content can, and degrades
+   to the instant open this replaced wherever it is unsupported. */
+#rl-mobile-nav details {
+  interpolate-size: allow-keywords;
+}
+
+#rl-mobile-nav details::details-content {
+  block-size: 0;
+  overflow: hidden;
+  transition:
+    block-size 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    content-visibility 280ms allow-discrete;
+}
+
+#rl-mobile-nav details[open]::details-content {
+  block-size: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #rl-mobile-nav details::details-content {
+    transition: none;
   }
 }

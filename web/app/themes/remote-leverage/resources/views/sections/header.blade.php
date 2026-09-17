@@ -135,49 +135,62 @@
     </div>
 
     <!-- Mobile Menu Drawer (Using MobileNavWalker) -->
+    {{-- Bounded to whatever the viewport has left under the sticky header, so fourteen role
+         links scroll inside the drawer instead of pushing the CTA off the bottom of the screen.
+         100dvh, not 100vh: mobile Safari's toolbar makes vh taller than the visible area. --}}
     <div id="rl-mobile-nav" hidden
-        class="lg:hidden border-b border-slate-200 bg-[#F4F6FC] px-4 pt-2 pb-6 space-y-4 shadow-xl">
-        <nav class="flex flex-col space-y-1">
+        class="lg:hidden flex flex-col max-h-[calc(100dvh-var(--rl-header-h))] border-b border-slate-200 bg-[#F4F6FC] shadow-xl">
+        <nav class="flex-1 overflow-y-auto overscroll-contain px-4 pt-2 pb-4">
             {!! wp_nav_menu([
                 'theme_location' => 'primary_navigation',
-                'menu_class' => 'flex flex-col space-y-1',
+                'menu_class' => 'flex flex-col',
                 'container' => false,
                 'echo' => false,
                 'walker' => new \App\View\MobileNavWalker(),
+                /*
+                 * Mirrors production's mobile structure — one row per top-level item, hairline
+                 * separated, with a circled chevron on the rows that open — but in the 2026 type
+                 * and colour. The two desktop dropdowns become accordions rather than being
+                 * flattened into a long list, which is what the fourteen role pages made
+                 * untenable: flat, they buried Pricing under fourteen rows.
+                 *
+                 * <details>/<summary> rather than a JS disclosure: it is keyboard and screen
+                 * reader accessible for free, and the drawer keeps its collapsed height until
+                 * someone opens a section.
+                 */
                 'fallback_cb' => function () {
-                    return '
-                      <a href="' .
-                        home_url('/reviews') .
-                        '" class="px-3 py-2 rounded-lg text-base font-semibold text-slate-800 hover:bg-slate-100">Reviews</a>
-                      <a href="' .
-                        home_url('/case-study/') .
-                        '" class="px-3 py-2 rounded-lg text-base font-semibold text-slate-800 hover:bg-slate-100">Case Studies</a>
-                      <details class="group">
-                        <summary class="flex cursor-pointer items-center justify-between px-3 py-2 rounded-lg text-base font-semibold text-slate-800 hover:bg-slate-100 [&::-webkit-details-marker]:hidden">
-                          <span>Virtual Assistant Roles</span>
-                          <svg class="h-4 w-4 shrink-0 transition-transform duration-200 group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </summary>
-                        <div class="mt-1 flex flex-col border-l border-slate-200 pl-3">' .
+                    $row = 'flex w-full cursor-pointer items-center justify-between gap-3 border-b border-slate-200 py-4 text-base font-semibold text-slate-800 [&::-webkit-details-marker]:hidden';
+                    $chevron = '<span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-300 text-slate-700 transition-colors group-open:border-brand-purple group-open:text-brand-purple">'
+                        .'<svg class="h-4 w-4 transition-transform duration-200 group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">'
+                        .'<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg></span>';
+
+                    $child = fn (string $url, string $label) => '<a href="' . $url .
+                        '" class="block py-2.5 text-[15px] font-medium text-slate-700 hover:text-brand-purple">' . esc_html($label) . '</a>';
+
+                    // The shared `name` makes these an exclusive accordion: opening one closes
+                    // the other, with no JavaScript. Browsers without it simply allow both open,
+                    // which is what this did before, so there is nothing to fall back to.
+                    $section = fn (string $label, string $children) => '<details name="rl-mobile-nav" class="group">'
+                        .'<summary class="' . $row . ' group-open:text-brand-purple"><span>' . esc_html($label) . '</span>' . $chevron . '</summary>'
+                        .'<div class="flex flex-col border-b border-slate-200 pb-2 pl-3">' . $children . '</div>'
+                        .'</details>';
+
+                    return $section('Reviews',
+                        $child(home_url('/reviews'), 'Testimonial Reviews')
+                        . $child(home_url('/case-study/'), 'Case Studies')
+                        . $child(home_url('/samples'), 'Sample Applicant Recordings')
+                    ) . $section('Roles',
                         implode('', array_map(
-                            fn ($slug) => '<a href="' . home_url('/' . $slug . '/') .
-                                '" class="px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">' .
-                                esc_html(\App\Support\RolePages::title($slug)) . '</a>',
+                            fn ($slug) => $child(home_url('/' . $slug . '/'), \App\Support\RolePages::title($slug)),
                             \App\Support\RolePages::slugs()
-                        )) . '</div>
-                      </details>
-                      <a href="' .
-                        home_url('/vapricing') .
-                        '" class="px-3 py-2 rounded-lg text-base font-semibold text-slate-800 hover:bg-slate-100">Pricing</a>
-                      <a href="' .
-                        home_url('/samples') .
-                        '" class="px-3 py-2 rounded-lg text-base font-semibold text-slate-800 hover:bg-slate-100">Audio Samples</a>';
+                        ))
+                    ) . '<a href="' . home_url('/vapricing') .
+                        '" class="block border-b border-slate-200 py-4 text-base font-semibold text-slate-800 hover:text-brand-purple">Pricing</a>';
                 },
             ]) !!}
         </nav>
 
-        <div class="pt-3 border-t border-slate-200">
+        <div class="shrink-0 border-t border-slate-200 bg-[#F4F6FC] px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
             <a href="{{ home_url('/vacalendar') }}"
                 class="inline-flex w-full items-center justify-center gap-2 rounded-full border border-black py-3 text-sm font-display font-bold uppercase tracking-wider text-black bg-white shadow-sm">
                 <span>{{ __('Book a Consultation', 'remote-leverage') }}</span>

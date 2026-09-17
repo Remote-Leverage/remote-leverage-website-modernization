@@ -1,6 +1,6 @@
 {{-- About page metrics: a row of dark midnight highlight cards (icon + headline value + label)
      above a grid of up to four supporting stat pairs. --}}
-<div class="w-full">
+<div class="w-full px-4 sm:px-6 lg:px-8">
     @if (! empty($sectionTitle))
         <h2 class="font-display text-3xl sm:text-4xl lg:text-[42px] font-bold text-black tracking-[-0.03em] leading-tight mb-10 sm:mb-12 text-center">
             {!! $sectionTitle !!}

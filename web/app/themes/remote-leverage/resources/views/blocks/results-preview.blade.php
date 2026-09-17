@@ -1,5 +1,5 @@
 {{-- Results/case-study preview: a section header with filter tabs above a grid of outcome cards. --}}
-<div class="w-full">
+<div class="w-full px-4 sm:px-6 lg:px-8">
     {{-- Section Header & Filter Tabs --}}
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 sm:mb-12">
         <div class="max-w-2xl">
