@@ -4,6 +4,7 @@ import laravel from 'laravel-vite-plugin'
 import { wordpressPlugin, wordpressThemeJson } from '@roots/vite-plugin';
 
 import { themeImages } from './vite/theme-images.js'
+import { themeVideos } from './vite/theme-videos.js'
 
 // Set APP_URL if it doesn't exist for Laravel Vite plugin
 if (! process.env.APP_URL) {
@@ -40,6 +41,11 @@ export default defineConfig({
     }),
 
     themeImages(),
+
+    // resources/videos/** -> public/videos/**, verbatim. public/ is gitignored and
+    // excluded from the Docker build context, so anything not regenerated here is
+    // simply absent in every deployed environment.
+    themeVideos(),
 
     wordpressPlugin(),
 

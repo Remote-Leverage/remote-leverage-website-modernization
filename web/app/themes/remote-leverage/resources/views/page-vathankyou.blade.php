@@ -65,7 +65,7 @@
                 {{-- Walkthrough video --}}
                 <div class="w-full rounded-card overflow-hidden shadow-[0_12px_32px_rgba(0,0,0,0.08)] bg-black aspect-video">
                     <video
-                        src="{{ get_template_directory_uri() }}/public/videos/home/booking-confirmation-walkthrough.mp4"
+                        src="{{ \App\Support\BlockDefaults::video('home/booking-confirmation-walkthrough.mp4') }}"
                         autoplay muted loop playsinline controls
                         class="w-full h-full object-cover"
                     ></video>

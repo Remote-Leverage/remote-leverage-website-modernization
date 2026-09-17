@@ -46,7 +46,7 @@ describe('zero-byte files never shadow a working asset', function () {
         // The predicate the three resolvers share. Reflection rather than a public method:
         // this is an internal detail of how a path is judged, not part of the class's surface.
         $isUsable = function (string $path): bool {
-            $m = new ReflectionMethod(BlockDefaults::class, 'isUsableImage');
+            $m = new ReflectionMethod(BlockDefaults::class, 'isUsableFile');
             $m->setAccessible(true);
 
             return $m->invoke(null, $path);
@@ -80,7 +80,7 @@ describe('zero-byte files never shadow a working asset', function () {
             expect($body)->not->toMatch(
                 '/(?<!isUsable)\bis_file\(/',
                 "BlockDefaults::{$method}() probes the filesystem with a bare is_file(). Use "
-                    .'self::isUsableImage() so a zero-byte file falls through to the next candidate.'
+                    .'self::isUsableFile() so a zero-byte file falls through to the next candidate.'
             );
         }
     });

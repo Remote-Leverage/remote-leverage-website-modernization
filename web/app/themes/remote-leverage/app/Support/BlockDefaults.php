@@ -307,7 +307,7 @@ class BlockDefaults
         }
 
         $themePath = get_theme_file_path('public/images/'.$path);
-        if (self::isUsableImage($themePath)) {
+        if (self::isUsableFile($themePath)) {
             return esc_url(set_url_scheme(get_template_directory_uri().'/public/images/'.$path, 'https'));
         }
 
@@ -345,13 +345,55 @@ class BlockDefaults
         foreach ($dirs as $dir => $url) {
             foreach (['webp', 'png', 'jpg', 'jpeg', 'svg'] as $ext) {
                 $path = $dir.'/'.$name.'.'.$ext;
-                if (self::isUsableImage($path)) {
+                if (self::isUsableFile($path)) {
                     return esc_url(set_url_scheme(rtrim($url, '/').'/'.$name.'.'.$ext, 'https'));
                 }
             }
         }
 
         return esc_url(set_url_scheme(self::imgBase().'/'.$file, 'https'));
+    }
+
+    /**
+     * Resolve a video, preferring EFS uploads then the theme's built public dir.
+     *
+     * Two storage locations, split on size, because they fail in opposite directions.
+     *
+     * Small clips live in `resources/videos/` and are copied into `public/videos/` by the
+     * `themeVideos()` Vite plugin, so they are in git and every environment has them without
+     * anyone remembering to do anything. Large ones cannot: `public/` is gitignored and
+     * excluded from the Docker build context, so a 61MB file dropped there works locally and
+     * 404s everywhere else — which is what `/about-us/` and `/vathankyou/` were doing on both
+     * staging and the production preview host. Putting it in git instead just moves the cost
+     * onto every clone, forever.
+     *
+     * So the VSL is uploaded once per environment to `uploads/videos/` on EFS and found here
+     * first. Uploads winning also means a video can be swapped without a deploy.
+     *
+     * @param  string  $file  Path below the videos root, e.g. `home/walkthrough.mp4`.
+     */
+    public static function video(string $file): string
+    {
+        $file = ltrim($file, '/');
+
+        $candidates = [];
+
+        if (defined('WP_CONTENT_DIR')) {
+            $candidates[WP_CONTENT_DIR.'/uploads/videos/'.$file] = content_url('/uploads/videos/'.$file);
+        }
+
+        $candidates[get_theme_file_path('public/videos/'.$file)] =
+            get_template_directory_uri().'/public/videos/'.$file;
+
+        foreach ($candidates as $path => $url) {
+            if (self::isUsableFile($path)) {
+                return esc_url(set_url_scheme($url, 'https'));
+            }
+        }
+
+        // Nothing on disk yet. Point at uploads rather than the theme: that is the location an
+        // operator can fix without a deploy, and it is where the missing file is expected to be.
+        return esc_url(set_url_scheme(content_url('/uploads/videos/'.$file), 'https'));
     }
 
     /**
@@ -372,7 +414,7 @@ class BlockDefaults
      * filesize() costs nothing extra here — PHP serves it from the stat cache is_file() just
      * populated for the same path.
      */
-    private static function isUsableImage(string $path): bool
+    private static function isUsableFile(string $path): bool
     {
         return is_file($path) && filesize($path) > 0;
     }
@@ -440,7 +482,7 @@ class BlockDefaults
         // This is the branch that actually carries the sample-applicant media:
         // those files were synced into uploads/ without being registered as
         // attachments, so the library lookup above finds nothing.
-        if (defined('WP_CONTENT_DIR') && self::isUsableImage(WP_CONTENT_DIR.'/uploads/'.$relative)) {
+        if (defined('WP_CONTENT_DIR') && self::isUsableFile(WP_CONTENT_DIR.'/uploads/'.$relative)) {
             // Re-encode per segment: $relative was decoded for the filesystem
             // probe, and filenames here really do contain spaces.
             $encoded = implode('/', array_map('rawurlencode', explode('/', $relative)));

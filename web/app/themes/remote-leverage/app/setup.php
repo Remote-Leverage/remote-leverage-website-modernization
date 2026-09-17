@@ -26,6 +26,7 @@ use App\Blocks\TrustStatsBlock;
 use App\Blocks\WhyHireBlock;
 use App\Support\HeaderMode;
 use App\Support\PageRobots;
+use App\Support\SiteRobotsTxt;
 use Illuminate\Support\Facades\Vite;
 
 /**
@@ -241,6 +242,14 @@ add_action('template_redirect', function () {
  * where that mu-plugin stops applying. See App\Support\PageRobots.
  */
 add_filter('wp_robots', [PageRobots::class, 'filter'], 20);
+
+/**
+ * `robots.txt`, generated per host instead of shipped as a static file.
+ *
+ * The static `web/robots.txt` hardcoded the apex sitemap URL, so every non-apex environment
+ * advertised the legacy site's sitemap. See App\Support\SiteRobotsTxt.
+ */
+add_filter('robots_txt', [SiteRobotsTxt::class, 'filter'], 10, 2);
 
 /**
  * Force a real 404 for pretty-permalink paths WordPress could not resolve, instead of
