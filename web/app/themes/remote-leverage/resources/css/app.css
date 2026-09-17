@@ -1802,6 +1802,37 @@ h2.wp-block-heading,
   flex-wrap: nowrap !important;
 }
 
+/* Pre-emptive, from core, with no effect on anything rendering today.
+
+   1. A column that declares its own width must not also grow. Every columns block in the repo
+      currently declares widths summing to exactly 100% (55/45, 60/40, 52/48, 50/50, 38/62), so
+      grow never engages and this changes nothing. The day someone writes a 45% column beside an
+      undeclared one, core gives 621/727px and this theme would give 985/364px.
+   2. `aligncenter` on an image. Only the centring half of core's rule is taken: core also sets
+      `display:table` on `.alignleft`/`.alignright`, which would collide with the hand-written
+      `.rl-guarantee-group` figure rules, and nothing here needs the float behaviour.
+
+   Both verified against wp-includes/blocks/{columns,image}/style.css and confirmed by a
+   before/after geometry diff over 57 pages at 414px and 1440px: 0 changed boxes. */
+@media (min-width: 782px) {
+  .wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-block-column[style*="flex-basis"] {
+    flex-grow: 0;
+  }
+}
+
+.wp-block-columns.is-not-stacked-on-mobile > .wp-block-column[style*="flex-basis"] {
+  flex-grow: 0;
+}
+
+.wp-block-image.aligncenter {
+  text-align: center;
+}
+
+.wp-block-image .aligncenter {
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* The canonical gutter, for bare core blocks sitting directly in a constrained group.
    WordPress prints the constrained *width* inline per group, but the horizontal padding that
    normally comes with it ships in `global-styles`, which app/setup.php dequeues. Nothing
