@@ -16,8 +16,11 @@ use Illuminate\Console\Command;
  * was not, because the media library was deliberately never ported — so there was nothing
  * to point them at until local attachments existed.
  *
- * Measured on 2026-09-17: 171 `_yoast_wpseo_opengraph-image` rows across 149 distinct
- * filenames, of which 124 have a local attachment with the same basename and 25 do not.
+ * Measured on 2026-09-17: 171 `_yoast_wpseo_opengraph-image` rows on the legacy host, of
+ * which 134 resolved to local media and 37 — spanning 24 distinct filenames — did not.
+ * (A plain basename comparison against `_wp_attached_file` predicts a worse 124; the
+ * resolver does better because it also matches `-scaled` variants back to their original
+ * and accepts a file sitting in uploads without being registered as an attachment.)
  * Harmless while the legacy site is up; it means the new site's social cards depend on the
  * old one, which is not a dependency that survives the apex cutover.
  *
@@ -25,7 +28,7 @@ use Illuminate\Console\Command;
  * migrated presets use — so a file re-uploaded under a different year/month folder still
  * resolves, and a `-scaled` variant resolves to its original.
  *
- * **What happens to the 25 with no local file** is the one real decision here, and it is why
+ * **What happens to the rows with no local file** is the one real decision here, and it is why
  * `--unmatched` exists. The default is to delete the row: Yoast then falls back to the
  * site-wide default OG image, which is a picture from this site. Keeping the row leaves the
  * card pointing at the legacy host, which is the defect being fixed. `--unmatched=keep`

@@ -87,22 +87,32 @@ staging and the production preview host both pointed crawlers at the **legacy** 
 physical file wins over WordPress's rewrite, so it was always the one answering, and no single
 value of that line can be right everywhere: a static file cannot know which host is serving it.
 
-The file is deleted. `App\Support\SiteRobotsTxt` now produces the same directives on the
-`robots_txt` filter, registered in `app/setup.php`. Yoast already appends the sitemap itself at
-priority 99999 using its own base URL, so the line is correct per environment with nothing
-hardcoded — verified locally, where it renders `https://remoteleverage-v2.test/sitemap_index.xml`.
-The disallow directives are unchanged.
+The file is deleted. `App\Support\SiteRobotsTxt` now appends the route disallows on the `robots_txt`
+filter, registered in `app/setup.php`, and Yoast appends the sitemap itself at priority 99999 using
+its own base URL — so that line is correct per environment with nothing hardcoded. The rendered
+file carries the same directives the static one did.
 
-One behavioural change: when the site is not public (`DISALLOW_INDEXING` on dev, staging and the
-preview host) the filter returns core's output untouched instead of appending the `Allow:` line and
-the portal disallows. The static file served a permissive allow-list on hosts meant to be wholly
-excluded. This is not what keeps them out of the index — core does **not** emit `Disallow: /` (see
-#4), and the `noindex` meta is still doing that work — it just stops a non-public host publishing
-a crawl invitation it never meant to.
+**Two things the class deliberately does not do, both of which its own first cut got wrong:**
+
+- **No wp-admin rule of its own.** Core's `do_robots()` already writes the `Disallow:`/`Allow:` pair
+  from `admin_url()`, which is Bedrock-aware and correctly yields `/wp/wp-admin/` in this layout.
+  Restating it produced a duplicate pair.
+- **No branch on `$public`.** The portal and `/api/` disallows are appended on every host. An
+  earlier version returned early when the site was not public, which meant the filter contributed
+  **nothing at all** on dev, staging and the preview host — the three environments that are not
+  production, and so the only ones where a mistake here is cheap to notice.
+
+It adds no blanket `Disallow: /` on those hosts either, and that is core's reasoning rather than
+ours: core stopped emitting one in 5.3 because a crawler told not to fetch a page never reads the
+`noindex` meta on it, which can strand already-indexed URLs. `DISALLOW_INDEXING` plus that meta tag
+is the mechanism doing the job — see #4.
+
+**Verified on this local (noindex) install:** core's wp-admin pair, then the six portal/API
+disallows, then Yoast's block with `Sitemap: https://remoteleverage-v2.test/sitemap_index.xml`.
 
 **The original 2026-09-14 entry follows; its account of the local 404 is unchanged and still true.**
 
-~~**A `robots.txt` now exists** at `web/robots.txt`, served as a static file from the Bedrock web root.~~ It disallowed `/wp/wp-admin/` (core lives under `/wp/` in this layout, not the web root), allowed `admin-ajax.php`, disallowed the authenticated portals and `/api/`, and pointed at the sitemap (`/wp-sitemap.xml`, changed to Yoast's `/sitemap_index.xml` on 2026-09-15). `SiteRobotsTxt` carries every one of those directives forward.
+~~**A `robots.txt` now exists** at `web/robots.txt`, served as a static file from the Bedrock web root.~~ It disallowed `/wp/wp-admin/` (core lives under `/wp/` in this layout, not the web root), allowed `admin-ajax.php`, disallowed the authenticated portals and `/api/`, and pointed at the sitemap (`/wp-sitemap.xml`, changed to Yoast's `/sitemap_index.xml` on 2026-09-15). Every one of those directives still appears in the rendered file — the wp-admin pair from core, the portal and `/api/` disallows from `SiteRobotsTxt`, the sitemap from Yoast.
 
 **The 404 was never an application bug.** Traced with a request-lifecycle probe: PHP reported `http_response_code() === 200` at `send_headers`, `template_redirect`, `do_robots` and `shutdown` — the full request — while nginx still returned 404 to the client. After adding the static file, nginx serves **our exact file** (correct bytes, `content-type: text/plain`, its own `etag`) and *still* reports 404.
 
@@ -697,9 +707,11 @@ Call sites updated: `patterns/about-quote.php` and `resources/views/page-vathank
 Filenames and directory names are preserved exactly for the same reason `themeImages()` preserves
 them — the URL is built by hand, so a content hash would break the call site.
 
-> **Still broken until a human acts.** `5-minute-VSL_Horizontal_V01.mp4` must be uploaded to
-> `uploads/videos/` on EFS in **staging and production**. Until it is, `/about-us/` renders a
-> broken player on both. The code change does not carry the file. See
+> **Still broken until a human acts, in two ways.** `5-minute-VSL_Horizontal_V01.mp4` must be
+> uploaded to `uploads/videos/` on EFS in **staging and production** — the code change does not
+> carry the file — **and** `/about-us/` must be repointed at its pattern on both, because the page
+> holds expanded block markup with the old video URL baked into `post_content` and no deploy
+> reaches a database row. Until both are done, `/about-us/` renders a broken player there. See
 > [deployment.md](deployment.md) § Content import.
 
 **Renamed in passing:** the private helper `BlockDefaults::isUsableImage()` is now `isUsableFile()`

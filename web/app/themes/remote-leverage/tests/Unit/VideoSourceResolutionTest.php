@@ -105,7 +105,15 @@ describe('video() searches uploads before the theme', function () {
 
         // The scaffolding above those two directories is this run's alone, so take it with us
         // rather than leaving an empty tree in the temp dir on every CI run.
-        foreach ([WP_CONTENT_DIR.'/uploads', WP_CONTENT_DIR, dirname($this->theme), $GLOBALS['rl_video_theme_dir'], dirname($GLOBALS['rl_video_theme_dir'])] as $dir) {
+        $scaffolding = [
+            WP_CONTENT_DIR.'/uploads',
+            WP_CONTENT_DIR,
+            dirname($this->theme),
+            $GLOBALS['rl_video_theme_dir'],
+            dirname($GLOBALS['rl_video_theme_dir']),
+        ];
+
+        foreach ($scaffolding as $dir) {
             if (is_dir($dir) && (glob($dir.'/*') ?: []) === []) {
                 rmdir($dir);
             }

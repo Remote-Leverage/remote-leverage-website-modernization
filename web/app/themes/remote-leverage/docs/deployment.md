@@ -307,3 +307,32 @@ chown www-data:www-data web/app/uploads/videos/5-minute-VSL_Horizontal_V01.mp4
 Delete the S3 copy afterwards. Verify by loading `/about-us/` rather than by listing the directory:
 a zero-byte file passes `ls` and fails `BlockDefaults::video()`'s usability check, which is the
 failure mode [known-issues.md](known-issues.md) #5 describes for images.
+
+### Pages holding expanded markup instead of a pattern reference — `/about-us/` needs a database edit
+
+An upload alone will not fix `/about-us/`. That page (ID 209 locally) held **expanded block markup**
+in `post_content` rather than the one-line pattern reference, so the old
+`/app/themes/remote-leverage/public/videos/…` URL is baked into the database row and the pattern
+edit cannot reach it. Fixed locally on 2026-09-17 by repointing the page at its pattern:
+
+```bash
+# Resolve the id per environment — do not assume 209 travels.
+wp post list --post_type=page --name=about-us --field=ID
+
+wp post update <ID> --post_content='<!-- wp:pattern {"slug":"remote-leverage/about-full"} /-->'
+```
+
+Both renders were diffed before the swap. The only substantive difference was `font-black` versus
+`font-bold` on the decorative quote glyph — a change commit `2990554` made to the pattern that the
+database copy never received, which is the drift this arrangement exists to prevent, caught in the
+act.
+
+**Staging and production still hold the stale expanded markup**, so the same update has to be run
+against each of them — through ECS Exec or a one-off task, alongside the video upload above — or the
+video fix will not land on that page however correct the file on EFS is.
+
+Not just this page: a survey of published pages on 2026-09-17 found **63 correctly holding a pattern
+reference and 4 still holding expanded markup**. Those four are not a work item anyone has taken on,
+but the drift is real and now measured. Pages created through the MCP `app/clone-page` ability are a
+deliberate exception and are expected to be database-resident — see
+[ai-mcp-and-sync.md](ai-mcp-and-sync.md).
