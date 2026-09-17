@@ -91,6 +91,13 @@ class WhyHireBlock extends Block
             'headingAlign' => get_field('heading_align') ?: 'left',
             'proofChrome' => get_field('proof_chrome') ?: 'full',
             'proofBackground' => get_field('proof_background') ?: 'midnight',
+            'layout' => get_field('layout') ?: 'split',
+            'iconSet' => get_field('icon_set') ?: 'classic',
+            'proofImage' => get_field('proof_image') ?: '',
+            'proofBadgeCount' => BlockDefaults::cleanText(get_field('proof_badge_count')),
+            'proofBadgeLabel' => BlockDefaults::cleanText(get_field('proof_badge_label')),
+            'proofCtaText' => BlockDefaults::cleanText(get_field('proof_cta_text')),
+            'proofCtaUrl' => get_field('proof_cta_url') ?: '#booking-footer',
             'cards' => $this->cards(),
         ];
     }
@@ -109,6 +116,16 @@ class WhyHireBlock extends Block
                 'label' => 'Section Headline',
                 'default_value' => 'Why hire through Remote Leverage?',
             ])
+            ->addSelect('layout', [
+                'label' => 'Arrangement',
+                'instructions' => 'Split is production and the 2026 homepage: the proof card in a 5/7 column '
+                    .'beside a vertical stack of four cards. Banner is the role pages '
+                    .'(/admin-virtual-assistants/ and its siblings): the proof card runs full width with the '
+                    .'globe in its own half, and the four cards sit under it in a 2x2 grid.',
+                'choices' => ['split' => 'Proof card beside the cards (default)', 'banner' => 'Proof banner over a 2x2 grid'],
+                'default_value' => 'split',
+                'return_format' => 'value',
+            ])
             ->addSelect('heading_align', [
                 'label' => 'Heading Alignment',
                 'choices' => ['left' => 'Left (default)', 'center' => 'Centred'],
@@ -126,8 +143,13 @@ class WhyHireBlock extends Block
             ->addSelect('proof_background', [
                 'label' => 'Proof Card Ground',
                 'instructions' => 'Midnight is the flat #250D4A production paints. Violet is the 2026 homepage: '
-                    .'#6410A6 with a #7616B6 radial behind the globe.',
-                'choices' => ['midnight' => 'Flat midnight #250D4A (default)', 'violet' => 'Violet gradient (2026 homepage)'],
+                    .'#6410A6 with a #7616B6 radial behind the globe. Violet-deep is the role pages: a vertical '
+                    .'#5920AE to #290F51 ramp, sampled off the comp.',
+                'choices' => [
+                    'midnight' => 'Flat midnight #250D4A (default)',
+                    'violet' => 'Violet gradient (2026 homepage)',
+                    'violet-deep' => 'Violet to midnight ramp (role pages)',
+                ],
                 'default_value' => 'midnight',
                 'return_format' => 'value',
             ])
@@ -135,6 +157,39 @@ class WhyHireBlock extends Block
                 'label' => 'Proof Card Title',
                 'default_value' => "We've helped more than 2,000 businesses hire top talent across LatAm, the Caribbean and the EU.",
                 'rows' => 3,
+            ])
+            ->addImage('proof_image', [
+                'label' => 'Proof Card Globe',
+                'instructions' => 'Leave empty for the shared globe. The role pages supply their own export, '
+                    .'which carries the orbit arcs and the candidate portraits already composited in.',
+                'return_format' => 'url',
+            ])
+            ->addText('proof_badge_count', [
+                'label' => 'Proof Badge Figure',
+                'instructions' => 'Banner arrangement only. Sits beside the stacked portraits, e.g. "2.5K+". '
+                    .'Leave empty to fall back to the five gold stars the split arrangement shows.',
+            ])
+            ->addText('proof_badge_label', [
+                'label' => 'Proof Badge Label',
+                'instructions' => 'The second line of the badge, e.g. "pre-vetted candidates".',
+            ])
+            ->addText('proof_cta_text', [
+                'label' => 'Proof Card CTA Text',
+                'instructions' => 'Banner arrangement only. Leave empty for no button.',
+            ])
+            ->addText('proof_cta_url', [
+                'label' => 'Proof Card CTA Target URL',
+                'default_value' => '#booking-footer',
+            ])
+            ->addSelect('icon_set', [
+                'label' => 'Card Icons',
+                'instructions' => 'Classic is the set every page shipping this block already renders: dollar '
+                    .'sign, speech bubble, check circle, document. Descriptive is the role comps\' set, which '
+                    .'depicts each card rather than decorating it: barred dollar, EN speech bubble, percent, '
+                    .'barred document.',
+                'choices' => ['classic' => 'Generic icons (default)', 'descriptive' => 'Icons matching each card'],
+                'default_value' => 'classic',
+                'return_format' => 'value',
             ])
             ->addRepeater('cards', [
                 'label' => 'Feature Cards (Leave empty for default 4 cards)',

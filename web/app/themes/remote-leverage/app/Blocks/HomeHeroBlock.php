@@ -95,11 +95,15 @@ class HomeHeroBlock extends Block
             'showRating' => (bool) ($this->field('show_rating') ?? true),
             'headline' => BlockDefaults::cleanText($this->field('headline')) ?: "Latin American\nVirtual Assistants",
             'headlineAccent' => BlockDefaults::cleanText($this->field('headline_accent')) ?: '$6-$10 Per Hour',
+            'accentTone' => $this->field('headline_accent_tone') ?: 'purple',
             'subtitle' => $this->field('subtitle') ?: 'Recruiting agency helping businesses hire English speaking Virtual Assistants from Latin America for <strong>70% less than U.S. Employees.</strong>',
             'checklist' => $this->checklist(),
             'ctaText' => BlockDefaults::cleanText($this->field('cta_text')) ?: 'BOOK A CONSULTATION',
             'ctaUrl' => $this->field('cta_url') ?: '#booking-footer',
             'cards' => $this->cards(),
+            'tickTone' => $this->field('tick_tone') ?: 'magenta',
+            'media' => $this->field('media') ?: 'cards',
+            'heroImage' => $this->field('hero_image') ?: '',
         ];
     }
 
@@ -169,6 +173,22 @@ class HomeHeroBlock extends Block
         $fields = new FieldsBuilder('home_hero');
 
         $fields
+            ->addSelect('media', [
+                'label' => 'What sits beside the copy',
+                'instructions' => 'Cards is the homepage: a fan of three talent cards on desktop, nothing on '
+                    .'mobile. Image is the role pages (/admin-virtual-assistants/ and its siblings): one square '
+                    .'composite beside the copy on desktop, under the CTA on mobile, and the copy left-aligned '
+                    .'at every width rather than centred on mobile.',
+                'choices' => ['cards' => 'Talent card fan (default)', 'image' => 'Single hero image'],
+                'default_value' => 'cards',
+                'return_format' => 'value',
+            ])
+            ->addImage('hero_image', [
+                'label' => 'Hero Image',
+                'instructions' => 'Only used when the above is set to Image. Square; the role comps supply a '
+                    .'1000x1000 composite with the rating badge and UI cards already baked in.',
+                'return_format' => 'url',
+            ])
             ->addTrueFalse('show_rating', [
                 'label' => 'Show the Google rating row',
                 'instructions' => 'Desktop only — the mobile design omits it either way. Off since 2026-09-16.',
@@ -188,13 +208,29 @@ class HomeHeroBlock extends Block
             ])
             ->addText('headline_accent', [
                 'label' => 'Headline Accent Line',
-                'instructions' => 'Rendered on its own third line, in brand purple.',
+                'instructions' => 'Rendered on its own third line.',
                 'default_value' => '$6-$10 Per Hour',
+            ])
+            ->addSelect('headline_accent_tone', [
+                'label' => 'Accent Line Colour',
+                'instructions' => 'Purple is the homepage. Inherit keeps the accent the same ink as the rest of '
+                    .'the headline — the role comps set all three lines in brand-hero.',
+                'choices' => ['purple' => 'Brand purple (default)', 'inherit' => 'Same as the headline'],
+                'default_value' => 'purple',
+                'return_format' => 'value',
             ])
             ->addTextarea('subtitle', [
                 'label' => 'Subtitle (supports basic HTML)',
                 'rows' => 3,
                 'default_value' => 'Recruiting agency helping businesses hire English speaking Virtual Assistants from Latin America for <strong>70% less than U.S. Employees.</strong>',
+            ])
+            ->addSelect('tick_tone', [
+                'label' => 'Checklist Tick Colour',
+                'instructions' => 'Magenta is the homepage. Emerald (#10B981, the same green '
+                    .'acf/consult-landing-hero already ticks with) is what the role comps show.',
+                'choices' => ['magenta' => 'Brand magenta (default)', 'emerald' => 'Emerald green'],
+                'default_value' => 'magenta',
+                'return_format' => 'value',
             ])
             ->addRepeater('checklist', [
                 'label' => 'Checklist Items (leave empty for the preset six)',

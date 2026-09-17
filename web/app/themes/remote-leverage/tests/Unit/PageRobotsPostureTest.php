@@ -29,6 +29,8 @@ $expected = [
     'spanish' => null,
     'hire-for-less' => null,
     'vaonboardingguide' => null,
+    // A role SEO landing page — the whole point is that it ranks.
+    'admin-virtual-assistants' => null,
 ];
 
 describe('robots posture matches production per page', function () use ($expected) {

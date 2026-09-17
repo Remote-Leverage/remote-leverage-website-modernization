@@ -160,11 +160,15 @@ return [
 
     // Role / industry SEO pages -> /hire-va-4/.
     // One page per role or vertical ("Legal Virtual Assistants from Latin America",
-    // "Telemarketers from Latin America", ...). None of them is being rebuilt; /hire-va-4/ is
-    // the canonical hire-a-VA landing page in v2 and is already the target of the two
-    // pre-existing hire-va redirects above, so the whole SEO long tail lands there.
+    // "Telemarketers from Latin America", ...). /hire-va-4/ is the canonical hire-a-VA landing
+    // page in v2 and is already the target of the two pre-existing hire-va redirects above, so
+    // the whole SEO long tail lands there.
+    //
+    // The role pages ARE now being rebuilt, one at a time, from the 2026 comps — so this list
+    // shrinks as they ship. A slug keeps its redirect until its own page exists; removing one
+    // early 404s a live URL. /admin-virtual-assistants/ was the first to land (2026-09-16) and
+    // is why it is absent below.
     'accounting-virtual-assistants' => 'hire-va-4',
-    'admin-virtual-assistants' => 'hire-va-4',
     'appointment-setting-virtual-assistants' => 'hire-va-4',
     'b2b-sales-virtual-assistants' => 'hire-va-4',
     'bookkeeping-accounting-virtual-assistants' => 'hire-va-4',

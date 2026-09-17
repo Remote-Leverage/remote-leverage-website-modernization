@@ -1275,11 +1275,18 @@ class BlockDefaults
      * Measured off Homepage V3.png: 348x61, fill #F90066, label 19px/700 uppercase with
      * tracking -0.45px, and a 1.5px ring 4px outside the fill.
      */
-    public static function ctaPillClasses(string $extra = ''): string
+    public static function ctaPillClasses(string $extra = '', string $size = 'default'): string
     {
-        $base = 'group inline-flex items-center justify-center gap-9 rounded-full bg-brand-magenta '
-            .'py-[19px] pl-10 pr-8 font-display text-[17px] font-bold uppercase leading-none '
-            .'tracking-[-0.45px] text-white outline outline-[1.5px] outline-offset-4 '
+        // 'compact' trims only the chrome — the gap either side of the label and the horizontal
+        // padding — and leaves the fill, type and ring identical. The default pill spends 131px
+        // on chrome (36px gap + 40/32px padding + a 23px icon), which in a card narrower than
+        // ~340px leaves too little for "BOOK A CONSULTATION" and breaks it over two lines. That
+        // is what it did inside the role pages' proof banner at 390px.
+        $chrome = $size === 'compact' ? 'gap-5 pl-7 pr-6' : 'gap-9 pl-10 pr-8';
+
+        $base = 'group inline-flex items-center justify-center '.$chrome.' rounded-full bg-brand-magenta '
+            .'py-[19px] font-display text-[17px] font-bold uppercase leading-none '
+            .'tracking-[-0.45px] whitespace-nowrap text-white outline outline-[1.5px] outline-offset-4 '
             .'outline-brand-magenta transition-all duration-200 hover:bg-brand-magenta-hover '
             .'hover:outline-brand-magenta-hover focus:outline-brand-magenta focus-visible:ring-2 '
             .'focus-visible:ring-brand-magenta focus-visible:ring-offset-2 sm:text-[19px]';
@@ -1331,6 +1338,38 @@ class BlockDefaults
             '30% Discount on Future Hires',
             'Hire Direct, No Middleman',
             'Interview in 48 Hours',
+        ];
+    }
+
+    /**
+     * The four "why hire through us" cards as the 2026 comps word them.
+     *
+     * Longer and more specific than WhyHireBlock::defaultCards(), which is what production's
+     * older pages still render and stays the block's fallback. The 2026 homepage and every one
+     * of the fourteen role pages carry this wording verbatim, so it lives here rather than
+     * being restated in fifteen patterns.
+     *
+     * @return array<int, array{title: string, desc: string}>
+     */
+    public static function whyHire2026Cards(): array
+    {
+        return [
+            [
+                'title' => 'No Recurring Fees - Hire Direct',
+                'desc' => 'Save thousands of Dollars a year by hiring your Virtual Assistant directly. One flat fee, direct onboarding, no ongoing costs.',
+            ],
+            [
+                'title' => 'Fluent English',
+                'desc' => 'We understand how important it is to speak fluent English with little to no accent. We go through hundreds of applicants a day and only bring you the top 1%.',
+            ],
+            [
+                'title' => '30% Discount on Future Hires',
+                'desc' => 'Get 30% off placement fees for every additional VA you hire within 12 months of your first placement.',
+            ],
+            [
+                'title' => 'No Contracts',
+                'desc' => "You're not locked into any sort of long term commitment with us or any Virtual Assistant you hire through us. If you're not happy with the applicants we bring you, we don't get paid.",
+            ],
         ];
     }
 

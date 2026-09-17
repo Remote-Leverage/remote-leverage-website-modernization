@@ -11,10 +11,11 @@
      The class list comes from BlockDefaults::ctaPillClasses() so the reviews wall can put the
      same pill on a <button> carrying Alpine state without copying it.
 
-     Params: $text, $url, optional $class for positioning, and optional $icon
-     ('arrow', the default, or 'chevron-down' for a disclosure control). --}}
+     Params: $text, $url, optional $class for positioning, optional $icon ('arrow', the
+     default, or 'chevron-down' for a disclosure control), and optional $size ('default', or
+     'compact' to trim the gap and horizontal padding for a narrow container). --}}
 <a href="{{ $url ?? '#booking-footer' }}"
-   class="{{ \App\Support\BlockDefaults::ctaPillClasses($class ?? '') }}">
+   class="{{ \App\Support\BlockDefaults::ctaPillClasses($class ?? '', $size ?? 'default') }}">
     <span>{{ $text ?? 'BOOK A CONSULTATION' }}</span>
     @include('blocks.partials.cta-pill-icon', ['icon' => $icon ?? 'arrow'])
 </a>

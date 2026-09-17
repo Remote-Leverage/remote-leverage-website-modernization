@@ -107,7 +107,36 @@ class BookingFooterBlock extends Block
             ),
             'description' => (function_exists('get_field') ? get_field('description') : null)
                 ?: 'During this meeting we will go over the role you’re planning to hire for, what the process looks like, answer any questions you have, and proceed to next steps.',
+            // Off unless a page asks, so every page already shipping this block is untouched.
+            // The 2026 role comps put a Google rating pill and the six hero checkpoints under
+            // the description; the homepage comp has neither.
+            'showTrust' => (bool) (($this->block->data['show_trust'] ?? null)
+                ?: ((function_exists('get_field') ? get_field('show_trust') : null) ?: false)),
+            'ratingLogo' => BlockDefaults::homeImg('google-logo.png'),
+            'ratingScore' => BlockDefaults::cleanText(
+                (function_exists('get_field') ? get_field('rating_score') : null)
+            ) ?: '4.8',
+            'checklist' => $this->checklist(),
         ];
+    }
+
+    /**
+     * The trust checklist, empty unless a page supplies one.
+     *
+     * @return array<int, string>
+     */
+    public function checklist(): array
+    {
+        $rows = function_exists('get_field') ? get_field('checklist') : null;
+
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            fn ($row) => BlockDefaults::cleanText($row['item'] ?? ''),
+            $rows
+        )));
     }
 
     /**
@@ -134,7 +163,26 @@ class BookingFooterBlock extends Block
                 'label' => 'Headline',
                 'default_value' => 'Book a free consultation',
                 'rows' => 2,
-            ]);
+            ])
+            ->addTrueFalse('show_trust', [
+                'label' => 'Show the rating pill and checklist',
+                'instructions' => 'Off is production and the 2026 homepage. On is the role pages, whose comps '
+                    .'put a Google rating pill and the six hire checkpoints under the description.',
+                'default_value' => 0,
+                'ui' => 1,
+            ])
+            ->addText('rating_score', [
+                'label' => 'Google Rating Score',
+                'default_value' => '4.8',
+            ])
+            ->addRepeater('checklist', [
+                'label' => 'Trust Checklist',
+                'instructions' => 'Only rendered when the toggle above is on. One column, in the order given.',
+                'layout' => 'table',
+                'button_label' => 'Add Item',
+            ])
+            ->addText('item', ['label' => 'Item'])
+            ->endRepeater();
 
         return $fields->build();
     }
