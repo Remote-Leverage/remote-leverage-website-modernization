@@ -9,6 +9,7 @@ use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\SlackMessageRenderer;
+use App\Domains\Referral\Models\Referrer;
 use App\Infrastructure\Slack\SlackCredentials;
 use App\Infrastructure\Slack\SlackTransport;
 use Illuminate\Support\Facades\Log;
@@ -72,13 +73,15 @@ class HandleLeadEventsForSlack
     /**
      * Handle LeadBookingCompleted.
      *
-     * **Off by default**, because the legacy feed did not send it — see the class docblock.
-     * Enable with `SLACK_NOTIFY_ON_BOOKING=true` if the team wants a second alert when a lead
-     * actually books.
+     * **On by default** since 2026-09-17. It used to be off because the legacy Gravity Forms
+     * feed never sent one — a description of the old system rather than a reason to keep the
+     * new one quiet about the event sales actually acts on. The alert threads under the lead's
+     * existing card rather than starting a new one. Silence it with
+     * `SLACK_NOTIFY_ON_BOOKING=false`.
      */
     public function handleBookingCompleted(LeadBookingCompleted $event): void
     {
-        if (! config('services.slack.notify_on_booking', false)) {
+        if (! config('services.slack.notify_on_booking', true)) {
             return;
         }
 
@@ -398,9 +401,54 @@ class HandleLeadEventsForSlack
      */
     protected function headline(Lead $lead): string
     {
+        /*
+         * A referral outranks every other channel, and is checked here rather than in
+         * channelLabel() so the wording can differ: "New referral from Dana Whitfield" names a
+         * person who is owed a commission, which is a different fact from "New lead from
+         * Facebook" naming a platform.
+         *
+         * This used to be missed entirely. channelLabel() reads `partner` and the UTMs, and
+         * neither is set by the referral programme — that attribution lives in
+         * `source_type`/`source_id` — so a correctly attributed referral with no campaign
+         * parameters fell through to "New organic lead". The lead was right in the database and
+         * wrong in the only place anyone reads it.
+         */
+        if ($referrer = $this->referrerName($lead)) {
+            return "New referral from {$referrer}";
+        }
+
         $channel = $this->channelLabel($lead);
 
         return $channel === '' ? 'New organic lead' : "New lead from {$channel}";
+    }
+
+    /**
+     * The name of the referrer this lead is attributed to, or null.
+     *
+     * Falls back to the raw code when the referrer row cannot be found: a lead stamped
+     * `referral_hub:some-code` is still a referral, and saying so with the code is more use to
+     * whoever reads the alert than calling it organic.
+     */
+    protected function referrerName(Lead $lead): ?string
+    {
+        if (! in_array($lead->source_type, ['referral_hub', 'partnership'], true)) {
+            return null;
+        }
+
+        $code = trim((string) $lead->source_id);
+
+        if ($code === '') {
+            return null;
+        }
+
+        try {
+            $name = Referrer::query()->where('referral_code', $code)->value('name');
+        } catch (\Throwable $e) {
+            // Never let a lookup cost the alert; the headline degrades, the message still sends.
+            $name = null;
+        }
+
+        return trim((string) ($name ?: $code)) ?: null;
     }
 
     /**

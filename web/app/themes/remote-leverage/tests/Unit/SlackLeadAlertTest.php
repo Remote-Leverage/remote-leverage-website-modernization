@@ -6,6 +6,7 @@ use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Listeners\HandleLeadEventsForSlack;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
+use App\Domains\Referral\Models\Referrer;
 
 /*
  * The "NEW LEAD" Slack alert.
@@ -280,6 +281,53 @@ describe('lead headline', function () {
             'utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null,
             'utm_content' => null, 'utm_term' => null, 'partner' => null,
         ]))->toContain('New organic lead');
+    });
+
+    test('a referred lead names the referrer, not the campaign it happened to carry', function () {
+        Referrer::query()->create([
+            'name' => 'Dana Whitfield',
+            'email' => 'headline-'.uniqid().'@agency.com',
+            'referral_code' => 'headline-dana',
+            'status' => 'active',
+        ]);
+
+        /*
+         * The referral programme stamps `source_type`/`source_id`; it sets neither `partner`
+         * nor any UTM. The headline read only those two, so a correctly attributed referral
+         * with no campaign parameters was announced as "New organic lead" — right in the
+         * database, wrong in the only place anyone reads it.
+         */
+        expect(headlineFor([
+            'source_type' => 'referral_hub',
+            'source_id' => 'headline-dana',
+            'partner' => null,
+            'utm_source' => null, 'utm_medium' => null,
+        ]))->toContain('New referral from Dana Whitfield');
+    });
+
+    test('a referral outranks a campaign, because it names someone who is owed a commission', function () {
+        Referrer::query()->create([
+            'name' => 'Priya Raghunathan',
+            'email' => 'headline2-'.uniqid().'@agency.com',
+            'referral_code' => 'headline-priya',
+            'status' => 'active',
+        ]);
+
+        expect(headlineFor([
+            'source_type' => 'referral_hub',
+            'source_id' => 'headline-priya',
+            'partner' => null,
+            'utm_source' => 'facebook', 'utm_medium' => 'cpc',
+        ]))->toContain('New referral from Priya Raghunathan');
+    });
+
+    test('a referral whose referrer row is gone still reads as a referral', function () {
+        expect(headlineFor([
+            'source_type' => 'referral_hub',
+            'source_id' => 'deleted-code',
+            'partner' => null,
+            'utm_source' => null, 'utm_medium' => null,
+        ]))->toContain('New referral from deleted-code');
     });
 
     test('a partner referral outranks the utm, because it names a relationship', function () {

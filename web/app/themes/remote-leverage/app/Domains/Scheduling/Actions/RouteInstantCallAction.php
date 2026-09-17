@@ -189,9 +189,10 @@ class RouteInstantCallAction
         Log::info('Instant live call booked', ['session_id' => $sessionId, 'meet_url' => $meetUrl]);
 
         /*
-         * Separate from LeadBookingCompleted above, which is off by default in Slack
-         * (`SLACK_NOTIFY_ON_BOOKING`) because the legacy feed never sent it. A live call cannot
-         * inherit that default: it starts within fifteen minutes and somebody has to be there.
+         * Separate from LeadBookingCompleted above, which is governed by
+         * `SLACK_NOTIFY_ON_BOOKING`. A live call does not read that flag at all: it starts
+         * within fifteen minutes and somebody has to be there, so it announces itself even
+         * where booking alerts have been silenced.
          */
         Event::dispatch(new LiveCallRequested(
             outcome: LiveCallRequested::ROUTED,

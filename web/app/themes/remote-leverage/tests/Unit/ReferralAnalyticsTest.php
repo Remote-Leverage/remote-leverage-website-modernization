@@ -12,6 +12,20 @@ use Illuminate\Support\Facades\Cache;
 
 beforeEach(function () {
     Cache::forget('rl_referral_analytics_metrics');
+
+    /*
+     * The suite shares one sqlite database across every file, and this screen renders only the
+     * eight most recent referrals (ReferralAdminDashboard::renderAnalytics). Rows seeded by
+     * files that happen to run earlier therefore push this test's own fixtures out of the very
+     * table it asserts on — which is exactly how it broke: it passed locally and failed in CI
+     * on nothing but file ordering, because `executionOrder="depends,defects"` reorders a run
+     * that has a result cache and CI never has one.
+     *
+     * Starting from empty makes the assertions depend on this file's fixtures and nothing else.
+     * The sibling test below already did this for the same reason; doing it here covers both.
+     */
+    Referral::query()->delete();
+    ReferralClick::query()->delete();
 });
 
 function makeAnalyticsReferrer(array $overrides = []): Referrer

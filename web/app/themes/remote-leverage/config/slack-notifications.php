@@ -204,7 +204,7 @@ return [
     | Call booked
     |--------------------------------------------------------------------------
     |
-    | Off by default (`SLACK_NOTIFY_ON_BOOKING`), because the legacy feed did not
+    | On by default (`SLACK_NOTIFY_ON_BOOKING=false` to silence). It was off because the legacy feed did not
     | send it. See HandleLeadEventsForSlack.
     */
     'booked' => [
@@ -420,7 +420,14 @@ return [
             [
                 'type' => 'card',
                 'title' => ['type' => 'mrkdwn', 'text' => '{{ name }}', 'verbatim' => false],
-                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ company }}', 'verbatim' => false],
+                /*
+                 * `company` used to sit here and is never collected: the public registration
+                 * form asks only for name, email and password, so this resolved to an empty
+                 * string and Slack rejected the whole message with `invalid_blocks`. Every
+                 * referrer registration went unannounced. SlackMessageRenderer now also prunes
+                 * an empty subtitle, so this is belt and braces rather than the only guard.
+                 */
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ status }}', 'verbatim' => false],
                 'body' => ['type' => 'mrkdwn', 'text' => '{{ email_link }}', 'verbatim' => false],
             ],
             [

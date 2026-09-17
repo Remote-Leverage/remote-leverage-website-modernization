@@ -152,7 +152,15 @@ return [
          * (`submission_type is not Final`), so sales sees leads that never finish booking.
          * A second alert when a lead does book is a v2 addition, off by default.
          */
-        'notify_on_booking' => filter_var(env('SLACK_NOTIFY_ON_BOOKING', false), FILTER_VALIDATE_BOOLEAN),
+        /*
+         * A booked call posts as a reply in the lead's existing Slack thread.
+         *
+         * On by default since 2026-09-17. It was off because the legacy Gravity Forms feed
+         * never sent one, but that is a description of the old system rather than a reason:
+         * the submission alert says someone filled in a form, and the booking is the part
+         * sales actually acts on. Set SLACK_NOTIFY_ON_BOOKING=false to silence it.
+         */
+        'notify_on_booking' => filter_var(env('SLACK_NOTIFY_ON_BOOKING', true), FILTER_VALIDATE_BOOLEAN),
     ],
 
     /*

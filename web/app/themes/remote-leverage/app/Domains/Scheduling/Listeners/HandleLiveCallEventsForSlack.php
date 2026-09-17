@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
  * "Somebody wants to talk right now" — in the channel, while it is still true.
  *
  * A routed call posts because it needs a human inside fifteen minutes, and it cannot wait on
- * `SLACK_NOTIFY_ON_BOOKING` (off by default, for parity with a legacy feed that had no concept
+ * `SLACK_NOTIFY_ON_BOOKING` (on by default since 2026-09-17, for a legacy feed that had no concept
  * of a live call). A declined one posts because it is the most expensive silence on the site:
  * the visitor asked for the thing we sell, got a polite refusal, and left.
  *

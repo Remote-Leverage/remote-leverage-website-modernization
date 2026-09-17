@@ -39,7 +39,7 @@ values for `{{ placeholders }}`.
 | Template | Fired by | Notes |
 | :--- | :--- | :--- |
 | `new_lead` | `LeadCreated`, partial only | Opens the thread. Suppressed for blocked profiles and for `submission_type: Final`. |
-| `booked` | `LeadBookingCompleted` | Off by default (`SLACK_NOTIFY_ON_BOOKING`). Replies in-thread, broadcast. |
+| `booked` | `LeadBookingCompleted` | On by default since 2026-09-17; `SLACK_NOTIFY_ON_BOOKING=false` silences it. Replies in-thread, broadcast. |
 | `lead_claimed`, `lead_contacted`, `lead_blocked` | A button press | Replies in-thread. Only the block broadcasts. |
 | `live_call_routed` | `LiveCallRequested`, routed | Always on — a live call starts within 15 minutes. |
 | `live_call_declined` | `LiveCallRequested`, declined | The reason this event exists; see below. |

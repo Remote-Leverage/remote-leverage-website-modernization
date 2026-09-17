@@ -22,6 +22,12 @@ namespace App\Domains\Lead\Services;
 class SlackMessageRenderer
 {
     /**
+     * Block properties that Slack treats as optional, and that are therefore safe to drop when
+     * their placeholder resolves to nothing. See renderBlock().
+     */
+    public const OPTIONAL_TEXT_KEYS = ['subtitle', 'description'];
+
+    /**
      * Render one named template.
      *
      * @param  array<string, string>  $values
@@ -83,6 +89,31 @@ class SlackMessageRenderer
                 $block['accessory'] = $this->substituteDeep($accessory, $values);
             } else {
                 unset($block['accessory']);
+            }
+        }
+
+        /*
+         * Optional text objects that resolved to nothing.
+         *
+         * Slack rejects the ENTIRE message with `invalid_blocks` when a text object carries an
+         * empty string — not the one block, the whole post — so a single unbound placeholder
+         * silently costs the notification. That is what happened to every referrer registration
+         * (`referrer_registered` bound a card subtitle to `company`, which the public form never
+         * collects): the row was created, the event fired, the listener ran, Slack answered
+         * `ok:false`, and nobody heard anything.
+         *
+         * `_when` cannot cover this — it prunes whole blocks, the accessory, and items inside
+         * `fields`/`elements`, and a card's own title/subtitle/body are none of those. Only
+         * genuinely optional keys are pruned here; a section's required `text` is left alone,
+         * because dropping that would produce a different invalid block rather than a valid one.
+         */
+        foreach (self::OPTIONAL_TEXT_KEYS as $key) {
+            if (! isset($block[$key]) || ! is_array($block[$key]) || ! isset($block[$key]['text'])) {
+                continue;
+            }
+
+            if (trim($this->substitute((string) $block[$key]['text'], $values)) === '') {
+                unset($block[$key]);
             }
         }
 
