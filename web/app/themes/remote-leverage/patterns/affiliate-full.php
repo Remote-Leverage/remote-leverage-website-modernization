@@ -12,8 +12,8 @@ $uploads = home_url('/app/uploads/2026/09');
 ?>
 <!-- wp:acf/affiliate-hero {"name":"acf/affiliate-hero","data":{"headline":"Remote Leverage Affiliate Program","_headline":"field_affiliate_hero_block_headline","subheadline":"Help Your Network Scale.<br><strong>Earn $1,000 for Every Hire &amp; Pass on $500 in Savings.</strong>","_subheadline":"field_affiliate_hero_block_subheadline","primary_cta_text":"Apply to Join Now","_primary_cta_text":"field_affiliate_hero_block_primary_cta_text","primary_cta_url":"/referrer-register","_primary_cta_url":"field_affiliate_hero_block_primary_cta_url","secondary_cta_text":"Book a Strategy Call","_secondary_cta_text":"field_affiliate_hero_block_secondary_cta_text","secondary_cta_url":"#booking-footer","_secondary_cta_url":"field_affiliate_hero_block_secondary_cta_url","hero_image":"<?= $uploads ?>/3b6cb07dcd46261926ab63d1d3a19c6039817183.png","_hero_image":"field_affiliate_hero_block_hero_image"},"mode":"preview"} /-->
 
-<!-- wp:group {"align":"full","className":"bg-purple-50 min-h-[90vh] flex flex-col justify-center items-stretch","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
-<div class="wp-block-group alignfull bg-purple-50 min-h-[90vh] flex flex-col justify-center items-stretch" style="padding-top:4rem;padding-bottom:4rem">
+<!-- wp:group {"align":"full","className":"bg-purple-50 min-h-[90vh] flex flex-col justify-center items-stretch px-4 sm:px-6 lg:px-8","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
+<div class="wp-block-group alignfull bg-purple-50 min-h-[90vh] flex flex-col justify-center items-stretch px-4 sm:px-6 lg:px-8" style="padding-top:4rem;padding-bottom:4rem">
     <!-- wp:html -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-16 mb-16">
         <h2 class="font-display text-3xl sm:text-4xl font-bold text-black tracking-[-0.03em] leading-[1.15]">
@@ -53,8 +53,8 @@ $uploads = home_url('/app/uploads/2026/09');
 </div>
 <!-- /wp:group -->
 
-<!-- wp:group {"align":"full","className":"min-h-[90vh] flex flex-col justify-center items-stretch","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}},"color":{"background":"#E6DEF4"}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
-<div class="wp-block-group alignfull has-background min-h-[90vh] flex flex-col justify-center items-stretch"
+<!-- wp:group {"align":"full","className":"min-h-[90vh] flex flex-col justify-center items-stretch px-4 sm:px-6 lg:px-8","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}},"color":{"background":"#E6DEF4"}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
+<div class="wp-block-group alignfull has-background min-h-[90vh] flex flex-col justify-center items-stretch px-4 sm:px-6 lg:px-8"
     style="padding-top:4rem;padding-bottom:4rem;background-color:#E6DEF4">
     <!-- wp:html -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-16 mb-28">
@@ -70,8 +70,8 @@ $uploads = home_url('/app/uploads/2026/09');
 </div>
 <!-- /wp:group -->
 
-<!-- wp:group {"align":"full","className":"min-h-[90vh] flex flex-col justify-center items-stretch","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}},"color":{"background":"#F9EAFF"}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
-<div class="wp-block-group alignfull has-background min-h-[90vh] flex flex-col justify-center items-stretch" style="padding-top:4rem;padding-bottom:4rem;background-color:#F9EAFF">
+<!-- wp:group {"align":"full","className":"min-h-[90vh] flex flex-col justify-center items-stretch px-4 sm:px-6 lg:px-8","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}},"color":{"background":"#F9EAFF"}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
+<div class="wp-block-group alignfull has-background min-h-[90vh] flex flex-col justify-center items-stretch px-4 sm:px-6 lg:px-8" style="padding-top:4rem;padding-bottom:4rem;background-color:#F9EAFF">
     <?= BlockDefaults::renderProgressSteps(
         [
             'headline' => 'How It Works',
@@ -86,8 +86,8 @@ $uploads = home_url('/app/uploads/2026/09');
 </div>
 <!-- /wp:group -->
 
-<!-- wp:group {"align":"full","className":"min-h-[90vh] flex flex-col justify-center items-stretch","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}},"color":{"background":"#E6DEF4"}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
-<div class="wp-block-group alignfull has-background min-h-[90vh] flex flex-col justify-center items-stretch"
+<!-- wp:group {"align":"full","className":"min-h-[90vh] flex flex-col justify-center items-stretch px-4 sm:px-6 lg:px-8","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}},"color":{"background":"#E6DEF4"}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
+<div class="wp-block-group alignfull has-background min-h-[90vh] flex flex-col justify-center items-stretch px-4 sm:px-6 lg:px-8"
     style="padding-top:4rem;padding-bottom:4rem;background-color:#E6DEF4">
     <!-- wp:html -->
     <h2 class="w-full font-display text-3xl sm:text-4xl font-bold text-black tracking-[-0.03em] mb-4">Who is this program for?</h2>
@@ -127,8 +127,8 @@ $uploads = home_url('/app/uploads/2026/09');
 </div>
 <!-- /wp:group -->
 
-<!-- wp:group {"align":"full","className":"min-h-[90vh] flex flex-col justify-center items-stretch","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}},"color":{"background":"#F9EAFF"}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
-<div class="wp-block-group alignfull has-background min-h-[90vh] flex flex-col justify-center items-stretch" style="padding-top:4rem;padding-bottom:4rem;background-color:#F9EAFF">
+<!-- wp:group {"align":"full","className":"min-h-[90vh] flex flex-col justify-center items-stretch px-4 sm:px-6 lg:px-8","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}},"color":{"background":"#F9EAFF"}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
+<div class="wp-block-group alignfull has-background min-h-[90vh] flex flex-col justify-center items-stretch px-4 sm:px-6 lg:px-8" style="padding-top:4rem;padding-bottom:4rem;background-color:#F9EAFF">
     <!-- wp:html -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-16 mb-20">
         <h2 class="font-display text-3xl sm:text-4xl font-bold text-black tracking-[-0.03em] leading-[1.15]">
@@ -182,8 +182,8 @@ $uploads = home_url('/app/uploads/2026/09');
 </div>
 <!-- /wp:group -->
 
-<!-- wp:group {"align":"full","className":"min-h-[90vh] flex flex-col justify-center items-stretch","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}},"color":{"background":"#E6DEF4"}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
-<div class="wp-block-group alignfull has-background min-h-[90vh] flex flex-col justify-center items-stretch"
+<!-- wp:group {"align":"full","className":"min-h-[90vh] flex flex-col justify-center items-stretch px-4 sm:px-6 lg:px-8","style":{"spacing":{"padding":{"top":"4rem","bottom":"4rem"}},"color":{"background":"#E6DEF4"}},"layout":{"type":"constrained","contentSize":"1380px"}} -->
+<div class="wp-block-group alignfull has-background min-h-[90vh] flex flex-col justify-center items-stretch px-4 sm:px-6 lg:px-8"
     style="padding-top:4rem;padding-bottom:4rem;background-color:#E6DEF4">
     <!-- wp:html -->
     <h2 class="w-full font-display text-3xl sm:text-4xl font-bold text-black tracking-[-0.03em] mb-4">Ready to Get Started?</h2>

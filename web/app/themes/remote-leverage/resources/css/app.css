@@ -709,9 +709,17 @@ body.admin-bar {
   transform: translateZ(0);
 }
 /* Production's /reviews/ band runs these cards square rather than the 5/8 portrait
-   used elsewhere — measured 299x302 there on 2026-09-16. Opt-in, so nothing else moves. */
-.rl-talent-grid--square .rl-talent-grid-card {
-  aspect-ratio: 1 / 1;
+   used elsewhere — measured 299x302 there on 2026-09-16. Opt-in, so nothing else moves.
+
+   That 299x302 is a *desktop* measurement and only holds from sm up. Two-across on a 414px
+   screen a square card is 185x185, while the overlaid name/title/bio/logo block is a fixed
+   125px — 68% of the card, so the text sat across the subject's face. Below sm the cards keep
+   the 5/8 portrait every other talent grid uses (185x296, content 42%), which puts the copy
+   under the face instead of over it. */
+@media (min-width: 640px) {
+  .rl-talent-grid--square .rl-talent-grid-card {
+    aspect-ratio: 1 / 1;
+  }
 }
 
 .rl-talent-grid-card .rl-department-card__bg {
