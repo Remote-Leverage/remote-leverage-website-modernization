@@ -122,6 +122,13 @@ $app->singleton('cache', function () {
 
             return true;
         }
+
+        public function flush()
+        {
+            $this->storage = [];
+
+            return true;
+        }
     };
 });
 

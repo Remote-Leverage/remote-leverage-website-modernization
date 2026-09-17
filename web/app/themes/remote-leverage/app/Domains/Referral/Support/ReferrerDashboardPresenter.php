@@ -20,6 +20,18 @@ use Illuminate\Support\Collection;
  */
 class ReferrerDashboardPresenter
 {
+    /**
+     * How many stale referrals the "needs attention" rail lists before it stops. A worklist
+     * longer than this is a filtered table, not a rail — the pipeline's own "Needs a nudge"
+     * filter is the right tool at that point.
+     */
+    public const ATTENTION_LIMIT = 5;
+
+    /**
+     * How many entries the merged activity feed shows.
+     */
+    public const ACTIVITY_LIMIT = 8;
+
     public function __construct(
         protected ReferralSettingsService $settings,
         protected ReferralTimeline $timeline,
@@ -65,8 +77,58 @@ class ReferrerDashboardPresenter
             ],
             'earnings' => $this->earnings($referrals),
             'referrals' => $rows,
+            'needs_attention' => $this->needsAttention($rows),
+            'recent_activity' => $this->recentActivity($rows),
             'stale_days' => $staleDays,
         ];
+    }
+
+    /**
+     * The stale referrals themselves, not a count of them.
+     *
+     * A referrer cannot act on "3". The right rail lists who has gone quiet and for how long,
+     * longest first, because that is the only part of this dashboard that asks them to do
+     * something.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    protected function needsAttention(array $rows): array
+    {
+        $stale = array_values(array_filter($rows, static fn (array $row) => $row['is_stale']));
+
+        usort($stale, static fn (array $a, array $b) => ($b['days_since_change'] ?? 0) <=> ($a['days_since_change'] ?? 0));
+
+        return array_slice($stale, 0, self::ATTENTION_LIMIT);
+    }
+
+    /**
+     * One merged feed across every referral, answering "what changed since I last looked".
+     *
+     * The per-referral timelines are each behind a click, so without this there is no way to
+     * see movement without opening rows one at a time.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    protected function recentActivity(array $rows): array
+    {
+        $entries = [];
+
+        foreach ($rows as $row) {
+            foreach ($row['timeline'] as $entry) {
+                $entries[] = $entry + [
+                    'referral_id' => $row['id'],
+                    'name' => $row['name'],
+                ];
+            }
+        }
+
+        // ISO-8601 with a consistent offset sorts correctly as a string, and every value here
+        // is produced by the same Carbon instance.
+        usort($entries, static fn (array $a, array $b) => strcmp((string) $b['iso'], (string) $a['iso']));
+
+        return array_slice($entries, 0, self::ACTIVITY_LIMIT);
     }
 
     /**

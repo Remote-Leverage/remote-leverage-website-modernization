@@ -10,6 +10,7 @@ use App\Domains\Lead\Services\AttributionCollector;
 use App\Domains\Lead\Services\EmailValidationService;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Scheduling\Actions\FetchAvailableSlotsAction;
+use App\Domains\Scheduling\Services\AvailabilityHealthMonitor;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
 use App\Domains\Tracking\Data\AnalyticsEventData;
@@ -24,6 +25,12 @@ use Livewire\Component;
 #[Lazy]
 class MultistepBookingWizard extends Component
 {
+    /** How long a populated availability answer is reused. See availabilityTtl(). */
+    public const AVAILABILITY_TTL_SECONDS = 600;
+
+    /** How long an empty one is. Deliberately an order of magnitude shorter. */
+    public const EMPTY_AVAILABILITY_TTL_SECONDS = 60;
+
     // Step progression (1: Details, 2: Date, 3: Time & Confirm)
     public int $currentStep = 1;
 
@@ -231,6 +238,12 @@ class MultistepBookingWizard extends Component
     public ?string $selectedDate = null;
 
     public array $availableDates = [];
+
+    /**
+     * Soonest bookable date on this tier, in any month. Null only when the tier has nothing
+     * bookable at all — which is the sell-out condition, not merely an empty month.
+     */
+    public ?string $nextAvailableDate = null;
 
     // Step 3: Time Selection
     public ?string $selectedSlot = null;
@@ -845,9 +858,16 @@ class MultistepBookingWizard extends Component
             $slotsAction = app(FetchAvailableSlotsAction::class);
             $start = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1, $this->timezone)->startOfMonth();
             $end = $start->copy()->endOfMonth();
+            $monthKey = $start->format('Y-m');
 
-            $cacheKey = 'rl_avail_dates_'.md5($this->getActiveEventTypeUri().$start->format('Y-m').$this->timezone);
-            $this->availableDates = Cache::remember($cacheKey, 600, function () use ($slotsAction, $start, $end) {
+            $cacheKey = 'rl_avail_dates_'.md5($this->getActiveEventTypeUri().$monthKey.$this->timezone);
+
+            $cached = Cache::get($cacheKey);
+            $fetched = false;
+
+            if (is_array($cached)) {
+                $this->availableDates = $cached;
+            } else {
                 $slots = $slotsAction->execute(
                     $start->toIso8601String(),
                     $end->toIso8601String(),
@@ -861,12 +881,147 @@ class MultistepBookingWizard extends Component
                     $dates[$dateKey] = true;
                 }
 
-                return array_keys($dates);
-            });
+                $this->availableDates = array_keys($dates);
+                $fetched = true;
+
+                Cache::put($cacheKey, $this->availableDates, self::availabilityTtl($this->availableDates));
+            }
+
+            $this->refreshNextAvailableDate();
+
+            /*
+             * Reported after the next-available lookup, because that is what separates a sold-out
+             * tier from a month the rolling booking window simply has not reached yet — and only
+             * on a real fetch, so a cached empty does not re-report a sell-out on every pageview.
+             */
+            if ($fetched) {
+                app(AvailabilityHealthMonitor::class)->record(
+                    $this->activeTierRole(),
+                    $this->getActiveEventTypeUri(),
+                    $this->availableDates,
+                    $monthKey,
+                    $this->nextAvailableDate
+                );
+            }
         } catch (\Throwable $e) {
             Log::warning('Failed to load month availability: '.$e->getMessage());
             $this->availableDates = [];
         }
+    }
+
+    /**
+     * The soonest bookable date on this tier, in any month, or null when there is none.
+     *
+     * Only consulted when the displayed month came back empty, because that is the only time
+     * the answer is worth a request. Calendly's booking window is a rolling few days, so an
+     * empty month is the normal state of an otherwise healthy calendar viewed from far
+     * enough away — "fully booked" with no date attached reads as broken, and is the message
+     * that sent the 2026-09-17 sell-out to engineering instead of to sales.
+     */
+    protected function refreshNextAvailableDate(): void
+    {
+        if (! empty($this->availableDates)) {
+            /*
+             * Already on screen — no request needed, but still worth setting rather than
+             * nulling. The empty state never renders this branch, so the only reader is
+             * AvailabilityHealthMonitor, and a null here would have the admin panel print
+             * "no bookable dates" beside a tier it had just marked bookable.
+             */
+            $dates = $this->availableDates;
+            sort($dates);
+            $this->nextAvailableDate = $dates[0];
+
+            return;
+        }
+
+        try {
+            $cacheKey = 'rl_avail_next_'.md5($this->getActiveEventTypeUri().$this->timezone);
+
+            /*
+             * A miss and a cached "nothing at all" are both meaningful and have to be
+             * distinguishable. Null cannot carry that: Laravel's cache repository returns the
+             * *default* for a stored null, so caching null would read back as a miss forever
+             * and re-hit Calendly on every pageview — precisely when the tier is sold out and
+             * the calendar is busiest. Empty string is the stored form of "none".
+             */
+            $cached = Cache::get($cacheKey, false);
+
+            if ($cached !== false) {
+                $this->nextAvailableDate = $cached === '' ? null : $cached;
+
+                return;
+            }
+
+            // Nulls let FetchAvailableSlotsAction pick its own window: now through +30 days,
+            // which is past any horizon Calendly will answer for.
+            $slots = app(FetchAvailableSlotsAction::class)->execute(
+                null,
+                null,
+                $this->timezone,
+                $this->getActiveEventTypeUri()
+            );
+
+            $dates = [];
+            foreach ($slots as $slot) {
+                $dates[] = Carbon::parse($slot->startTime)->setTimezone($this->timezone)->format('Y-m-d');
+            }
+
+            sort($dates);
+
+            $this->nextAvailableDate = $dates[0] ?? null;
+
+            Cache::put(
+                $cacheKey,
+                $this->nextAvailableDate ?? '',
+                self::availabilityTtl($dates)
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to resolve next available date: '.$e->getMessage());
+            $this->nextAvailableDate = null;
+        }
+    }
+
+    /**
+     * Move the calendar to the soonest bookable date and open it.
+     */
+    public function jumpToNextAvailable(): void
+    {
+        if (empty($this->nextAvailableDate)) {
+            return;
+        }
+
+        $target = Carbon::parse($this->nextAvailableDate, $this->timezone);
+
+        $this->currentMonth = (int) $target->format('n');
+        $this->currentYear = (int) $target->format('Y');
+
+        $this->loadMonthAvailability();
+        $this->selectDate($target->format('Y-m-d'));
+    }
+
+    /**
+     * How long an availability answer may be reused.
+     *
+     * An empty answer is the perishable one. Availability on these calendars is consumed and
+     * released continuously — twelve bookings landed on `t10` during the five hours it was
+     * reporting empty on 2026-09-17 — so a ten-minute hold on "nothing here" converts every
+     * momentary sell-out into a ten-minute outage for everyone routed to that tier. A
+     * populated answer going stale by the same margin costs a visitor one rejected slot at
+     * submit time, which the booking path already handles.
+     *
+     * @param  array<int, string>  $result
+     */
+    protected static function availabilityTtl(array $result): int
+    {
+        return empty($result) ? self::EMPTY_AVAILABILITY_TTL_SECONDS : self::AVAILABILITY_TTL_SECONDS;
+    }
+
+    /**
+     * Which revenue tier the current answers route to.
+     */
+    public function activeTierRole(): string
+    {
+        return $this->isUnder10kMrr() ? 't0' : 't10';
     }
 
     public function loadSlotsForDate(string $date): void
@@ -877,7 +1032,12 @@ class MultistepBookingWizard extends Component
             $end = $start->copy()->endOfDay();
 
             $cacheKey = 'rl_avail_slots_'.md5($this->getActiveEventTypeUri().$date.$this->timezone);
-            $this->availableSlots = Cache::remember($cacheKey, 600, function () use ($slotsAction, $start, $end) {
+
+            $cached = Cache::get($cacheKey);
+
+            if (is_array($cached)) {
+                $this->availableSlots = $cached;
+            } else {
                 $slots = $slotsAction->execute(
                     $start->toIso8601String(),
                     $end->toIso8601String(),
@@ -893,8 +1053,14 @@ class MultistepBookingWizard extends Component
                     ];
                 }
 
-                return $times;
-            });
+                $this->availableSlots = $times;
+
+                // A day that just sold out is the single most perishable answer here: the
+                // visitor is looking at it, and the next slot to free up is the one they
+                // wanted. Ten minutes of "no times available" on a day that has them again
+                // is a lost booking.
+                Cache::put($cacheKey, $times, self::availabilityTtl($times));
+            }
         } catch (\Throwable $e) {
             Log::warning('Failed to load slots for date: '.$e->getMessage());
             $this->availableSlots = [];

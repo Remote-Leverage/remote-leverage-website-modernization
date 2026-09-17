@@ -13,6 +13,7 @@ use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Scheduling\Actions\RetryFailedBookingAction;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
+use App\Domains\Scheduling\Services\AvailabilityHealthMonitor;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -2032,6 +2033,55 @@ class LeadsAdminDashboard
                                 <span style="font-size: 11px; color: #71717a;"><?php echo esc_html($t0Status); ?></span>
                             </td>
                         </tr>
+                        <?php
+                        /*
+                         * "Active (200 OK)" above answers whether Calendly is reachable, which is a
+                         * different question from whether there is anything left to book — on
+                         * 2026-09-17 the t10 event type was 200 OK and completely sold out for hours,
+                         * and this panel said everything was fine. These rows are the second question.
+                         *
+                         * Read from the last real availability fetch rather than making one: rendering
+                         * an admin screen must not cost four Calendly calls, and a value older than
+                         * AvailabilityHealthMonitor::STALE_AFTER_SECONDS says so instead of lying.
+                         */
+                        $availability = app(AvailabilityHealthMonitor::class)->status();
+        foreach (['t10' => 'T10', 't0' => 'T0'] as $role => $label) {
+            $seen = $availability[$role] ?? null;
+            $stale = AvailabilityHealthMonitor::isStale($seen['checked_at'] ?? null);
+            ?>
+                            <tr>
+                                <td><?php echo esc_html($label); ?> Availability:</td>
+                                <td>
+                                    <?php if ($seen === null) { ?>
+                                        <span class="rl-badge"><span class="rl-status-dot"></span>Not checked yet</span>
+                                    <?php } elseif (! empty($seen['sold_out'])) { ?>
+                                        <span class="rl-badge rl-badge-failed"><span class="rl-status-dot"></span>Sold out<?php echo $stale ? ' (stale)' : ''; ?></span>
+                                    <?php } else { ?>
+                                        <span class="rl-badge rl-badge-succeeded"><span class="rl-status-dot"></span>Bookable<?php echo $stale ? ' (stale)' : ''; ?></span>
+                                    <?php } ?>
+                                    <?php if ($seen !== null) { ?>
+                                        <br><span style="font-size: 11px; color: #71717a;">
+                                            <?php
+                                            /*
+                                             * The soonest bookable date is the number worth surfacing. "3 open days
+                                             * in 2026-09" says nothing about whether a lead can book today, and these
+                                             * calendars only publish a rolling few days, so the count swings for
+                                             * reasons that are not health.
+                                             */
+                                            if (! empty($seen['next_available'])) {
+                                                echo 'Next opening '.esc_html(Carbon::parse($seen['next_available'])->format('M j'));
+                                            } else {
+                                                echo 'No bookable dates';
+                                            }
+                                        ?>
+                                            &middot; checked <?php echo esc_html(Carbon::parse($seen['checked_at'])->diffForHumans()); ?>
+                                        </span>
+                                    <?php } ?>
+                                </td>
+                            </tr>
+                            <?php
+        }
+        ?>
                     </table>
                 </div>
 

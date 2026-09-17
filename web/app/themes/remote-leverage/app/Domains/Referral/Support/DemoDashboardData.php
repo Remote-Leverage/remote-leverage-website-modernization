@@ -169,9 +169,47 @@ class DemoDashboardData
                 'currency' => 'USD',
             ],
             'referrals' => $referrals,
+            'needs_attention' => self::needsAttention($referrals),
+            'recent_activity' => self::recentActivity($referrals),
             'stale_days' => $staleDays,
             'is_demo' => true,
         ];
+    }
+
+    /**
+     * Derived exactly as ReferrerDashboardPresenter derives them, so the demo exercises the
+     * same rails rather than a second set of hand-written values that can disagree with the
+     * table above them.
+     *
+     * @param  array<int, array<string, mixed>>  $referrals
+     * @return array<int, array<string, mixed>>
+     */
+    protected static function needsAttention(array $referrals): array
+    {
+        $stale = array_values(array_filter($referrals, static fn (array $row) => $row['is_stale']));
+
+        usort($stale, static fn (array $a, array $b) => ($b['days_since_change'] ?? 0) <=> ($a['days_since_change'] ?? 0));
+
+        return array_slice($stale, 0, ReferrerDashboardPresenter::ATTENTION_LIMIT);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $referrals
+     * @return array<int, array<string, mixed>>
+     */
+    protected static function recentActivity(array $referrals): array
+    {
+        $entries = [];
+
+        foreach ($referrals as $row) {
+            foreach ($row['timeline'] as $entry) {
+                $entries[] = $entry + ['referral_id' => $row['id'], 'name' => $row['name']];
+            }
+        }
+
+        usort($entries, static fn (array $a, array $b) => strcmp((string) $b['iso'], (string) $a['iso']));
+
+        return array_slice($entries, 0, ReferrerDashboardPresenter::ACTIVITY_LIMIT);
     }
 
     /**

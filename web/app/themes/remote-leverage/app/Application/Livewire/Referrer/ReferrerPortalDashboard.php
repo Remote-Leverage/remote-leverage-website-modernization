@@ -251,6 +251,21 @@ class ReferrerPortalDashboard extends Component
         $this->visibleCount += self::PAGE_SIZE;
     }
 
+    /**
+     * Jump the pipeline to one referral and open its history.
+     *
+     * What makes the "needs attention" rail a worklist rather than a read-only list: the row
+     * may be behind an active filter or past the current page, so both are cleared first —
+     * otherwise clicking a name appears to do nothing.
+     */
+    public function focusReferral(int $referralId): void
+    {
+        $this->statusFilter = 'all';
+        $this->search = '';
+        $this->visibleCount = max($this->visibleCount, self::PAGE_SIZE);
+        $this->expandedReferralId = $referralId;
+    }
+
     public function toggleTimeline(int $referralId): void
     {
         $this->expandedReferralId = $this->expandedReferralId === $referralId ? null : $referralId;
@@ -303,6 +318,8 @@ class ReferrerPortalDashboard extends Component
             'metrics' => ['reach' => 0, 'referrals' => 0, 'qualified' => 0, 'fulfilled' => 0, 'stale' => 0],
             'earnings' => ['due' => 0.0, 'issued' => 0.0, 'total' => 0.0, 'currency' => 'USD'],
             'referrals' => [],
+            'needs_attention' => [],
+            'recent_activity' => [],
             'stale_days' => ReferralSettingsService::DEFAULT_STALE_DAYS,
             'is_demo' => false,
         ];
@@ -435,6 +452,8 @@ class ReferrerPortalDashboard extends Component
         return view('livewire.referrer.referrer-portal-dashboard', [
             'metrics' => $model['metrics'],
             'earnings' => $model['earnings'],
+            'needsAttention' => $model['needs_attention'],
+            'recentActivity' => $model['recent_activity'],
             'staleDays' => $model['stale_days'],
             'isDemo' => (bool) ($model['is_demo'] ?? false),
             'canToggleDemo' => $this->demoAllowed(),

@@ -288,16 +288,26 @@
                 @endforeach
               </div>
 
-              {{-- See the note on the light skin's copy of this: a month with no availability
-                   is otherwise indistinguishable from one that is simply fully booked. --}}
+              {{-- See the note on the light skin's copy of this. --}}
               @if (empty($availableDates))
                 <div class="mt-4 rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-center">
-                  <p class="text-xs font-semibold text-white">No times are open in {{ $monthTitle }}.</p>
-                  <p class="text-xs text-white/80 mt-1">
-                    Try the next month, or email
-                    <a href="mailto:contact@remoteleverage.com" class="underline hover:text-white">contact@remoteleverage.com</a>
-                    and we will find you a slot.
-                  </p>
+                  <p class="text-xs font-semibold text-white">{{ $monthTitle }} is fully booked.</p>
+                  @if ($nextAvailableDate)
+                    <p class="text-xs text-white/80 mt-1">
+                      Next opening is
+                      {{ \Carbon\Carbon::parse($nextAvailableDate, $timezone)->format('l, F j') }}.
+                    </p>
+                    <button type="button" wire:click="jumpToNextAvailable"
+                      class="mt-2 text-xs font-semibold text-white underline hover:text-white/80">
+                      Go to {{ \Carbon\Carbon::parse($nextAvailableDate, $timezone)->format('F j') }}
+                    </button>
+                  @else
+                    <p class="text-xs text-white/80 mt-1">
+                      New times open continuously — check back shortly, or email
+                      <a href="mailto:contact@remoteleverage.com" class="underline hover:text-white">contact@remoteleverage.com</a>
+                      and we will find you a slot.
+                    </p>
+                  @endif
                 </div>
               @endif
             </div>
@@ -375,7 +385,7 @@
                         class="w-full py-3.5 px-4 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-base text-center shadow-lg hover:shadow-orange-500/30 hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 ease-out cursor-pointer flex items-center justify-center gap-2 animate-confirm-pop"
                       >
                         <span wire:loading.remove wire:target="submitBooking">Confirm</span>
-                        <span wire:loading wire:target="submitBooking" class="flex items-center gap-1.5">
+                        <span wire:loading.flex wire:target="submitBooking" class="flex items-center gap-1.5">
                           <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -486,7 +496,8 @@
       {{-- ────────────────────────────────────────────────────────── --}}
       @if ($currentStep === 1)
         <div 
-          class="{{ $skin === 'naked' ? 'p-0 space-y-4' : 'p-6 sm:p-8 space-y-4' }}"
+          wire:key="light-step-1"
+          class="animate-wizard-step {{ $skin === 'naked' ? 'p-0 space-y-4' : 'p-6 sm:p-8 space-y-4' }}"
           {{-- Only the two values that are fixed at mount. Field values must NOT be seeded
                here: Livewire re-renders this attribute on every round trip, and Alpine treats
                a changed `x-data` as a new component — it tears the scope down and rebuilds it
@@ -779,7 +790,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
               </svg>
 
-              <span wire:loading wire:target="goToStep" class="inline-flex items-center gap-2">
+              <span wire:loading.inline-flex wire:target="goToStep" class="inline-flex items-center gap-2">
                 <svg class="w-4 h-4 animate-spin shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"></path>
@@ -795,91 +806,131 @@
       {{-- STEP 2: Pick a Date (Calendar Grid)                        --}}
       {{-- ────────────────────────────────────────────────────────── --}}
       @if ($currentStep === 2)
-        <div class="{{ $skin === 'naked' ? 'p-0' : 'p-6 sm:p-8' }}">
-          <div class="flex items-center justify-between mb-4">
-            <button 
-              type="button" 
+        <div wire:key="light-step-2" class="animate-wizard-step {{ $skin === 'naked' ? 'p-0' : 'p-6 sm:p-8' }}">
+          {{-- Header mirrors the glass skin's: a circular back button on the left, then the
+               month chevrons and the month title as one group on the right. Light colours,
+               same geometry — the two skins are the same calendar, not two designs. --}}
+          <div class="flex items-center justify-between gap-4 mb-7">
+            <button
+              type="button"
               wire:click="goToStep(1)"
-              class="text-xs font-semibold text-text-muted hover:text-brand-hero inline-flex items-center gap-1.5 transition cursor-pointer"
+              class="w-12 h-12 rounded-full border border-slate-200 bg-white text-brand-purple flex items-center justify-center shadow-sm hover:border-brand-purple/40 hover:shadow-md hover:scale-110 active:scale-95 transition-all duration-200 ease-out cursor-pointer shrink-0"
+              aria-label="Back to your details"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-              <span>Back</span>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+              </svg>
             </button>
-            <span class="text-xs text-text-muted font-medium">Click any date to see times</span>
-          </div>
 
-          <div>
-            {{-- Month Navigation Header --}}
-            <div class="flex items-center justify-between mb-4 px-2">
-              <h3 class="text-base font-bold text-brand-hero">{{ $monthTitle }}</h3>
-              <div class="flex items-center gap-2">
-                <button 
-                  type="button" 
+            <div class="flex items-center gap-4 sm:gap-5">
+              <div class="flex items-center gap-1.5 text-slate-400">
+                <button
+                  type="button"
                   wire:click="prevMonth"
-                  class="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                  class="p-1.5 rounded-full hover:text-brand-purple hover:scale-125 active:scale-90 transition-all duration-200 cursor-pointer"
                   aria-label="Previous Month"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+                  </svg>
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   wire:click="nextMonth"
-                  class="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                  class="p-1.5 rounded-full hover:text-brand-purple hover:scale-125 active:scale-90 transition-all duration-200 cursor-pointer"
                   aria-label="Next Month"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                  </svg>
                 </button>
               </div>
-            </div>
-
-            {{-- Day Name Column Headers --}}
-            <div class="grid grid-cols-7 text-center text-2xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-              <span>SUN</span><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span>
-            </div>
-
-            {{-- Dates Grid --}}
-            <div class="grid grid-cols-7 gap-1 text-center">
-              @foreach ($daysGrid as $cell)
-                @if ($cell['empty'])
-                  <div class="h-9 w-9"></div>
-                @else
-                  <button
-                    type="button"
-                    wire:click="selectDate('{{ $cell['date'] }}')"
-                    wire:target="selectDate('{{ $cell['date'] }}')"
-                    wire:loading.attr="disabled"
-                    wire:loading.class="opacity-60 cursor-wait"
-                    @disabled($cell['isPast'] || ! $cell['hasAvailability'])
-                    class="mx-auto h-9 w-9 rounded-full text-xs font-semibold flex items-center justify-center transition-all duration-150
-                      {{ $cell['isSelected'] ? 'bg-brand-purple text-white font-bold shadow-md shadow-brand-purple/30 scale-105' : '' }}
-                      {{ $cell['hasAvailability'] && ! $cell['isSelected'] ? 'hover:bg-brand-purple/10 text-brand-hero font-bold hover:text-brand-purple cursor-pointer' : '' }}
-                      {{ ! $cell['hasAvailability'] || $cell['isPast'] ? 'text-slate-300 cursor-not-allowed' : '' }}
-                    "
-                  >
-                    <span wire:loading.remove wire:target="selectDate('{{ $cell['date'] }}')">{{ $cell['day'] }}</span>
-                    <svg wire:loading wire:target="selectDate('{{ $cell['date'] }}')" class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  </button>
-                @endif
-              @endforeach
+              <h3 class="text-lg sm:text-xl font-bold text-brand-hero tracking-tight">{{ $monthTitle }}</h3>
             </div>
           </div>
 
+          {{-- Day Name Column Headers --}}
+          <div class="grid grid-cols-7 text-center text-2xs sm:text-xs font-bold text-brand-hero uppercase tracking-wider mb-4">
+            <span>SUN</span><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span>
+          </div>
+
+          {{-- Dates Grid. A bookable day is a filled circle, everything else is flat grey —
+               the same read as the glass skin, where availability is the white pill. The
+               peach is the light card's equivalent of that pill; selection stays a solid
+               brand-purple fill so it can never be mistaken for "merely open". --}}
+          <div wire:key="light-grid-{{ $currentYear }}-{{ $currentMonth }}"
+               class="grid grid-cols-7 gap-y-2 sm:gap-y-3 text-center items-center justify-items-center animate-grid-month">
+            @foreach ($daysGrid as $cell)
+              @if ($cell['empty'])
+                <div class="w-11 h-11 sm:w-12 sm:h-12"></div>
+              @else
+                @php $isOpen = $cell['hasAvailability'] && ! $cell['isPast']; @endphp
+                <button
+                  type="button"
+                  wire:click="selectDate('{{ $cell['date'] }}')"
+                  wire:target="selectDate('{{ $cell['date'] }}')"
+                  wire:loading.attr="disabled"
+                  wire:loading.class="opacity-60 cursor-wait"
+                  @disabled(! $isOpen)
+                  @if ($cell['isToday']) aria-current="date" @endif
+                  class="relative w-11 h-11 sm:w-12 sm:h-12 rounded-full text-base sm:text-lg flex items-center justify-center transition-all duration-200 ease-out
+                    {{ $cell['isSelected'] ? 'bg-brand-purple text-white font-bold shadow-md shadow-brand-purple/30 scale-105' : '' }}
+                    {{ $isOpen && ! $cell['isSelected'] ? 'bg-[#FDF2E6] text-brand-purple font-bold cursor-pointer hover:bg-[#FAE4CE] hover:scale-110 active:scale-95' : '' }}
+                    {{ ! $isOpen ? 'text-slate-300 font-normal cursor-not-allowed' : '' }}
+                  "
+                >
+                  <span wire:loading.remove wire:target="selectDate('{{ $cell['date'] }}')">{{ $cell['day'] }}</span>
+                  <svg wire:loading wire:target="selectDate('{{ $cell['date'] }}')" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+
+                  {{-- Today. Sits inside the circle so it never changes the grid's rhythm; it
+                       is dropped on the selected day, where the solid fill already says where
+                       you are and the dot would only muddy it. --}}
+                  @if ($cell['isToday'] && ! $cell['isSelected'])
+                    <span class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full {{ $isOpen ? 'bg-brand-orange-warm' : 'bg-slate-300' }}" aria-hidden="true"></span>
+                  @endif
+                </button>
+              @endif
+            @endforeach
+          </div>
+
+          <p class="mt-4 text-center text-xs text-text-muted font-medium">Click any date to see times</p>
+
           {{-- Every day in the grid is @disabled when the month has no availability, so an
-               empty calendar and a fully-booked one are the same greyed-out pixels. Without
-               this the visitor is told nothing at all: the Calendly event type behind the
-               $10k+ revenue bands had zero availability for four weeks straight on
-               2026-09-17, and the form simply looked broken. --}}
+               empty calendar and a fully-booked one are the same greyed-out pixels, and the
+               form simply looks broken. That is how the 2026-09-17 t10 sell-out reached
+               engineering instead of sales.
+
+               Two things the copy has to get right, both learned from that incident:
+
+               "Fully booked", not "no times" — this is a sold-out calendar, not a failure,
+               and the wording is what routes it to the right team.
+
+               Never suggest the next month. Calendly only offers a rolling four-day booking
+               window on these event types, so the next month is *always* empty and that
+               advice sends every visitor who takes it into a dead end. The soonest real date
+               is what they need, and it is almost always days away, not weeks. --}}
           @if (empty($availableDates))
             <div class="mt-4 rounded-card bg-amber-50 border border-amber-200 px-4 py-3 text-center">
-              <p class="text-xs text-amber-900 font-semibold">No times are open in {{ $monthTitle }}.</p>
-              <p class="text-xs text-amber-800 mt-1">
-                Try the next month, or email
-                <a href="mailto:contact@remoteleverage.com" class="underline hover:text-amber-950">contact@remoteleverage.com</a>
-                and we will find you a slot.
-              </p>
+              <p class="text-xs text-amber-900 font-semibold">{{ $monthTitle }} is fully booked.</p>
+              @if ($nextAvailableDate)
+                <p class="text-xs text-amber-800 mt-1">
+                  Next opening is
+                  {{ \Carbon\Carbon::parse($nextAvailableDate, $timezone)->format('l, F j') }}.
+                </p>
+                <button type="button" wire:click="jumpToNextAvailable"
+                  class="mt-2 text-xs font-semibold text-amber-900 underline hover:text-amber-950">
+                  Go to {{ \Carbon\Carbon::parse($nextAvailableDate, $timezone)->format('F j') }}
+                </button>
+              @else
+                <p class="text-xs text-amber-800 mt-1">
+                  New times open continuously — check back shortly, or email
+                  <a href="mailto:contact@remoteleverage.com" class="underline hover:text-amber-950">contact@remoteleverage.com</a>
+                  and we will find you a slot.
+                </p>
+              @endif
             </div>
           @endif
 
@@ -893,7 +944,7 @@
       {{-- STEP 3: Select a Time                                      --}}
       {{-- ────────────────────────────────────────────────────────── --}}
       @if ($currentStep === 3)
-        <div class="{{ $skin === 'naked' ? 'p-0 space-y-6' : 'p-6 sm:p-8 space-y-6' }}">
+        <div wire:key="light-step-3" class="animate-wizard-step {{ $skin === 'naked' ? 'p-0 space-y-6' : 'p-6 sm:p-8 space-y-6' }}">
           <div class="flex items-center justify-between border-b border-slate-100 pb-4">
             <button 
               type="button" 
@@ -942,10 +993,10 @@
                       wire:click="submitBooking"
                       wire:target="submitBooking"
                       wire:loading.attr="disabled"
-                      class="w-full py-3 px-4 rounded-card bg-[#F8248A] hover:bg-[#E91E63] text-white text-xs sm:text-sm font-bold text-center shadow-lg hover:shadow-pink-500/25 hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 ease-out cursor-pointer flex items-center justify-center gap-2"
+                      class="w-full py-3 px-4 rounded-card bg-[#F8248A] hover:bg-[#E91E63] text-white text-xs sm:text-sm font-bold text-center shadow-lg hover:shadow-pink-500/25 hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 ease-out cursor-pointer flex items-center justify-center gap-2 animate-confirm-pop"
                     >
                       <span wire:loading.remove wire:target="submitBooking">Confirm</span>
-                      <span wire:loading wire:target="submitBooking" class="flex items-center gap-1.5">
+                      <span wire:loading.flex wire:target="submitBooking" class="flex items-center gap-1.5">
                         <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -959,6 +1010,9 @@
                     type="button"
                     wire:key="slot-opt-{{ $slot['iso'] }}"
                     wire:click="selectSlot('{{ $slot['iso'] }}')"
+                    wire:target="selectSlot('{{ $slot['iso'] }}')"
+                    wire:loading.attr="disabled"
+                    wire:loading.class="border-brand-purple bg-brand-purple/5 opacity-70 cursor-wait"
                     class="w-full py-3 px-4 rounded-card border border-slate-200 hover:border-brand-purple hover:bg-brand-purple/5 text-text-body font-semibold text-xs sm:text-sm transition-all duration-200 ease-out cursor-pointer block text-center"
                   >
                     {{ $slot['time'] }}
@@ -982,7 +1036,7 @@
       {{-- ────────────────────────────────────────────────────────── --}}
       {{-- BOOKING CONFIRMED (Summary Card & Add to Calendar)         --}}
       {{-- ────────────────────────────────────────────────────────── --}}
-      <div class="{{ $skin === 'naked' ? 'p-0 text-center space-y-6' : 'p-8 sm:p-10 text-center space-y-6' }}">
+      <div wire:key="light-step-booked" class="animate-wizard-step {{ $skin === 'naked' ? 'p-0 text-center space-y-6' : 'p-8 sm:p-10 text-center space-y-6' }}">
         <div class="w-16 h-16 rounded-full bg-status-success/10 text-status-success mx-auto flex items-center justify-center">
           <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>

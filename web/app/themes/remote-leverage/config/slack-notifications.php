@@ -39,11 +39,20 @@
  *
  * Fields inside a `section` support `_when` the same way and are removed individually.
  *
- * ## House rule
+ * ## House rules
  *
- * No emoji, anywhere. Hierarchy comes from headers, dividers and field grouping. Every family
- * of templates below has a test asserting it, because the Block Kit Builder emoji picker is one
- * click away from the JSON you are about to paste in here.
+ * **No emoji, anywhere.** Hierarchy comes from headers, dividers and field grouping. Every
+ * family of templates below has a test asserting it, because the Block Kit Builder emoji picker
+ * is one click away from the JSON you are about to paste in here.
+ *
+ * **No `style` on a message button.** Slack renders `primary` and `danger` as filled buttons
+ * and everything else as outlined, so a single styled button in a row makes the row look
+ * misaligned even though every button is the same height. Leaving them all unstyled is what
+ * keeps an action row reading as one control group.
+ *
+ * The one exception is the `style` inside a `confirm` dialog, which colours the dialog's own
+ * confirm button rather than anything in the channel. Block keeps it: the modal is where the
+ * warning actually belongs, and it is the last moment before an irreversible action.
  */
 return [
 
@@ -154,7 +163,6 @@ return [
                         'type' => 'button',
                         'action_id' => 'lead_claim',
                         'text' => ['type' => 'plain_text', 'text' => 'Claim', 'emoji' => false],
-                        'style' => 'primary',
                         'value' => '{{ lead_id }}',
                     ],
                     [
@@ -167,7 +175,6 @@ return [
                         'type' => 'button',
                         'action_id' => 'lead_block',
                         'text' => ['type' => 'plain_text', 'text' => 'Block', 'emoji' => false],
-                        'style' => 'danger',
                         'value' => '{{ lead_id }}',
 
                         /*
@@ -333,7 +340,6 @@ return [
                         'type' => 'button',
                         '_when' => ['meeting_url'],
                         'text' => ['type' => 'plain_text', 'text' => 'Join call', 'emoji' => false],
-                        'style' => 'primary',
                         'url' => '{{ meeting_url }}',
                     ],
                     [
@@ -381,7 +387,6 @@ return [
                         'type' => 'button',
                         '_when' => ['admin_url'],
                         'text' => ['type' => 'plain_text', 'text' => 'Open in portal', 'emoji' => false],
-                        'style' => 'primary',
                         'url' => '{{ admin_url }}',
                     ],
                     [
@@ -467,7 +472,6 @@ return [
                     [
                         'type' => 'button',
                         'text' => ['type' => 'plain_text', 'text' => 'Open referrals', 'emoji' => false],
-                        'style' => 'primary',
                         'url' => '{{ admin_url }}',
                     ],
                 ],
@@ -504,6 +508,60 @@ return [
                         'type' => 'button',
                         'text' => ['type' => 'plain_text', 'text' => 'Open payouts', 'emoji' => false],
                         'url' => '{{ admin_url }}',
+                    ],
+                ],
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Calendly tier sold out
+    |--------------------------------------------------------------------------
+    |
+    | A revenue tier has no bookable times left anywhere — not merely none in the
+    | month someone is looking at. See AvailabilityHealthMonitor.
+    |
+    | The card names the tier rather than a person, because this is the one alert
+    | here that is about a calendar and not about a lead. `next_check` and the
+    | guidance line exist to stop it reading as an outage: on 2026-09-17 t10 sold
+    | out overnight and the first hour of the response went into confirming it was
+    | not a bug.
+    */
+    'availability_sold_out' => [
+        'color' => null,
+        'fallback' => "Calendly {{ tier_label }} has no bookable times\n{{ month }}",
+        'blocks' => [
+            [
+                'type' => 'section',
+                'text' => ['type' => 'mrkdwn', 'text' => '*No bookable times left*'],
+            ],
+            [
+                'type' => 'card',
+                'title' => ['type' => 'mrkdwn', 'text' => 'Calendly {{ tier_label }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => 'Every visitor routed to this tier sees an empty calendar', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => 'Checked {{ month }}, and no later date is open either.', 'verbatim' => false],
+            ],
+            [
+                'type' => 'context',
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => 'Usually a sell-out, not an outage. Check the date range and host availability on the event type before treating it as a bug.'],
+                ],
+            ],
+            [
+                'type' => 'actions',
+                '_when' => ['admin_url'],
+                'elements' => [
+                    [
+                        'type' => 'button',
+                        'text' => ['type' => 'plain_text', 'text' => 'Open diagnostics', 'emoji' => false],
+                        'url' => '{{ admin_url }}',
+                    ],
+                    [
+                        'type' => 'button',
+                        '_when' => ['event_type_url'],
+                        'text' => ['type' => 'plain_text', 'text' => 'Open in Calendly', 'emoji' => false],
+                        'url' => '{{ event_type_url }}',
                     ],
                 ],
             ],

@@ -188,6 +188,66 @@ describe('contact masking', function () {
     });
 });
 
+describe('sidebar rails', function () {
+    it('lists the stale referrals themselves, longest-quiet first', function () {
+        $referrer = dashboardReferrer();
+
+        foreach ([7, 30, 12] as $daysQuiet) {
+            [$lead] = dashboardReferral($referrer, 'qualified');
+            $lead->forceFill([
+                'hubspot_lifecycle_stage' => 'opportunity',
+                'hubspot_lifecycle_changed_at' => now()->subDays($daysQuiet),
+                'hubspot_lifecycle_synced_at' => now(),
+            ])->save();
+        }
+
+        // A count cannot be acted on. The rail exists to say who has gone quiet, worst first.
+        $attention = dashboardPresenter()->forReferrer($referrer)['needs_attention'];
+
+        expect(collect($attention)->pluck('days_since_change')->all())->toBe([30, 12, 7]);
+    });
+
+    it('merges every referral timeline into one newest-first feed', function () {
+        $referrer = dashboardReferrer();
+        [$leadA] = dashboardReferral($referrer, 'qualified');
+        [$leadB] = dashboardReferral($referrer, 'qualified');
+
+        LeadActivityLog::query()->create([
+            'lead_id' => $leadA->id, 'event_type' => 'LeadCreated', 'actor_domain' => 'Lead',
+            'stage' => 'dispatch', 'outcome' => 'succeeded', 'created_at' => now()->subDays(5),
+        ]);
+        LeadActivityLog::query()->create([
+            'lead_id' => $leadB->id, 'event_type' => 'LeadBookingCompleted', 'actor_domain' => 'Scheduling',
+            'stage' => 'dispatch', 'outcome' => 'succeeded', 'created_at' => now()->subDays(1),
+        ]);
+
+        $feed = dashboardPresenter()->forReferrer($referrer)['recent_activity'];
+
+        expect(collect($feed)->pluck('label')->all())
+            ->toBe(['Consultation booked', 'Referral received'])
+            // Each entry has to carry the referral it came from, or the rail cannot link back.
+            ->and($feed[0])->toHaveKeys(['referral_id', 'name', 'tone', 'at', 'iso']);
+    });
+
+    it('caps each rail so a busy referrer does not get an unbounded sidebar', function () {
+        $referrer = dashboardReferrer();
+
+        foreach (range(1, ReferrerDashboardPresenter::ATTENTION_LIMIT + 3) as $i) {
+            [$lead] = dashboardReferral($referrer, 'qualified');
+            $lead->forceFill([
+                'hubspot_lifecycle_changed_at' => now()->subDays(10 + $i),
+                'hubspot_lifecycle_synced_at' => now(),
+            ])->save();
+        }
+
+        $model = dashboardPresenter()->forReferrer($referrer);
+
+        expect($model['needs_attention'])->toHaveCount(ReferrerDashboardPresenter::ATTENTION_LIMIT)
+            // The count still reflects reality even though the list is truncated.
+            ->and($model['metrics']['stale'])->toBe(ReferrerDashboardPresenter::ATTENTION_LIMIT + 3);
+    });
+});
+
 describe('demo mode', function () {
     it('is available to an administrator', function () {
         $GLOBALS['_wp_mock_capabilities'] = ['manage_options'];
@@ -223,7 +283,11 @@ describe('demo fixture', function () {
         // absent in the other would be an undefined-index error only the demo can reach.
         expect(array_keys($demo['metrics']))->toBe(array_keys($real['metrics']))
             ->and(array_keys($demo['earnings']))->toBe(array_keys($real['earnings']))
-            ->and(array_keys($demo['referrals'][0]))->toBe(array_keys($real['referrals'][0]));
+            ->and(array_keys($demo['referrals'][0]))->toBe(array_keys($real['referrals'][0]))
+            // Both sidebars render from these, so a shape mismatch is a blank rail in demo
+            // mode only — exactly the place it would be noticed last.
+            ->and(array_keys($demo))->toContain('needs_attention', 'recent_activity')
+            ->and(array_keys($real))->toContain('needs_attention', 'recent_activity');
     });
 
     it('always contains a stale row at whatever threshold is configured', function () {

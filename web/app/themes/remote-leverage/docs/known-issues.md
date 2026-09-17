@@ -857,6 +857,59 @@ The namespaced form is now canonical and the only one registered. **No migration
 
 **Verified:** `/hire-va-4/`, `/partners/`, `/social-media-kit/` and `/referrer-register/` all still return 200 with a hydrated `wire:snapshot` island.
 
+### 25. `text-2xs` is a class that does not exist, used in 10 templates
+
+There is no `--text-2xs` theme token and no `.text-2xs` utility is generated. Confirmed against
+the compiled bundle: the only `2xs` matches in `public/build/assets/app-*.css` are
+`--container-2xs` and `--shadow-2xs`, both unrelated.
+
+Every element marked `text-2xs` therefore renders at the **inherited** size. It is used as the
+"smallest caption" size, so the effect is captions rendering at body size — which reads as a
+screen with no typographic hierarchy rather than as a missing class.
+
+```bash
+grep -rlo "text-2xs" resources/views/ | wc -l   # 10 templates
+```
+
+Among them: `livewire/partner/partner-directory-grid`, `livewire/booking/multistep-booking-wizard`,
+`livewire/blog/guide-index-filter`, `livewire/referrer/referrer-registration-form`,
+`blocks/hire-va-hero`, `blocks/roles-grid`, `blocks/partials/why-hire-cards`, `single-rl_partner`.
+
+**Fixed in one place only.** `livewire/referrer/referrer-portal-dashboard` now uses
+`text-[11px]`. The other nine are untouched **by decision on 2026-09-17**: defining the token
+globally would start applying a size that has never applied, changing the appearance of the
+booking wizard, partner directory and several marketing blocks in one go — including pages
+verified against production.
+
+**Proposal:** either define `--text-2xs: 11px` and do a visual-parity pass over the nine, or
+replace the class with an explicit size in each. Not a silent token addition.
+
+### 26. Every "muted" text colour token is pure black
+
+`resources/css/app.css:166-170`:
+
+```css
+--color-text-body: #000000;
+--color-text-muted: #000000;
+--color-text-slate: #000000;
+--color-text-secondary: #000000;
+--color-text-dim: #000000;
+```
+
+So `text-text-muted` is not muted, `text-text-dim` is not dim, and a template that carefully
+distinguishes primary from secondary text renders both identically. Combined with issue 25 —
+the two compound, because the elements marked as smallest are usually also the ones marked as
+muted — this is why a screen using both tokens has no visible hierarchy at all.
+
+**Avoided, not fixed,** by decision on 2026-09-17: the referrer portal dashboard uses `slate-400`
+/ `slate-500` / `slate-600` directly and leaves the tokens alone. Giving them real values would
+change the appearance of every template that uses them, marketing pages included, so it needs a
+visual-parity pass rather than a one-line edit.
+
+**Proposal:** assign real greys and re-verify the affected pages against production — or retire
+the four aliases in favour of Tailwind's slate scale, which is what the templates that get this
+right already use.
+
 ### The documentation tree is split across two directories
 
 ADRs live in `doc/adr/` at the repository root; everything else lives in `web/app/themes/remote-leverage/docs/`. The split is historical and mildly confusing — `doc` and `docs` one character apart is a genuine footgun.
