@@ -33,16 +33,30 @@ return [
     | Containers
     |--------------------------------------------------------------------------
     |
-    | Every GTM container to load, in order. Production serves two
-    | (cutover-decisions.md decision 32) and Site Kit can only hold one, so the
-    | theme emits them and Site Kit is told to stand down.
+    | Every GTM container to load, in order.
+    |
+    | One, not two. Decision 32 recorded that production serves both
+    | GTM-53JDTQCZ and GTM-P4KZNJWL, read off its HTML on 2026-09-15. Audited
+    | 2026-09-17 and that is wrong twice over:
+    |
+    |   - Production's GTM-P4KZNJWL snippet sits inside an HTML comment reading
+    |     "Deprecated: unused Google Tag Manager script tag". It has never
+    |     loaded. Only Site Kit's GTM-53JDTQCZ snippet is live.
+    |   - GTM-P4KZNJWL is an empty container regardless: its published payload
+    |     is version 1 with "tags":[], "predicates":[], "rules":[].
+    |
+    | Loading it would cost a request and a round trip to run nothing at all.
+    |
+    | The list stays plural because the delivery decision does not depend on the
+    | count: Site Kit holds one container id, so the moment a second is wanted
+    | this is the only place that can express it.
     |
     | Comma-separated in the environment, so an environment can carry a
     | different set without a deploy of this file.
     */
     'containers' => array_values(array_filter(array_map(
         'trim',
-        explode(',', (string) env('GTM_CONTAINER_IDS', 'GTM-53JDTQCZ,GTM-P4KZNJWL')),
+        explode(',', (string) env('GTM_CONTAINER_IDS', 'GTM-53JDTQCZ')),
     ))),
 
     /*
