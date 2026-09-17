@@ -158,31 +158,53 @@ export function phoneInputComponent(config = {}) {
 
 window.phoneInputComponent = phoneInputComponent;
 
+/**
+ * The progressive "isolated fields" reveal on step 1.
+ *
+ * Reads field values straight off `$wire` rather than keeping its own copies.
+ *
+ * It used to mirror every field into a shadow property (`emailVal`, `firstNameVal`, …) seeded
+ * from the server through the `x-data` attribute, with the inputs carrying both `x-model` and
+ * `wire:model`. Two things then went wrong together: Livewire rewrites that attribute on every
+ * re-render, which makes Alpine rebuild this component from the server's last-known values;
+ * and the duplicate `x-model` binding pushed those stale values back into the DOM. Typing a
+ * name while the revenue field's `.live` round trip was in flight lost the name — Livewire's
+ * own state kept it, the shadow copy did not, and the shadow copy owned the input.
+ *
+ * `$wire` is the single source of truth and is reactive, so these getters re-evaluate in the
+ * `x-show` / `:class` effects exactly as the old properties did. Deferred `wire:model` still
+ * updates `$wire` locally on every keystroke — it only defers the network request — so the
+ * reveal remains instant and works offline.
+ */
 export function rlBookingWizardIsolated(config = {}) {
   return {
     isolated: Boolean(config.isolated),
     steps: Array.isArray(config.steps) ? config.steps : [],
     currentSubStep: 0,
-    emailVal: config.email || '',
-    firstNameVal: config.firstName || '',
-    lastNameVal: config.lastName || '',
-    phoneVal: config.phone || '',
-    monthlyRevenueVal: config.monthlyRevenue || '',
-    consentChecked: false,
+
+    /** Livewire hands back reactive proxies; coerce before calling string methods on them. */
+    wireString(prop) {
+      const value = this.$wire ? this.$wire[prop] : '';
+      return typeof value === 'string' ? value : '';
+    },
 
     isFieldValid(f) {
       if (f === 'email') {
         const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return typeof this.emailVal === 'string' && re.test(this.emailVal.trim());
+        return re.test(this.wireString('email').trim());
       }
       if (f === 'name') {
-        return typeof this.firstNameVal === 'string' && this.firstNameVal.trim().length > 0 && typeof this.lastNameVal === 'string' && this.lastNameVal.trim().length > 0;
+        return this.wireString('firstName').trim().length > 0
+          && this.wireString('lastName').trim().length > 0;
       }
       if (f === 'phone') {
+        // Always true. The phone input sits inside `wire:ignore` and is owned by
+        // phoneInputComponent, which only writes `$wire.phone` on input/change/blur/
+        // countrychange — so a keystroke-level gate here would lag the typing.
         return true;
       }
       if (f === 'monthly_revenue') {
-        return typeof this.monthlyRevenueVal === 'string' && this.monthlyRevenueVal.trim().length > 0;
+        return this.wireString('monthlyRevenue').trim().length > 0;
       }
       if (f === 'consent') {
         // Recorded, not required: an unticked box must never hold the sub-step
@@ -249,6 +271,53 @@ export function rlBookingWizardIsolated(config = {}) {
 }
 
 window.rlBookingWizardIsolated = rlBookingWizardIsolated;
+
+/**
+ * Bring the form back into view when the wizard changes step.
+ *
+ * Each step is a different height — step 1 is ~720px, the calendar ~306px — so advancing
+ * shrinks the document under the visitor while the scroll position stays put. On a phone that
+ * leaves the form above the viewport and the footer filling the screen: measured on an iPhone
+ * 13, stepping to the calendar put its first row 83px off the top with the footer below it.
+ * The visitor is simply stranded, with no indication anything happened.
+ *
+ * Watches `$wire` rather than listening for a dispatched event, so no server change is needed
+ * and every route into a new step is covered — the Continue button, `selectDate()` jumping
+ * straight to step 3, the Back buttons, and the pricing warning appearing or being dismissed.
+ * Same `$watch('$wire.…')` shape already used by instant-live-call-button.
+ */
+export function rlBookingStepScroll() {
+  return {
+    scrollToForm() {
+      // Wait for the new step to be painted, or we measure the old layout's height.
+      requestAnimationFrame(() => {
+        const rect = this.$el.getBoundingClientRect();
+
+        // A sticky site header would otherwise cover the top of the card.
+        const header = document.querySelector('header.sticky, header.fixed, [data-sticky-header]');
+        const offset = (header ? header.getBoundingClientRect().height : 0) + 16;
+
+        // Leave it alone when the top of the form is already comfortably in view —
+        // scrolling a desktop visitor who can see the whole card is just a jolt.
+        if (rect.top >= offset && rect.top < window.innerHeight * 0.5) return;
+
+        const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+
+        window.scrollTo({
+          top: Math.max(0, rect.top + window.scrollY - offset),
+          behavior: reduced ? 'auto' : 'smooth',
+        });
+      });
+    },
+    init() {
+      if (!this.$wire) return;
+      this.$watch('$wire.currentStep', () => this.scrollToForm());
+      this.$watch('$wire.showWarning', () => this.scrollToForm());
+    },
+  };
+}
+
+window.rlBookingStepScroll = rlBookingStepScroll;
 
 export function rlAudioPlayer(initialDuration = '0:45') {
   return {
@@ -719,6 +788,7 @@ const registerAlpine = () => {
   if (window.Alpine) {
     window.Alpine.data('phoneInputComponent', phoneInputComponent);
     window.Alpine.data('rlBookingWizardIsolated', rlBookingWizardIsolated);
+    window.Alpine.data('rlBookingStepScroll', rlBookingStepScroll);
     window.Alpine.data('rlDocumentToc', rlDocumentToc);
     window.Alpine.data('rlAudioPlayer', rlAudioPlayer);
   }

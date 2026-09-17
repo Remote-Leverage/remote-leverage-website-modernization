@@ -1271,7 +1271,21 @@ body.admin-bar {
 /* ───────────────────────────────────────────────────────────
    Intl-tel-input (rl-elementor-blocks parity)
 ─────────────────────────────────────────────────────────── */
-.iti {
+/*
+ * `:not(.iti--container)` is load-bearing, not tidiness.
+ *
+ * On mobile intl-tel-input switches to a full-screen popup: it appends a wrapper to
+ * <body> whose class list is literally "iti iti--container iti--fullscreen-popup" and
+ * positions it with `position: fixed; inset: 0; display: flex`. Those are plain
+ * declarations, so an unscoped `.iti { position: relative !important }` here beat them —
+ * the overlay dropped into normal flow as the last child of <body>, rendering *below the
+ * site footer*, 854px past the phone input. Opening it also grew the page by 325px and,
+ * because the library focuses its search field, threw the visitor 5,067px down the page.
+ *
+ * Scoping to the inline wrapper hands the popup back to the library and leaves desktop
+ * byte-identical.
+ */
+.iti:not(.iti--container) {
   --iti-hover-color: transparent !important;
   width: 100% !important;
   position: relative !important;
@@ -1330,6 +1344,11 @@ body.admin-bar {
   background-color: #ffffff !important;
   color: #1e293b !important;
   z-index: 9999 !important;
+}
+
+/* Gap between the input and the dropdown — meaningless for the full-screen sheet, which is
+   pinned to the viewport rather than anchored under the field. */
+.iti:not(.iti--fullscreen-popup) .iti__dropdown-content {
   margin-top: 4px !important;
 }
 
@@ -1350,8 +1369,17 @@ body.admin-bar {
   background: #ffffff !important;
 }
 
-.iti__country-list {
+/*
+ * Second half of the same bug: capping the list at 220px inside the full-screen popup
+ * leaves a correctly-positioned scrim wrapped around a tiny card. The cap is right for the
+ * inline desktop dropdown and wrong for the mobile sheet, which is sized by its own
+ * `max-height: 100%`.
+ */
+.iti:not(.iti--fullscreen-popup) .iti__country-list {
   max-height: 220px !important;
+}
+
+.iti__country-list {
   overflow-y: auto !important;
   color: #1e293b !important;
 }

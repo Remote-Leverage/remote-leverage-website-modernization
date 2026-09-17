@@ -1,4 +1,4 @@
-<div class="w-full">
+<div class="w-full" x-data="rlBookingStepScroll()">
   {{-- Revenue-band pricing warning. Sits between step 1 and the calendar: the visitor has
        already been captured as a partial lead, so leaving here still produces a lead and a
        Slack alert. See config/booking.php for the copy and which bands trigger it. --}}
@@ -287,6 +287,19 @@
                   @endif
                 @endforeach
               </div>
+
+              {{-- See the note on the light skin's copy of this: a month with no availability
+                   is otherwise indistinguishable from one that is simply fully booked. --}}
+              @if (empty($availableDates))
+                <div class="mt-4 rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-center">
+                  <p class="text-xs font-semibold text-white">No times are open in {{ $monthTitle }}.</p>
+                  <p class="text-xs text-white/80 mt-1">
+                    Try the next month, or email
+                    <a href="mailto:contact@remoteleverage.com" class="underline hover:text-white">contact@remoteleverage.com</a>
+                    and we will find you a slot.
+                  </p>
+                </div>
+              @endif
             </div>
 
           @elseif ($currentStep === 3)
@@ -473,7 +486,18 @@
       @if ($currentStep === 1)
         <div 
           class="{{ $skin === 'naked' ? 'p-0 space-y-4' : 'p-6 sm:p-8 space-y-4' }}"
-          x-data="rlBookingWizardIsolated(@js(['isolated' => (bool) $enableIsolatedFields, 'steps' => $isolatedSteps, 'email' => $email, 'firstName' => $firstName, 'lastName' => $lastName, 'phone' => $phone, 'monthlyRevenue' => $monthlyRevenue]))"
+          {{-- Only the two values that are fixed at mount. Field values must NOT be seeded
+               here: Livewire re-renders this attribute on every round trip, and Alpine treats
+               a changed `x-data` as a new component — it tears the scope down and rebuilds it
+               from whatever the server last knew. Anything typed since the request went out is
+               then overwritten in the DOM by the stale copy. That is exactly how picking a
+               revenue band (the one `.live` field, and a slow one because it calls Calendly)
+               wiped the name the visitor was typing at the time.
+
+               `isolated` and `steps` are settled in mount() and never change, so this string is
+               byte-identical on every render and the morph leaves it alone. Keep it that way:
+               adding a live field here reintroduces the bug. --}}
+          x-data="rlBookingWizardIsolated(@js(['isolated' => (bool) $enableIsolatedFields, 'steps' => $isolatedSteps]))"
         >
           @if ($skin !== 'naked')
             <div class="space-y-1 mb-6">
@@ -528,7 +552,6 @@
                       autocomplete="email"
                       aria-label="Email"
                       aria-required="true"
-                      x-model="emailVal"
                       wire:model="email"
                       @input="onFieldInput('email', {{ $stepIdx }})"
                       @blur="advanceIfValid({{ $stepIdx }})"
@@ -564,7 +587,6 @@
                               type="radio"
                               name="monthlyRevenue"
                               value="{{ $val }}"
-                              x-model="monthlyRevenueVal"
                               wire:model.live="monthlyRevenue"
                               @change="onFieldInput('monthly_revenue', {{ $stepIdx }})"
                               class="h-4 w-4 cursor-pointer border-slate-300 text-[#F8248A] transition-transform duration-150 focus:ring-2 focus:ring-[#F8248A]/20 group-hover:scale-110"
@@ -578,7 +600,6 @@
                         id="default-monthly-revenue"
                         name="monthlyRevenue"
                         aria-label="Monthly company revenue"
-                        x-model="monthlyRevenueVal"
                         wire:model.live="monthlyRevenue"
                         @change="onFieldInput('monthly_revenue', {{ $stepIdx }})"
                         class="w-full px-4 py-2.5 h-[48px] rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#F8248A]/15 focus:border-[#F8248A] text-sm text-slate-900 bg-[#F8F9FA] transition"
@@ -599,7 +620,7 @@
                       ] as $val => $label)
                         <label 
                           class="cursor-pointer inline-flex items-center justify-center px-4 py-2 rounded-full border text-xs sm:text-sm font-medium transition-all duration-150 select-none"
-                          :class="monthlyRevenueVal === '{{ $val }}' 
+                          :class="$wire.monthlyRevenue === '{{ $val }}' 
                             ? 'border-2 border-[#F8248A] text-[#F8248A] bg-white ring-1 ring-[#F8248A]/20 font-semibold shadow-xs' 
                             : 'border border-slate-200 bg-[#F8F9FA] text-slate-800 hover:border-slate-300 hover:bg-slate-100/80'"
                         >
@@ -607,7 +628,6 @@
                             type="radio" 
                             name="monthlyRevenue" 
                             value="{{ $val }}" 
-                            x-model="monthlyRevenueVal"
                             wire:model.live="monthlyRevenue"
                             @change="onFieldInput('monthly_revenue', {{ $stepIdx }})"
                             class="sr-only"
@@ -636,7 +656,6 @@
                         autocomplete="given-name"
                         aria-label="First Name"
                         aria-required="true"
-                        x-model="firstNameVal"
                         wire:model="firstName"
                         @input="onFieldInput('name', {{ $stepIdx }})"
                         @blur="onFieldInput('name', {{ $stepIdx }})"
@@ -657,7 +676,6 @@
                         autocomplete="family-name"
                         aria-label="Last Name"
                         aria-required="true"
-                        x-model="lastNameVal"
                         wire:model="lastName"
                         @input="onFieldInput('name', {{ $stepIdx }})"
                         @blur="onFieldInput('name', {{ $stepIdx }})"
@@ -702,7 +720,6 @@
                         id="default-consent-checkbox"
                         name="consent"
                         aria-label="Consent to receive SMS appointment reminders"
-                        x-model="consentChecked"
                         wire:model="consent"
                         class="mt-0.5 w-4 h-4 rounded bg-[#E5E7EB] text-[#F8248A] border-slate-300 focus:ring-0 focus:ring-offset-0 shrink-0 cursor-pointer"
                       />
@@ -849,8 +866,24 @@
             </div>
           </div>
 
-          @error('selectedDate') 
-            <span class="text-status-alert text-xs block text-center mt-3">{{ $message }}</span> 
+          {{-- Every day in the grid is @disabled when the month has no availability, so an
+               empty calendar and a fully-booked one are the same greyed-out pixels. Without
+               this the visitor is told nothing at all: the Calendly event type behind the
+               $10k+ revenue bands had zero availability for four weeks straight on
+               2026-09-17, and the form simply looked broken. --}}
+          @if (empty($availableDates))
+            <div class="mt-4 rounded-card bg-amber-50 border border-amber-200 px-4 py-3 text-center">
+              <p class="text-xs text-amber-900 font-semibold">No times are open in {{ $monthTitle }}.</p>
+              <p class="text-xs text-amber-800 mt-1">
+                Try the next month, or email
+                <a href="mailto:contact@remoteleverage.com" class="underline hover:text-amber-950">contact@remoteleverage.com</a>
+                and we will find you a slot.
+              </p>
+            </div>
+          @endif
+
+          @error('selectedDate')
+            <span class="text-status-alert text-xs block text-center mt-3">{{ $message }}</span>
           @enderror
         </div>
       @endif

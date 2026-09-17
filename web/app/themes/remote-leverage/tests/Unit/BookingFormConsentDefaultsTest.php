@@ -112,11 +112,24 @@ describe('Booking form defaults express a real choice', function () {
         }
     });
 
-    test('the Alpine isolated-wizard mirror also starts unticked', function () {
+    /*
+     * Supersedes "the Alpine isolated-wizard mirror also starts unticked".
+     *
+     * There is no mirror any more. `consentChecked` was an Alpine copy of `$wire.consent` that
+     * was hardcoded to false on every rebuild of the component, so once the visitor ticked the
+     * box a re-render silently un-ticked it on screen. Alpine writes `.checked` directly
+     * without dispatching an input event, so Livewire never saw it and the *recorded* consent
+     * stayed correct — it was the checkbox that lied.
+     *
+     * The fix was to delete the copy rather than to seed it correctly, so what this now
+     * guards is that it stays deleted.
+     */
+    test('the consent checkbox has no Alpine copy to drift out of sync', function () {
         $js = file_get_contents(__DIR__.'/../../resources/js/app.js');
+        $blade = file_get_contents(__DIR__.'/../../resources/views/livewire/booking/multistep-booking-wizard.blade.php');
 
-        expect($js)->toContain('consentChecked: false,')
-            ->and($js)->not->toContain('consentChecked: true,');
+        expect($js)->not->toContain('consentChecked:')
+            ->and($blade)->not->toContain('x-model="consentChecked"');
     });
 
     test('consent is stamped once and never cleared by a later submission', function () {

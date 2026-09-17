@@ -18,11 +18,80 @@ use Illuminate\Support\Str;
 
 class CaptureLeadAction
 {
+    /**
+     * Widths of the columns holding values we do not author.
+     *
+     * Ad platforms decide how long their click ids are and change that without notice. Under
+     * `STRICT_TRANS_TABLES` an overlong value does not truncate, it aborts the INSERT — so an
+     * unbounded third-party string is not a tracking inconvenience, it is a lost customer. A
+     * 212-character `fbclid` against `varchar(150)` was dropping every paid-social lead on
+     * 2026-09-17, partial capture included, with no row left behind to show for it.
+     *
+     * The 2026_09_17_000001 migration widens these; clamping here is the half that keeps
+     * working when the next value outgrows the new width too. Losing the tail of a click id
+     * costs one attribution join. Losing the row costs the lead.
+     *
+     * Only bounded columns appear here. `landing_url`, `referrer_url`, `notes`,
+     * `scheduler_link` and `landing_page_base` are TEXT and cannot overflow this way.
+     *
+     * @var array<string, int>
+     */
+    private const COLUMN_LIMITS = [
+        'fbclid' => 512,
+        'gclid' => 512,
+        'fbc' => 512,
+        'li_fat_id' => 255,
+        'utm_source' => 255,
+        'utm_medium' => 255,
+        'utm_campaign' => 255,
+        'utm_term' => 255,
+        'utm_content' => 255,
+        'utm_id' => 255,
+        'oppref' => 255,
+        'partner' => 255,
+        'referral_code' => 100,
+        'session_id' => 100,
+        'monthly_revenue' => 100,
+        'phone_country' => 5,
+        'data_source' => 100,
+        'intake_form' => 50,
+        'ip_address' => 45,
+        'timezone' => 64,
+        'submission_type' => 50,
+        'device_id' => 64,
+        'posthog_session_id' => 100,
+    ];
+
     public function __construct(
         protected AttributionEngine $attributionEngine,
         protected PhoneValidationService $phoneValidator,
         protected LeadActivityLogger $activityLogger,
     ) {}
+
+    /**
+     * Trim every bounded column to what its schema can actually hold.
+     *
+     * Multibyte-aware: the limits are column *character* lengths, and `mb_substr` is what
+     * matches how MySQL counts them. Cutting on bytes would both over-trim a UTF-8 campaign
+     * name and risk splitting a character.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function clampToColumnLimits(array $attributes): array
+    {
+        foreach (self::COLUMN_LIMITS as $column => $limit) {
+            if (! isset($attributes[$column]) || ! is_string($attributes[$column])) {
+                continue;
+            }
+
+            if (mb_strlen($attributes[$column]) > $limit) {
+                $attributes[$column] = mb_substr($attributes[$column], 0, $limit);
+            }
+        }
+
+        return $attributes;
+    }
 
     /**
      * Capture, validate, attribute, and persist a new prospective lead.
@@ -120,6 +189,10 @@ class CaptureLeadAction
         if ($data->attribution !== [] || $existingAttribution !== []) {
             $leadAttributes['attribution'] = array_replace($data->attribution, $existingAttribution);
         }
+
+        // Last thing before the write, so it also covers the attribution columns merged in
+        // above — which are exactly the ones carrying third-party values.
+        $leadAttributes = $this->clampToColumnLimits($leadAttributes);
 
         if ($lead) {
             $lead->update($leadAttributes);

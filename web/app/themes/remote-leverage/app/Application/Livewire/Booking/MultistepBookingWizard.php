@@ -610,6 +610,34 @@ class MultistepBookingWizard extends Component
             $this->trackStepEvent('partial_form_submitted', ['lead_id' => $lead->id]);
         } catch (\Throwable $e) {
             Log::warning('Could not capture partial lead on Step 1: '.$e->getMessage());
+            $this->reportException($e);
+        }
+    }
+
+    /**
+     * Send a swallowed exception to Sentry.
+     *
+     * Both catch blocks in this component deliberately keep the visitor moving, which means
+     * nothing else raises the alarm: Sentry's automatic reporting only sees *uncaught*
+     * exceptions, `enable_logs` is off, and there is no Sentry log channel — so `Log::error()`
+     * becomes a breadcrumb attached to no event. The only surviving trace was a line in
+     * `laravel.log`, which is truncated on every container start.
+     *
+     * That is how a 212-character `fbclid` silently dropped every paid-social lead for as long
+     * as it did: the form said "an error occurred", the dashboard simply looked quiet, and no
+     * alert existed anywhere in between.
+     *
+     * Guarded and never rethrown: reporting a failure must not become a second failure, and in
+     * the bare container the unit tests build, `sentry` is not bound at all.
+     */
+    protected function reportException(\Throwable $e): void
+    {
+        try {
+            if (app()->bound('sentry')) {
+                app('sentry')->captureException($e);
+            }
+        } catch (\Throwable) {
+            // Reporting is best-effort by definition.
         }
     }
 
@@ -798,6 +826,7 @@ class MultistepBookingWizard extends Component
             return;
         } catch (\Throwable $e) {
             Log::error('Error executing booking in wizard: '.$e->getMessage(), ['exception' => $e]);
+            $this->reportException($e);
             $this->errorMessage = 'An error occurred processing your consultation. Please check your information or try again.';
         } finally {
             $lock->release();
