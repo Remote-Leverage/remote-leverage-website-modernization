@@ -10,6 +10,7 @@ use App\Domains\Referral\Models\Referrer;
 use App\Domains\Referral\Repositories\ReferrerRepositoryInterface;
 use App\Domains\Referral\Services\ReferralSettingsService;
 use App\Domains\Referral\Support\DemoDashboardData;
+use App\Domains\Referral\Support\ReferralLink;
 use App\Domains\Referral\Support\ReferrerDashboardPresenter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
@@ -64,10 +65,29 @@ class ReferrerPortalDashboard extends Component
      */
     public bool $demoMode = false;
 
-    // Available Landing Pages for referral links
+    /**
+     * Landing pages, kept only for the direct-submission form's "target service" choice.
+     *
+     * No longer offered as link destinations: every referral link points at
+     * ReferralLink::DESTINATION_PATH. A referrer could previously share a link to the homepage
+     * or the booking funnel — pages that carry no referral offer — which made the welcome
+     * notice impossible to guarantee and the destination a coin flip.
+     */
     public array $landingPages = [];
 
-    public string $selectedLandingUrl = '';
+    /**
+     * The link this referrer shares. Derived from the selected destination, never typed.
+     */
+    public string $referralUrl = '';
+
+    /**
+     * Which page the link points at. Defaults to the hiring page; changed only through the
+     * picker, and validated against ReferralLink::isAllowed() because it arrives from the
+     * browser like any other Livewire property.
+     */
+    public string $selectedPath = ReferralLink::DESTINATION_PATH;
+
+    public bool $showPageModal = false;
 
     // Direct Lead Submission Modal
     public bool $showLeadModal = false;
@@ -98,7 +118,7 @@ class ReferrerPortalDashboard extends Component
                 $this->referrer = $referrer;
                 $this->referrerCode = $referrer->referral_code;
                 $this->isAuthenticated = true;
-                $this->updateSelectedLandingUrl();
+                $this->updateReferralUrl();
 
                 return;
             }
@@ -159,7 +179,7 @@ class ReferrerPortalDashboard extends Component
         $this->password = '';
         session(['referrer_code' => $this->referrerCode]);
 
-        $this->updateSelectedLandingUrl();
+        $this->updateReferralUrl();
     }
 
     /**
@@ -188,17 +208,72 @@ class ReferrerPortalDashboard extends Component
         session()->forget('referrer_code');
     }
 
-    public function updateSelectedLandingUrl(): void
+    /**
+     * Build this referrer's shareable link for the selected destination.
+     */
+    public function updateReferralUrl(): void
     {
-        $baseUrl = $this->selectedLandingUrl ?: ($this->landingPages[0]['base_url'] ?? 'https://remoteleverage.com');
-        $cleanBase = strtok($baseUrl, '?');
-        $this->selectedLandingUrl = "{$cleanBase}?via={$this->referrerCode}";
+        $this->referralUrl = $this->referrerCode
+            ? ReferralLink::for($this->referrerCode, $this->selectedPath)
+            : '';
     }
 
-    public function updatedSelectedLandingUrl(string $value): void
+    public function openPagePicker(): void
     {
-        $cleanBase = strtok($value, '?');
-        $this->selectedLandingUrl = "{$cleanBase}?via={$this->referrerCode}";
+        $this->showPageModal = true;
+    }
+
+    public function closePagePicker(): void
+    {
+        $this->showPageModal = false;
+    }
+
+    /**
+     * Point the referral link at a different page.
+     *
+     * Silently falls back to the default for anything not on the curated list. The path comes
+     * from the browser, so without the check a crafted request could put an arbitrary URL in
+     * front of the referrer as "their" link to share.
+     */
+    public function selectPage(string $path): void
+    {
+        $this->selectedPath = ReferralLink::isAllowed($path) ? trim($path, '/') : ReferralLink::DESTINATION_PATH;
+        $this->showPageModal = false;
+        $this->updateReferralUrl();
+    }
+
+    /**
+     * The destination list, each row carrying the two links the picker renders.
+     *
+     * Preview links are signed so opening one does not record a click against the referrer's
+     * own reach figure — see ReferralLink::preview().
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function destinations(): array
+    {
+        $code = (string) $this->referrerCode;
+
+        return array_map(function (array $destination) use ($code) {
+            return $destination + [
+                'selected' => $destination['path'] === $this->selectedPath,
+                'preview_url' => $code ? ReferralLink::preview($code, $destination['path']) : '#',
+            ];
+        }, ReferralLink::destinations());
+    }
+
+    /**
+     * Display name of the page currently selected.
+     */
+    public function selectedPageName(): string
+    {
+        foreach (ReferralLink::destinations() as $destination) {
+            if ($destination['path'] === $this->selectedPath) {
+                return $destination['name'];
+            }
+        }
+
+        return 'Hire a VA';
     }
 
     /**
@@ -461,6 +536,8 @@ class ReferrerPortalDashboard extends Component
             'filteredCount' => count($filtered),
             'referrals' => array_slice($filtered, 0, $this->visibleCount),
             'hasMore' => count($filtered) > $this->visibleCount,
+            'destinations' => $this->destinations(),
+            'selectedPageName' => $this->selectedPageName(),
         ]);
     }
 }

@@ -12,8 +12,10 @@ use App\Domains\Lead\Services\IdentityResolver;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Referral\Services\AttributionEngine;
+use App\Domains\Referral\Services\ReferralSettingsService;
 use App\Infrastructure\Observability\IntegrationCallRecorder;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -127,6 +129,36 @@ class CaptureLeadAction
      * @param  array<string, mixed>  $attributes
      * @return array<string, mixed>
      */
+    /**
+     * The referral welcome discount owed to a lead from this source, or null.
+     *
+     * Null for organic and paid traffic, and when the notice is switched off — in both cases no
+     * offer was ever made, and recording one would invent a promise nobody owes.
+     */
+    private function referralWelcomeDiscount(?string $sourceType): ?int
+    {
+        if (! in_array($sourceType, ['referral_hub', 'partnership'], true)) {
+            return null;
+        }
+
+        try {
+            $settings = app(ReferralSettingsService::class)->get();
+
+            if (empty($settings['visitor_notice_enabled'])) {
+                return null;
+            }
+
+            $amount = (int) ($settings['visitor_discount_amount'] ?? 0);
+
+            return $amount > 0 ? $amount : null;
+        } catch (\Throwable $e) {
+            // Reading a setting must never cost a lead.
+            Log::warning('CaptureLeadAction: could not resolve the referral welcome discount: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
     private function clampToColumnLimits(array $attributes): array
     {
         foreach ($this->columnLimits() as $column => $limit) {
@@ -237,6 +269,30 @@ class CaptureLeadAction
 
         if ($data->attribution !== [] || $existingAttribution !== []) {
             $leadAttributes['attribution'] = array_replace($data->attribution, $existingAttribution);
+        }
+
+        /*
+         * Record the referral welcome discount this lead is entitled to.
+         *
+         * Nothing in this codebase applies a discount — there is no coupon or checkout-credit
+         * mechanism — so the offer shown to a referred visitor is honoured by hand. Without
+         * this the only person who knows a discount was promised is the prospect, and the sales
+         * team hears about it for the first time on the call. It goes in the attribution blob
+         * rather than a column of its own, and is deliberately NOT sent to HubSpot: an unknown
+         * property name there rejects the entire contact sync (see HubSpotGateway::propertiesFor).
+         *
+         * Stamped from the lead's resolved source, not from whether the notice was rendered:
+         * the durable fact is "this lead came through a referral, so the referral offer
+         * applies", which holds whether or not the visitor happened to see the banner.
+         */
+        $referralDiscount = $this->referralWelcomeDiscount($leadAttributes['source_type'] ?? null);
+
+        if ($referralDiscount !== null) {
+            $attribution = $leadAttributes['attribution'] ?? $existingAttribution;
+            // First-write-wins, like every other attribution value: the amount promised at
+            // acquisition is the one owed, even if the setting changes later.
+            $attribution['referral_discount_offered'] ??= $referralDiscount;
+            $leadAttributes['attribution'] = $attribution;
         }
 
         // Last thing before the write, so it also covers the attribution columns merged in

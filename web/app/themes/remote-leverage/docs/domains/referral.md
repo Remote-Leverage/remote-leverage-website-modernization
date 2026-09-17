@@ -43,14 +43,26 @@ The cookie (`AttributionEngine::COOKIE_NAME = 'rl_referrer'`) lasts 60 days by d
 
 **Lead source stamping**: `resolveLeadSource()` produces the `source_type` / `source_id` pair written onto every lead — `ad`, `organic`, `referral_hub` or `partnership`.
 
-`ReferralAttributionMiddleware` sets the cookie on Acorn-routed requests.
+**Where this runs.** `ReferralVisitorContext`, on the WordPress `template_redirect` hook (wired
+in `ReferralServiceProvider`). It resolves the referrer once per front-end request, records the
+click and sets the cookie.
+
+It used to be `ReferralAttributionMiddleware`, which was **registered nowhere and therefore never
+ran** — and could not have worked where it mattered even if it had been, because
+`RouteServiceProvider` applies middleware only to `routes/web.php` and `routes/api.php` while
+`/hire-va-4/`, the sole destination of every referral link, is rendered by WordPress. For as long
+as that was the only implementation, no referral click was ever recorded from real traffic, the
+`rl_referrer` cookie was never set, and attribution survived only while `?via=` stayed in the
+address bar. That class was deleted on 2026-09-17 rather than registered, so nothing invites the
+next person to wire up the version that cannot work.
 
 ## Flow
 
 ```mermaid
 flowchart TB
-    V["Visit ?via=slug"] --> ME["ReferralAttributionMiddleware"]
+    V["Visit /hire-va-4/?via=slug"] --> ME["ReferralVisitorContext<br/>(template_redirect)"]
     ME --> AE["AttributionEngine"]
+    ME --> NOTE["ReferralWelcomeNotice<br/>→ toast on arrival"]
     AE --> CK["set rl_referrer cookie (60d)"]
     AE --> DD{"click from this IP<br/>in last 24h?"}
     DD -->|"no"| TC["TrackReferralClickAction<br/>→ rl_referral_clicks"]
@@ -90,7 +102,8 @@ flowchart TB
 | Class | Does |
 | :--- | :--- |
 | `AttributionEngine` | Above |
-| `ReferralSettingsService` | `rl_referral_settings` — cookie days, reward type (`cash` default), currency (`USD`), landing pages |
+| `ReferralSettingsService` | `rl_referral_settings` — cookie days, reward type (`cash` default), currency (`USD`), stale threshold, visitor welcome offer, target-service list |
+| `ReferralVisitorContext` | Resolves the referrer for the current request; records the click and sets the cookie |
 | `StripeConnectGateway` | `createOnboardingLink()` for referrer onboarding, `transferPayout()` for the transfer. **Both are no-ops while `STRIPE_CONNECT_ENABLED` is unset** |
 | `ReferralLeadMatcher` | Resolves a lead to its referral through the identity graph — the one definition of "the same person" all three call sites share |
 | `ReferrerDashboardPresenter` | Assembles the portal's whole view model (KPIs, earnings, per-referral timeline, staleness) |
@@ -106,6 +119,69 @@ flowchart TB
 | `ReferrerPortalDashboard` | `/referrer-portal` — referral links, KPIs, commissions, and a per-referral status timeline with staleness flags |
 
 `/referral-dashboard` is kept as a legacy route: the old plugin served signup and login as tabs of one URL, so `?tab=login`, `?logged_out` and `?action=login` route to the portal and everything else to registration. Old bookmarks and email links keep working without a redirect.
+
+## The shared link and the welcome offer
+
+**`/hire-va-4/` is the default** (`ReferralLink::DESTINATION_PATH`), and a referrer who never
+opens the picker shares that. "Select a different page" opens a modal offering six curated
+destinations — homepage first, then the hiring page, the longer pitch, two campaign pages and
+Contractor of Record — each with a hero screenshot, a name and a preview link.
+
+The list is `ReferralLink::destinations()`, curated in code rather than read from
+`landing_pages`. The site has around forty published pages, most of them retired experiments or
+A/B variants, and a referrer handed that list would eventually send a prospect somewhere with no
+offer on it. `landing_pages` still exists and still drives the "target service" choice on the
+direct-submission form; that is a different question (what the prospect wants) from where the
+link goes.
+
+The chosen path arrives from the browser like any other Livewire property, so
+`ReferralLink::isAllowed()` gates it — without that check an arbitrary string would be
+concatenated into the link a referrer is then told to share.
+
+Contractor of Record is linked as `/contractor-management/` rather than the `/cor/` vanity URL.
+That redirect does preserve the query string (checked, so `?via=` would survive it), but a
+shared link should not spend a round trip it does not need.
+
+### Tile screenshots
+
+`resources/images/pages/referral-links/<slug>.jpg`, tracked in git, built to
+`public/images/referral-links/` by the `themeImages()` Vite plugin and referenced through
+`BlockDefaults::pageImg('referral-links', …)`. They are 640×400 hero captures taken from the
+running site at a 1280×800 viewport and downscaled — regenerate them when a hero is redesigned,
+or the picker quietly advertises the old one.
+
+### Previewing without inflating the numbers
+
+A preview link carries `rl_preview=<token>`, an HMAC over the referral code keyed on the site's
+auth salt. `ReferralVisitorContext` verifies it and, when it matches, resolves the referrer and
+shows the welcome notice but records **no** click and sets **no** cookie.
+
+Both halves matter. A referrer checking their own links would otherwise inflate the "link
+clicks" figure their own dashboard reports back to them, and would be attributed to themselves
+for the next 60 days — so any form they later filled in would arrive as their own referral. The
+token is signed rather than a literal flag because a guessable `?rl_preview=1` would let a
+visitor suppress a click that should have counted, quietly costing the referrer the attribution;
+and being keyed per code, a token lifted from one referrer's preview does nothing on another's
+link.
+
+A visitor arriving on that link is greeted once by `partials/referral-welcome-notice` —
+"{referrer} is giving you a $500 discount with Remote Leverage!" — shown on the arrival request
+only, not for the life of the 60-day cookie, and dismissible without auto-hiding.
+`ReferralWelcomeNotice` owns the decision and the wording.
+
+| Setting | Default | Where |
+| :--- | :--- | :--- |
+| `visitor_notice_enabled` | on | Referrers → Settings → Visitor Welcome Offer |
+| `visitor_discount_amount` | `500` | Same |
+| `visitor_notice_template` | `{referrer} is giving you a {amount} discount…` | Same — `{referrer}` is required |
+
+> **Nothing applies this discount.** There is no coupon, checkout credit or pricing hook
+> anywhere in the codebase; the offer is honoured by hand. What the code guarantees is that the
+> promise is *recorded*: `CaptureLeadAction` writes `referral_discount_offered` into the lead's
+> `attribution` blob for any lead whose source is `referral_hub` or `partnership`, at the amount
+> in force when that lead arrived. Without it the prospect would be the only person who knew an
+> offer had been made. It is deliberately **not** sent to HubSpot — an unknown property name
+> there rejects the entire contact sync (see `HubSpotGateway::propertiesFor`).
 
 ## Linking a referral to its lead
 
@@ -198,7 +274,7 @@ curl -X POST https://remoteleverage-v2.test/api/webhooks/stripe \
 
 ## Tests
 
-`AttributionEngineTest`, `ReferralAttributionReferrerTest`, `ReferralAnalyticsTest`, `ReferralRewardAutomationTest`, `ReferralSettingsTest`, `ReferrerAuthenticationTest`, `ReferrerPortalLoginTest`, `ReferralLeadLinkageTest`, `HubSpotLifecycleSyncTest`, `ReferrerDashboardTest`, `StripeConnectDisabledTest`, `tests/Feature/StripeWebhookTest.php`.
+`AttributionEngineTest`, `ReferralAttributionReferrerTest`, `ReferralAnalyticsTest`, `ReferralRewardAutomationTest`, `ReferralSettingsTest`, `ReferrerAuthenticationTest`, `ReferrerPortalLoginTest`, `ReferralLeadLinkageTest`, `HubSpotLifecycleSyncTest`, `ReferrerDashboardTest`, `StripeConnectDisabledTest`, `ReferralWelcomeOfferTest`, `tests/Feature/StripeWebhookTest.php`.
 
 ## Known issues
 

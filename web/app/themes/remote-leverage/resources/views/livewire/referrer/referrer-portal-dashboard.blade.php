@@ -158,24 +158,29 @@
         <aside class="lg:col-span-4 xl:col-span-3 space-y-5 xl:sticky xl:top-6">
 
           <div class="bg-surface-white rounded-card-lg ring-1 ring-slate-200 p-5">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Your referral link</span>
-
-            <select
-              wire:change="updatedSelectedLandingUrl($event.target.value)"
-              aria-label="Landing page to share"
-              class="w-full px-3 py-2.5 rounded-card ring-1 ring-slate-200 border-0 text-xs font-medium text-slate-900 bg-white focus:ring-2 focus:ring-brand-purple cursor-pointer mb-2"
-            >
-              @foreach ($landingPages as $lp)
-                <option value="{{ $lp['base_url'] }}">{{ $lp['name'] }}</option>
-              @endforeach
-            </select>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Your referral link</span>
+            {{-- A short curated list, not every page on the site. The default is the hiring
+                 page so a referrer who never opens the picker still sends prospects somewhere
+                 that carries the offer. --}}
+            <div class="flex items-baseline justify-between gap-2 mb-3">
+              <p class="text-[11px] text-slate-500 min-w-0 truncate">
+                Sends to <strong class="font-bold text-slate-700">{{ $selectedPageName }}</strong>
+              </p>
+              <button
+                type="button"
+                wire:click="openPagePicker"
+                class="shrink-0 text-[11px] font-bold text-brand-purple hover:underline cursor-pointer"
+              >
+                Select a different page
+              </button>
+            </div>
 
             <div class="rounded-card bg-slate-50 ring-1 ring-slate-200 p-2.5 mb-2">
               <input
                 type="text"
                 id="rl-referral-link-input"
                 readonly
-                value="{{ $selectedLandingUrl }}"
+                value="{{ $referralUrl }}"
                 aria-label="Your referral link"
                 class="w-full bg-transparent border-0 p-0 text-[11px] font-mono text-slate-700 select-all focus:ring-0"
               />
@@ -196,16 +201,16 @@
             <div class="mt-4 pt-4 border-t border-slate-100">
               <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Share via</span>
               <div class="flex items-center gap-2">
-                <a href="https://api.whatsapp.com/send?text={{ urlencode('Scale your team with top 1% Latin American talent: ' . $selectedLandingUrl) }}" target="_blank" rel="noopener" class="flex-1 py-2 rounded-card bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition flex items-center justify-center" title="Share on WhatsApp" aria-label="Share on WhatsApp">
+                <a href="https://api.whatsapp.com/send?text={{ urlencode('Scale your team with top 1% Latin American talent: ' . $referralUrl) }}" target="_blank" rel="noopener" class="flex-1 py-2 rounded-card bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition flex items-center justify-center" title="Share on WhatsApp" aria-label="Share on WhatsApp">
                   <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
                 </a>
-                <a href="https://www.linkedin.com/sharing/share-offsite/?url={{ urlencode($selectedLandingUrl) }}" target="_blank" rel="noopener" class="flex-1 py-2 rounded-card bg-blue-50 text-blue-600 hover:bg-blue-100 transition flex items-center justify-center" title="Share on LinkedIn" aria-label="Share on LinkedIn">
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url={{ urlencode($referralUrl) }}" target="_blank" rel="noopener" class="flex-1 py-2 rounded-card bg-blue-50 text-blue-600 hover:bg-blue-100 transition flex items-center justify-center" title="Share on LinkedIn" aria-label="Share on LinkedIn">
                   <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
                 </a>
-                <a href="https://twitter.com/intent/tweet?text={{ urlencode('Scale your business operations with Remote Leverage: ' . $selectedLandingUrl) }}" target="_blank" rel="noopener" class="flex-1 py-2 rounded-card bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center justify-center" title="Share on X" aria-label="Share on X">
+                <a href="https://twitter.com/intent/tweet?text={{ urlencode('Scale your business operations with Remote Leverage: ' . $referralUrl) }}" target="_blank" rel="noopener" class="flex-1 py-2 rounded-card bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center justify-center" title="Share on X" aria-label="Share on X">
                   <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                 </a>
-                <a href="mailto:?subject={{ urlencode('Talent Solution Recommendation') }}&body={{ urlencode('Take a look at Remote Leverage for dedicated remote staffing: ' . $selectedLandingUrl) }}" class="flex-1 py-2 rounded-card bg-purple-50 text-brand-purple hover:bg-purple-100 transition flex items-center justify-center" title="Share via email" aria-label="Share via email">
+                <a href="mailto:?subject={{ urlencode('Talent Solution Recommendation') }}&body={{ urlencode('Take a look at Remote Leverage for dedicated remote staffing: ' . $referralUrl) }}" class="flex-1 py-2 rounded-card bg-purple-50 text-brand-purple hover:bg-purple-100 transition flex items-center justify-center" title="Share via email" aria-label="Share via email">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                 </a>
               </div>
@@ -505,6 +510,77 @@
 
       </div>
     </div>
+
+    {{-- ── LANDING PAGE PICKER ───────────────────────────────────────────── --}}
+    @if ($showPageModal)
+      <div class="fixed inset-0 z-50 bg-brand-midnight/70 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="rl-page-picker-title">
+        <div class="bg-surface-white rounded-card-lg max-w-4xl w-full my-8 sm:my-0 p-6 sm:p-8 shadow-card-elevated">
+
+          <div class="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
+            <div>
+              <h3 id="rl-page-picker-title" class="text-base font-bold text-brand-hero font-display">Choose where your link goes</h3>
+              <p class="text-[11px] text-slate-500 mt-0.5">
+                Your prospect sees the welcome offer on every one of these. Previewing a page does not count as a click on your link.
+              </p>
+            </div>
+            <button type="button" wire:click="closePagePicker" aria-label="Close" class="shrink-0 text-slate-400 hover:text-slate-700 text-xl font-bold cursor-pointer leading-none">&times;</button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-5">
+            @foreach ($destinations as $destination)
+              {{-- Flex column with the text block growing, so the preview link sits on the
+                   same baseline in every card however many lines the blurb takes. --}}
+              <div class="flex flex-col rounded-card-lg ring-1 overflow-hidden transition {{ $destination['selected'] ? 'ring-2 ring-brand-purple' : 'ring-slate-200 hover:ring-brand-purple/40' }}">
+                <button
+                  type="button"
+                  wire:click="selectPage('{{ $destination['path'] }}')"
+                  class="flex flex-col flex-1 w-full text-left cursor-pointer"
+                  aria-pressed="{{ $destination['selected'] ? 'true' : 'false' }}"
+                >
+                  <span class="block relative aspect-[8/5] bg-slate-100 overflow-hidden">
+                    <img
+                      src="{{ \App\Support\BlockDefaults::pageImg('referral-links', $destination['image']) }}"
+                      alt="{{ $destination['name'] }} hero"
+                      width="640" height="400" loading="lazy" decoding="async"
+                      class="w-full h-full object-cover object-top"
+                    />
+                    @if ($destination['selected'])
+                      <span class="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-pill bg-brand-purple text-white text-[11px] font-bold">
+                        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m5 13 4 4L19 7"/></svg>
+                        Selected
+                      </span>
+                    @endif
+                  </span>
+
+                  <span class="block flex-1 px-4 pt-3">
+                    <span class="block text-sm font-bold text-slate-900">{{ $destination['name'] }}</span>
+                    <span class="block text-[11px] text-slate-500 mt-0.5">{{ $destination['blurb'] }}</span>
+                  </span>
+                </button>
+
+                <div class="px-4 pb-3 pt-2">
+                  <a
+                    href="{{ $destination['preview_url'] }}"
+                    target="_blank"
+                    rel="noopener"
+                    class="inline-flex items-center gap-1 text-[11px] font-bold text-brand-purple hover:underline"
+                  >
+                    Preview page
+                    <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/>
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            @endforeach
+          </div>
+
+          <div class="pt-5 mt-5 border-t border-slate-100 flex justify-end">
+            <button type="button" wire:click="closePagePicker" class="px-4 py-2 rounded-card bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer transition">Done</button>
+          </div>
+        </div>
+      </div>
+    @endif
 
     {{-- ── SUBMIT PROSPECT MODAL ─────────────────────────────────────────── --}}
     @if ($showLeadModal)

@@ -90,6 +90,11 @@
         @includeUnless(\App\Support\PageChrome::usesCtaOnlyHeader(), 'sections.header')
       @endif
 
+      {{-- Renders only for a visitor who has just arrived on a referral link; ordinary
+           traffic gets no markup at all. Sits outside <main> because it is fixed-position
+           chrome over the page rather than part of its content. --}}
+      @include('partials.referral-welcome-notice')
+
       <main id="main" class="main flex-1 w-full">
         {{-- The case-study/talent/reviews tab bar sits between the header and the page's
              own hero on production. Rendered here rather than from each template so the

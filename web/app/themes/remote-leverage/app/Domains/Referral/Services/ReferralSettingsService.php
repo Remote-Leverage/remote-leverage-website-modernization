@@ -23,6 +23,21 @@ class ReferralSettingsService
     public const DEFAULT_STALE_DAYS = 5;
 
     /**
+     * The discount a referred visitor is told they are getting, in whole currency units.
+     *
+     * Nothing in this codebase applies it: there is no coupon or checkout-credit mechanism, so
+     * this is a promise the sales team honours by hand. What the code does guarantee is that
+     * the promise is recorded on the resulting Lead (see CaptureLeadAction), so the team can
+     * see what a prospect was offered instead of hearing it from the prospect on the call.
+     */
+    public const DEFAULT_VISITOR_DISCOUNT = 500;
+
+    /**
+     * `{referrer}` is the referrer's name, `{amount}` the formatted discount.
+     */
+    public const DEFAULT_VISITOR_NOTICE = '{referrer} is giving you a {amount} discount with Remote Leverage!';
+
+    /**
      * Default settings applied when no admin-configured value exists.
      * Reward amount falls back to the env-configured value (config/services.php)
      * so a fresh install keeps working before any admin visits the settings screen.
@@ -35,6 +50,9 @@ class ReferralSettingsService
             'default_reward_type' => self::DEFAULT_REWARD_TYPE,
             'cookie_days' => self::DEFAULT_COOKIE_DAYS,
             'stale_days' => self::DEFAULT_STALE_DAYS,
+            'visitor_notice_enabled' => true,
+            'visitor_discount_amount' => self::DEFAULT_VISITOR_DISCOUNT,
+            'visitor_notice_template' => self::DEFAULT_VISITOR_NOTICE,
             'landing_pages' => self::defaultLandingPages(),
         ];
     }
@@ -104,6 +122,20 @@ class ReferralSettingsService
             $errors[] = 'Stale threshold must be at least 1 day.';
         }
 
+        // Absent means "not on this form", as with stale_days above.
+        $current = $this->get();
+        $discount = (int) ($input['visitor_discount_amount'] ?? $current['visitor_discount_amount'] ?? self::DEFAULT_VISITOR_DISCOUNT);
+        if ($discount < 0) {
+            $errors[] = 'Visitor discount cannot be negative.';
+        }
+
+        $noticeTemplate = trim((string) ($input['visitor_notice_template'] ?? $current['visitor_notice_template'] ?? self::DEFAULT_VISITOR_NOTICE));
+        if ($noticeTemplate !== '' && ! str_contains($noticeTemplate, '{referrer}')) {
+            // Without the name the notice is an anonymous discount claim, which is both less
+            // persuasive and harder to honour — the sales team cannot tell who promised it.
+            $errors[] = 'The visitor notice must include {referrer}.';
+        }
+
         $landingPages = $this->parseLandingPages((string) ($input['landing_pages'] ?? ''));
         if (empty($landingPages)) {
             $errors[] = 'At least one landing page is required (format: "Name = https://url", one per line).';
@@ -119,6 +151,9 @@ class ReferralSettingsService
             'default_reward_type' => trim((string) ($input['default_reward_type'] ?? self::DEFAULT_REWARD_TYPE)) ?: self::DEFAULT_REWARD_TYPE,
             'cookie_days' => $cookieDays,
             'stale_days' => $staleDays,
+            'visitor_notice_enabled' => ! empty($input['visitor_notice_enabled']),
+            'visitor_discount_amount' => $discount,
+            'visitor_notice_template' => $noticeTemplate ?: self::DEFAULT_VISITOR_NOTICE,
             'landing_pages' => $landingPages,
         ];
 

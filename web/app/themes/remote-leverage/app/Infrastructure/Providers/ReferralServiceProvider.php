@@ -17,7 +17,9 @@ use App\Domains\Referral\Repositories\ReferrerRepositoryInterface;
 use App\Domains\Referral\Services\AttributionEngine;
 use App\Domains\Referral\Services\ReferralLeadMatcher;
 use App\Domains\Referral\Services\ReferralSettingsService;
+use App\Domains\Referral\Services\ReferralVisitorContext;
 use App\Domains\Referral\Services\StripeConnectGateway;
+use App\Domains\Referral\Support\ReferralWelcomeNotice;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -34,6 +36,11 @@ class ReferralServiceProvider extends ServiceProvider
         $this->app->singleton(AttributionEngine::class, fn () => new AttributionEngine);
         $this->app->singleton(ReferralSettingsService::class, fn () => new ReferralSettingsService);
         $this->app->singleton(ReferralLeadMatcher::class, fn () => new ReferralLeadMatcher);
+
+        // Request-scoped: resolved once, then reused by the welcome notice and by lead capture,
+        // so one page view never costs two referrer lookups or records two clicks.
+        $this->app->singleton(ReferralVisitorContext::class);
+        $this->app->singleton(ReferralWelcomeNotice::class);
         $this->app->singleton(HandleReferralEventsForSlack::class);
 
         if ($this->app->runningInConsole()) {
@@ -72,6 +79,47 @@ class ReferralServiceProvider extends ServiceProvider
         });
 
         $this->scheduleHubSpotLifecycleSync();
+        $this->captureReferralVisits();
+    }
+
+    /**
+     * Resolve `?via=` on every front-end request: record the click, set the attribution cookie.
+     *
+     * On `template_redirect` rather than as Laravel middleware. `ReferralAttributionMiddleware`
+     * used to hold this logic and was **registered nowhere**, so none of it ever ran — and it
+     * could not have worked where it mattered even if it had been registered, because
+     * RouteServiceProvider only applies middleware to `routes/web.php` and `routes/api.php`
+     * while `/hire-va-4/`, the sole destination of every referral link, is rendered by
+     * WordPress. The result was that no referral click was ever recorded from real traffic and
+     * the attribution cookie was never set; attribution survived only for as long as `?via=`
+     * stayed in the address bar.
+     *
+     * `template_redirect` fires for every front-end request and still before any output, which
+     * is what lets the cookie be set. Admin, AJAX, REST and CLI are all excluded — a referral
+     * link never lands on any of them, and resolving there would record clicks for an
+     * administrator browsing the dashboard.
+     */
+    protected function captureReferralVisits(): void
+    {
+        if (! function_exists('add_action')) {
+            return;
+        }
+
+        add_action('template_redirect', function () {
+            if ((function_exists('is_admin') && is_admin()) || (defined('WP_CLI') && WP_CLI)) {
+                return;
+            }
+
+            if (function_exists('wp_doing_ajax') && wp_doing_ajax()) {
+                return;
+            }
+
+            if (defined('REST_REQUEST') && REST_REQUEST) {
+                return;
+            }
+
+            $this->app->make(ReferralVisitorContext::class)->resolve();
+        }, 1);
     }
 
     /**

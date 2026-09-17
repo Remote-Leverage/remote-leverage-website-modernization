@@ -181,6 +181,9 @@ class ReferralAdminDashboard
                 'default_reward_type' => $_POST['default_reward_type'] ?? '',
                 'cookie_days' => $_POST['cookie_days'] ?? '',
                 'stale_days' => $_POST['stale_days'] ?? '',
+                'visitor_notice_enabled' => $_POST['visitor_notice_enabled'] ?? '',
+                'visitor_discount_amount' => $_POST['visitor_discount_amount'] ?? '',
+                'visitor_notice_template' => wp_unslash($_POST['visitor_notice_template'] ?? ''),
                 'landing_pages' => wp_unslash($_POST['landing_pages'] ?? ''),
             ]);
 
@@ -1287,10 +1290,42 @@ class ReferralAdminDashboard
                 </div>
 
                 <div class="rl-detail-card" style="margin-bottom: 20px;">
+                    <h3 class="rl-detail-title">Visitor Welcome Offer</h3>
+                    <table class="form-table" role="presentation">
+                        <tr>
+                            <th scope="row">Show the offer</th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="visitor_notice_enabled" value="1" <?php checked(! empty($settings['visitor_notice_enabled'])); ?> />
+                                    Greet visitors arriving on a referral link
+                                </label>
+                                <p class="description">Shown once, on the page they land on. <strong>Nothing in the site applies this discount</strong> &mdash; there is no coupon or checkout credit. The amount is recorded against the resulting lead so the sales team can honour it, but honouring it is a manual step.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="visitor_discount_amount">Discount amount</label></th>
+                            <td>
+                                $<input type="number" min="0" step="1" id="visitor_discount_amount" name="visitor_discount_amount" class="small-text"
+                                    value="<?php echo esc_attr((string) $settings['visitor_discount_amount']); ?>" />
+                                <p class="description">Whole dollars. Stored on each referred lead as <code>referral_discount_offered</code> at the value in force when they arrived, so changing it later does not rewrite what an earlier prospect was promised.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="visitor_notice_template">Message</label></th>
+                            <td>
+                                <input type="text" id="visitor_notice_template" name="visitor_notice_template" class="large-text"
+                                    value="<?php echo esc_attr((string) $settings['visitor_notice_template']); ?>" />
+                                <p class="description"><code>{referrer}</code> (required) becomes the referrer's name, <code>{amount}</code> the figure above, formatted.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="rl-detail-card" style="margin-bottom: 20px;">
                     <h3 class="rl-detail-title">Landing Pages</h3>
                     <table class="form-table" role="presentation">
                         <tr>
-                            <th scope="row"><label for="landing_pages">Referral link destinations</label></th>
+                            <th scope="row"><label for="landing_pages">Target services</label></th>
                             <td>
                                 <textarea id="landing_pages" name="landing_pages" rows="6" class="large-text code"><?php echo esc_textarea($settingsService->landingPagesToText($settings['landing_pages'])); ?></textarea>
                                 <p class="description">One per line, format: <code>Name = https://url</code>. Populates the link generator in the Referrer Portal.</p>
