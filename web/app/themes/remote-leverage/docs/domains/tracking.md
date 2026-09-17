@@ -50,9 +50,23 @@ Both destinations receive the same DTO. `RecordBehaviorEventAction` is the only 
 | `CUSTOMERIO_SITE_ID`, `CUSTOMERIO_API_KEY` | `CustomerIOClient` (Track API v1, server side). Region is **us** (`track.customer.io`), confirmed against the legacy `rl_cio_region` option. |
 | `CUSTOMERIO_CDP_WRITE_KEY` | The browser `cioanalytics` snippet only. A **different credential** from the site id above — CDP source write key vs Track API site id. Blank -> no snippet is emitted. Value recovered 2026-09-15 from the `analytics.load("…")` argument in the page source of `remoteleverage.com` and `rl-testing.test`, identical on both; it is a publishable browser key, not a secret. |
 
-GTM, LinkedIn Insight and Meta Pixel are **not** injected by this domain. Google Site Kit is installed (`wp-plugin/google-site-kit`) and ships the GTM `<head>` snippet and `wp_body_open` noscript once a container is connected; LinkedIn and Meta are added as tags inside that container. This was a deliberate rescope of WR-99 from code to configuration — the remaining work is admin setup, not engineering.
+LinkedIn Insight and Meta Pixel are **not** injected by this domain — they are tags inside the GTM containers. GTM itself is delivered by `SiteKitHooks` (`app/Infrastructure/WordPress/Hooks`) from `config/site-kit.php`.
 
-> **Site Kit is currently inactive locally** (verified 2026-09-14), so no GTM snippet is emitted and no tag inside the container fires. Activating it and connecting the container is a prerequisite for any GTM-delivered tracking at cutover.
+**This reverses the earlier plan of having Site Kit ship the snippet.** Site Kit's Tag Manager module holds exactly one container: `Modules\Tag_Manager::register_tag()` builds `new Web_Tag($settings['containerID'])` from a single value, and `ampContainerID` is a separate AMP-only render path, not a second container on the same page (verified against Site Kit 1.187.0). Production serves **two** containers ([cutover-decisions.md §32](../cutover-decisions.md)), so connecting Site Kit to one would have silently stopped every tag in the other — exactly the ad-spend parity that decision exists to protect.
+
+Site Kit stays installed and is still *configured* from the same file: `SiteKitHooks` serves `googlesitekit_tagmanager_settings` through a `pre_option_` filter, so the config file wins over whatever wp-admin holds. `useSnippet` is forced to `false` while the theme is emitting, which makes a double snippet structurally impossible rather than something a deploy has to correct. Site Kit's own dashboards still work if anyone connects it.
+
+| Setting | Default | Does |
+| :--- | :--- | :--- |
+| `GTM_CONTAINER_IDS` | `GTM-53JDTQCZ,GTM-P4KZNJWL` | Containers to load, in order |
+| `GTM_EMIT_SNIPPET` | `true` | Theme renders them; `false` hands delivery back to Site Kit, and back to one container |
+| `GTM_ENVIRONMENTS` | `production` | Which `wp_get_environment_type()` values load them |
+| `GTM_ACCOUNT_ID` | *(blank)* | GTM account, for Site Kit's dashboards only |
+| `GTM_FORCE_MODULE_ACTIVE` | `false` | Force `tagmanager` into Site Kit's active module list |
+
+Production-only by default for the same reason Site Kit's `Tag_Environment_Type_Guard` is: the containers hold Meta and LinkedIn conversion pixels, and a test booking on staging fires them against the same ad accounts as a real one.
+
+`tests/Unit/SiteKitConfigTest.php` pins all of it.
 
 ## PostHog is initialised exactly once
 
@@ -68,8 +82,18 @@ loaded two copies of the SDK and captured every pageview twice. Removed 2026-09-
 
 > **Production initialises PostHog from GTM, not from the theme.** Its HTML carries
 > `posthog.capture` but no `posthog.init`. Since v2 inherits both production GTM containers
-> ([cutover-decisions.md §32](../cutover-decisions.md)), check the container before switching Site
-> Kit on, or the duplicate comes back from the other direction.
+> ([cutover-decisions.md §32](../cutover-decisions.md)), a PostHog init tag in either one loads a
+> second copy of the SDK alongside `TrackingHooks::injectPostHogSnippet()` and counts every
+> pageview twice — the same bug that was fixed on 2026-09-15 by removing `posthog-js` from
+> `app.js`, arriving from the other direction.
+>
+> It is invisible today only because `POSTHOG_API_KEY` has never been set in any environment, so
+> the theme's snippet renders nothing. **It surfaces the moment that key is filled in**, which is
+> on the cutover list. Before then, remove the PostHog init tag from both containers and leave
+> `TrackingHooks` as the sole owner: a container tag can be edited by anyone with GTM access and
+> no deploy, so the theme is the side that can be reasoned about. GTM tags that *call*
+> `posthog.capture()` are fine and need no change — the snippet's queueing stub accepts calls
+> before the SDK lands.
 
 ## Booking funnel events
 

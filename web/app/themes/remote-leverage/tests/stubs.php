@@ -673,6 +673,33 @@ if (! function_exists('esc_url_raw')) {
     }
 }
 
+if (! function_exists('esc_js')) {
+    function esc_js($text)
+    {
+        // WordPress escapes for a single-quoted JS string literal and collapses newlines.
+        return str_replace(
+            ["\r", "\n"],
+            ['', '\\n'],
+            addcslashes((string) $text, "\\'\""),
+        );
+    }
+}
+
+/*
+ * The environment WordPress believes it is running in.
+ *
+ * Settable, because it gates whether the GTM containers load at all
+ * (App\Infrastructure\WordPress\Hooks\SiteKitHooks) and a test that cannot flip it can only
+ * assert one side of that. Defaults to 'development' so anything production-gated stays off
+ * unless a test asks for it.
+ */
+if (! function_exists('wp_get_environment_type')) {
+    function wp_get_environment_type()
+    {
+        return $GLOBALS['wp_environment_type'] ?? 'development';
+    }
+}
+
 if (! function_exists('esc_textarea')) {
     function esc_textarea($text)
     {
