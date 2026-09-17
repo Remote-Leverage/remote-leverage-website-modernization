@@ -10,8 +10,11 @@
 
     @if (! $isSubmitted)
       <div>
-        <div class="mb-6">
-          <span class="px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">
+        {{-- Centred to match the login card, whose wrapper carries text-center. The two
+             cards sit in the same place under the switcher, so a flip in alignment reads
+             as the page jumping when you change tabs. --}}
+        <div class="mb-6 text-center">
+          <span class="inline-block px-3 py-1 rounded-pill bg-brand-purple/10 text-brand-purple text-xs font-bold uppercase tracking-wider">
             Strategic Network
           </span>
           <h3 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight mt-2">
@@ -94,7 +97,7 @@
           </div>
 
           <p class="text-center text-2xs text-text-muted mt-2">
-            By applying, you agree to Remote Leverage affiliate terms. Payouts processed automatically via Stripe Connect.
+            By applying, you agree to Remote Leverage affiliate terms. Payouts are processed automatically.
           </p>
         </form>
 
@@ -147,23 +150,13 @@
           </div>
         </div>
 
-        {{-- Stripe Connect Onboarding Button --}}
         <div class="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-          @if ($stripeOnboardingUrl)
-            <a
-              href="{{ $stripeOnboardingUrl }}"
-              class="w-full sm:w-auto px-6 py-3 rounded-cta bg-brand-magenta hover:bg-brand-magenta-hover text-white text-xs sm:text-sm font-bold shadow-md transition inline-flex items-center justify-center gap-2"
-            >
-              <span>Connect Stripe Payouts</span>
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-            </a>
-          @endif
-
           <a
             href="{{ home_url('/referrer-portal?referrer=' . $referralCode) }}"
-            class="w-full sm:w-auto px-6 py-3 rounded-cta border border-slate-200 text-text-body hover:bg-slate-50 text-xs sm:text-sm font-semibold transition inline-flex items-center justify-center"
+            class="w-full sm:w-auto px-6 py-3 rounded-cta bg-brand-magenta hover:bg-brand-magenta-hover text-white text-xs sm:text-sm font-bold shadow-md transition inline-flex items-center justify-center gap-2"
           >
-            Open Referrer Dashboard
+            <span>Open Referrer Dashboard</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
           </a>
         </div>
       </div>
