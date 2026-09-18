@@ -393,4 +393,9 @@ return [
     // Verified against production 2026-09-16: 301 -> buy.stripe.com/cNi14nfrY18b7tX6DkfrW0E.
     'deposit' => 'https://buy.stripe.com/cNi14nfrY18b7tX6DkfrW0E',
 
+    // Production 301 /refund/ (and /Refund/) straight to the JostForm refund form rather than
+    // serving a page. It is the main redirect under /refund/ path in the GoDaddy version.
+    // Verified against production 2026-09-17: 301 -> https://form.jotform.com/252185178652665
+    'refund' => 'https://form.jotform.com/252185178652665',
+    
 ];
