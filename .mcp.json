@@ -4,7 +4,7 @@
       "command": "npx",
       "args": ["-y", "@automattic/mcp-wordpress-remote@latest"],
       "env": {
-        "WP_API_URL": "${STAGING_MCP_URL:-https://staging.remoteleverage.com}/wp-json/mcp/mcp-adapter-default-server",
+        "WP_API_URL": "${STAGING_MCP_URL:-https://staging.remoteleverage.com}/wp-json/mcp/mcp-adapter-default-server/",
         "WP_API_USERNAME": "${STAGING_MCP_USER:-ai-content-agent}",
         "WP_API_PASSWORD": "${STAGING_MCP_APP_PASSWORD}"
       }
@@ -13,7 +13,7 @@
       "command": "npx",
       "args": ["-y", "@automattic/mcp-wordpress-remote@latest"],
       "env": {
-        "WP_API_URL": "${PRODUCTION_MCP_URL:-https://remoteleverage.com}/wp-json/mcp/mcp-adapter-default-server",
+        "WP_API_URL": "${PRODUCTION_MCP_URL:-https://remoteleverage.com}/wp-json/mcp/mcp-adapter-default-server/",
         "WP_API_USERNAME": "${PRODUCTION_MCP_USER:-ai-content-agent}",
         "WP_API_PASSWORD": "${PRODUCTION_MCP_APP_PASSWORD}"
       }
