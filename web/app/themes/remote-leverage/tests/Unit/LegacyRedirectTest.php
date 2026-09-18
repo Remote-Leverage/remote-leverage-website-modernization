@@ -153,7 +153,8 @@ describe('external targets cannot be turned into an open redirect', function () 
         $config = require dirname(__DIR__, 2).'/config/redirects.php';
 
         // buy.stripe.com added 2026-09-16: production 301s /deposit/ to a Stripe payment link.
-        expect(LegacyRedirectMiddleware::externalHosts($config))->toBe(['anyshore.ai', 'buy.stripe.com']);
+        // form.jotform.com added 2026-09-17: production 301s /refund/ to a JostForm refund link.
+        expect(LegacyRedirectMiddleware::externalHosts($config))->toBe(['anyshore.ai', 'buy.stripe.com', 'form.jotform.com']);
     });
 });
 
