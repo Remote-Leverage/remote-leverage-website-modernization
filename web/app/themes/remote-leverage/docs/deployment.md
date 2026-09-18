@@ -47,9 +47,9 @@ Nothing deploys without CI passing — both deploy workflows declare `needs: ci`
 | Workflow | Trigger | GitHub Environment | Image tag |
 | :--- | :--- | :--- | :--- |
 | `deploy-staging.yml` | Push to `main` or `workflow_dispatch` | `staging` | `staging` |
-| `deploy-production.yml` | Git tag `v-YYYYMMDD-v{1,2,3,4}` | `production` (required reviewers) | `production` plus the release tag |
+| `deploy-production.yml` | Git tag `v-YYYYMMDD-vN` | `production` (required reviewers) | `production` plus the release tag |
 
-Production is not auto-deployed from `main`. Push a tag such as `v-20260916-v1` (then `v2`…`v4` for later deploys that day). CI runs first; the **Build and deploy** job waits for a GitHub Environment approval before it builds or touches ECS. The image is pushed as `:production` (what ECS runs), `:<release tag>`, and `:<git sha>`.
+Production is not auto-deployed from `main`. Push a tag such as `v-20260916-v1` (then `v2`, `v3`, `v12` for later deploys that day). CI runs first; the **Build and deploy** job waits for a GitHub Environment approval before it builds or touches ECS. The image is pushed as `:production` (what ECS runs), `:<release tag>`, and `:<git sha>`.
 
 ## CI (`.github/workflows/ci.yml`)
 
@@ -83,7 +83,7 @@ Each image is pushed twice — `:staging` and `:<git sha>` — so a rollback is 
 
 ## Deploy production (`.github/workflows/deploy-production.yml`)
 
-Triggered only by a git tag matching **`v-YYYYMMDD-v{1,2,3,4}`** — for example `v-20260916-v1`. Same-day follow-ups are `v2`, `v3`, `v4`. Tags that do not match are ignored; the validate job also rejects anything that is not eight digits and `v1`–`v4`.
+Triggered only by a git tag matching **`v-YYYYMMDD-vN`** — for example `v-20260916-v1`. Same-day follow-ups are `v2`, `v3`, `v12`, any positive integer. Tags that do not match are ignored; the validate job also rejects anything that is not eight date digits and `-v` plus one or more digits.
 
 ```bash
 git tag v-20260916-v1
