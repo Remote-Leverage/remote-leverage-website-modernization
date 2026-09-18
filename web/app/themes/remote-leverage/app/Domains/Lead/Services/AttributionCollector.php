@@ -149,6 +149,25 @@ class AttributionCollector
             $attribution['user_agent'] = $userAgent;
         }
 
+        /*
+         * Derive `fbc` from a bare `fbclid` when the cookie is not there yet.
+         *
+         * `_fbc` is written by Meta's own pixel JS, so it only exists from the *second* request
+         * of a session onward — a visitor who lands from an ad and submits on that same page view
+         * has `fbclid` in the URL and no cookie. That is not an edge case: it is the fast
+         * converter, and it is why the legacy data shows fbc present on 52 of 59 fbclid leads
+         * even with HandL doing the capture.
+         *
+         * Meta's documented format is `fb.<subdomainIndex>.<creationTimeMs>.<fbclid>`, and it
+         * accepts one we assemble ourselves — the click id is the part that matters. Doing it
+         * here rather than only at send time means the `fbc` column is populated for every
+         * consumer (the CAPI client, the admin, and any downstream automation), not just for the
+         * one that happened to know how to reconstruct it.
+         */
+        if (($named['fbc'] ?? '') === '' && ($named['fbclid'] ?? '') !== '') {
+            $named['fbc'] = sprintf('fb.1.%d.%s', (int) round(microtime(true) * 1000), $named['fbclid']);
+        }
+
         return ['named' => $named, 'attribution' => $attribution];
     }
 
@@ -244,6 +263,32 @@ class AttributionCollector
 
         foreach ($keys as $key) {
             $value = $request->cookie($key);
+
+            if (is_scalar($value)) {
+                $clean = $this->clean((string) $value);
+
+                if ($clean !== null) {
+                    return $clean;
+                }
+            }
+        }
+
+        /*
+         * Raw $_COOKIE as a last resort.
+         *
+         * `$request->cookie()` reads the bag Laravel built for *this* Request object. Lead capture
+         * runs from a Livewire XHR and from WordPress hooks, where the Request is not always the
+         * one that was captured from the live superglobals — and anything that decrypts cookies
+         * drops a third-party one like `_fbp` rather than passing it through, because it cannot
+         * be decrypted and is treated as tampered.
+         *
+         * The cookies that matter most here are exactly the ones Laravel never set: `_fbp` and
+         * `_fbc` are written by Meta's pixel JS in the browser. Missing one is invisible — the
+         * lead saves fine and Meta just matches fewer people — so it is worth reading them from
+         * the place the browser actually put them.
+         */
+        foreach ($keys as $key) {
+            $value = $_COOKIE[$key] ?? null;
 
             if (is_scalar($value)) {
                 $clean = $this->clean((string) $value);

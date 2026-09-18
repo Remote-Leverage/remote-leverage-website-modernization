@@ -261,3 +261,60 @@ describe('PostHog session replay link', function () {
         expect($lead->posthogPersonUrl())->toBeNull();
     });
 });
+
+/*
+ * Meta match-quality fields, added 2026-09-18.
+ *
+ * The first production lead through the Conversions API reported `fbp: false` and no stored
+ * `fbc`, which is the difference between a conversion Meta can attribute to an ad and one it
+ * counts anonymously. Both were capture-side.
+ */
+describe('AttributionCollector Meta identifiers', function () {
+    test('derives fbc from a bare fbclid when the _fbc cookie does not exist yet', function () {
+        $before = (int) round(microtime(true) * 1000);
+
+        $collected = (new AttributionCollector)->collect(attributionRequest(['fbclid' => 'IwAR-abc123']));
+
+        $after = (int) round(microtime(true) * 1000);
+
+        expect($collected['named']['fbc'])->toMatch('/^fb\.1\.\d+\.IwAR-abc123$/');
+
+        // `fb.<subdomainIndex>.<creationTimeMs>.<fbclid>` — the timestamp is the click time, and
+        // a visitor landing from an ad is clicking now.
+        $ms = (int) explode('.', $collected['named']['fbc'])[2];
+        expect($ms)->toBeGreaterThanOrEqual($before)->toBeLessThanOrEqual($after);
+    });
+
+    test('a real _fbc cookie always wins over a derived one', function () {
+        $collected = (new AttributionCollector)->collect(
+            attributionRequest(['fbclid' => 'IwAR-abc123'], ['_fbc' => 'fb.1.1699999999999.realcookie'])
+        );
+
+        expect($collected['named']['fbc'])->toBe('fb.1.1699999999999.realcookie');
+    });
+
+    test('leaves fbc alone when there is no fbclid to derive from', function () {
+        $collected = (new AttributionCollector)->collect(attributionRequest(['utm_source' => 'google']));
+
+        expect($collected['named'])->not->toHaveKey('fbc');
+    });
+
+    test('reads _fbp and _fbc from the raw cookie jar when the Request bag does not carry them', function () {
+        // Lead capture runs from a Livewire XHR and from WordPress hooks, where the Request is
+        // not always built from the live superglobals — and cookie decryption drops a
+        // third-party cookie rather than passing it through. Both of these are written by Meta's
+        // pixel JS, so they are exactly the ones Laravel never knows about.
+        $original = $_COOKIE;
+        $_COOKIE['_fbp'] = 'fb.1.1700000000000.987654321';
+        $_COOKIE['_fbc'] = 'fb.1.1700000000000.IwAR-from-jar';
+
+        try {
+            $collected = (new AttributionCollector)->collect(attributionRequest());
+
+            expect($collected['attribution']['handl']['_fbp'])->toBe('fb.1.1700000000000.987654321')
+                ->and($collected['named']['fbc'])->toBe('fb.1.1700000000000.IwAR-from-jar');
+        } finally {
+            $_COOKIE = $original;
+        }
+    });
+});
