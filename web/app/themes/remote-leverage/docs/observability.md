@@ -186,6 +186,20 @@ cutover. In rough order of how much each removes:
 host than the page, real errors stop reporting** — and the failure mode is silence, not an error.
 The fix at that point is to add the asset host to the array.
 
+### Release tagging
+
+Both SDKs tag events with the version the running image was built from. The Docker build (`ARG
+RELEASE_VERSION`) writes it straight into `/var/www/html/.env` as `APP_VERSION=...` — not a
+`SENTRY_*` name, since the browser side reads it too — and Bedrock's own Dotenv loader in
+`config/application.php` picks it up from there — no extra entrypoint step needed, and a real
+environment variable still wins over `.env` if one is ever set. `config/sentry.php` reads
+`APP_VERSION` as its `release`. `deploy-production.yml` passes `$RELEASE_TAG`, the
+`v-YYYYMMDD-vN` tag that triggered the run, as that build arg; `deploy-staging.yml` isn't
+tag-triggered, so it passes `$GITHUB_SHA` instead. The browser SDK reuses the same value: `app.blade.php`
+exposes `config('sentry.release')` as `window.APP_VERSION`, which `app.js` passes as `release` to
+`Sentry.init()`. One value, one source, both sides — so an issue can be filtered to the deploy that
+introduced it instead of showing up tagged with no release at all.
+
 ### Production runs a different SDK
 
 Production is still on `wp-sentry-integration`, not this stack's `@sentry/browser` +
