@@ -610,3 +610,60 @@ describe('defaults that used to depend on an unset variable', function () {
             ->and($out)->toContain('disable_surveys:true');
     });
 });
+
+describe('an empty environment variable falls through to the default', function () {
+    /*
+     * The bug that took PostHog dark on production on 2026-09-18, minutes after its GTM tag was
+     * deleted. `env(X, 'default')` only applies the default when X is *absent*; production
+     * carries an empty `POSTHOG_API_KEY`, and an empty string beat the default underneath it.
+     *
+     * Asserted by re-reading the config files with the variables set to empty, because the
+     * mistake this catches is somebody reverting one of them to a plain `env()` default.
+     */
+    test('every public pixel id survives its variable being present but empty', function () {
+        $vars = [
+            'META_PIXEL_IDS', 'BING_UET_TAG_ID', 'LINKEDIN_PARTNER_IDS', 'OPENAI_PIXEL_IDS',
+            'TIKTOK_PIXEL_IDS', 'GOOGLE_TAG_IDS', 'GOOGLE_TAG_LINKER_DOMAINS',
+            'HUBSPOT_PORTAL_ID', 'HUBSPOT_SCRIPT_REGION',
+        ];
+
+        foreach ($vars as $var) {
+            $_ENV[$var] = '';
+            $_SERVER[$var] = '';
+            putenv("{$var}=");
+        }
+
+        try {
+            $config = require __DIR__.'/../../config/pixels.php';
+
+            expect($config['meta']['pixel_ids'])->toBe(['1430907207548734', '1482937899395718'])
+                ->and($config['bing_uet']['tag_id'])->toBe('97187250')
+                ->and($config['linkedin']['partner_ids'])->toBe(['6411876'])
+                ->and($config['openai']['pixel_ids'])->toBe(['7QY9HDVocGyeNvMMW1gLWb'])
+                ->and($config['tiktok']['pixel_ids'])->toBe(['CPMB51BC77U75I0QMMAG'])
+                ->and($config['google_tag']['ids'])->toBe(['GT-NCNQ6N2'])
+                ->and($config['hubspot']['portal_id'])->toBe('243484989')
+                ->and($config['hubspot']['region'])->toBe('na2');
+        } finally {
+            foreach ($vars as $var) {
+                unset($_ENV[$var], $_SERVER[$var]);
+                putenv($var);
+            }
+        }
+    });
+
+    test('the PostHog key survives an empty POSTHOG_API_KEY', function () {
+        $_ENV['POSTHOG_API_KEY'] = '';
+        $_SERVER['POSTHOG_API_KEY'] = '';
+        putenv('POSTHOG_API_KEY=');
+
+        try {
+            $config = require __DIR__.'/../../config/services.php';
+
+            expect($config['posthog']['api_key'])->toBe('phc_3PbasnDYndH8YVEky0ksHrB3SFwBZKmzkf5bl37o8u0');
+        } finally {
+            unset($_ENV['POSTHOG_API_KEY'], $_SERVER['POSTHOG_API_KEY']);
+            putenv('POSTHOG_API_KEY');
+        }
+    });
+});

@@ -13,6 +13,15 @@
  * losing conversion signal on two thirds of paid acquisition, with nothing in the container to
  * put it back.
  *
+ * ## An empty variable is not a configuration
+ *
+ * Every id below reads `trim((string) env(X, '')) ?: '<default>'` rather than `env(X, '<default>')`.
+ * An `env()` default only applies when the variable is **absent**; a variable that is present and
+ * empty wins, and silently turns the pixel off. That is not theoretical — it took PostHog dark on
+ * 2026-09-18 the moment its GTM tag was deleted, because production carries an empty
+ * `POSTHOG_API_KEY` and the default underneath never got a chance. An empty value means "not
+ * configured", so it falls through to the default here.
+ *
  * ## These belong in GTM eventually
  *
  * A pixel is exactly what a tag manager is for, and the container is where marketing can change
@@ -60,7 +69,7 @@ return [
     'meta' => [
         'pixel_ids' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('META_PIXEL_IDS', '1430907207548734,1482937899395718')),
+            explode(',', trim((string) env('META_PIXEL_IDS', '')) ?: '1430907207548734,1482937899395718'),
         ))),
         'track_page_view' => filter_var(env('META_TRACK_PAGE_VIEW', true), FILTER_VALIDATE_BOOLEAN),
     ],
@@ -75,7 +84,7 @@ return [
     | being attributable — 35 leads in the backfill, small but paid.
     */
     'bing_uet' => [
-        'tag_id' => (string) env('BING_UET_TAG_ID', '97187250'),
+        'tag_id' => trim((string) env('BING_UET_TAG_ID', '')) ?: '97187250',
     ],
 
     /*
@@ -103,7 +112,7 @@ return [
     'linkedin' => [
         'partner_ids' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('LINKEDIN_PARTNER_IDS', '6411876')),
+            explode(',', trim((string) env('LINKEDIN_PARTNER_IDS', '')) ?: '6411876'),
         ))),
     ],
 
@@ -123,7 +132,7 @@ return [
     'openai' => [
         'pixel_ids' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('OPENAI_PIXEL_IDS', '7QY9HDVocGyeNvMMW1gLWb')),
+            explode(',', trim((string) env('OPENAI_PIXEL_IDS', '')) ?: '7QY9HDVocGyeNvMMW1gLWb'),
         ))),
         'debug' => filter_var(env('OPENAI_PIXEL_DEBUG', false), FILTER_VALIDATE_BOOLEAN),
 
@@ -193,11 +202,11 @@ return [
     'google_tag' => [
         'ids' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('GOOGLE_TAG_IDS', 'GT-NCNQ6N2')),
+            explode(',', trim((string) env('GOOGLE_TAG_IDS', '')) ?: 'GT-NCNQ6N2'),
         ))),
         'linker_domains' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('GOOGLE_TAG_LINKER_DOMAINS', 'remoteleverage.com')),
+            explode(',', trim((string) env('GOOGLE_TAG_LINKER_DOMAINS', '')) ?: 'remoteleverage.com'),
         ))),
     ],
 
@@ -224,7 +233,7 @@ return [
     'tiktok' => [
         'pixel_ids' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('TIKTOK_PIXEL_IDS', 'CPMB51BC77U75I0QMMAG')),
+            explode(',', trim((string) env('TIKTOK_PIXEL_IDS', '')) ?: 'CPMB51BC77U75I0QMMAG'),
         ))),
         'track_page_view' => filter_var(env('TIKTOK_TRACK_PAGE_VIEW', true), FILTER_VALIDATE_BOOLEAN),
     ],
@@ -331,7 +340,7 @@ return [
          * variable is why browser tracking was dark on production until 2026-09-18 with no
          * error anywhere. `HUBSPOT_ACCESS_TOKEN`, which *is* a secret, stays in the environment.
          */
-        'portal_id' => (string) env('HUBSPOT_PORTAL_ID', '243484989'),
-        'region' => (string) env('HUBSPOT_SCRIPT_REGION', 'na2'),
+        'portal_id' => trim((string) env('HUBSPOT_PORTAL_ID', '')) ?: '243484989',
+        'region' => trim((string) env('HUBSPOT_SCRIPT_REGION', '')) ?: 'na2',
     ],
 ];
