@@ -397,5 +397,5 @@ return [
     // serving a page. It is the main redirect under /refund/ path in the GoDaddy version.
     // Verified against production 2026-09-17: 301 -> https://form.jotform.com/252185178652665
     'refund' => 'https://form.jotform.com/252185178652665',
-    
+
 ];
