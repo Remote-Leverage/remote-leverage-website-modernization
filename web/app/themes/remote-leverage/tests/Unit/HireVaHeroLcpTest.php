@@ -10,7 +10,6 @@ use App\Support\PageChrome;
  * fetchpriority, no preload, and no mobile crop. Role pages already mark their
  * LCP img high; this file pins the same treatment on acf/hire-va-hero.
  */
-
 describe('the hire-va hero is discoverable as LCP', function () {
     test('the view uses a picture element with fetchpriority high and a 750px source', function () {
         $blade = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/blocks/hire-va-hero.blade.php');
