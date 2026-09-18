@@ -95,8 +95,14 @@ return [
          *
          * Not a credential: it can only write events. `POSTHOG_PERSONAL_API_KEY`-class secrets
          * are a different thing and do not belong here.
+         *
+         * `?:` rather than an `env()` default, because an env() default only applies when the
+         * variable is *absent*. Production has it present and empty — which is why PostHog went
+         * dark on 2026-09-18 the moment the GTM tag was deleted: the default was there, and an
+         * empty string beat it. An empty value means "not configured", not "configured as
+         * nothing".
          */
-        'api_key' => env('POSTHOG_API_KEY', 'phc_3PbasnDYndH8YVEky0ksHrB3SFwBZKmzkf5bl37o8u0'),
+        'api_key' => trim((string) env('POSTHOG_API_KEY', '')) ?: 'phc_3PbasnDYndH8YVEky0ksHrB3SFwBZKmzkf5bl37o8u0',
         'host' => env('POSTHOG_HOST', 'https://us.i.posthog.com'),
 
         /*

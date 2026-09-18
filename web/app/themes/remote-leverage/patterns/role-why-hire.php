@@ -29,7 +29,7 @@ $data = BlockDefaults::withFieldKeys('why_hire', [
     'proof_badge_label' => 'pre-vetted candidates',
     'proof_cta_text' => 'BOOK A CONSULTATION',
     'proof_cta_url' => '#booking-footer',
-    'proof_image' => BlockDefaults::pageImg('admin-virtual-assistants', 'globe.png'),
+    'proof_image' => BlockDefaults::pageImg('role-pages', 'globe.png'),
 ]);
 ?>
 <?= BlockDefaults::renderBlockWithRepeater('why-hire', 'cards', 'field_why_hire_cards', BlockDefaults::whyHire2026Cards(), $data, ['align' => 'full']) ?>
