@@ -1,0 +1,168 @@
+
+<h1>Log a booking</h1>
+    <p>For leads who didn't book online but agreed to a meeting on the call.</p>
+  <form id="bdrfForm" novalidate>
+          <label for="bdrf-first">First name</label>
+          <input id="bdrf-first" name="first_name" type="text" autocomplete="off" required>
+          <p data-error-for="first_name"></p>
+          <label for="bdrf-last">Last name</label>
+          <input id="bdrf-last" name="last_name" type="text" autocomplete="off" required>
+          <p data-error-for="last_name"></p>
+        <label for="bdrf-company">Company name or website</label>
+        <input id="bdrf-company" name="company_or_website" type="text" autocomplete="off" required>
+        <p>Type N/A if you don't have either.</p>
+        <p data-error-for="company_or_website"></p>
+          <label for="bdrf-email">Email</label>
+          <input id="bdrf-email" name="email" type="email" inputmode="email" autocomplete="off" required>
+          <p data-error-for="email"></p>
+          <label for="bdrf-phone">Phone</label>
+          <input id="bdrf-phone" name="phone" type="tel" inputmode="tel" placeholder="+1 123 456 9810" autocomplete="off" required>
+          <p>Include the country code.</p>
+          <p data-error-for="phone"></p>
+          <label for="bdrf-when">Meeting date and time</label>
+          <input id="bdrf-when" name="booking_datetime" type="datetime-local" required>
+          <p>Eastern time, not your local time.</p>
+          <p data-error-for="booking_datetime"></p>
+          <label for="bdrf-bdr">Booked by</label>
+          <input id="bdrf-bdr" name="bdr_name" type="text" list="bdrf-bdrs" autocomplete="off" required>
+          <datalist id="bdrf-bdrs">
+            <!-- PLACEHOLDER: your BDR names -->
+            <option value="Cyrynn Contreras"></option>
+            <option value="Paula Vargas"></option>
+            <option value="Carlos Jimenez"></option>
+            <option value="Antonio Silva"></option>
+            <option value="Leo Sanchez"></option>
+          </datalist>
+          <p data-error-for="bdr_name"></p>
+        <label for="bdrf-rep">Sales rep taking the meeting</label>
+        <input id="bdrf-rep" name="sales_rep_email" type="email" inputmode="email" autocomplete="off" required>
+        <p>Their Recruit CRM email, exactly as it appears on their account.</p>
+        <p data-error-for="sales_rep_email"></p>
+      <button type="submit" id="bdrfSubmit">Create contact in Recruit CRM</button>
+      <p id="bdrfStatus" role="status" aria-live="polite"></p>
+  </form>
+    <h2>Booking logged</h2>
+    <p id="bdrfDoneBody"></p>
+    <button type="button" id="bdrfAgain">Log another booking</button>
+<style>
+/* ---- scoped so nothing leaks into the theme ---- */
+.bdrf,
+.bdrf *,
+.bdrf *::before,
+.bdrf *::after { box-sizing: border-box; }
+.bdrf {
+  --ink: #12161c;
+  --ink-soft: #5b6673;
+  --line: #d9dfe6;
+  --line-strong: #aab4c0;
+  --paper: #ffffff;
+  --surface: #f4f6f8;
+  --signal: #1b3ad1;
+  --signal-deep: #142b9c;
+  --warn: #9a3412;
+  --good: #14653b;
+  max-width: 40rem;
+  margin: 0 auto;
+  color: var(--ink);
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  text-align: left;
+}
+.bdrf__head { margin-bottom: 1.5rem; }
+.bdrf__title {
+  margin: 0 0 .35rem;
+  font-size: 1.75rem;
+  line-height: 1.15;
+  font-weight: 640;
+  letter-spacing: -.015em;
+  color: var(--ink);
+}
+.bdrf__lede { margin: 0; max-width: 32rem; color: var(--ink-soft); font-size: .95rem; }
+.bdrf__form { margin: 0; }
+.bdrf__panel {
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+}
+.bdrf__row { display: grid; gap: 1rem; margin-bottom: 1.1rem; }
+.bdrf__row--2 { grid-template-columns: 1fr 1fr; }
+.bdrf__field { min-width: 0; margin-bottom: 1.1rem; }
+.bdrf__row .bdrf__field { margin-bottom: 0; }
+.bdrf__panel > *:last-child { margin-bottom: 0; }
+.bdrf label {
+  display: block;
+  margin-bottom: .35rem;
+  font-size: .875rem;
+  font-weight: 560;
+  color: var(--ink);
+}
+.bdrf input[type="text"],
+.bdrf input[type="email"],
+.bdrf input[type="tel"],
+.bdrf input[type="datetime-local"]{
+  width: 100%;
+  padding: .6rem .7rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: .95rem;
+  line-height: 1.4;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.bdrf__mono { font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.bdrf input:focus-visible,
+.bdrf button:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+  border-color: var(--signal);
+}
+.bdrf [aria-invalid="true"] { border-color: var(--warn); background: #fff8f5; }
+.bdrf__hint { margin: .35rem 0 0; font-size: .8rem; color: var(--ink-soft); }
+.bdrf__error { margin: .35rem 0 0; font-size: .8rem; color: var(--warn); }
+.bdrf__error:empty { display: none; }
+.bdrf__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.bdrf__submit,
+.bdrf__again {
+  padding: .75rem 1.4rem;
+  border: 1px solid var(--signal-deep);
+  border-radius: 4px;
+  background: var(--signal);
+  color: #fff;
+  font: inherit;
+  font-size: .95rem;
+  font-weight: 560;
+  cursor: pointer;
+  transition: background-color .12s ease-out;
+}
+.bdrf__submit:hover,
+.bdrf__again:hover { background: var(--signal-deep); }
+.bdrf__submit[disabled] { background: var(--line-strong); border-color: var(--line-strong); cursor: progress; }
+.bdrf__again { background: var(--paper); color: var(--signal); }
+.bdrf__again:hover { background: var(--surface); color: var(--signal-deep); }
+.bdrf__status { margin: 0; font-size: .875rem; color: var(--ink-soft); }
+.bdrf__status--bad { color: var(--warn); }
+.bdrf__done {
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--good);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.bdrf__doneTitle { margin: 0 0 .4rem; font-size: 1.15rem; font-weight: 620; color: var(--good); }
+.bdrf__doneBody { margin: 0 0 1.1rem; color: var(--ink-soft); font-size: .95rem; }
+@media (max-width: 34rem) {
+  .bdrf__row--2 { grid-template-columns: 1fr; }
+  .bdrf__title { font-size: 1.45rem; }
+  .bdrf__panel { padding: 1rem; }
+  .bdrf__submit, .bdrf__again { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bdrf * { transition: none !important; }
+}
+</style>

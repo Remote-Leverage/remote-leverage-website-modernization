@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domains\Scheduling\Actions\RouteInstantCallAction;
+use App\Support\PageRobots;
 use App\Support\SocialKit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,30 @@ Route::get('book-consultation', function () {
 Route::get('book', function () {
     return redirect()->route('funnel.book-consultation');
 });
+
+/*
+ * Live-transfer booking form — the internal tool a BDR fills in after a live call, for a lead
+ * who agreed to a meeting but never went through the online funnel.
+ *
+ * Recovered from production page 51147 (an Elementor html widget) on 2026-09-17; see
+ * `docs/recovered/live-transfer-contact-creation/` for the original and what changed.
+ *
+ * **Public but never indexed**, which is a deliberate pair rather than an oversight. It stays
+ * public because reps reach it by URL with no login, exactly as on production. It is noindexed
+ * because production's copy was not — it sits in `page-sitemap.xml` today and serves the full
+ * working form to anyone anonymous — and an internal tool that creates CRM contacts has no
+ * business in search results.
+ *
+ * `forceNoindex()` runs before the view, and therefore before `wp_head()` emits the robots tag.
+ */
+Route::get('live-transfer-contact-creation', function () {
+    PageRobots::forceNoindex();
+
+    return view('pages.live-transfer-contact-creation', [
+        'webhookUrl' => (string) config('live-transfer.webhook_url', ''),
+        'timezone' => (string) config('live-transfer.timezone', 'America/New_York'),
+    ]);
+})->name('tools.live-transfer');
 
 // Instant Live Call Router (replaces rl-join-live-call plugin)
 Route::get('live-call/connect', function (Request $request, RouteInstantCallAction $action) {

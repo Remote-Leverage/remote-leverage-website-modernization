@@ -48,7 +48,7 @@ class PageRobots
      */
     public static function filter(array $robots): array
     {
-        $posture = self::currentPagePosture();
+        $posture = self::$forced ?? self::currentPagePosture();
 
         if ($posture === null) {
             return $robots;
@@ -65,6 +65,36 @@ class PageRobots
         }
 
         return $robots;
+    }
+
+    /**
+     * A posture set by a route rather than discovered from page content.
+     *
+     * Routes have no post and no pattern, so `currentPagePosture()` — which starts with an
+     * `is_singular()` check — can never speak for one. Without this a route is silently
+     * indexable however it is written, which is the wrong default for the internal tools that
+     * live on routes.
+     */
+    private static ?string $forced = null;
+
+    /**
+     * Keep the current route out of search results.
+     *
+     * Called from the route itself, before the view renders and therefore before `wp_head()`
+     * fires. `$follow` mirrors the two markers: false gives `noindex, nofollow`, true gives
+     * `noindex, follow` for a page whose links should still pass equity.
+     */
+    public static function forceNoindex(bool $follow = false): void
+    {
+        self::$forced = $follow ? self::NOINDEX_FOLLOW_MARKER : self::NOINDEX_MARKER;
+    }
+
+    /**
+     * Drop a forced posture, so one test cannot decide the next.
+     */
+    public static function clearForced(): void
+    {
+        self::$forced = null;
     }
 
     /**
@@ -97,6 +127,6 @@ class PageRobots
      */
     public static function currentPageIsNoindex(): bool
     {
-        return self::currentPagePosture() !== null;
+        return (self::$forced ?? self::currentPagePosture()) !== null;
     }
 }

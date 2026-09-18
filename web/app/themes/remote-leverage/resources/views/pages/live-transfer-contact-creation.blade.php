@@ -1,0 +1,419 @@
+{{--
+  Live-transfer booking form — an internal sales tool, not a marketing page.
+
+  Recovered verbatim from production post 51147 (Elementor html widget) on 2026-09-17; the
+  markup, styles and script below are that page's, with two changes:
+
+   - the n8n webhook URL and the booking timezone now come from `config/live-transfer.php`
+     via `data-` attributes instead of being hardcoded in the script;
+   - everything from `<style>` onward sits inside a verbatim block, because the CSS contains
+     a media query and Blade would otherwise try to read it as a directive. (Do not write that
+     directive's name literally in this comment: Blade expands it before it strips comments,
+     which opens a block that swallows the section below it.)
+
+  Deliberately NOT ported: nothing. The Eastern-time default and the per-submission
+  `submissionId` (which survives retries so n8n can drop duplicates) are load-bearing — a port
+  that mints a fresh id on retry double-creates contacts.
+
+  Public by decision, but never indexed: the route calls `PageRobots::forceNoindex()`.
+--}}
+@extends('layouts.app')
+
+@section('content')
+  <div class="py-12 sm:py-16 bg-surface-white min-h-175">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+
+<div class="bdrf">
+  <div class="bdrf__head">
+    <h1 class="bdrf__title">Log a booking</h1>
+    <p class="bdrf__lede">For leads who didn't book online but agreed to a meeting on the call.</p>
+  </div>
+
+  <form class="bdrf__form" id="bdrfForm" novalidate
+          data-webhook="{{ $webhookUrl }}"
+          data-timezone="{{ $timezone }}">
+    <div class="bdrf__panel">
+
+      <div class="bdrf__row bdrf__row--2">
+        <div class="bdrf__field">
+          <label for="bdrf-first">First name</label>
+          <input id="bdrf-first" name="first_name" type="text" autocomplete="off" required>
+          <p class="bdrf__error" data-error-for="first_name"></p>
+        </div>
+        <div class="bdrf__field">
+          <label for="bdrf-last">Last name</label>
+          <input id="bdrf-last" name="last_name" type="text" autocomplete="off" required>
+          <p class="bdrf__error" data-error-for="last_name"></p>
+        </div>
+      </div>
+
+      <div class="bdrf__field">
+        <label for="bdrf-company">Company name or website</label>
+        <input id="bdrf-company" name="company_or_website" type="text" autocomplete="off" required>
+        <p class="bdrf__hint">Type N/A if you don't have either.</p>
+        <p class="bdrf__error" data-error-for="company_or_website"></p>
+      </div>
+
+      <div class="bdrf__row bdrf__row--2">
+        <div class="bdrf__field">
+          <label for="bdrf-email">Email</label>
+          <input id="bdrf-email" name="email" type="email" inputmode="email" autocomplete="off" required>
+          <p class="bdrf__error" data-error-for="email"></p>
+        </div>
+        <div class="bdrf__field">
+          <label for="bdrf-phone">Phone</label>
+          <input id="bdrf-phone" name="phone" type="tel" inputmode="tel" class="bdrf__mono" placeholder="+1 123 456 9810" autocomplete="off" required>
+          <p class="bdrf__hint">Include the country code.</p>
+          <p class="bdrf__error" data-error-for="phone"></p>
+        </div>
+      </div>
+
+      <div class="bdrf__row bdrf__row--2">
+        <div class="bdrf__field">
+          <label for="bdrf-when">Meeting date and time</label>
+          <input id="bdrf-when" name="booking_datetime" type="datetime-local" required>
+          <p class="bdrf__hint">Eastern time, not your local time.</p>
+          <p class="bdrf__error" data-error-for="booking_datetime"></p>
+        </div>
+        <div class="bdrf__field">
+          <label for="bdrf-bdr">Booked by</label>
+          <input id="bdrf-bdr" name="bdr_name" type="text" list="bdrf-bdrs" autocomplete="off" required>
+          <datalist id="bdrf-bdrs">
+            <!-- PLACEHOLDER: your BDR names -->
+            <option value="Cyrynn Contreras"></option>
+            <option value="Paula Vargas"></option>
+            <option value="Carlos Jimenez"></option>
+            <option value="Antonio Silva"></option>
+            <option value="Leo Sanchez"></option>
+          </datalist>
+          <p class="bdrf__error" data-error-for="bdr_name"></p>
+        </div>
+      </div>
+
+      <div class="bdrf__field">
+        <label for="bdrf-rep">Sales rep taking the meeting</label>
+        <input id="bdrf-rep" name="sales_rep_email" type="email" inputmode="email" autocomplete="off" required>
+        <p class="bdrf__hint">Their Recruit CRM email, exactly as it appears on their account.</p>
+        <p class="bdrf__error" data-error-for="sales_rep_email"></p>
+      </div>
+
+    </div>
+
+    <div class="bdrf__actions">
+      <button type="submit" class="bdrf__submit" id="bdrfSubmit">Create contact in Recruit CRM</button>
+      <p class="bdrf__status" id="bdrfStatus" role="status" aria-live="polite"></p>
+    </div>
+  </form>
+
+  <div class="bdrf__done" id="bdrfDone" hidden>
+    <h2 class="bdrf__doneTitle">Booking logged</h2>
+    <p class="bdrf__doneBody" id="bdrfDoneBody"></p>
+    <button type="button" class="bdrf__again" id="bdrfAgain">Log another booking</button>
+  </div>
+</div>
+
+@verbatim
+<style>
+/* ---- scoped so nothing leaks into the theme ---- */
+.bdrf,
+.bdrf *,
+.bdrf *::before,
+.bdrf *::after { box-sizing: border-box; }
+
+.bdrf {
+  --ink: #12161c;
+  --ink-soft: #5b6673;
+  --line: #d9dfe6;
+  --line-strong: #aab4c0;
+  --paper: #ffffff;
+  --surface: #f4f6f8;
+  --signal: #1b3ad1;
+  --signal-deep: #142b9c;
+  --warn: #9a3412;
+  --good: #14653b;
+
+  max-width: 40rem;
+  margin: 0 auto;
+  color: var(--ink);
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.bdrf__head { margin-bottom: 1.5rem; }
+
+.bdrf__title {
+  margin: 0 0 .35rem;
+  font-size: 1.75rem;
+  line-height: 1.15;
+  font-weight: 640;
+  letter-spacing: -.015em;
+  color: var(--ink);
+}
+
+.bdrf__lede { margin: 0; max-width: 32rem; color: var(--ink-soft); font-size: .95rem; }
+
+.bdrf__form { margin: 0; }
+
+.bdrf__panel {
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+}
+
+.bdrf__row { display: grid; gap: 1rem; margin-bottom: 1.1rem; }
+.bdrf__row--2 { grid-template-columns: 1fr 1fr; }
+.bdrf__field { min-width: 0; margin-bottom: 1.1rem; }
+.bdrf__row .bdrf__field { margin-bottom: 0; }
+.bdrf__panel > *:last-child { margin-bottom: 0; }
+
+.bdrf label {
+  display: block;
+  margin-bottom: .35rem;
+  font-size: .875rem;
+  font-weight: 560;
+  color: var(--ink);
+}
+
+.bdrf input[type="text"],
+.bdrf input[type="email"],
+.bdrf input[type="tel"],
+.bdrf input[type="datetime-local"]{
+  width: 100%;
+  padding: .6rem .7rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: .95rem;
+  line-height: 1.4;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.bdrf__mono { font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+
+.bdrf input:focus-visible,
+.bdrf button:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+  border-color: var(--signal);
+}
+
+.bdrf [aria-invalid="true"] { border-color: var(--warn); background: #fff8f5; }
+
+.bdrf__hint { margin: .35rem 0 0; font-size: .8rem; color: var(--ink-soft); }
+
+.bdrf__error { margin: .35rem 0 0; font-size: .8rem; color: var(--warn); }
+.bdrf__error:empty { display: none; }
+
+.bdrf__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+
+.bdrf__submit,
+.bdrf__again {
+  padding: .75rem 1.4rem;
+  border: 1px solid var(--signal-deep);
+  border-radius: 4px;
+  background: var(--signal);
+  color: #fff;
+  font: inherit;
+  font-size: .95rem;
+  font-weight: 560;
+  cursor: pointer;
+  transition: background-color .12s ease-out;
+}
+.bdrf__submit:hover,
+.bdrf__again:hover { background: var(--signal-deep); }
+.bdrf__submit[disabled] { background: var(--line-strong); border-color: var(--line-strong); cursor: progress; }
+
+.bdrf__again { background: var(--paper); color: var(--signal); }
+.bdrf__again:hover { background: var(--surface); color: var(--signal-deep); }
+
+.bdrf__status { margin: 0; font-size: .875rem; color: var(--ink-soft); }
+.bdrf__status--bad { color: var(--warn); }
+
+.bdrf__done {
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--good);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.bdrf__doneTitle { margin: 0 0 .4rem; font-size: 1.15rem; font-weight: 620; color: var(--good); }
+.bdrf__doneBody { margin: 0 0 1.1rem; color: var(--ink-soft); font-size: .95rem; }
+
+@media (max-width: 34rem) {
+  .bdrf__row--2 { grid-template-columns: 1fr; }
+  .bdrf__title { font-size: 1.45rem; }
+  .bdrf__panel { padding: 1rem; }
+  .bdrf__submit, .bdrf__again { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bdrf * { transition: none !important; }
+}
+</style>
+
+<script>
+(function () {
+  "use strict";
+
+  // PLACEHOLDER: your n8n production webhook URL
+  var WEBHOOK_URL = (document.getElementById("bdrfForm") || {}).getAttribute
+    ? document.getElementById("bdrfForm").getAttribute("data-webhook") || ""
+    : "";
+  var FORM_VERSION = "3.0.0";
+
+  var form     = document.getElementById("bdrfForm");
+  var submit   = document.getElementById("bdrfSubmit");
+  var status   = document.getElementById("bdrfStatus");
+  var done     = document.getElementById("bdrfDone");
+  var doneBody = document.getElementById("bdrfDoneBody");
+  var again    = document.getElementById("bdrfAgain");
+
+  // Bookings are always entered in Eastern time, whatever the rep's own clock says.
+  var TIMEZONE = (document.getElementById("bdrfForm").getAttribute("data-timezone")) || "America/New_York";
+
+  // One id per filled-in form. Survives retries, so n8n can drop duplicates.
+  var submissionId = newId();
+
+  function newId() {
+    if (window.crypto && crypto.randomUUID) { return crypto.randomUUID(); }
+    return "s-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+  }
+
+  function showError(name, message) {
+    var slot = form.querySelector('[data-error-for="' + name + '"]');
+    var field = form.elements[name];
+    if (slot) { slot.textContent = message || ""; }
+    if (field) {
+      if (message) { field.setAttribute("aria-invalid", "true"); }
+      else { field.removeAttribute("aria-invalid"); }
+    }
+  }
+
+  function clearErrors() {
+    var slots = form.querySelectorAll("[data-error-for]");
+    for (var i = 0; i < slots.length; i++) {
+      showError(slots[i].getAttribute("data-error-for"), "");
+    }
+    status.textContent = "";
+    status.classList.remove("bdrf__status--bad");
+  }
+
+  function validate(data) {
+    var problems = [];
+    var required = {
+      first_name: "Add a first name.",
+      last_name: "Add a last name.",
+      company_or_website: "Add the company or website, or type N/A.",
+      email: "Add an email address.",
+      phone: "Add a phone number.",
+      booking_datetime: "Pick the meeting date and time.",
+      bdr_name: "Add who booked the meeting.",
+      sales_rep_email: "Add the sales rep's email."
+    };
+
+    for (var key in required) {
+      if (!data[key]) { problems.push([key, required[key]]); }
+    }
+    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(data.email)) {
+      problems.push(["email", "Check the email address — it doesn't look complete."]);
+    }
+    if (data.sales_rep_email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(data.sales_rep_email)) {
+      problems.push(["sales_rep_email", "Check the rep's email — it has to match their Recruit CRM account."]);
+    }
+    if (data.phone && data.phone.replace(/\D/g, "").length < 7) {
+      problems.push(["phone", "Check the phone number — it's too short to dial."]);
+    }
+    return problems;
+  }
+
+  function collect() {
+    return {
+      first_name:         form.elements.first_name.value.trim(),
+      last_name:          form.elements.last_name.value.trim(),
+      company_or_website: form.elements.company_or_website.value.trim(),
+      email:              form.elements.email.value.trim().toLowerCase(),
+      phone:              form.elements.phone.value.trim(),
+      booking_datetime:   form.elements.booking_datetime.value,   // "2026-09-18T14:30", Eastern
+      bdr_name:           form.elements.bdr_name.value.trim(),
+      sales_rep_email:    form.elements.sales_rep_email.value.trim().toLowerCase(),
+      timezone:           TIMEZONE,
+      submission_id:      submissionId,
+      submitted_at:       new Date().toISOString(),
+      page_url:           window.location.href,
+      form_version:       FORM_VERSION
+    };
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    clearErrors();
+
+    var data = collect();
+    var problems = validate(data);
+
+    if (problems.length) {
+      for (var i = 0; i < problems.length; i++) {
+        showError(problems[i][0], problems[i][1]);
+      }
+      status.textContent = problems.length + (problems.length === 1 ? " field needs fixing." : " fields need fixing.");
+      status.classList.add("bdrf__status--bad");
+      var firstBad = form.querySelector('[aria-invalid="true"]');
+      if (firstBad) { firstBad.focus(); }
+      return;
+    }
+
+    submit.disabled = true;
+    submit.textContent = "Creating contact…";
+    status.textContent = "Sending to Recruit CRM.";
+
+    // Form-encoded on purpose: this is a "simple request", so no OPTIONS preflight.
+    fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: new URLSearchParams(data).toString()
+    })
+      .then(function (response) {
+        if (!response.ok) { throw new Error("Webhook returned " + response.status); }
+        return response.text();
+      })
+      .then(function () {
+        doneBody.textContent =
+          data.first_name + " " + data.last_name + " is in Recruit CRM. Meeting on " +
+          data.booking_datetime.replace("T", " at ") + " Eastern.";
+        form.hidden = true;
+        done.hidden = false;
+        done.setAttribute("tabindex", "-1");
+        done.focus();
+      })
+      .catch(function (error) {
+        submit.disabled = false;
+        submit.textContent = "Create contact in Recruit CRM";
+        status.textContent = "That didn't send (" + error.message + "). Your answers are still here — try again, and tell ops if it keeps failing.";
+        status.classList.add("bdrf__status--bad");
+      });
+  });
+
+  again.addEventListener("click", function () {
+    form.reset();
+    clearErrors();
+    submissionId = newId();
+    submit.disabled = false;
+    submit.textContent = "Create contact in Recruit CRM";
+    done.hidden = true;
+    form.hidden = false;
+    form.elements.first_name.focus();
+  });
+})();
+</script>
+@endverbatim
+
+    </div>
+  </div>
+@endsection

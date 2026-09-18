@@ -680,6 +680,17 @@ if (! function_exists('esc_url_raw')) {
     }
 }
 
+/*
+ * False by default: the bare test container renders no post, and `PageRobots` opens with this
+ * check, so anything asserting a *forced* posture needs the unforced path to be reachable.
+ */
+if (! function_exists('is_singular')) {
+    function is_singular($post_types = '')
+    {
+        return $GLOBALS['wp_is_singular'] ?? false;
+    }
+}
+
 if (! function_exists('wp_json_encode')) {
     function wp_json_encode($data, $options = 0, $depth = 512)
     {
