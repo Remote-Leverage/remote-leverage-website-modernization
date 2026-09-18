@@ -164,19 +164,28 @@ return [
     | `G-JFBLS33ET8` is the reason this is here: without it a whole GA4 property
     | goes dark at cutover and the first sign is a flat graph nobody is watching.
     |
-    | Re-verified 2026-09-18 by resolving each payload. Two corrections to the
-    | note that used to sit here:
+    | Re-verified 2026-09-18 against the published container:
     |
-    |  - The container carries **no Google tag of its own** -- no `AW-` or `GT-`
-    |    id appears anywhere in `GTM-53JDTQCZ`. So this tag is the site's only
-    |    gtag loader and the container's GA4 tags piggyback on it. That is why
-    |    it is deliberately absent from the `defer` block below.
+    |  - The container **does** publish a Google tag of its own --
+    |    `AW-11406183013`, with `send_to: G-SCP464C5EH`. So this tag is not the
+    |    site's only gtag loader; the two overlap on both of those destinations.
+    |
+    |    An earlier revision of this note claimed the opposite, on the strength
+    |    of grepping `GTM-53JDTQCZ` for `AW-11406183013` and finding nothing.
+    |    The grep was wrong, not the container: GTM stores the id as
+    |    `["template","AW-",["macro",5]]`, so the prefix and the number are
+    |    separate strings and the joined form appears nowhere in the payload.
+    |    **Grep the bare number.**
+    |  - `G-JFBLS33ET8` really is reachable through nothing else -- it appears
+    |    nowhere in the container under any spelling. That is still the reason
+    |    this tag has to stay.
     |  - `AW-1140618301` is **not** a typo of `AW-11406183013`. It appears in the
-    |    routing map as its own `publicId`, so both are live destinations.
+    |    gtag routing map as its own `publicId`, so both are live destinations.
     |
-    | Cost: one Google tag fanning out to four destinations pulls four config
-    | payloads, ~730KB transferred on a cold load. Trimming that means unlinking
-    | a destination in the Google tag UI -- there is nothing to change here.
+    | Cost: this tag fans out to four destination configs, ~730KB transferred on
+    | a cold load, and the container's Google tag duplicates two of them. The
+    | overlap is worth removing, but which side to cut is a question for the ads
+    | accounts and GTM Preview rather than something to infer from a payload.
     |
     | Emitted here rather than by Site Kit's Analytics module, so that one
     | mechanism owns page-level tags and the module stays disconnected.
@@ -240,8 +249,10 @@ return [
     |
     |  - **meta** -- Facebook is 67% of paid acquisition. A PageView that lands
     |    late is still counted, but this is not the pixel to experiment on.
-    |  - **google_tag** -- it is the site's only gtag loader and the container's
-    |    GA4 tags piggyback on it. See the Google tag block above.
+    |  - **google_tag** -- GA4 and Google Ads conversions should not wait behind
+    |    an idle callback, and the tag is already `async` so it costs no parse
+    |    time. See the Google tag block above for how it overlaps the
+    |    container's own Google tag.
     |
     | The flush also pushes `rl_idle` onto `dataLayer`, which is the intended
     | way to defer a tag that lives in the container rather than here: retrigger

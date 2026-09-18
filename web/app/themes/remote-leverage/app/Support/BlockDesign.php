@@ -333,6 +333,117 @@ class BlockDesign
     }
 
     /**
+     * Every design field, mapped to the ACF field key that gives it meaning.
+     *
+     * ACF resolves a value through a companion `_<name>` key holding the field
+     * key; a value written without one is inert. For a block's *own* fields
+     * those keys are unknowable from outside, which is why PageSectionEditor
+     * refuses to invent fields at all. These are the exception: the set is fixed
+     * and declared right here in fields(), so a design control can be added to a
+     * block that has never had one — which is every block built from a pattern,
+     * since no pattern ships design values.
+     *
+     * Derived from fields() rather than restated, so the two cannot drift.
+     *
+     * @return array<string, string> field name => ACF field key
+     */
+    public static function fieldKeys(): array
+    {
+        static $map = null;
+
+        if ($map !== null) {
+            return $map;
+        }
+
+        $map = [];
+
+        foreach (self::fields() as $field) {
+            $name = (string) ($field['name'] ?? '');
+
+            // Tabs carry an empty name and are presentation only.
+            if ($name === '' || ($field['type'] ?? '') === 'tab') {
+                continue;
+            }
+
+            $map[$name] = (string) $field['key'];
+        }
+
+        return $map;
+    }
+
+    /**
+     * Whether a field name is one of this class's controls.
+     */
+    public static function isDesignField(string $name): bool
+    {
+        return array_key_exists($name, self::fieldKeys());
+    }
+
+    /**
+     * What each control accepts, for an agent that has never seen this screen.
+     *
+     * describe-page returns this verbatim. It exists because the controls are
+     * invisible otherwise: a block that has never been styled carries none of
+     * these keys in its attribute bag, so anything reading only what is present
+     * concludes the site has no spacing or CSS controls at all — which is
+     * exactly the wrong conclusion, and one that has been reached in practice.
+     *
+     * @return array<string, array{label: string, accepts: string}>
+     */
+    public static function controlReference(): array
+    {
+        $spacing = implode('|', array_filter(array_keys(self::SPACING)));
+        $backgrounds = implode('|', array_filter(array_keys(self::BACKGROUNDS)));
+
+        return [
+            self::PREFIX.'space_top' => [
+                'label' => 'Space above',
+                'accepts' => "{$spacing}, or '' to leave the block's own padding alone",
+            ],
+            self::PREFIX.'space_bottom' => [
+                'label' => 'Space below',
+                'accepts' => "{$spacing}, or '' to leave the block's own padding alone",
+            ],
+            self::PREFIX.'bg' => [
+                'label' => 'Background',
+                'accepts' => "{$backgrounds}. Text colour does NOT follow the background — most "
+                    .'blocks have their own light/dark setting, and that is the one to use',
+            ],
+            self::PREFIX.'bg_custom' => [
+                'label' => 'Custom background colour',
+                'accepts' => "a hex colour, used only when {$backgrounds} is set to 'custom'",
+            ],
+            self::PREFIX.'hide_mobile' => [
+                'label' => 'Hide on mobile',
+                'accepts' => 'true or false. Hidden below '.self::BREAKPOINT.'px; still downloaded',
+            ],
+            self::PREFIX.'hide_desktop' => [
+                'label' => 'Hide on desktop',
+                'accepts' => 'true or false. Hidden at '.self::BREAKPOINT.'px and above',
+            ],
+            self::PREFIX.'anchor' => [
+                'label' => 'Anchor ID',
+                'accepts' => 'letters, numbers and hyphens; links as #your-id',
+            ],
+            self::PREFIX.'classes' => [
+                'label' => 'Extra CSS classes',
+                'accepts' => 'space-separated class names on the block wrapper. A Tailwind '
+                    .'utility typed here does nothing — Tailwind only compiles classes it '
+                    .'finds in the theme source',
+            ],
+            self::PREFIX.'css' => [
+                'label' => 'Custom CSS',
+                'accepts' => 'ordinary CSS, automatically scoped to this block and nothing else, '
+                    .'so class names need not be unique. Use `selector` (or `&`) for the block '
+                    .'itself: `selector { padding-top: 24px }`. Bare declarations apply to the '
+                    .'block. Nesting and @media work. Rules aimed outside the block never match. '
+                    .'@import/@charset and script-like content are stripped. Max '
+                    .self::MAX_CSS_BYTES.' bytes',
+            ],
+        ];
+    }
+
+    /**
      * Apply a block instance's design settings to its rendered HTML.
      *
      * @param  string  $content  The block's rendered HTML.

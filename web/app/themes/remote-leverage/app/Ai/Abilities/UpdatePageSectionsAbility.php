@@ -31,13 +31,29 @@ class UpdatePageSectionsAbility extends Ability
 
     public function description(): string
     {
-        return 'Replaces the copy in named sections of an existing page, leaving all other sections untouched. '.
-            'Use this to iterate on a page — including one made by clone-page — without rebuilding it. '.
-            'Call describe-page first for valid section and field names. Editing a page that is already '.
-            'published changes the live site immediately and requires the edit_published_pages capability. '.
-            'Overrides naming a section or field that does not exist are reported in "skipped", not applied. '.
-            'If the response contains a "warning" key, relay it to the user verbatim: it means this edit '.
-            'detached the page from its pattern file in git and the change needs a developer to make permanent.';
+        return 'Edits named sections of an existing page in place, leaving all other sections untouched. '.
+            'This changes BOTH copy and design. Call describe-page first for valid section and field names. '.
+            "\n\n".
+            'DESIGN AND LAYOUT ARE EDITABLE HERE — you do not need a developer, a separate tool, or a repo '.
+            'change to adjust how a section looks. Every acf/* section accepts these fields, and describe-page '.
+            'lists them on every section with type "design" whether or not they have been set before: '.
+            'rl_design_space_top and rl_design_space_bottom (padding above/below, one of none|xs|sm|md|lg|xl), '.
+            'rl_design_bg (background), rl_design_hide_mobile and rl_design_hide_desktop (true/false), '.
+            'rl_design_anchor, rl_design_classes, and rl_design_css. '.
+            "\n\n".
+            'rl_design_css takes ordinary CSS and is automatically scoped to that one section, so it cannot '.
+            'affect anything else on the site and class names do not need to be unique. Use `selector` for the '.
+            'section itself, e.g. "selector { padding-top: 24px }". This is the correct way to make a visual fix '.
+            'that the named controls above do not cover — prefer the named controls when one fits, because they '.
+            'stay on the theme scale. Do NOT tell the user that spacing or styling can only be changed in the '.
+            'theme source; on this site it cannot only be changed there. '.
+            "\n\n".
+            'Editing a page that is already published changes the live site immediately and requires the '.
+            'edit_published_pages capability. Overrides naming a section or field that does not exist are '.
+            'reported in "skipped", not applied — always read "skipped", because a skipped item means the page '.
+            'did NOT change the way you were asked. If the response contains a "warning" key, relay it to the '.
+            'user verbatim: it means this edit detached the page from its pattern file in git and the change '.
+            'needs a developer to make permanent.';
     }
 
     public function execute(array $input): mixed

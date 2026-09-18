@@ -31,7 +31,15 @@ class DescribePageAbility extends Ability
             'its current editable field values. Call this to understand a page before cloning it or editing it: '.
             'the "section" and "field" names it returns are exactly the ones clone-page and update-page-sections '.
             'take as overrides. Fields are typed — "text" is copy you may rewrite, "image_id" is an attachment ID, '.
-            'and "repeater_count" is the number of rows in a repeater and should usually be left alone.';
+            '"number" is a numeric setting, and "repeater_count" is the number of rows in a repeater and should '.
+            'usually be left alone. '.
+            "\n\n".
+            'Fields typed "design" are the layout and styling controls every section has: spacing above and '.
+            'below, background, hide-on-mobile/desktop, anchor, extra classes, and per-section custom CSS. They '.
+            'are listed on every acf/* section even when never set — an empty value means "unchanged", not '.
+            '"unavailable" — and each carries a "label" and an "accepts" string saying exactly what it takes. '.
+            'Pass them to update-page-sections like any other field. Spacing and styling on this site are '.
+            'therefore editable through the API; do not report them as theme-source-only.';
     }
 
     public function execute(array $input): mixed
@@ -105,7 +113,24 @@ class DescribePageAbility extends Ability
                                         // ACF stores copy as strings and both
                                         // image IDs and repeater counts as
                                         // numbers, so this is genuinely mixed.
-                                        'value' => ['type' => ['string', 'number', 'boolean', 'null']],
+                                        //
+                                        // 'array' and 'object' are here because
+                                        // some ACF field types (a multi-select,
+                                        // a checkbox, a link) store one, and the
+                                        // adapter validates this schema before
+                                        // returning: omitting them did not
+                                        // degrade those fields, it failed the
+                                        // whole call with
+                                        // "value is not of type
+                                        // string,number,boolean,null" and took
+                                        // every other section on the page down
+                                        // with it. /hire-va-4/ was unreadable,
+                                        // and so uneditable, for that reason.
+                                        'value' => ['type' => ['string', 'number', 'boolean', 'null', 'array', 'object']],
+                                        // Present only on design controls, which
+                                        // are advertised whether set or not.
+                                        'label' => ['type' => 'string'],
+                                        'accepts' => ['type' => 'string'],
                                     ],
                                 ],
                             ],

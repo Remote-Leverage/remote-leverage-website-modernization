@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Ai\Support\PageSectionEditor;
+use App\Support\BlockDesign;
 
 /**
  * PageSectionEditor is what stands between "clone this page with new copy" and
@@ -94,9 +95,75 @@ it('addresses sections by their declared name', function () {
 
 it('hides ACF field-key companions from the editable field list', function () {
     $sections = (new PageSectionEditor)->outline(samplePage());
+    $names = array_column($sections[0]['fields'], 'field');
 
-    expect(array_column($sections[0]['fields'], 'field'))
-        ->toBe(['headline', 'cta_text', 'hero_image']);
+    // The block's own fields, separated from the design controls that every
+    // acf/* section now advertises whether or not it has ever used one.
+    $own = array_values(array_filter(
+        $names,
+        fn (string $field) => ! str_starts_with($field, BlockDesign::PREFIX),
+    ));
+
+    expect($own)->toBe(['headline', 'cta_text', 'hero_image']);
+
+    // The point of the test: a value is only meaningful alongside its "_field"
+    // companion, and exposing those as editable invites writing one.
+    foreach ($names as $field) {
+        expect($field)->not->toStartWith('_');
+    }
+});
+
+/**
+ * Advertised on every acf/* section, set or not. A pattern-built block carries
+ * no design keys at all, so a reader that reported only what was present
+ * concluded the site had no spacing or CSS controls — and said so to a user.
+ */
+it('advertises the design controls on a section that has never used one', function () {
+    $sections = (new PageSectionEditor)->outline(samplePage());
+
+    $design = array_values(array_filter(
+        $sections[0]['fields'],
+        fn (array $field) => $field['type'] === 'design',
+    ));
+
+    expect($design)->not->toBeEmpty();
+
+    $names = array_column($design, 'field');
+    expect($names)->toContain(BlockDesign::PREFIX.'space_top');
+    expect($names)->toContain(BlockDesign::PREFIX.'css');
+
+    // Empty means "unchanged", and each control has to say what it takes or
+    // nothing reading this can use it.
+    expect($design[0]['value'])->toBe('');
+    expect($design[0]['accepts'])->not->toBeEmpty();
+});
+
+it('creates a design field that the block does not yet carry', function () {
+    $result = (new PageSectionEditor)->apply(samplePage(), [
+        ['section' => 'hero', 'fields' => [
+            BlockDesign::PREFIX.'space_top' => 'sm',
+            BlockDesign::PREFIX.'css' => 'selector { padding-top: 24px }',
+        ]],
+    ]);
+
+    expect($result['skipped'])->toBe([]);
+    expect($result['applied'])->toContain('hero.'.BlockDesign::PREFIX.'space_top');
+
+    // Written with its ACF field key, without which the value is inert — the
+    // markup would look correct and render nothing.
+    expect($result['content'])->toContain('field_rl_design_space_top');
+    expect($result['content'])->toContain('field_rl_design_css');
+});
+
+it('still refuses to invent a field that is not a design control', function () {
+    $result = (new PageSectionEditor)->apply(samplePage(), [
+        ['section' => 'hero', 'fields' => ['not_a_real_field' => 'x']],
+    ]);
+
+    // Its ACF key is unknowable from out here, so creating it would write
+    // markup that looks wired up and renders nothing.
+    expect($result['applied'])->not->toContain('hero.not_a_real_field');
+    expect($result['skipped'])->not->toBeEmpty();
 });
 
 it('classifies a repeater count apart from an image and plain copy', function () {

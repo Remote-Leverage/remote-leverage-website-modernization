@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ai\Support;
 
+use App\Support\BlockDesign;
 use WP_Block_Patterns_Registry;
 
 /**
@@ -274,6 +275,46 @@ final class PageSectionEditor
             $fields[] = ['field' => 'text', 'type' => 'text', 'value' => $text];
         }
 
+        $fields = array_merge($fields, $this->describeDesignControls($block));
+
+        return $fields;
+    }
+
+    /**
+     * The design controls, listed whether or not this block has ever used one.
+     *
+     * Every other field here is discovered by reading what the block already
+     * carries. That is the right rule for a block's own fields and the wrong one
+     * for these: no pattern ships design values, so on a pattern-built page the
+     * keys are simply absent, and a reader that reports only what is present
+     * concludes the site has no spacing, visibility or custom-CSS controls at
+     * all. That conclusion has been drawn in practice and cost a round trip, so
+     * the controls are now advertised rather than inferred.
+     *
+     * @param  array<string, mixed>  $block
+     * @return array<int, array<string, mixed>>
+     */
+    private function describeDesignControls(array $block): array
+    {
+        $name = $block['blockName'] ?? '';
+
+        if (! is_string($name) || ! str_starts_with($name, 'acf/')) {
+            return [];
+        }
+
+        $data = $block['attrs']['data'] ?? [];
+        $fields = [];
+
+        foreach (BlockDesign::controlReference() as $field => $reference) {
+            $fields[] = [
+                'field' => $field,
+                'type' => 'design',
+                'value' => array_key_exists($field, $data) ? $data[$field] : '',
+                'label' => $reference['label'],
+                'accepts' => $reference['accepts'],
+            ];
+        }
+
         return $fields;
     }
 
@@ -393,8 +434,26 @@ final class PageSectionEditor
                         continue;
                     }
 
-                    if (! array_key_exists($field, $block['attrs']['data'] ?? [])) {
-                        continue;
+                    $exists = array_key_exists($field, $block['attrs']['data'] ?? []);
+
+                    // The design controls are the one case where a field may be
+                    // *created*. Every other field is refused when absent because
+                    // ACF needs a companion "_field" key whose value cannot be
+                    // known from out here. BlockDesign declares its own keys, so
+                    // they can be written correctly — and they have to be, because
+                    // no pattern ships design values, so on a pattern-built page
+                    // these keys are always absent and every spacing, background
+                    // or custom-CSS change would otherwise be silently skipped.
+                    if (! $exists) {
+                        if (! str_starts_with($field, BlockDesign::PREFIX) || ! BlockDesign::isDesignField($field)) {
+                            continue;
+                        }
+
+                        if (! is_string($block['blockName']) || ! str_starts_with($block['blockName'], 'acf/')) {
+                            continue;
+                        }
+
+                        $block['attrs']['data']['_'.$field] = BlockDesign::fieldKeys()[$field];
                     }
 
                     $block['attrs']['data'][$field] = $value;
