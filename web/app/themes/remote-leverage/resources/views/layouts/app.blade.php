@@ -8,14 +8,18 @@
 
     {{-- LCP preload for acf/hire-va-hero. Must sit above wp_head(): production
          pixels also land there, and a preload after those scripts loses the
-         race the preload exists to win. Media-split so a phone does not
-         download the 1366px original. --}}
+         race the preload exists to win.
+
+         One URL, no media query. A media-split pair (max-width 1023 / min-width
+         1024) is what Chrome's preload scanner evaluates against the *default*
+         viewport before Lighthouse applies the Moto G width — so the 85 KB
+         desktop file can start on a phone and the 6.5 KB LCP candidate waits.
+         Desktop still swaps via the picture `source`; 6.5 KB extra there is
+         cheaper than a 5 s LCP here. --}}
     @if (\App\Support\PageChrome::usesHireVaHero())
       @php($hireVaLcp = \App\Support\BlockDefaults::hireVaHeroBackground())
       <link rel="preload" as="image" type="image/webp" fetchpriority="high"
-            href="{{ $hireVaLcp['mobile'] }}" media="(max-width: 1023px)">
-      <link rel="preload" as="image" type="image/webp" fetchpriority="high"
-            href="{{ $hireVaLcp['desktop'] }}" media="(min-width: 1024px)">
+            href="{{ $hireVaLcp['mobile'] }}">
     @endif
 
     <link rel="icon" type="image/svg+xml" href="{{ Vite::asset('resources/images/logo-icon-black.svg') }}">

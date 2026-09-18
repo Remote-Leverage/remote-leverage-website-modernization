@@ -17,7 +17,6 @@ describe('the hire-va hero is discoverable as LCP', function () {
         expect($blade)
             ->toContain('<picture>')
             ->toContain('fetchpriority="high"')
-            ->toContain('decoding="async"')
             ->toContain('hireVaHeroBackground()')
             ->toContain('(min-width: 1024px)');
 
@@ -27,6 +26,7 @@ describe('the hire-va hero is discoverable as LCP', function () {
         expect($picture)
             ->not->toBe('')
             ->not->toContain('loading="lazy"')
+            ->not->toContain('decoding="async"')
             // `img src` must be the 750px file. A desktop src is what the 2026-09-18
             // staging PSI run fetched on a phone, which put an 85 KB decode on TBT.
             ->toContain('<img src="{{ $heroBg[\'mobile\'] }}"')

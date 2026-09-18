@@ -28,15 +28,16 @@
   {{-- Hero Background Graphic with Candidate Grid --}}
   <div class="absolute inset-0 z-0 pointer-events-none select-none">
     {{-- LCP on every page that uses this block. Mobile-first: `img src` is the
-         750px file PSI actually paints. A desktop `src` here is what the
-         2026-09-18 staging re-run fetched on a 412px viewport (85 KB decode
-         during TBT) despite the picture source. Desktop is a min-width source
-         so the preload scanner does not discover it on a phone. --}}
+         750px file PSI actually paints. Desktop is a min-width source so the
+         preload scanner does not discover the 85 KB original on a phone.
+         No `decoding="async"`: async decode is what kept LCP at 5.1 s after
+         Speed Index had already hit 1.6 s — the pixels were on screen, the
+         image had not been promoted to LCP yet. --}}
     <picture>
       <source media="(min-width: 1024px)" srcset="{{ $heroBg['desktop'] }}" type="image/webp" width="1366" height="945" />
       <img src="{{ $heroBg['mobile'] }}"
            alt="" width="750" height="519"
-           fetchpriority="high" decoding="async"
+           fetchpriority="high"
            class="w-full h-full object-cover object-[70%_top] lg:object-top" />
     </picture>
     {{-- Dark gradient overlay for mobile/tablet text readability --}}
