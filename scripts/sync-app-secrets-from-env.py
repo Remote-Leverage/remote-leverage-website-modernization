@@ -49,6 +49,9 @@ ALLOWLIST = [
     "GOOGLE_CALENDAR_REFRESH_TOKEN",
     "GOOGLE_CALENDAR_ID",
     # Tracking
+    # Meta Conversions API — without this the server-side Lead never sends and Ads Manager
+    # reports 0 conversions, which is the failure this was added to fix (2026-09-18).
+    "META_CAPI_ACCESS_TOKEN",
     "CUSTOMERIO_SITE_ID",
     "CUSTOMERIO_API_KEY",
     # Browser CDP snippet — a different credential from CUSTOMERIO_SITE_ID.

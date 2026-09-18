@@ -33,6 +33,7 @@ class IntegrationIcons
         'Slack' => 'slack',
         'OutgoingWebhook' => 'webhook',
         'EmailNotification' => 'email',
+        'Meta' => 'meta',
 
         // Integration call names.
         'calendly' => 'calendly',
@@ -42,6 +43,7 @@ class IntegrationIcons
         'google' => 'google',
         'customerio' => 'customerio',
         'posthog' => 'posthog',
+        'meta' => 'meta',
         'zerobounce' => 'zerobounce',
         'webhook' => 'webhook',
         'other' => 'webhook',
@@ -96,6 +98,7 @@ class IntegrationIcons
             self::google(),
             self::customerio(),
             self::posthog(),
+            self::meta(),
             self::zerobounce(),
             self::webhook(),
             self::email(),
@@ -225,6 +228,25 @@ class IntegrationIcons
         return '<symbol id="rl-ico-posthog" viewBox="0 0 16 16">'
             .'<rect width="16" height="16" rx="3.4" fill="#F54E00"/>'
             .'<path d="M3.4 12.2V8l4.2 4.2H3.4Zm0-5.8V3.6l8.6 8.6H8.8L3.4 6.4Z" fill="#fff"/>'
+            .'</symbol>';
+    }
+
+    /**
+     * Meta, for the server-side Conversions API `Lead`.
+     *
+     * The infinity-loop mark on Meta blue. Drawn rather than mapped onto an existing symbol so a
+     * Meta row in the lead timeline is identifiable at a glance — this integration is the one
+     * whose silent absence cost a day of conversion reporting, and it should not look like
+     * "some other vendor" in the audit trail.
+     */
+    protected static function meta(): string
+    {
+        return '<symbol id="rl-ico-meta" viewBox="0 0 16 16">'
+            .'<rect width="16" height="16" rx="3.4" fill="#0081FB"/>'
+            .'<path d="M4.3 4.6c1.5 0 2.3 1.3 3.7 3.6 1.4-2.3 2.2-3.6 3.7-3.6 1.4 0 2.3 1.4 2.3 3.4 '
+            .'0 2-.9 3.4-2.3 3.4-1.1 0-1.9-.8-3-2.5l-.7-1.2-.7 1.2c-1.1 1.7-1.9 2.5-3 2.5C2.9 11.4 2 10 2 8c0-2 .9-3.4 2.3-3.4Z'
+            .'m0 1.4c-.6 0-1 .8-1 2s.4 2 1 2c.5 0 1-.5 1.8-1.8l.2-.2-.2-.2C5.3 6.5 4.8 6 4.3 6Z'
+            .'m7.4 0c-.5 0-1 .5-1.8 1.8l-.2.2.2.2c.8 1.3 1.3 1.8 1.8 1.8.6 0 1-.8 1-2s-.4-2-1-2Z" fill="#fff"/>'
             .'</symbol>';
     }
 

@@ -99,6 +99,46 @@ return [
         ))),
     ],
 
+    /*
+     * Meta Conversions API — the server-side `Lead`.
+     *
+     * This is the *only* conversion signal Meta gets from this site. There is no client-side
+     * fbq('track','Lead') and there never was: on the legacy stack the HandL UTM Grabber posted
+     * a Lead to the Graph API on every Gravity Forms submit, and removing that plugin at cutover
+     * took the whole channel with it. Ads Manager read 0 against ~12 real conversions until this
+     * was added on 2026-09-18.
+     *
+     * Pixel ids are NOT duplicated here — the gateway reads `pixels.meta.pixel_ids`, so the
+     * browser pixel and the server-side event can never drift apart.
+     *
+     * Plain `env()` with no default, deliberately: unset means off. A wrong default here would
+     * post real visitor PII to somebody else's pixel.
+     */
+    'meta_capi' => [
+        'access_token' => env('META_CAPI_ACCESS_TOKEN'),
+
+        /*
+         * Defaults to the version the legacy integration used, because that is the one proven to
+         * work with this token and this pixel pair (verified against its send log 2026-09-18).
+         * Newer is usually better with Graph, but "usually" is not a reason to change the one
+         * variable we have evidence for. Bump it deliberately.
+         */
+        'api_version' => trim((string) env('META_CAPI_API_VERSION', '')) ?: 'v11.0',
+
+        'enabled' => filter_var(env('META_CAPI_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+
+        // Set while validating in Events Manager -> Test Events; blank in normal operation.
+        'test_event_code' => trim((string) env('META_CAPI_TEST_EVENT_CODE', '')),
+
+        /*
+         * 8s/5s, matching PostHogClient rather than CustomerIOClient's 3s/2s. The send is
+         * deferred with afterResponse(), so a tight timeout costs conversions on a cold TLS
+         * handshake and buys the visitor nothing.
+         */
+        'timeout' => (int) env('META_CAPI_TIMEOUT', 8),
+        'connect_timeout' => (int) env('META_CAPI_CONNECT_TIMEOUT', 5),
+    ],
+
     'posthog' => [
         /*
          * The `phc_` project key, defaulted because it is publishable by design — it is emitted

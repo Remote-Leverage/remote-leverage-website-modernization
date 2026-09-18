@@ -110,10 +110,10 @@ class HandleLeadEventsForSlack
         );
 
         /*
-         * Broadcast the reply. A booking is the event the team is waiting for, and a plain
-         * threaded reply is collapsed behind "1 reply" for anyone not already watching the
-         * thread — quieter than the flat message it replaced, which is the wrong trade for
-         * this one.
+         * The booking stays in the thread and only in the thread. It used to broadcast, on the
+         * argument that a reply collapsed behind "1 reply" is easy to miss — but Slack renders
+         * a broadcast as a second, independent message in the channel as well as the reply, so
+         * the team read every booking twice. One card per lead is the point of the threading.
          */
         $threadTs = $isFinal ? $this->threadTsFor($lead) : null;
 
@@ -123,7 +123,6 @@ class HandleLeadEventsForSlack
                 $rendered['blocks'],
                 $rendered['color'] ?? null,
                 $threadTs,
-                broadcast: $threadTs !== null,
             );
 
             $success = $result !== null;

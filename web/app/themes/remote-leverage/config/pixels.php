@@ -72,6 +72,12 @@ return [
             explode(',', trim((string) env('META_PIXEL_IDS', '')) ?: '1430907207548734,1482937899395718'),
         ))),
         'track_page_view' => filter_var(env('META_TRACK_PAGE_VIEW', true), FILTER_VALIDATE_BOOLEAN),
+
+        /*
+        | The server-side half of Meta lives in config/services.php under `meta_capi` — it is a
+        | credential, and credentials do not belong in this file. It reuses the ids above, so a
+        | pixel added here starts receiving server-side Leads too.
+        */
     ],
 
     /*

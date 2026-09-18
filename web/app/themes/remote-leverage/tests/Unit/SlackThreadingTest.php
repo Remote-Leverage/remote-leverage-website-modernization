@@ -134,7 +134,7 @@ describe('the booking replies into that thread', function () {
         config(['services.slack.channel' => '']);
     });
 
-    test('a booking replies under the lead, and broadcasts so the channel still sees it', function () {
+    test('a booking replies under the lead, and only under it', function () {
         $lead = persistedLead([
             'slack_message_ts' => '1726500000.000100',
             'slack_channel_id' => 'C086BBKUXL5',
@@ -149,8 +149,10 @@ describe('the booking replies into that thread', function () {
             startTime: '2026-09-20T15:00:00Z',
         ));
 
+        // Not broadcast: Slack renders a broadcast reply as a second, independent message in
+        // the channel, so the team read every booking twice.
         expect($listener->sent[0]['thread_ts'])->toBe('1726500000.000100')
-            ->and($listener->sent[0]['broadcast'])->toBeTrue();
+            ->and($listener->sent[0]['broadcast'])->toBeFalse();
     });
 
     test('a lead whose alert never landed still gets a flat booking message', function () {

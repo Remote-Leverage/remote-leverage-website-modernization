@@ -39,7 +39,7 @@ values for `{{ placeholders }}`.
 | Template | Fired by | Notes |
 | :--- | :--- | :--- |
 | `new_lead` | `LeadCreated`, partial only | Opens the thread. Suppressed for blocked profiles and for `submission_type: Final`. |
-| `booked` | `LeadBookingCompleted` | On by default since 2026-09-17; `SLACK_NOTIFY_ON_BOOKING=false` silences it. Replies in-thread, broadcast. |
+| `booked` | `LeadBookingCompleted` | On by default since 2026-09-17; `SLACK_NOTIFY_ON_BOOKING=false` silences it. Replies in-thread only. |
 | `lead_claimed`, `lead_contacted`, `lead_blocked` | A button press | Replies in-thread. Only the block broadcasts. |
 | `live_call_routed` | `LiveCallRequested`, routed | Always on — a live call starts within 15 minutes. |
 | `live_call_declined` | `LiveCallRequested`, declined | The reason this event exists; see below. |
@@ -67,8 +67,10 @@ Three things worth knowing:
 - **A `ts` is only valid in the channel that produced it.** If `SLACK_CHANNEL` changes, the
   stored channel no longer matches and the reply posts flat on purpose — Slack would otherwise
   accept the stale timestamp and silently post flat anyway, which looks like a bug with no cause.
-- **Replies broadcast when they must not be missed.** A booking and a block go to the channel as
-  well as the thread; a claim and a contact stay in the thread.
+- **Only a block broadcasts.** A broadcast reply arrives twice — once in the thread and once as
+  an independent message in the channel — so everything else, the booking included, stays in the
+  thread. A block is the exception because it is a decision about a person the channel has
+  already been alerted about.
 
 ## Turning the buttons on
 

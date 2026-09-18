@@ -37,6 +37,9 @@ return [
             'posthog.com' => 'posthog',
             'customer.io' => 'customerio',
             'customerioapi.com' => 'customerio',
+            // Meta Conversions API (graph.facebook.com). The access_token travels in a JSON
+            // body so `redact_keys` below fingerprints it; never move it to the query string.
+            'facebook.com' => 'meta',
         ],
 
         /*

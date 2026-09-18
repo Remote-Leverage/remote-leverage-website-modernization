@@ -6,8 +6,10 @@ namespace App\Infrastructure\Providers;
 
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Tracking\Gateways\CustomerIOClient;
+use App\Domains\Tracking\Gateways\MetaConversionsApiClient;
 use App\Domains\Tracking\Gateways\PostHogClient;
 use App\Domains\Tracking\Listeners\HandleLeadCreatedForTracking;
+use App\Domains\Tracking\Listeners\SendLeadToMetaConversionsApi;
 use App\Infrastructure\WordPress\Hooks\ConversionHooks;
 use App\Infrastructure\WordPress\Hooks\MarketingPixelHooks;
 use App\Infrastructure\WordPress\Hooks\SiteKitHooks;
@@ -29,6 +31,8 @@ class TrackingServiceProvider extends ServiceProvider
         $this->app->singleton(MarketingPixelHooks::class, fn () => new MarketingPixelHooks);
         $this->app->singleton(ConversionHooks::class, fn () => new ConversionHooks);
         $this->app->singleton(HandleLeadCreatedForTracking::class);
+        $this->app->singleton(MetaConversionsApiClient::class, fn () => new MetaConversionsApiClient);
+        $this->app->singleton(SendLeadToMetaConversionsApi::class);
     }
 
     /**
@@ -72,6 +76,18 @@ class TrackingServiceProvider extends ServiceProvider
         // dropping the deferred work every time.
         Event::listen(LeadCreated::class, function (LeadCreated $event) {
             dispatch(static fn () => app(HandleLeadCreatedForTracking::class)->handle($event))->afterResponse();
+        });
+
+        /*
+         * Meta's Conversions API, on its own listener rather than inside the one above.
+         *
+         * This is the only conversion signal Facebook gets — there is no client-side
+         * fbq('track','Lead'). Keeping it separate means a Meta outage cannot cost us the
+         * Customer.io identify, and a Customer.io outage cannot cost us the ad attribution that
+         * pays for the traffic. Same `static` + global app() rule as above.
+         */
+        Event::listen(LeadCreated::class, function (LeadCreated $event) {
+            dispatch(static fn () => app(SendLeadToMetaConversionsApi::class)->handle($event))->afterResponse();
         });
     }
 }
