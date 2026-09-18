@@ -6,9 +6,11 @@ namespace App\Infrastructure\WordPress\Admin;
 
 use App\Domains\Lead\Actions\BlockLeadProfileAction;
 use App\Domains\Lead\Actions\PurgeOldLeadsAction;
+use App\Domains\Lead\Data\LeadAudience;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Models\LeadProfile;
+use App\Domains\Lead\Services\LeadPlatform;
 use App\Domains\Lead\Services\LeadSearch;
 use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Scheduling\Actions\RetryFailedBookingAction;
@@ -17,6 +19,7 @@ use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
 use App\Domains\Scheduling\Services\AvailabilityHealthMonitor;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\QueryException;
@@ -950,6 +953,64 @@ class LeadsAdminDashboard
         LeadSearch::apply($query, $search);
     }
 
+    /**
+     * Narrow a lead query to one of the toolbar's date windows.
+     *
+     * All three are rolling windows counted back from now, and the first one is why.
+     *
+     * It used to be `whereDate('created_at', Carbon::today())` — a calendar day, resolved in the
+     * app timezone. PHP here runs in UTC and WordPress has no timezone set, so from 8pm Eastern
+     * onwards `Carbon::today()` was already tomorrow: the filter asked for a day that had barely
+     * started and returned nothing, while the table beside it printed "Sep 17" on 96 rows. It
+     * emptied the list every evening, in the middle of the working day.
+     *
+     * A rolling 24 hours has no midnight to fall off, so it cannot do that in any timezone. The
+     * cost is that this no longer answers "what came in on the 17th" — the dropdown says "Last
+     * 24 hours" rather than "Today" because that is now what it means.
+     *
+     * @param  Builder  $query
+     */
+    protected function applyDateRange($query, string $range): void
+    {
+        // `today` is the slug this window shipped under; old bookmarks still carry it.
+        $days = match ($range) {
+            '24h', 'today' => 1,
+            'week' => 7,
+            'month' => 30,
+            default => 0,
+        };
+
+        if ($days > 0) {
+            $query->where('created_at', '>=', Carbon::now()->subDays($days));
+        }
+    }
+
+    /**
+     * Paginate a query for a WP admin screen.
+     *
+     * Laravel's default page parameter is `page`, which inside wp-admin is already taken by the
+     * screen slug (`admin.php?page=rl-leads`). Left at the default, every screen was stuck:
+     * `resolveCurrentPage()` read "rl-leads", found it non-numeric and returned page 1 forever,
+     * and the Next link it generated pointed at `admin.php?page=2` — a slug that matches no
+     * registered menu page. So the cursor is `paged` (WP's own name for it) and the path is the
+     * admin entry point with the screen slug and the active filters appended, so a page change
+     * keeps the list it was started from.
+     *
+     * @param  Builder  $query
+     * @param  array<string, string>  $filters  Toolbar state to carry across pages; empty values are dropped.
+     */
+    protected function paginateScreen($query, int $perPage, string $screen, array $filters = []): LengthAwarePaginator
+    {
+        $paged = max(1, absint($_GET['paged'] ?? 1));
+
+        return $query->paginate($perPage, ['*'], 'paged', $paged)
+            ->withPath(admin_url('admin.php'))
+            ->appends(array_merge(
+                ['page' => $screen],
+                array_filter($filters, static fn ($value) => $value !== '' && $value !== null),
+            ));
+    }
+
     public function renderDashboard(): void
     {
         $viewLeadId = isset($_GET['view_lead']) ? absint($_GET['view_lead']) : 0;
@@ -964,8 +1025,16 @@ class LeadsAdminDashboard
         $statusFilter = sanitize_text_field($_GET['status'] ?? '');
         $mrrFilter = sanitize_text_field($_GET['mrr'] ?? '');
         $dateFilter = sanitize_text_field($_GET['date_range'] ?? '');
+        $platformFilter = sanitize_text_field($_GET['platform'] ?? '');
+        $audienceFilter = sanitize_text_field($_GET['audience'] ?? '');
 
-        $query = Lead::query()->latest('id');
+        /*
+         * Newest first means newest *submission*, not highest id. The Gravity Forms import
+         * writes each row's historical `submitted_at` into `created_at` while the rows still
+         * take fresh auto-increment ids, so ordering by id put 2023 backfill at the top and
+         * buried today's leads on the last page. Id only breaks ties within the same second.
+         */
+        $query = Lead::query()->latest('created_at')->latest('id');
 
         if ($search) {
             $this->applyOptimizedSearch($query, $search);
@@ -983,13 +1052,10 @@ class LeadsAdminDashboard
             $query->whereIn('monthly_revenue', ['$0 to $5k Per Month', '$5k to $10k Per Month', '<10k', 'under_10k']);
         }
 
-        if ($dateFilter === 'today') {
-            $query->whereDate('created_at', Carbon::today());
-        } elseif ($dateFilter === 'week') {
-            $query->where('created_at', '>=', Carbon::now()->subDays(7));
-        } elseif ($dateFilter === 'month') {
-            $query->where('created_at', '>=', Carbon::now()->subDays(30));
-        }
+        LeadPlatform::apply($query, $platformFilter);
+        LeadAudience::constrain($query, $audienceFilter);
+
+        $this->applyDateRange($query, $dateFilter);
 
         // Cache executive KPI metric counts for 3 minutes to avoid full table aggregate scans on every filter
         $metrics = Cache::remember('rl_lead_dashboard_kpi_metrics', 180, function () {
@@ -1011,7 +1077,14 @@ class LeadsAdminDashboard
         $partialLeads = $metrics['partial'];
         $totalLogs = $metrics['logs'];
 
-        $leads = $query->paginate(20);
+        $leads = $this->paginateScreen($query, 20, 'rl-leads', [
+            's' => $search,
+            'status' => $statusFilter,
+            'mrr' => $mrrFilter,
+            'date_range' => $dateFilter,
+            'platform' => $platformFilter,
+            'audience' => $audienceFilter,
+        ]);
 
         ?>
         <div class="wrap rl-admin-wrap">
@@ -1055,7 +1128,7 @@ class LeadsAdminDashboard
 
             <!-- KPI Metrics Grid -->
             <div class="rl-stats-grid">
-                <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads')); ?>" class="rl-card <?php echo ! $statusFilter && ! $mrrFilter ? 'rl-card-active' : ''; ?>">
+                <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads')); ?>" class="rl-card <?php echo ! $statusFilter && ! $mrrFilter && ! $platformFilter && ! $audienceFilter ? 'rl-card-active' : ''; ?>">
                     <div class="rl-card-header">
                         <span class="rl-card-title">Total Submissions</span>
                         <?php echo $this->iconUsers(); ?>
@@ -1122,15 +1195,30 @@ class LeadsAdminDashboard
                         <option value="t0" <?php selected($mrrFilter, 't0'); ?>>&lt; $10k/mo (Tier 0)</option>
                     </select>
 
+                    <select name="platform" class="rl-select">
+                        <option value="">All Platforms</option>
+                        <?php foreach (LeadPlatform::options() as $slug => $label) { ?>
+                            <option value="<?php echo esc_attr($slug); ?>" <?php selected($platformFilter, $slug); ?>>
+                                <?php echo esc_html($label); ?>
+                            </option>
+                        <?php } ?>
+                    </select>
+
+                    <select name="audience" class="rl-select">
+                        <option value="">Everyone</option>
+                        <option value="clients" <?php selected($audienceFilter, 'clients'); ?>>Exclude possible VAs</option>
+                        <option value="va" <?php selected($audienceFilter, 'va'); ?>>Only possible VAs</option>
+                    </select>
+
                     <select name="date_range" class="rl-select">
                         <option value="">All Dates</option>
-                        <option value="today" <?php selected($dateFilter, 'today'); ?>>Today</option>
+                        <option value="24h" <?php selected(in_array($dateFilter, ['24h', 'today'], true)); ?>>Last 24 hours</option>
                         <option value="week" <?php selected($dateFilter, 'week'); ?>>Last 7 Days</option>
                         <option value="month" <?php selected($dateFilter, 'month'); ?>>Last 30 Days</option>
                     </select>
 
                     <button type="submit" class="rl-btn rl-btn-primary">Filter</button>
-                    <?php if ($search || $statusFilter || $mrrFilter || $dateFilter) { ?>
+                    <?php if ($search || $statusFilter || $mrrFilter || $dateFilter || $platformFilter || $audienceFilter) { ?>
                         <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads')); ?>" class="rl-btn rl-btn-outline">Reset</a>
                     <?php } ?>
                 </form>
@@ -1286,7 +1374,7 @@ class LeadsAdminDashboard
                  * because an export started from a filtered list should cover what the list was
                  * showing — the term is resolved through the same LeadSearch the screen uses.
                  */
-                app(LeadExportPanel::class)->renderModal($search, $statusFilter);
+                app(LeadExportPanel::class)->renderModal($search, $statusFilter, $platformFilter, $audienceFilter);
         ?>
         </div>
         <?php
@@ -1776,7 +1864,12 @@ class LeadsAdminDashboard
             $query->where('outcome', $outcomeFilter);
         }
 
-        $logs = $query->paginate(30);
+        $logs = $this->paginateScreen($query, 30, 'rl-leads-activity', [
+            's' => $search,
+            'stage' => $stageFilter,
+            'domain' => $domainFilter,
+            'outcome' => $outcomeFilter,
+        ]);
 
         ?>
         <div class="wrap rl-admin-wrap">

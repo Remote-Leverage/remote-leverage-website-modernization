@@ -74,6 +74,9 @@ Production-only by default for the same reason Site Kit's `Tag_Environment_Type_
 
 ## Container audit, 2026-09-17
 
+> The full three-way event matrix — production, the 2026-08-27 backup and v2 — is in
+> [`tracking-event-matrix.md`](tracking-event-matrix.md). This section covers the containers only.
+
 Read from the containers' published payloads (`googletagmanager.com/gtm.js?id=…`, public) and
 production's live HTML.
 

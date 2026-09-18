@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Application\Livewire\Booking\MultistepBookingWizard;
 use App\Infrastructure\WordPress\Hooks\MarketingPixelHooks;
+use App\Infrastructure\WordPress\Hooks\TrackingHooks;
 
 /**
  * Covers the pixels production loads outside GTM, and the `dataLayer` bridge.
@@ -316,5 +317,101 @@ describe('Google tag', function () {
         config(['pixels.google_tag.ids' => ['not-a-tag', '', 'XX-1']]);
 
         expect(renderPixel(fn ($h) => $h->injectGoogleTag()))->toBe('');
+    });
+});
+
+describe('legacy events recovered from the 2026-08-27 backup', function () {
+    test('the booking confirmation fires the OpenAI conversion the legacy form fired', function () {
+        /*
+         * rl-elementor-blocks/assets/js/headless-calendly-multistep.js fired
+         * `oaiq("measure","appointment_scheduled",{type:"customer_action"})` on
+         * `gform_confirmation_loaded`. It is in NEITHER GTM container — verified by grepping both
+         * published payloads — so nothing else reproduces it. Without it the OpenAI pixel records
+         * page views and zero conversions, and ChatGPT ads optimise against nothing.
+         */
+        config(['pixels.openai.conversions' => ['vathankyou' => 'appointment_scheduled']]);
+        $_SERVER['REQUEST_URI'] = '/VAThankYou/';
+
+        $out = renderPixel(fn ($h) => $h->injectOpenAiConversion());
+
+        expect($out)->toContain('oaiq("measure", "appointment_scheduled"')
+            ->and($out)->toContain('type: "customer_action"')
+            // Guarded: injectOpenAi() runs at priority 4 and this at 5, but a config that drops
+            // the pixel entirely must not leave a call on an undefined object.
+            ->and($out)->toContain('window.oaiq &&');
+    });
+
+    test('an ordinary page fires no conversion', function () {
+        config(['pixels.openai.conversions' => ['vathankyou' => 'appointment_scheduled']]);
+        $_SERVER['REQUEST_URI'] = '/hire-va/';
+
+        expect(renderPixel(fn ($h) => $h->injectOpenAiConversion()))->toBe('');
+    });
+
+    test('the conversion path match is case-insensitive, unlike the GTM trigger', function () {
+        config(['pixels.openai.conversions' => ['vathankyou' => 'appointment_scheduled']]);
+
+        $h = new MarketingPixelHooks;
+
+        expect($h->openAiConversionForRequest('/VAThankYou/'))->toBe('appointment_scheduled')
+            ->and($h->openAiConversionForRequest('/vathankyou/'))->toBe('appointment_scheduled')
+            // Everything else must stay clean, or every page counts as a booking.
+            ->and($h->openAiConversionForRequest('/'))->toBeNull()
+            ->and($h->openAiConversionForRequest('/hire-va/'))->toBeNull();
+    });
+
+    test('no conversion fires when the OpenAI pixel itself is switched off', function () {
+        config([
+            'pixels.openai.pixel_ids' => [],
+            'pixels.openai.conversions' => ['vathankyou' => 'appointment_scheduled'],
+        ]);
+        $_SERVER['REQUEST_URI'] = '/VAThankYou/';
+
+        expect(renderPixel(fn ($h) => $h->injectOpenAiConversion()))->toBe('');
+    });
+});
+
+describe('Customer.io named page events', function () {
+    /**
+     * The snippet builder is protected, so a subclass exposes it.
+     */
+    function cioProbe(string $path): string
+    {
+        $hooks = new class extends TrackingHooks
+        {
+            public function probe(string $path): string
+            {
+                return $this->customerIoPageEvents($path);
+            }
+        };
+
+        return $hooks->probe($path);
+    }
+
+    test('the named page events the legacy plugin fired are reproduced', function () {
+        /*
+         * `analytics.page()` alone is not parity. rl-customer-io's FrontendTracker also fired
+         * named track() calls, and the plugin seeded a lead-scoring map that keys on those exact
+         * names — Form Submitted 20, Viewed Booking Page 15, Viewed Pricing Page 10, Page Viewed 1
+         * (src/Database/Migration.php:72-75 in the 2026-08-27 backup). A score built on them stops
+         * moving if only the anonymous page call survives.
+         */
+        expect(cioProbe('/vapricing/'))->toContain('"Viewed Pricing Page"')
+            ->and(cioProbe('/vacalendar/'))->toContain('"Viewed Booking Page"')
+            ->and(cioProbe('/booking/'))->toContain('"Viewed Booking Page"')
+            ->and(cioProbe('/some-appointment-page/'))->toContain('"Viewed Booking Page"');
+    });
+
+    test('ordinary pages emit no named event', function () {
+        // Every page firing a scoring event would make the score meaningless.
+        expect(cioProbe('/'))->toBe('')
+            ->and(cioProbe('/hire-va/'))->toBe('')
+            ->and(cioProbe(''))->toBe('');
+    });
+
+    test('a page matching two fragments still fires one event', function () {
+        // "booking" and "appointment" both map to Viewed Booking Page; a page containing both
+        // must not double-score.
+        expect(substr_count(cioProbe('/booking-appointment/'), 'analytics.track'))->toBe(1);
     });
 });

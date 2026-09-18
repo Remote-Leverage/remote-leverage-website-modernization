@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Lead\Export;
 
+use App\Domains\Lead\Data\LeadAudience;
 use App\Domains\Lead\Models\Lead;
+use App\Domains\Lead\Services\LeadPlatform;
 use App\Domains\Lead\Services\LeadSearch;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -38,6 +40,8 @@ readonly class LeadExportOptions
         public bool $includeDeleted = false,
         public int $limit = self::NO_LIMIT,
         public string $search = '',
+        public string $platform = '',
+        public string $audience = '',
     ) {}
 
     /**
@@ -69,6 +73,8 @@ readonly class LeadExportOptions
             includeDeleted: ! empty($input['include_deleted']) && $input['include_deleted'] !== 'false',
             limit: max(0, (int) ($input['limit'] ?? 0)),
             search: trim((string) ($input['search'] ?? '')),
+            platform: self::oneOf((string) ($input['platform'] ?? ''), array_keys(LeadPlatform::options())),
+            audience: self::oneOf((string) ($input['audience'] ?? ''), ['clients', 'va']),
         );
     }
 
@@ -90,6 +96,8 @@ readonly class LeadExportOptions
             'include_deleted' => $this->includeDeleted,
             'limit' => $this->limit,
             'search' => $this->search,
+            'platform' => $this->platform,
+            'audience' => $this->audience,
         ];
     }
 
@@ -127,6 +135,9 @@ readonly class LeadExportOptions
         if ($this->search !== '') {
             LeadSearch::apply($query, $this->search);
         }
+
+        LeadPlatform::apply($query, $this->platform);
+        LeadAudience::constrain($query, $this->audience);
 
         return $query;
     }
@@ -181,6 +192,16 @@ readonly class LeadExportOptions
 
         if ($this->from !== '' || $this->to !== '') {
             $parts[] = trim(($this->from !== '' ? 'from '.$this->from.' ' : '').($this->to !== '' ? 'to '.$this->to : ''));
+        }
+
+        if ($this->platform !== '') {
+            $parts[] = 'platform '.LeadPlatform::label($this->platform);
+        }
+
+        if ($this->audience === 'clients') {
+            $parts[] = 'excluding possible VAs';
+        } elseif ($this->audience === 'va') {
+            $parts[] = 'possible VAs only';
         }
 
         if ($this->search !== '') {

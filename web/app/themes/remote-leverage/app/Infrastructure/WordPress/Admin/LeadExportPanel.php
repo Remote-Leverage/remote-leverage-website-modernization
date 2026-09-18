@@ -9,6 +9,7 @@ use App\Domains\Lead\Export\LeadExportJob;
 use App\Domains\Lead\Export\LeadExportJobStore;
 use App\Domains\Lead\Export\LeadExportOptions;
 use App\Domains\Lead\Export\LeadExportRunner;
+use App\Domains\Lead\Services\LeadPlatform;
 
 /**
  * The CSV export modal on the leads list, and the endpoints behind it.
@@ -139,8 +140,10 @@ class LeadExportPanel
      * @param  string  $search  The list's current search term, carried in so an export started
      *                          from a filtered list covers what the list was showing.
      * @param  string  $status  The list's current status filter, used as the modal's default.
+     * @param  string  $platform  The list's current platform filter, same reason.
+     * @param  string  $audience  The list's current possible-VA filter, same reason.
      */
-    public function renderModal(string $search = '', string $status = ''): void
+    public function renderModal(string $search = '', string $status = '', string $platform = '', string $audience = ''): void
     {
         $groups = LeadExportColumns::groups();
         $recent = array_values(array_filter(
@@ -210,6 +213,29 @@ class LeadExportPanel
                                 <?php foreach (['organic', 'paid', 'referral_hub', 'partnership', 'direct'] as $option) { ?>
                                     <option value="<?php echo esc_attr($option); ?>"><?php echo esc_html($option); ?></option>
                                 <?php } ?>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="rl-export-row">
+                        <label class="rl-export-field">
+                            <span class="rl-export-label">Platform</span>
+                            <select id="rl-export-platform" class="rl-select">
+                                <option value="">Any platform</option>
+                                <?php foreach (LeadPlatform::options() as $slug => $label) { ?>
+                                    <option value="<?php echo esc_attr($slug); ?>" <?php selected($platform, $slug); ?>>
+                                        <?php echo esc_html($label); ?>
+                                    </option>
+                                <?php } ?>
+                            </select>
+                        </label>
+
+                        <label class="rl-export-field">
+                            <span class="rl-export-label">Audience</span>
+                            <select id="rl-export-audience" class="rl-select">
+                                <option value="">Everyone</option>
+                                <option value="clients" <?php selected($audience, 'clients'); ?>>Exclude possible VAs</option>
+                                <option value="va" <?php selected($audience, 'va'); ?>>Only possible VAs</option>
                             </select>
                         </label>
                     </div>
@@ -327,6 +353,8 @@ class LeadExportPanel
                     groups: groups.join(','),
                     status: document.getElementById('rl-export-status').value,
                     source_type: document.getElementById('rl-export-source').value,
+                    platform: document.getElementById('rl-export-platform').value,
+                    audience: document.getElementById('rl-export-audience').value,
                     from: document.getElementById('rl-export-from').value,
                     to: document.getElementById('rl-export-to').value,
                     include_deleted: document.getElementById('rl-export-deleted').checked ? '1' : '',

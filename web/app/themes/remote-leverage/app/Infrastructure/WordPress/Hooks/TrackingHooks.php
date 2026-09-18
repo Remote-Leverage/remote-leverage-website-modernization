@@ -7,6 +7,18 @@ namespace App\Infrastructure\WordPress\Hooks;
 class TrackingHooks
 {
     /**
+     * Path fragment => Customer.io event name, as the legacy plugin matched them.
+     *
+     * @var array<string, string>
+     */
+    private const CUSTOMER_IO_PAGE_EVENTS = [
+        'pricing' => 'Viewed Pricing Page',
+        'booking' => 'Viewed Booking Page',
+        'appointment' => 'Viewed Booking Page',
+        'vacalendar' => 'Viewed Booking Page',
+    ];
+
+    /**
      * Register WordPress action hooks for tracking.
      */
     public function register(): void
@@ -106,6 +118,47 @@ HTML;
      *  - a `cio_id` / `cio_form` query-param "identity bridge" for Customer.io-hosted forms.
      *    v2 has no Customer.io-hosted forms; it is a separate feature, not part of the snippet.
      */
+    /**
+     * The named Customer.io page events the legacy site fired, for the current page.
+     *
+     * `analytics.page()` alone is not parity. The legacy `rl-customer-io` plugin also fired
+     * named `track()` calls — `Viewed Pricing Page` when the slug contained "pricing", and
+     * `Viewed Booking Page` when it contained "booking" or "appointment"
+     * (`src/Tracking/FrontendTracker.php:39-41` in the 2026-08-27 backup).
+     *
+     * Those names are not decorative. The plugin seeded a lead-scoring map with them —
+     * `Form Submitted` 20, `Viewed Booking Page` 15, `Viewed Pricing Page` 10, `Page Viewed` 1
+     * (`src/Database/Migration.php:72-75`) — so a Customer.io score built on them simply stops
+     * moving if only the anonymous page call survives.
+     *
+     * Matched on the request path rather than the post slug, so it holds for a page whose slug
+     * and URL have drifted apart.
+     */
+    protected function customerIoPageEvents(?string $path = null): string
+    {
+        $path = strtolower($path ?? (string) ($_SERVER['REQUEST_URI'] ?? ''));
+
+        if ($path === '') {
+            return '';
+        }
+
+        $events = [];
+
+        foreach (self::CUSTOMER_IO_PAGE_EVENTS as $fragment => $event) {
+            if (str_contains($path, $fragment)) {
+                $events[$event] = true;
+            }
+        }
+
+        $out = '';
+
+        foreach (array_keys($events) as $event) {
+            $out .= 'analytics.track('.wp_json_encode($event).');'."\n";
+        }
+
+        return $out;
+    }
+
     public function injectCustomerIOSnippet(): void
     {
         $writeKey = config('services.customer_io.cdp_write_key');
@@ -119,13 +172,15 @@ HTML;
         // This emits the quotes itself, so the load() call below has none of its own.
         $writeKey = wp_json_encode((string) $writeKey);
 
+        $pageEvents = $this->customerIoPageEvents();
+
         echo <<<HTML
 <!-- Customer.io CDP -->
 <script type="text/javascript">
 !function(){var i="cioanalytics",analytics=(window[i]=window[i]||[]);if(!analytics.initialize){if(analytics.invoked){window.console&&console.error&&console.error("Snippet included twice.");}else{analytics.invoked=!0;analytics.methods=["trackSubmit","trackClick","trackLink","trackForm","pageview","identify","reset","group","track","ready","alias","debug","page","once","off","on","addSourceMiddleware","addIntegrationMiddleware","setAnonymousId","addDestinationMiddleware"];analytics.factory=function(e){return function(){var t=Array.prototype.slice.call(arguments);t.unshift(e);analytics.push(t);return analytics}};for(var e=0;e<analytics.methods.length;e++){var key=analytics.methods[e];analytics[key]=analytics.factory(key)}analytics.load=function(key,e){var t=document.createElement("script");t.type="text/javascript";t.async=!0;t.setAttribute("data-global-customerio-analytics-key",i);t.src="https://cdp.customer.io/v1/analytics-js/snippet/"+key+"/analytics.min.js";var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(t,n);analytics._writeKey=key;analytics._loadOptions=e};analytics.SNIPPET_VERSION="4.15.3";
 analytics.load({$writeKey});
 analytics.page();
-}}}();
+{$pageEvents}}}}();
 </script>
 HTML;
     }

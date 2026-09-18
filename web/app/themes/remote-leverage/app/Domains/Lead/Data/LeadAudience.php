@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Lead\Data;
 
 use App\Domains\Lead\Models\Lead;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Who a lead appears to be: a prospective client, or someone applying for VA work.
@@ -53,6 +54,52 @@ readonly class LeadAudience
         }
 
         return new self(self::phoneIsAwayFromHome($lead, $country), $country);
+    }
+
+    /**
+     * Narrow a lead query to one side of the same judgement.
+     *
+     * `$mode` is 'clients' to exclude possible applicants, 'va' to show only them; anything else
+     * is a no-op, because a filter nobody chose must not hide rows.
+     *
+     * This is the one part of the class that is allowed to restate the heuristic, and only
+     * because a per-row PHP call cannot be paginated — filtering 3,969 leads in PHP means
+     * loading all of them to show twenty. The restatement is the risk: SQL that drifts from
+     * {@see self::for()} gives two answers about the same lead, one on the badge and one in the
+     * filter that is supposed to hide it. LeadAttributionFilterTest walks a fixture matrix and
+     * fails if any row is classified differently by the two.
+     *
+     * @param  Builder  $query
+     */
+    public static function constrain($query, string $mode): void
+    {
+        $mode = strtolower(trim($mode));
+
+        if (! in_array($mode, ['clients', 'va'], true)) {
+            return;
+        }
+
+        $isVa = static function ($q) {
+            /*
+             * Mirrors wasReferred(): a referred lead is never flagged, whatever the phone says.
+             *
+             * COALESCE rather than whereNotIn: the column is NOT NULL DEFAULT 'organic' today,
+             * but SQL's `NULL NOT IN (...)` is NULL rather than true, so the day it is made
+             * nullable those rows would drop off the VA side while PHP went on flagging them.
+             */
+            $q->whereRaw("COALESCE(source_type, '') NOT IN ('referral_hub', 'partnership')")
+                ->whereRaw("TRIM(COALESCE(referral_code, '')) = ''")
+                ->where(static function ($phone) {
+                    // Mirrors phoneIsAwayFromHome(): the ISO-2 when we have it...
+                    $phone->whereRaw("TRIM(COALESCE(phone_country, '')) <> '' AND UPPER(TRIM(phone_country)) NOT IN ('US', 'CA')")
+                        // ...and only otherwise, the dial code of a number already in E.164.
+                        ->orWhereRaw("TRIM(COALESCE(phone_country, '')) = '' AND TRIM(COALESCE(phone, '')) LIKE '+%' AND TRIM(COALESCE(phone, '')) NOT LIKE '+1%'");
+                });
+        };
+
+        $mode === 'va'
+            ? $query->where($isVa)
+            : $query->whereNot($isVa);
     }
 
     /**

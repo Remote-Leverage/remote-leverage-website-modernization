@@ -126,6 +126,26 @@ return [
             explode(',', (string) env('OPENAI_PIXEL_IDS', '7QY9HDVocGyeNvMMW1gLWb')),
         ))),
         'debug' => filter_var(env('OPENAI_PIXEL_DEBUG', false), FILTER_VALIDATE_BOOLEAN),
+
+        /*
+         * Conversions, as `request path fragment => event name`.
+         *
+         * The legacy form fired `oaiq("measure", "appointment_scheduled",
+         * {type: "customer_action"})` from
+         * rl-elementor-blocks/assets/js/headless-calendly-multistep.js on
+         * `gform_confirmation_loaded` — the moment the booking confirmed. It is
+         * **not** in the GTM container, so nothing else reproduces it.
+         *
+         * Without it the OpenAI pixel records page views and zero conversions,
+         * and ChatGPT ads optimise against nothing. v2's equivalent of that
+         * confirmation is the thank-you page load.
+         *
+         * Matched case-insensitively here, unlike the GTM trigger — this is our
+         * own comparison and there is no reason to inherit that trap.
+         */
+        'conversions' => [
+            'vathankyou' => 'appointment_scheduled',
+        ],
     ],
 
     /*

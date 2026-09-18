@@ -37,6 +37,7 @@ class MarketingPixelHooks
         add_action('wp_head', [$this, 'injectLinkedIn'], 4);
         add_action('wp_head', [$this, 'injectOpenAi'], 4);
         add_action('wp_head', [$this, 'injectGoogleTag'], 4);
+        add_action('wp_head', [$this, 'injectOpenAiConversion'], 5);
         add_action('wp_body_open', [$this, 'injectMetaNoscript'], 2);
         add_action('wp_body_open', [$this, 'injectLinkedInNoscript'], 2);
     }
@@ -293,6 +294,60 @@ function gtag(){dataLayer.push(arguments);}
 <!-- End Google tag -->
 
 HTML;
+    }
+
+    /**
+     * The OpenAI conversion for this page, if it is one.
+     *
+     * Priority 5, after `injectOpenAi()` at 4, so `oaiq` is already the queueing stub by the
+     * time this pushes onto it.
+     *
+     * The legacy form fired this from `gform_confirmation_loaded`; v2's equivalent moment is the
+     * thank-you page load. It is in neither GTM container, so without this the OpenAI pixel
+     * reports page views and no conversions at all. See `config/pixels.php`.
+     */
+    public function injectOpenAiConversion(): void
+    {
+        if ($this->openAiPixelIds() === []) {
+            return;
+        }
+
+        $event = $this->openAiConversionForRequest();
+
+        if ($event === null) {
+            return;
+        }
+
+        printf(
+            '<script>window.oaiq && oaiq("measure", "%s", {type: "customer_action"});</script>'."\n",
+            esc_js($event),
+        );
+    }
+
+    /**
+     * The conversion event configured for the current path, or null.
+     *
+     * Case-insensitive, deliberately: the GTM trigger's case sensitivity is a trap this codebase
+     * already had to work around once (see MultistepBookingWizard's redirect), and there is no
+     * reason to reproduce it in our own comparison.
+     */
+    public function openAiConversionForRequest(?string $path = null): ?string
+    {
+        $path = $path ?? (string) ($_SERVER['REQUEST_URI'] ?? '');
+
+        if ($path === '') {
+            return null;
+        }
+
+        foreach ((array) config('pixels.openai.conversions', []) as $fragment => $event) {
+            $fragment = trim((string) $fragment);
+
+            if ($fragment !== '' && stripos($path, $fragment) !== false) {
+                return (string) $event;
+            }
+        }
+
+        return null;
     }
 
     /**

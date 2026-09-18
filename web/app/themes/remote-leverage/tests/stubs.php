@@ -418,6 +418,13 @@ if (! function_exists('sanitize_text_field')) {
     }
 }
 
+if (! function_exists('absint')) {
+    function absint($maybeint)
+    {
+        return abs((int) $maybeint);
+    }
+}
+
 if (! function_exists('get_option')) {
     function get_option($option, $default = false)
     {
@@ -670,6 +677,13 @@ if (! function_exists('esc_url_raw')) {
     function esc_url_raw($url)
     {
         return filter_var($url, FILTER_SANITIZE_URL) ?: '';
+    }
+}
+
+if (! function_exists('wp_json_encode')) {
+    function wp_json_encode($data, $options = 0, $depth = 512)
+    {
+        return json_encode($data, (int) $options, (int) $depth);
     }
 }
 
