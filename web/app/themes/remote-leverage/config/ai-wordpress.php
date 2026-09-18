@@ -51,10 +51,17 @@ return [
     | code on every container start, so these flags are the live definition of
     | what a Claude session may do on this environment.
     |
-    | Every flag defaults to false, so an environment that sets nothing gets an
-    | agent that can draft a page and nothing else — no publishing, no touching
-    | anything already live, no access to enquiry data. Widen deliberately, per
-    | environment; production is the one where the defaults are worth keeping.
+    | These default to true as of 2026-09-18, by explicit decision: the marketing
+    | team's whole workflow — edit a live page, publish a campaign, look at
+    | enquiries, upload art — needs all four, and carrying them as per-
+    | environment secrets meant a forgotten secret silently produced an agent
+    | that could only draft, with no error anywhere to explain why.
+    |
+    | The trade is real and worth stating: an environment that sets nothing now
+    | gets an agent that can publish, change live pages, read customer contact
+    | details and write to the uploads volume. Closing one is still a per-
+    | environment act — set the variable to false and the next deploy revokes
+    | the capability, because ensure() reconciles in both directions.
     |
     */
 
@@ -64,18 +71,18 @@ return [
         'role' => env('AI_AGENT_ROLE', 'editor'),
 
         // Let clone-page publish directly instead of always leaving a draft.
-        'can_publish' => env('AI_AGENT_CAN_PUBLISH', false),
+        'can_publish' => env('AI_AGENT_CAN_PUBLISH', true),
 
         // Let update-page-sections change a page that is already live.
-        'can_edit_published' => env('AI_AGENT_CAN_EDIT_PUBLISHED', false),
+        'can_edit_published' => env('AI_AGENT_CAN_EDIT_PUBLISHED', true),
 
         // Let query-leads return real customer contact details.
-        'can_read_leads' => env('AI_AGENT_CAN_READ_LEADS', false),
+        'can_read_leads' => env('AI_AGENT_CAN_READ_LEADS', true),
 
         // Let upload-media add files to the media library. Off by default
         // because an upload writes to the shared uploads volume and there is
         // no undo — the file stays until somebody deletes it by hand.
-        'can_upload_media' => env('AI_AGENT_CAN_UPLOAD_MEDIA', false),
+        'can_upload_media' => env('AI_AGENT_CAN_UPLOAD_MEDIA', true),
 
         // Set false to stop rl:deploy reconciling the user on this environment.
         'provision_on_deploy' => env('AI_AGENT_PROVISION_ON_DEPLOY', true),

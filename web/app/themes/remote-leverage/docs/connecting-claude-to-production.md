@@ -12,8 +12,8 @@ granting anyone access.
 
 Two audiences, split deliberately:
 
-- [**Part 1 — operator setup**](#part-1--operator-setup) is done once, by someone with AWS and
-  WP-CLI access.
+- [**Part 1 — operator setup**](#part-1--operator-setup) is done once, by any WordPress
+  administrator. It no longer needs AWS or a shell.
 - [**Part 2 — connecting a client**](#part-2--connecting-a-client) is what each person on the
   marketing team does, and is the part worth copying into a message.
 
@@ -58,57 +58,56 @@ survives CloudFront. If it does not, `rl-mcp-session-bridge.php` covers it
 ([known-issues.md](known-issues.md) item 20) — but the distribution should still be fixed and the
 bridge deleted. `scripts/verify-mcp.sh` in step 3 is what tells you which.
 
-### Step 1: grant the capabilities
+### Step 1: capabilities — nothing to do
 
-**This is the step that is currently missing, and without it nothing else matters.** Every
-`AI_AGENT_CAN_*` flag defaults to `false`, and the flags were only ever set as *staging* secrets.
-Production's agent can presently draft a page and nothing else — no publishing, no touching a live
-page, no enquiry data, no uploads.
+All four capability flags **default to `true`** as of 2026-09-18, so a deployed environment comes
+up able to publish, edit live pages, read enquiry data and upload media without any secret being
+set. This changed deliberately: they were previously per-environment secrets, and a forgotten
+secret produced an agent that could only draft, with nothing anywhere reporting why.
 
-Set these as **GitHub → Settings → Environments → `production` → secrets**:
-
-```
-AI_AGENT_CAN_EDIT_PUBLISHED=true   # edit pages that are already live
-AI_AGENT_CAN_PUBLISH=true          # publish a cloned page directly
-AI_AGENT_CAN_READ_LEADS=true       # lead-stats and query-leads
-AI_AGENT_CAN_UPLOAD_MEDIA=true     # upload-media
-```
-
-Then run the **Sync app secrets** workflow with `github_environment: production`. It merges them
-into Secrets Manager and restarts the ECS tasks; `rl:deploy` reconciles the agent on start.
-
-All four are on the allowlist in `scripts/sync-app-secrets-from-env.py`. That matters more than it
-looks: `main()` iterates the allowlist, so **a key missing from it is dropped in silence** —
-`AI_AGENT_CAN_PUBLISH` and `AI_AGENT_CAN_UPLOAD_MEDIA` were added there alongside this document
-for exactly that reason.
-
-Because reconciliation runs on every deploy, these tighten as well as widen. Removing a flag
-actually **revokes** the capability on the next release rather than leaving a grant made by hand
-months earlier. `upload_files` is the one to watch: the `editor` role grants it, so the agent only
-lacks it because `ensure()` writes an explicit per-user denial. Leave `AI_AGENT_CAN_UPLOAD_MEDIA`
-unset and uploads stay off even though the role would allow them.
-
-Confirm what actually landed:
+Confirm what actually landed under **Settings → AI Access**, or from a shell:
 
 ```bash
 wp acorn rl:ai:agent --status
 ```
 
-### Step 2: mint a credential
+To **close** one, set its variable to `false` as a `production` environment secret and deploy:
 
-```bash
-wp acorn rl:ai:agent --rotate     # prints the password once, then never again
+```
+AI_AGENT_CAN_PUBLISH=false          # drafts only; a human publishes
+AI_AGENT_CAN_EDIT_PUBLISHED=false   # cannot touch a live page
+AI_AGENT_CAN_READ_LEADS=false       # no enquiry data at all
+AI_AGENT_CAN_UPLOAD_MEDIA=false     # no uploads
 ```
 
-**Prefer a separate password per person.** Create those in the admin instead — Users →
-`ai-content-agent` → Edit → Application Passwords — and **name it anything except `mcp-client`**.
-That string is `ContentAgentProvisioner::PASSWORD_NAME`, and `--rotate` revokes every password
-carrying it, so rotating the shared credential would silently cut off every colleague who had been
-issued one. A distinctly-named password (`claude-<name>`) is invisible to that sweep and stays
-individually revocable — which is also the only way to remove one person's access without
-disrupting everyone.
+`ensure()` reconciles in both directions on every container start, so `false` genuinely revokes
+rather than leaving an earlier grant in place. That applies to `upload_files` too, even though the
+`editor` role grants it — the denial is written explicitly and beats the role.
 
-Reserve `--rotate` for the shared credential in `.mcp.json`.
+### Step 2: issue a credential
+
+**Settings → AI Access** in wp-admin. Requires `manage_options`; no shell, no AWS.
+
+Name it after the person who will hold it — `claude-jane`. The screen refuses the name
+`mcp-client`, which is reserved for the shared credential that `--rotate` sweeps as a set; a
+colleague given one of those loses access the next time anybody rotates, with no notice and no
+obvious cause. Named credentials are individually revocable, which is the whole point: somebody
+leaves, you revoke one row, and nobody else reconnects.
+
+The screen shows, exactly once:
+
+- the username and application password,
+- the full `Authorization: Basic …` header value for a claude.ai custom connector,
+- a ready-to-paste Claude Desktop config block.
+
+It is hashed on save and cannot be shown again. If it is lost, revoke it and issue another.
+
+The CLI equivalents still exist for anyone with shell access:
+
+```bash
+wp acorn rl:ai:agent --rotate   # the SHARED credential, revokes previous ones
+wp acorn rl:ai:agent --status
+```
 
 ### Step 3: verify the transport before handing anything out
 

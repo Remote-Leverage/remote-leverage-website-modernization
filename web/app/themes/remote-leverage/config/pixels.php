@@ -156,13 +156,27 @@ return [
     | Production's Site Kit loads `GT-NCNQ6N2` directly in the page, separately
     | from GTM. Resolving that tag's own payload shows it routes to:
     |
-    |   G-SCP464C5EH    GA4 -- also reached via the container's Google tag
-    |   AW-11406183013  Google Ads -- also reached via the container
+    |   G-SCP464C5EH    GA4 -- the container references this property directly
+    |   AW-11406183013  Google Ads
+    |   AW-1140618301   Google Ads -- a second, separately configured account
     |   G-JFBLS33ET8    GA4 -- reachable through NOTHING ELSE
     |
-    | That last one is the reason this is here. It is in neither container and
-    | nowhere in the theme, so without this a whole GA4 property goes dark at
-    | cutover and the first sign would be a flat graph nobody is looking at.
+    | `G-JFBLS33ET8` is the reason this is here: without it a whole GA4 property
+    | goes dark at cutover and the first sign is a flat graph nobody is watching.
+    |
+    | Re-verified 2026-09-18 by resolving each payload. Two corrections to the
+    | note that used to sit here:
+    |
+    |  - The container carries **no Google tag of its own** -- no `AW-` or `GT-`
+    |    id appears anywhere in `GTM-53JDTQCZ`. So this tag is the site's only
+    |    gtag loader and the container's GA4 tags piggyback on it. That is why
+    |    it is deliberately absent from the `defer` block below.
+    |  - `AW-1140618301` is **not** a typo of `AW-11406183013`. It appears in the
+    |    routing map as its own `publicId`, so both are live destinations.
+    |
+    | Cost: one Google tag fanning out to four destinations pulls four config
+    | payloads, ~730KB transferred on a cold load. Trimming that means unlinking
+    | a destination in the Google tag UI -- there is nothing to change here.
     |
     | Emitted here rather than by Site Kit's Analytics module, so that one
     | mechanism owns page-level tags and the module stays disconnected.
@@ -176,6 +190,49 @@ return [
             'trim',
             explode(',', (string) env('GOOGLE_TAG_LINKER_DOMAINS', 'remoteleverage.com')),
         ))),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Deferred SDK loading
+    |--------------------------------------------------------------------------
+    |
+    | Which pixels wait before fetching their SDK. Script *evaluation* is the
+    | expensive part of this page -- 4,959ms of main-thread work in the
+    | 2026-09-18 Lighthouse run -- and six pixels all fetching at `wp_head`
+    | priority 4 contend for it during the load.
+    |
+    | **No event is lost by deferring.** Every vendor here installs a queueing
+    | stub and drains it when the SDK arrives, so the stub and the `init` /
+    | `track` calls still run immediately and only the network fetch waits. See
+    | `MarketingPixelHooks::injectDeferBootstrap()` for the flush conditions:
+    | the earliest of first user interaction, browser idle, or `timeout_ms`.
+    |
+    | Two are deliberately NOT deferrable, and adding them here does nothing:
+    |
+    |  - **meta** -- Facebook is 67% of paid acquisition. A PageView that lands
+    |    late is still counted, but this is not the pixel to experiment on.
+    |  - **google_tag** -- it is the site's only gtag loader and the container's
+    |    GA4 tags piggyback on it. See the Google tag block above.
+    |
+    | The flush also pushes `rl_idle` onto `dataLayer`, which is the intended
+    | way to defer a tag that lives in the container rather than here: retrigger
+    | it on that custom event instead of on `gtm.js`. TikTok (162KB, the largest
+    | single non-Google third party) is the reason that hook exists.
+    */
+    'defer' => [
+        'vendors' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('PIXEL_DEFER_VENDORS', 'linkedin,openai,hubspot,bing_uet')),
+        ))),
+
+        /*
+         * Upper bound on the wait, in milliseconds. `requestIdleCallback`
+         * normally fires well inside this; the timeout is the floor for a page
+         * that never goes idle, which is precisely the busy page that made
+         * deferring worth doing.
+         */
+        'timeout_ms' => max(0, (int) env('PIXEL_DEFER_TIMEOUT_MS', 2500)),
     ],
 
     /*
@@ -194,6 +251,15 @@ return [
     |
     | If a tag is removed from the container, move its id up into the relevant
     | block in the same change.
+    |
+    | **PostHog left this list on 2026-09-18.** It is now loaded by
+    | `TrackingHooks::injectPostHogSnippet()` from `POSTHOG_API_KEY`, because
+    | theme code has a hard runtime dependency on `window.posthog` -- the
+    | booking wizard reads the session id for the replay link, and
+    | `resources/js/payment-gateway.js` dispatches funnel events to it. A
+    | dependency of our own conversion path should not be editable by whoever
+    | owns the container. **The GTM tag must be deleted in the same change** or
+    | PostHog initialises twice.
     */
     'delivered_by_gtm' => [
         'linkedin' => ['9514236'],
@@ -201,7 +267,6 @@ return [
         'tiktok' => ['CPMB51BC77U75I0QMMAG'],
         'statcounter' => ['13176576'],
         'rewardful' => ['39ea7a'],
-        'posthog' => ['phc_3PbasnDYndH8YVEky0ksHrB3SFwBZKmzkf5bl37o8u0'],
     ],
 
     /*

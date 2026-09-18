@@ -7,6 +7,7 @@ namespace App\Infrastructure\Providers;
 use App\Ai\Commands\GrantInsightsCapabilityCommand;
 use App\Ai\Commands\ProvisionContentAgentCommand;
 use App\Ai\Provisioning\ContentAgentProvisioner;
+use App\Infrastructure\WordPress\Admin\AiAccessAdmin;
 use Illuminate\Support\ServiceProvider;
 use WP\MCP\Core\McpAdapter;
 
@@ -22,6 +23,7 @@ class AiServiceProvider extends ServiceProvider
         }
 
         $this->app->singleton(ContentAgentProvisioner::class);
+        $this->app->singleton(AiAccessAdmin::class);
     }
 
     /**
@@ -36,6 +38,13 @@ class AiServiceProvider extends ServiceProvider
     {
         if (class_exists(McpAdapter::class)) {
             McpAdapter::instance();
+        }
+
+        // Settings → AI Access. Registered in admin only: it adds a menu page and
+        // an admin_init handler, neither of which has anything to do on a front-end
+        // request, and every entry point it exposes is gated on manage_options.
+        if (is_admin()) {
+            $this->app->make(AiAccessAdmin::class)->register();
         }
     }
 }

@@ -1,6 +1,6 @@
 # WP Admin surfaces
 
-The theme adds four top-level menus, one Settings page, list-table enhancements on three post types, dashboard widgets, a global admin restyle, and rebrands of Yoast SEO and WordFence into in-house "SEO" and "Security" sections. All are registered from `DomainServiceProvider::boot()` except Environment Sync, which registers itself from `SyncServiceProvider` and only when sync is enabled.
+The theme adds four top-level menus, two Settings pages, list-table enhancements on three post types, dashboard widgets, a global admin restyle, and rebrands of Yoast SEO and WordFence into in-house "SEO" and "Security" sections. All are registered from `DomainServiceProvider::boot()` except Environment Sync, which registers itself from `SyncServiceProvider` and only when sync is enabled, and AI Access, which registers from `AiServiceProvider::boot()` in admin only.
 
 Every screen requires `manage_options`.
 
@@ -370,3 +370,32 @@ Not wp-admin, but admin-adjacent — Acorn routes serving application pages:
 | `/social-media-kit` | `pages/social-media-kit` — replaced `/tools/signature-generator`, removed 2026-09-15 |
 | `/live-call/connect` | Redirects to a Meet room or to `/book-consultation?offline=1` |
 | `/api/health` | JSON health check |
+
+## AI Access
+
+`AiAccessAdmin` — `options-general.php?page=rl-ai-access`, under **Settings**. Registered from
+`AiServiceProvider::boot()`, admin-side only.
+
+Issues and revokes the credentials an MCP client authenticates with as `ai-content-agent`. It
+exists because the CLI equivalent (`wp acorn rl:ai:agent --rotate`) means ECS Exec on production —
+an AWS permission the person onboarding a colleague neither has nor should need. A credential
+nobody can issue is a feature nobody can use.
+
+| Panel | Shows |
+| :--- | :--- |
+| Capabilities | The four managed capabilities and whether each is granted, with a *Re-apply from configuration* action. Read-only by design — these come from `config/ai-wordpress.php` and are reapplied on every deploy, so changing them here would be undone |
+| Issue a credential | Creates a **named** application password. The plaintext is shown once, together with the `Authorization: Basic …` value for a claude.ai custom connector and a ready-to-paste Claude Desktop config block |
+| Existing credentials | Every password on the agent — name, created, last used, individual revoke. "Never used" on an old credential is the row worth acting on |
+| Connection details | The MCP endpoint, derived from `home_url()` so the screen is always correct for the environment being read |
+
+**Named, not shared.** It calls `ContentAgentProvisioner::issuePassword()` rather than
+`mintPassword()`. The latter revokes every password named `mcp-client` as it goes — that is what
+makes it a rotation — so handing a colleague one means a later rotation silently ends their
+access. The screen refuses that name outright. Individually-named credentials are what let one
+person be cut off without everyone else reconnecting.
+
+**The plaintext** survives exactly one redirect, in a transient keyed to the admin who asked for
+it, and is deleted on render. It cannot be recovered afterwards by anyone, including this screen.
+
+Actions are handled on `admin_init`, gated on `manage_options` and a nonce. See
+[connecting-claude-to-production.md](connecting-claude-to-production.md).

@@ -165,6 +165,120 @@ class ContentAgentProvisioner
     }
 
     /**
+     * Issue a password under a caller-chosen name, revoking nothing.
+     *
+     * This is the per-person credential, and it is deliberately not
+     * mintPassword(). That one is the shared credential and revokes every
+     * password named PASSWORD_NAME as it goes, which is what makes it a
+     * rotation. Handing a colleague something that a later rotation would sweep
+     * out from under them is the failure this exists to prevent: their access
+     * dies with no event, no notice and no obvious cause.
+     *
+     * The name is therefore the whole safety story, and PASSWORD_NAME is
+     * refused rather than silently renamed — a caller asking for that name
+     * wants the rotation semantics and should call mintPassword().
+     *
+     * @return array{user_login: string, password: string, name: string}
+     */
+    public function issuePassword(string $name): array
+    {
+        $name = trim($name);
+
+        if ($name === '') {
+            throw new RuntimeException('Give the credential a name, so it can be revoked individually later.');
+        }
+
+        if (strcasecmp($name, self::PASSWORD_NAME) === 0) {
+            throw new RuntimeException(sprintf(
+                'The name "%s" is reserved for the shared credential, which --rotate revokes as a set. '
+                .'Use a distinct name (for example "claude-jane") so this one stays individually revocable.',
+                self::PASSWORD_NAME,
+            ));
+        }
+
+        if (! $this->applicationPasswordsAvailable()) {
+            throw new RuntimeException($this->unavailableReason() ?? 'Application passwords are unavailable.');
+        }
+
+        $this->ensure();
+
+        $user = $this->findUser();
+
+        if (! $user instanceof WP_User) {
+            throw new RuntimeException('The content agent user could not be loaded after provisioning.');
+        }
+
+        $created = WP_Application_Passwords::create_new_application_password($user->ID, ['name' => $name]);
+
+        if (is_wp_error($created)) {
+            throw new RuntimeException('Could not create an application password: '.$created->get_error_message());
+        }
+
+        return [
+            'user_login' => $user->user_login,
+            'password' => (string) $created[0],
+            'name' => $name,
+        ];
+    }
+
+    /**
+     * Every application password on the agent, newest first.
+     *
+     * The plaintext is unrecoverable by design, so this is metadata only — what
+     * it is for, when it was made and whether it has ever been used. "Never
+     * used" on a credential issued last month is the signal worth acting on.
+     *
+     * @return array<int, array{uuid: string, name: string, created: ?int, last_used: ?int, managed: bool}>
+     */
+    public function passwords(): array
+    {
+        $user = $this->findUser();
+
+        if (! $user instanceof WP_User) {
+            return [];
+        }
+
+        $passwords = WP_Application_Passwords::get_user_application_passwords($user->ID);
+        $rows = [];
+
+        foreach (is_array($passwords) ? $passwords : [] as $password) {
+            $name = (string) ($password['name'] ?? '');
+
+            $rows[] = [
+                'uuid' => (string) ($password['uuid'] ?? ''),
+                'name' => $name,
+                'created' => isset($password['created']) ? (int) $password['created'] : null,
+                'last_used' => isset($password['last_used']) ? (int) $password['last_used'] : null,
+                // Flags the shared credential, which --rotate sweeps as a set.
+                'managed' => strcasecmp($name, self::PASSWORD_NAME) === 0,
+            ];
+        }
+
+        usort($rows, fn (array $a, array $b) => ($b['created'] ?? 0) <=> ($a['created'] ?? 0));
+
+        return $rows;
+    }
+
+    /**
+     * Revoke exactly one credential, leaving every other one working.
+     *
+     * This is what makes per-person passwords worth the trouble: somebody
+     * leaves, their access ends, and nobody else has to reconnect.
+     */
+    public function revokePassword(string $uuid): bool
+    {
+        $user = $this->findUser();
+
+        if (! $user instanceof WP_User || trim($uuid) === '') {
+            return false;
+        }
+
+        $deleted = WP_Application_Passwords::delete_application_password($user->ID, $uuid);
+
+        return ! is_wp_error($deleted) && $deleted;
+    }
+
+    /**
      * Revoke this tool's credentials and the capabilities that make them
      * useful. The user row is left alone; deleting users is not something a
      * provisioner should do silently.

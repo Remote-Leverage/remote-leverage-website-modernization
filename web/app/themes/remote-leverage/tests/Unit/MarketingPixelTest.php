@@ -415,3 +415,99 @@ describe('Customer.io named page events', function () {
         expect(substr_count(cioProbe('/booking-appointment/'), 'analytics.track'))->toBe(1);
     });
 });
+
+describe('deferred SDK loading', function () {
+    /*
+     * The 2026-09-18 Lighthouse run put 4,959ms of the mobile main thread in script evaluation,
+     * with six pixels all fetching at `wp_head` priority 4. Deferring the fetch is only safe
+     * because every one of these vendors installs a queueing stub first — so what these tests
+     * really guard is that the stub stayed synchronous while the fetch moved.
+     */
+    test('nothing is deferred, and no bootstrap is emitted, until a vendor is named', function () {
+        config(['pixels.defer.vendors' => []]);
+
+        $hooks = new MarketingPixelHooks;
+
+        expect($hooks->deferredVendors())->toBe([])
+            ->and(renderPixel(fn (MarketingPixelHooks $h) => $h->injectDeferBootstrap()))->toBe('')
+            ->and(renderPixel(fn (MarketingPixelHooks $h) => $h->injectLinkedIn()))->not->toContain('rlDefer');
+    });
+
+    test('the bootstrap flushes on interaction, idle or timeout, and announces rl_idle', function () {
+        config(['pixels.defer.vendors' => ['linkedin'], 'pixels.defer.timeout_ms' => 1800]);
+
+        $out = renderPixel(fn (MarketingPixelHooks $h) => $h->injectDeferBootstrap());
+
+        expect($out)->toContain('w.rlDefer = function')
+            ->and($out)->toContain('pointerdown')
+            ->and($out)->toContain('requestIdleCallback')
+            ->and($out)->toContain('w.setTimeout(flush, 1800)')
+            // The hook a container tag retriggers on, so TikTok can be deferred without
+            // leaving GTM. A tag would point at this event name.
+            ->and($out)->toContain("event: 'rl_idle'");
+    });
+
+    test('Meta and the Google tag are not deferrable, however they are configured', function () {
+        /*
+         * Meta carries 67% of paid acquisition and the Google tag is the site's only gtag
+         * loader — the container has none of its own, so its GA4 tags piggyback on this one.
+         * Both are excluded in code rather than by convention.
+         */
+        config(['pixels.defer.vendors' => ['meta', 'google_tag', 'linkedin']]);
+
+        $hooks = new MarketingPixelHooks;
+
+        expect($hooks->deferredVendors())->toBe(['linkedin'])
+            ->and($hooks->isDeferred('meta'))->toBeFalse()
+            ->and($hooks->isDeferred('google_tag'))->toBeFalse()
+            ->and(renderPixel(fn (MarketingPixelHooks $h) => $h->injectMetaPixel()))->not->toContain('rlDefer')
+            ->and(renderPixel(fn (MarketingPixelHooks $h) => $h->injectGoogleTag()))->not->toContain('rlDefer');
+    });
+
+    test('LinkedIn queues its ids and stub before the wrapper, not inside it', function () {
+        config(['pixels.defer.vendors' => ['linkedin']]);
+
+        $out = renderPixel(fn (MarketingPixelHooks $h) => $h->injectLinkedIn());
+
+        expect($out)->toContain('rlDefer');
+
+        // A `lintrk()` call before the SDK lands has to queue, so the stub cannot be deferred.
+        expect(strpos($out, "_linkedin_data_partner_ids.push('6411876')"))
+            ->toBeLessThan(strpos($out, 'rlDefer'));
+        expect(strpos($out, 'window.lintrk.q = []'))->toBeLessThan(strpos($out, 'rlDefer'));
+        expect(strpos($out, 'snap.licdn.com'))->toBeGreaterThan(strpos($out, 'rlDefer'));
+    });
+
+    test('OpenAI keeps its stub and init synchronous and defers only the SDK', function () {
+        config(['pixels.defer.vendors' => ['openai']]);
+
+        $out = renderPixel(fn (MarketingPixelHooks $h) => $h->injectOpenAi());
+
+        // `injectOpenAiConversion()` runs at priority 5 and pushes onto this stub.
+        expect(strpos($out, 'w.oaiq = q'))->toBeLessThan(strpos($out, 'rlDefer'));
+        expect(strpos($out, 'bzrcdn.openai.com'))->toBeGreaterThan(strpos($out, 'rlDefer'));
+        expect($out)->toContain("oaiq('init', {pixelId: '7QY9HDVocGyeNvMMW1gLWb'");
+    });
+
+    test('UET creates its queue before deferring, so an early push is not lost', function () {
+        config(['pixels.defer.vendors' => ['bing_uet']]);
+
+        $out = renderPixel(fn (MarketingPixelHooks $h) => $h->injectBingUet());
+
+        expect(strpos($out, 'window.uetq = window.uetq || []'))->toBeLessThan(strpos($out, 'rlDefer'));
+        expect(strpos($out, 'bat.bing.com'))->toBeGreaterThan(strpos($out, 'rlDefer'));
+        expect($out)->toContain('ti:"97187250"');
+    });
+
+    test('HubSpot is injected on flush and keeps the id its own code looks for', function () {
+        config(['pixels.defer.vendors' => ['hubspot']]);
+
+        $out = renderPixel(fn (MarketingPixelHooks $h) => $h->injectHubSpot());
+
+        expect($out)->toContain('rlDefer')
+            ->and($out)->toContain('s.id="hs-script-loader"')
+            ->and($out)->toContain('js-na2.hs-scripts.com/243484989.js')
+            // The undeferred path emits a plain tag; the deferred one must not also do that.
+            ->and($out)->not->toContain('<script id="hs-script-loader"');
+    });
+});

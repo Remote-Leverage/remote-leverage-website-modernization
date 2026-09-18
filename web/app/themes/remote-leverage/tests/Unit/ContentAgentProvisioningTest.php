@@ -62,15 +62,40 @@ it('manages upload_files rather than letting the role decide it', function () {
 });
 
 /**
- * The defaults land on production, where an agent that can publish or read the
- * lead database by default is the expensive mistake. Widening is meant to be a
- * deliberate per-environment act.
+ * These defaulted closed until 2026-09-18 and now default open, by explicit
+ * decision — the marketing workflow needs all four, and carrying them as
+ * per-environment secrets meant a forgotten secret produced a draft-only agent
+ * with no error anywhere to explain it.
+ *
+ * Pinned rather than left implicit because the consequence is worth being
+ * deliberate about: a new environment that sets nothing gets an agent that can
+ * publish, edit live pages, read customer contact details and write to uploads.
+ * Anyone flipping one of these back should have to change this test and read
+ * this comment on the way past.
  */
-it('defaults every capability flag closed', function (string $flag) {
+it('defaults every capability flag open', function (string $flag) {
     // env() falls back to the default when the variable is unset, which is the
     // state a fresh environment is in.
-    expect(agentConfig()[$flag])->toBeFalse();
+    expect(agentConfig()[$flag])->toBeTrue();
 })->with(['can_publish', 'can_edit_published', 'can_read_leads', 'can_upload_media']);
+
+/**
+ * The env() override is what keeps "default open" from meaning "always open".
+ * ensure() reconciles in both directions, so a false here actually revokes on
+ * the next deploy rather than leaving an earlier grant in place.
+ */
+it('keeps every capability overridable per environment', function () {
+    $source = file_get_contents(dirname(__DIR__, 2).'/config/ai-wordpress.php');
+
+    foreach ([
+        'AI_AGENT_CAN_PUBLISH',
+        'AI_AGENT_CAN_EDIT_PUBLISHED',
+        'AI_AGENT_CAN_READ_LEADS',
+        'AI_AGENT_CAN_UPLOAD_MEDIA',
+    ] as $variable) {
+        expect($source)->toContain("env('{$variable}'");
+    }
+});
 
 it('does not grant edit_pages through this list', function () {
     // edit_pages comes with the role. If it were managed here, a missing config

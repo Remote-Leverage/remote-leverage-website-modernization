@@ -297,10 +297,11 @@ Full setup, both halves: [**connecting-claude-to-production.md**](web/app/themes
 **never mints a credential**, because deploy output goes to CloudWatch and a password printed there
 is a password leaked. `wp acorn rl:ai:agent --rotate` is the only thing that issues one.
 
-**Everything is off by default.** All four capability flags default to `false`, so an environment
-that sets nothing gets an agent that can draft a page and nothing else:
+**All four capabilities are on by default** as of 2026-09-18, so a fresh environment gets a
+working agent rather than a silently draft-only one. Each stays closeable per environment — set
+the variable to `false` and the next deploy revokes it, because `ensure()` reconciles both ways:
 
-| Variable | Grants |
+| Variable | Grants (default `true`) |
 | :--- | :--- |
 | `AI_AGENT_CAN_PUBLISH` | `publish_pages` — may publish a cloned page directly |
 | `AI_AGENT_CAN_EDIT_PUBLISHED` | `edit_published_pages` — may change a page that is already live |
@@ -309,6 +310,11 @@ that sets nothing gets an agent that can draft a page and nothing else:
 
 Because `ensure()` runs every deploy, these **tighten as well as widen** — removing a flag revokes
 the capability on the next release rather than leaving a stale grant behind.
+
+**Credentials.** Issued from **Settings → AI Access** in wp-admin — named per person, individually
+revocable, and the plaintext shown exactly once alongside a ready-to-paste connector config. That
+screen exists because `wp acorn rl:ai:agent --rotate` needs ECS Exec on production, which the
+person onboarding a colleague neither has nor should need.
 
 **Connecting a client.** Three routes, detailed in the doc. A claude.ai custom connector using
 `Authorization: Basic` under the Request-headers beta needs nobody to install anything but is gated

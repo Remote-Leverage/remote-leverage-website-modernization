@@ -52,8 +52,10 @@ a bounded blast radius.
   CloudWatch, and a password printed there is a password leaked. `--rotate` is
   the only thing that issues one, and the plaintext is shown once.
 
-  Capabilities are driven by environment variables, all defaulting to **off**,
-  so an environment that sets nothing gets an agent that can only draft:
+  Capabilities are driven by environment variables. They defaulted to **off**
+  until 2026-09-18 and now default to **on**, so an environment that sets
+  nothing gets a working agent instead of a draft-only one whose limits nothing
+  reports. Set a variable to `false` to close that capability:
 
   | Variable | Grants |
   | --- | --- |
@@ -161,7 +163,7 @@ They fall into four groups.
 | `app/create-landing-page` | Compose a new page from whole patterns, verbatim. |
 | `app/update-landing-page-content` | Replace a page's whole content from a list of patterns. |
 
-**Media** — gated on `upload_files`, which is revoked by default:
+**Media** — gated on `upload_files`:
 
 | Ability | What it is for |
 | --- | --- |
@@ -174,8 +176,10 @@ inline `data_base64` (capped at 8MB decoded, because it travels inside a JSON-RP
 returns the ID to pass to `update-page-sections`.
 
 `upload_files` is the one managed capability the `editor` role already grants, so unlike the
-others the agent lacks it only because `ensure()` writes an explicit per-user denial. It is off by
-default because an upload writes to the shared uploads volume and nothing here can undo one.
+others it is closed by an explicit per-user denial rather than by simply never being granted.
+That matters when closing it: setting `AI_AGENT_CAN_UPLOAD_MEDIA=false` genuinely revokes it, and
+the role does not hand it back. Worth closing where uploads are unwanted, because an upload writes
+to the shared uploads volume and nothing here can undo one.
 
 **Enquiry data** — gated on `rl_read_business_data`, not `edit_pages`:
 

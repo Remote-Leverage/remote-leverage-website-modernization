@@ -16,7 +16,7 @@ namespace App\Infrastructure\WordPress\Hooks;
  *   1  TrackingHooks  visitor cookie
  *   2  TrackingHooks  PostHog
  *   3  SiteKitHooks   GTM containers
- *   4  here           Meta, UET, HubSpot, LinkedIn, OpenAI, Google tag
+ *   4  here           defer bootstrap, then Meta, UET, HubSpot, LinkedIn, OpenAI, Google tag
  *
  * Last deliberately. A pixel here is a fallback for something the container does not carry, so
  * if a tag inside GTM ever starts doing the same job it wins the race to define `fbq` and this
@@ -31,6 +31,13 @@ class MarketingPixelHooks
             return;
         }
 
+        /*
+         * Registered before the pixels below, which all sit on the same priority: WordPress
+         * runs same-priority callbacks in registration order, so this defines `window.rlDefer`
+         * ahead of the first caller. `deferWrap()` only emits a call when this emitted the
+         * helper, so the two cannot come apart.
+         */
+        add_action('wp_head', [$this, 'injectDeferBootstrap'], 4);
         add_action('wp_head', [$this, 'injectMetaPixel'], 4);
         add_action('wp_head', [$this, 'injectBingUet'], 4);
         add_action('wp_head', [$this, 'injectHubSpot'], 4);
@@ -40,6 +47,121 @@ class MarketingPixelHooks
         add_action('wp_head', [$this, 'injectOpenAiConversion'], 5);
         add_action('wp_body_open', [$this, 'injectMetaNoscript'], 2);
         add_action('wp_body_open', [$this, 'injectLinkedInNoscript'], 2);
+    }
+
+    /**
+     * Pixels whose SDK fetch can be deferred.
+     *
+     * Meta and the Google tag are absent on purpose rather than by omission — see the `defer`
+     * block in `config/pixels.php`. Intersecting against this list means a stray
+     * `PIXEL_DEFER_VENDORS=meta` is ignored rather than half-honoured.
+     */
+    private const DEFERRABLE = ['linkedin', 'openai', 'hubspot', 'bing_uet'];
+
+    /**
+     * The vendors actually being deferred, in a stable order.
+     *
+     * @return array<int, string>
+     */
+    public function deferredVendors(): array
+    {
+        $configured = array_map(
+            static fn ($v): string => strtolower(trim((string) $v)),
+            (array) config('pixels.defer.vendors', []),
+        );
+
+        return array_values(array_intersect(self::DEFERRABLE, $configured));
+    }
+
+    /**
+     * Whether this vendor's SDK fetch waits for the flush.
+     */
+    public function isDeferred(string $vendor): bool
+    {
+        return in_array($vendor, $this->deferredVendors(), true);
+    }
+
+    /**
+     * The `[prefix, suffix]` that wraps a vendor's SDK insertion, or two empty strings.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function deferWrap(string $vendor): array
+    {
+        return $this->isDeferred($vendor)
+            ? ['window.rlDefer(function(){', '});']
+            : ['', ''];
+    }
+
+    /**
+     * Defines `window.rlDefer`, which holds a callback until the page is done being busy.
+     *
+     * Flushes on the earliest of: the first real user interaction, browser idle, or
+     * `pixels.defer.timeout_ms`. Interaction is included because an engaged visitor should not
+     * wait out the timeout to be tracked, and idle alone never arrives on a page that stays
+     * busy — which is the page this exists for.
+     *
+     * The flush also pushes `rl_idle` onto `dataLayer`. That is the hook for deferring a tag
+     * that lives in the container rather than here: retrigger it on `rl_idle` instead of
+     * `gtm.js`. Emitted unconditionally once anything is deferred, so a container tag can rely
+     * on the event existing.
+     *
+     * Every callback runs inside its own try/catch. One vendor's loader throwing must not take
+     * the rest of the queue with it.
+     */
+    public function injectDeferBootstrap(): void
+    {
+        if ($this->deferredVendors() === []) {
+            return;
+        }
+
+        $timeout = (int) config('pixels.defer.timeout_ms', 2500);
+
+        echo <<<HTML
+<!-- Deferred pixel loading (config/pixels.php) -->
+<script>
+(function (w, d) {
+  if (w.rlDefer) return;
+
+  var queue = [], flushed = false, timer = null;
+  var EVENTS = ['pointerdown', 'keydown', 'touchstart', 'wheel', 'scroll'];
+
+  function flush() {
+    if (flushed) return;
+    flushed = true;
+
+    if (timer) w.clearTimeout(timer);
+
+    for (var i = 0; i < EVENTS.length; i++) {
+      w.removeEventListener(EVENTS[i], flush, true);
+    }
+
+    for (var j = 0; j < queue.length; j++) {
+      try { queue[j](); } catch (e) {}
+    }
+
+    queue.length = 0;
+
+    // Lets a container tag (TikTok, StatCounter) hang off the same moment.
+    w.dataLayer = w.dataLayer || [];
+    w.dataLayer.push({ event: 'rl_idle' });
+  }
+
+  for (var k = 0; k < EVENTS.length; k++) {
+    w.addEventListener(EVENTS[k], flush, { once: true, passive: true, capture: true });
+  }
+
+  timer = w.setTimeout(flush, {$timeout});
+
+  if (typeof w.requestIdleCallback === 'function') {
+    w.requestIdleCallback(flush, { timeout: {$timeout} });
+  }
+
+  w.rlDefer = function (fn) { flushed ? fn() : queue.push(fn); };
+})(window, document);
+</script>
+
+HTML;
     }
 
     /**
@@ -113,16 +235,23 @@ HTML;
         }
 
         $id = esc_js($tagId);
+        [$defer, $endDefer] = $this->deferWrap('bing_uet');
 
+        /*
+         * `uetq` is created before the wrapper rather than inside it, so a `uetq.push()` from
+         * anywhere else still lands in the array the loader drains. Deferring the fetch without
+         * this would throw on any early push.
+         */
         echo <<<HTML
 <!-- Microsoft UET (config/pixels.php) -->
 <script>
-(function(w,d,t,r,u){var f,n,i;w[u]=w[u]||[],f=function(){var o={ti:"{$id}",enableAutoSpaTracking:true};
+window.uetq = window.uetq || [];
+{$defer}(function(w,d,t,r,u){var f,n,i;w[u]=w[u]||[],f=function(){var o={ti:"{$id}",enableAutoSpaTracking:true};
 o.q=w[u],w[u]=new UET(o),w[u].push("pageLoad")},n=d.createElement(t),n.src=r,n.async=1,
 n.onload=n.onreadystatechange=function(){var s=this.readyState;
 s&&s!=="loaded"&&s!=="complete"||(f(),n.onload=n.onreadystatechange=null)},
 i=d.getElementsByTagName(t)[0],i.parentNode.insertBefore(n,i)})
-(window,document,"script","//bat.bing.com/bat.js","uetq");
+(window,document,"script","//bat.bing.com/bat.js","uetq");{$endDefer}
 </script>
 <!-- End Microsoft UET -->
 
@@ -145,9 +274,23 @@ HTML;
             return;
         }
 
+        $src = esc_url("https://js-{$region}.hs-scripts.com/{$portalId}.js");
+
+        if (! $this->isDeferred('hubspot')) {
+            printf('<script id="hs-script-loader" async defer src="%s"></script>'."\n", $src);
+
+            return;
+        }
+
+        /*
+         * Injected rather than emitted so the fetch waits. The element keeps its
+         * `hs-script-loader` id: HubSpot's own chat and forms code looks for it.
+         */
         printf(
-            '<script id="hs-script-loader" async defer src="%s"></script>'."\n",
-            esc_url("https://js-{$region}.hs-scripts.com/{$portalId}.js"),
+            '<script>window.rlDefer(function(){var s=document.createElement("script");'
+            .'s.id="hs-script-loader";s.async=true;s.defer=true;s.src=%s;'
+            .'document.head.appendChild(s);});</script>'."\n",
+            wp_json_encode($src, JSON_UNESCAPED_SLASHES),
         );
     }
 
@@ -176,19 +319,26 @@ HTML;
             $pushes .= "window._linkedin_data_partner_ids.push('".esc_js($id)."');\n";
         }
 
+        [$defer, $endDefer] = $this->deferWrap('linkedin');
+
+        /*
+         * Split from one IIFE into stub-then-fetch so the fetch can wait. The partner ids and
+         * the `lintrk` queue are still installed synchronously, so a `lintrk('track', ...)`
+         * before the SDK arrives queues exactly as it did before.
+         */
         echo <<<HTML
 <!-- LinkedIn Insight (config/pixels.php) -->
 <script>
 window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
-{$pushes}(function (l) {
-  if (!l) { window.lintrk = function (a, b) { window.lintrk.q.push([a, b]) }; window.lintrk.q = [] }
+{$pushes}if (!window.lintrk) { window.lintrk = function (a, b) { window.lintrk.q.push([a, b]) }; window.lintrk.q = [] }
+{$defer}(function () {
   var s = document.getElementsByTagName('script')[0];
   var b = document.createElement('script');
   b.type = 'text/javascript';
   b.async = true;
   b.src = 'https://snap.licdn.com/li.lms-analytics/insight.min.js';
   s.parentNode.insertBefore(b, s);
-})(window.lintrk);
+})();{$endDefer}
 </script>
 <!-- End LinkedIn Insight -->
 
@@ -231,20 +381,29 @@ HTML;
             $inits .= "oaiq('init', {pixelId: '".esc_js($id)."', debug: {$debug}});\n";
         }
 
+        [$defer, $endDefer] = $this->deferWrap('openai');
+
+        /*
+         * The `w.oaiq` guard and the queueing stub stay synchronous — `{$inits}` below pushes
+         * onto them immediately, and `injectOpenAiConversion()` at priority 5 relies on the stub
+         * existing. Only the SDK fetch is wrapped.
+         */
         echo <<<HTML
 <!-- OpenAI pixel (config/pixels.php) -->
 <script>
-!function (w, d, s, u) {
+!function (w, d) {
   if (w.oaiq) return;
   var q = function () { q.q.push(arguments) };
   q.q = [];
   w.oaiq = q;
-  var j = d.createElement(s);
-  j.async = 1;
-  j.src = u;
-  var f = d.getElementsByTagName(s)[0];
-  f.parentNode.insertBefore(j, f);
-}(window, document, 'script', 'https://bzrcdn.openai.com/sdk/oaiq.min.js');
+  {$defer}(function () {
+    var j = d.createElement('script');
+    j.async = 1;
+    j.src = 'https://bzrcdn.openai.com/sdk/oaiq.min.js';
+    var f = d.getElementsByTagName('script')[0];
+    f.parentNode.insertBefore(j, f);
+  })();{$endDefer}
+}(window, document);
 {$inits}</script>
 <!-- End OpenAI pixel -->
 

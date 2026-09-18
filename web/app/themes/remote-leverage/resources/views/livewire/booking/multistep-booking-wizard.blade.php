@@ -1146,48 +1146,43 @@
        * PostHog's session id, so the lead timeline can link to the session replay.
        *
        * Only the browser knows it, so unlike the rest of the attribution it cannot be read
-       * server-side. It is also not available synchronously: the snippet queues calls until
-       * array.js loads, and `get_session_id` returns nothing until then. Hence the short poll
-       * rather than a single read at init — a single read reliably returns undefined on a cold
-       * visit, which is exactly the visit worth replaying.
+       * server-side. It is not available synchronously either: the snippet queues calls until
+       * array.js loads, and `get_session_id` returns nothing until then.
+       *
+       * `onSessionId` is PostHog's own callback for exactly this, and it is in the snippet's
+       * stubbed method list — so registering it before array.js lands is safe, and it fires the
+       * moment the id exists. It replaced a 500ms x 20 poll that only existed because PostHog
+       * arrived from the GTM container at an unpredictable time. `TrackingHooks` now loads it in
+       * `wp_head` ahead of this component, so there is no longer a race to wait out.
        *
        * `false` on the set() keeps it out of the request queue: this is a passive stamp and
        * must never cost the visitor a round trip mid-form.
        */
-      let posthogAttempts = 0;
-      const posthogPoll = setInterval(function() {
-        posthogAttempts++;
+      try {
+        const stampPostHog = function (sessionId) {
+          if (sessionId && !$wire.get('posthogSessionId')) {
+            $wire.set('posthogSessionId', sessionId, false);
+          }
 
-        if (posthogAttempts > 20) {           // ~10s, then give up quietly
-          clearInterval(posthogPoll);
-          return;
-        }
+          // The browser's identity, so server-side funnel events join the same person
+          // rather than creating a second one PostHog cannot reconcile.
+          if (window.posthog
+              && typeof window.posthog.get_distinct_id === 'function'
+              && !$wire.get('posthogDistinctId')) {
+            const distinctId = window.posthog.get_distinct_id();
 
-        try {
-          if (window.posthog && typeof window.posthog.get_session_id === 'function') {
-            const sessionId = window.posthog.get_session_id();
-
-            if (sessionId) {
-              clearInterval(posthogPoll);
-
-              if (!$wire.get('posthogSessionId')) {
-                $wire.set('posthogSessionId', sessionId, false);
-              }
-
-              // The browser's identity, so server-side funnel events join the same person
-              // rather than creating a second one PostHog cannot reconcile.
-              if (typeof window.posthog.get_distinct_id === 'function' && !$wire.get('posthogDistinctId')) {
-                const distinctId = window.posthog.get_distinct_id();
-                if (distinctId) {
-                  $wire.set('posthogDistinctId', distinctId, false);
-                }
-              }
+            if (distinctId) {
+              $wire.set('posthogDistinctId', distinctId, false);
             }
           }
-        } catch (e) {
-          clearInterval(posthogPoll);        // PostHog blocked or absent; not worth retrying
+        };
+
+        if (window.posthog && typeof window.posthog.onSessionId === 'function') {
+          window.posthog.onSessionId(stampPostHog);
         }
-      }, 500);
+      } catch (e) {
+        // PostHog blocked or absent; the lead simply arrives without a replay link.
+      }
     })();
   </script>
   @endscript
