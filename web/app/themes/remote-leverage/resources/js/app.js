@@ -1155,6 +1155,7 @@ if (sentryDsn && !isAutomated()) {
     Sentry.init({
       dsn: sentryDsn,
       environment: window.APP_ENV || 'production',
+      release: window.APP_VERSION || undefined,
 
       // Performance sampling is separate from error sampling and much cheaper to lose.
       tracesSampleRate: 0.1,
