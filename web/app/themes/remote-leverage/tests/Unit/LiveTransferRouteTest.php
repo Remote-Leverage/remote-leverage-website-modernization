@@ -82,10 +82,7 @@ describe('the recovered view', function () {
          */
         $view = liveTransferView();
 
-        // `@endverbatim` contains `@verbatim`, so count the opener by subtracting the closer.
-        $openers = substr_count($view, '@verbatim') - substr_count($view, '@endverbatim');
-
-        expect($openers)->toBe(1)
+        expect(substr_count($view, '@verbatim'))->toBe(1)
             ->and(substr_count($view, '@endverbatim'))->toBe(1)
             ->and(substr_count($view, '@section('))->toBe(substr_count($view, '@endsection'))
             ->and(substr_count($view, '@extends('))->toBe(1);
