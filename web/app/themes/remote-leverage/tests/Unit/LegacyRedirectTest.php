@@ -31,6 +31,58 @@ describe('LegacyRedirectMiddleware (WR-103, ADR-0006 § SEO & Risk Mitigation)',
 
         expect($target)->toBe('/hire-va-4/?utm_source=google&utm_campaign=spring');
     });
+
+    test('matches case-insensitively, as the GoDaddy install did', function () use ($map) {
+        $middleware = new LegacyRedirectMiddleware;
+
+        // Every rule in the legacy `301-redirects` table carried case_insensitive=enabled, and
+        // live traffic relies on it: the /vastore5/ script sends people to /Deposit/, and the
+        // recruiting /apply link is pasted into job posts in whatever case the poster typed.
+        expect($middleware->resolve('/HIRE-VA-OLD/', $map))->toBe('/hire-va-4/');
+        expect($middleware->resolve('/Hire-Va-Old/', $map))->toBe('/hire-va-4/');
+        expect($middleware->resolve('Book-A-Call', $map))->toBe('/book-consultation/');
+    });
+
+    test('a case-folded match still preserves the query string', function () use ($map) {
+        $middleware = new LegacyRedirectMiddleware;
+
+        expect($middleware->resolve('/HIRE-VA-OLD/?utm_source=fb', $map, 'utm_source=fb'))
+            ->toBe('/hire-va-4/?utm_source=fb');
+    });
+
+    test('folding the key never folds the target', function () {
+        $middleware = new LegacyRedirectMiddleware;
+
+        // Case is load-bearing in a target: these resolve to real files on a case-sensitive
+        // filesystem. Only the lookup key may be folded.
+        $map = ['Legacy/Asset.PNG' => 'app/themes/remote-leverage/public/images/kit/Avatar_02.png'];
+
+        expect($middleware->resolve('/legacy/asset.png', $map))
+            ->toBe('/app/themes/remote-leverage/public/images/kit/Avatar_02.png');
+    });
+
+    test('a file target is not slashed, because a slashed file path 404s', function () {
+        $middleware = new LegacyRedirectMiddleware;
+
+        // nginx try_files matches neither `$uri` nor `$uri/` for `/logo.svg/`, so it falls
+        // through to index.php. Page slugs keep their trailing slash; files must not get one.
+        $map = [
+            'old-logo' => 'app/themes/remote-leverage/public/images/kit/logo-icon-black.svg',
+            'old-page' => 'hire-va-4',
+        ];
+
+        expect($middleware->resolve('/old-logo/', $map))
+            ->toBe('/app/themes/remote-leverage/public/images/kit/logo-icon-black.svg');
+        expect($middleware->resolve('/old-page/', $map))->toBe('/hire-va-4/');
+    });
+
+    test('isFileTarget separates asset paths from page slugs', function () {
+        expect(LegacyRedirectMiddleware::isFileTarget('images/a/b/avatar_02-1.png'))->toBeTrue();
+        expect(LegacyRedirectMiddleware::isFileTarget('kit/logo.svg'))->toBeTrue();
+        expect(LegacyRedirectMiddleware::isFileTarget('hire-va-4'))->toBeFalse();
+        expect(LegacyRedirectMiddleware::isFileTarget('blog/some-post-about-v2'))->toBeFalse();
+        expect(LegacyRedirectMiddleware::isFileTarget(''))->toBeFalse();
+    });
 });
 
 describe('absolute external targets', function () {

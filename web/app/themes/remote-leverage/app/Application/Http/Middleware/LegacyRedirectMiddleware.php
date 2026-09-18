@@ -47,6 +47,44 @@ class LegacyRedirectMiddleware
     }
 
     /**
+     * Does this site-relative target name a file rather than a permalink?
+     *
+     * Decided on the extension, which separates the two cleanly in this map: the social-kit
+     * asset targets all end in one, and every page-slug target is bare.
+     */
+    public static function isFileTarget(string $target): bool
+    {
+        return preg_match('#\.[A-Za-z0-9]{2,5}$#', $target) === 1;
+    }
+
+    /**
+     * Fall back to a case-insensitive lookup when the exact key misses.
+     *
+     * The GoDaddy install matched case-insensitively — every rule in its `301-redirects` table
+     * carried `case_insensitive=enabled` — and real traffic depends on it. The /vastore5/
+     * objection-handling script sends people to /Deposit/ and /Refund/ with a capital letter,
+     * and the recruiting funnel's /apply link is pasted into job posts in whatever case the
+     * poster typed. Exact matching turned all of those into 404s at cutover.
+     *
+     * Only the *key* is folded. Targets are returned with their original case because case is
+     * load-bearing there: the social-kit asset paths resolve to real files on a case-sensitive
+     * filesystem, and the paths of the absolute targets are case-sensitive to their host.
+     *
+     * `array_change_key_case()` is ASCII-only and locale-independent, so it lowercases the hex
+     * of a percent-encoded key without touching the UTF-8 bytes behind it — which also makes
+     * `%CA%BB` and `%ca%bb` match, as the RFC says they should.
+     *
+     * Folding happens only after the exact lookup misses, so a request that hits a key — or an
+     * ordinary page view that hits none — still costs a single hash lookup.
+     *
+     * @param  array<string, string>  $map
+     */
+    private static function matchCaseInsensitively(string $path, array $map): ?string
+    {
+        return array_change_key_case($map, CASE_LOWER)[strtolower($path)] ?? null;
+    }
+
+    /**
      * Resolve a request path against the legacy redirect map (ADR-0006 § SEO & Risk Mitigation).
      * Preserves the query string (UTM parameters, cookies referral markers) on the target.
      *
@@ -63,11 +101,11 @@ class LegacyRedirectMiddleware
     {
         $normalizedPath = trim(parse_url($requestPath, PHP_URL_PATH) ?: $requestPath, '/');
 
-        if (! isset($map[$normalizedPath])) {
+        $mapped = $map[$normalizedPath] ?? self::matchCaseInsensitively($normalizedPath, $map);
+
+        if ($mapped === null) {
             return null;
         }
-
-        $mapped = $map[$normalizedPath];
 
         if (self::isExternalTarget($mapped)) {
             // Absolute targets are emitted verbatim — trimming slashes here would corrupt the
@@ -83,7 +121,12 @@ class LegacyRedirectMiddleware
         // Permalinks are slashed. Emitting /hire-va-4 used to force a second
         // redirect_canonical hop — which is a PHP miss, and is what made
         // "the redirects are down" look the same as /hire-va-4 hanging.
-        if ($target !== '/') {
+        //
+        // A file target is the exception, and slashing one is a 404: the 36 social-kit assets
+        // resolve to real files, and /...PersonalBanner_01_4400x1100.jpg/ matches neither
+        // `try_files $uri` nor `$uri/` in docker/nginx.conf, so it falls through to index.php.
+        // Page slugs never carry an extension — all 192 of the others are bare.
+        if ($target !== '/' && ! self::isFileTarget($target)) {
             $target .= '/';
         }
 

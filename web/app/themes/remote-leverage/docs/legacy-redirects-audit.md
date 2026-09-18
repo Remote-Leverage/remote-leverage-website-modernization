@@ -48,8 +48,6 @@ them on the homepage, ours go to the relevant page.
 - **`/coldcallscript/` and `/followupscript/`** (24 hits each) served Download Monitor PDFs
   (`download/2637`, `download/2640`) that were never migrated. They fall back to the root under
   the map's no-live-equivalent policy — re-point them if the collateral is brought over.
-- **Case sensitivity** (§6) is unfixed: legacy matched case-insensitively, v2 does not.
-  `/Deposit/` and `/APPLY` still 404 in v2.
 
 ## Headline
 
@@ -723,7 +721,7 @@ Built from the production *page* audit, not from the redirect table — retired 
 
 ## 6. Semantic differences that matter
 
-- **Case.** Every legacy plugin rule is `case_insensitive=enabled`. `LegacyRedirectMiddleware` does an exact `isset($map[$path])`, which is case-**sensitive**. `/Deposit/` and `/APPLY` resolve on legacy and 404 in v2.
+- **Case. Resolved 2026-09-18.** Every legacy plugin rule is `case_insensitive=enabled`, and `LegacyRedirectMiddleware` used an exact `isset($map[$path])`, so `/Deposit/` and `/APPLY` resolved on legacy and 404'd in v2. It now falls back to a folded lookup when the exact key misses. Only the key is folded — targets keep their case, which the 36 social-kit asset paths need on a case-sensitive filesystem. Folding introduced no new page shadowing (checked against all 216 published slugs) and no key collisions.
 - **Query strings.** Legacy plugin rules are `query_parameters=ignore` (incoming query dropped). Ours always preserves and appends it. Harmless for pages, but it changes Stripe/Calendly links.
 - **Hit counters are lifetime**, since 2024-10-20 for the plugin rules.
 - **No regex rules exist on legacy** (all 328 are `regex=disabled`), so a literal key-for-key port is complete.

@@ -38,9 +38,10 @@ return [
     |
     | Filenames and the per-tab structure are unchanged; only the prefix moved, because
     | Bedrock serves the theme from /app/themes/ rather than /wp-content/plugins/. Listed
-    | one by one because LegacyRedirectMiddleware matches on an exact normalized path and
-    | has no prefix rules — and because an explicit list is what the RoutesTest target check
-    | can verify actually exists on disk.
+    | one by one because LegacyRedirectMiddleware matches a whole normalized path and has no
+    | prefix rules — and because an explicit list is what the RoutesTest target check can
+    | verify actually exists on disk. The match is case-insensitive, but only on the key:
+    | these targets keep their case because they name real files.
     */
     'wp-content/plugins/rl-social-kit/assets/resources/linkedin/RL_LKD_PersonalBanner_01_4400x1100.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/linkedin/RL_LKD_PersonalBanner_01_4400x1100.jpg',
     'wp-content/plugins/rl-social-kit/assets/resources/linkedin/RL_LKD_PersonalBanner_02_4400x1100.jpg' => 'app/themes/remote-leverage/public/images/social-media-kit/linkedin/RL_LKD_PersonalBanner_02_4400x1100.jpg',
