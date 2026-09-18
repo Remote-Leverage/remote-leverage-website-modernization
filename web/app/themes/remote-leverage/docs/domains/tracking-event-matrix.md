@@ -171,7 +171,7 @@ The container's tag 61 runs the full PostHog snippet, which loads the SDK. `POST
 
 | Integration | Detail | v2 | Status |
 | :--- | :--- | :---: | :--- |
-| **n8n** `…/webhook/gravityforms-leads` | 8 forms (1, 20, 25, 29, 30, 31, 34, 35), no auth header | different URL | **VERIFY** — v2 has `HandleLeadEventsForWebhook` (`lead.partial_captured`, `lead.booking_completed`) but points at `rl_lead_webhook_url`. Point it at n8n or rebuild the flow |
+| **n8n** `…/webhook/gravityforms-leads` | 8 forms (1, 20, 25, 29, 30, 31, 34, 35), no auth header | yes | OK — `HandleLeadEventsForWebhook` posts here by default since 2026-09-17 (`config/services.php`). `lead.partial_captured` covers **both** the step-one capture and the completed submission, which the flow separates by `lead.submission_type` (`Partial`/`Final`) exactly as the GF feed did; `lead.booking_completed` follows when the slot is confirmed. The payload is the whole lead row. |
 | **Supabase** `…/functions/v1/gravity-forms-webhook` | form 27 only, `x-webhook-secret` header | no | **GAP** — form 27 has HubSpot and Slack feeds **inactive**, so Supabase is its only destination |
 | **HubSpot** | 14 feeds, portal `243484989`, 2 revenue-gated | yes | OK — `HubSpotGateway`; needs `HUBSPOT_ACCESS_TOKEN` |
 | **Slack** | 12 feeds → channel `C086BBKUXL5`; Join Live Call → `C09HXD9S76Z` | yes | OK — different mechanism, same purpose |

@@ -333,6 +333,76 @@ describe('Lead Domain', function () {
             ->and($finalLog->outcome)->toBe('succeeded');
     });
 
+    test('outgoing webhook posts the whole lead row, so Partial and Final are distinguishable', function () {
+        config(['services.webhooks.lead_webhook_url' => 'https://n8n.test/webhook/gravityforms-leads']);
+        $GLOBALS['_wp_remote_post_calls'] = [];
+        unset($GLOBALS['_wp_remote_post_response']);
+
+        $listener = new HandleLeadEventsForWebhook(new LeadActivityLogger);
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Priya Raman',
+            'email' => 'priya@northwind.io',
+            'status' => 'captured',
+            'submission_type' => 'Partial',
+            // Columns the hand-picked payload never carried, which is the whole point of the
+            // change: they were on the lead and never reached n8n.
+            'device_id' => 'dev-7781',
+            'ip_address' => '203.0.113.9',
+            'li_fat_id' => 'li-4412',
+            'attribution' => ['first_utm_source' => 'linkedin'],
+        ]);
+
+        /*
+         * Refreshed first, the way production hands this listener its lead.
+         *
+         * `create()` leaves the model holding only the attributes that were written, so an
+         * un-refreshed one serialises without its untouched nullable columns. Every real caller
+         * reloads before the event — `CaptureLeadAction` refreshes after `IdentityResolver`,
+         * `CalendlyWebhookController` reads the row back — so the payload carries the full
+         * column set. Asserting against a half-hydrated model would test the wrong shape.
+         */
+        $lead->refresh();
+
+        $listener->handleCreated(new LeadCreated($lead, ['preferred_slot' => null]));
+
+        // The completed submission re-runs CaptureLeadAction against the same row, which flips
+        // submission_type to Final and dispatches LeadCreated a second time. Both posts go out
+        // under the same event name; only the column tells them apart.
+        $lead->update(['submission_type' => 'Final', 'status' => 'booking_pending']);
+        $listener->handleCreated(new LeadCreated($lead, ['preferred_slot' => '2026-10-01T15:00:00Z']));
+
+        expect($GLOBALS['_wp_remote_post_calls'])->toHaveCount(2)
+            ->and($GLOBALS['_wp_remote_post_calls'][0]['url'])->toBe('https://n8n.test/webhook/gravityforms-leads');
+
+        [$partial, $final] = array_map(
+            static fn (array $call): array => json_decode((string) $call['args']['body'], true, 512, JSON_THROW_ON_ERROR),
+            $GLOBALS['_wp_remote_post_calls']
+        );
+
+        expect($partial['event'])->toBe('lead.partial_captured')
+            ->and($final['event'])->toBe('lead.partial_captured')
+            ->and($partial['lead']['submission_type'])->toBe('Partial')
+            ->and($final['lead']['submission_type'])->toBe('Final')
+            ->and($final['context']['preferred_slot'])->toBe('2026-10-01T15:00:00Z');
+
+        foreach (['device_id', 'ip_address', 'li_fat_id', 'attribution', 'hubspot_lifecycle_stage', 'is_blocked'] as $column) {
+            expect($partial['lead'])->toHaveKey($column);
+        }
+
+        expect($partial['lead']['device_id'])->toBe('dev-7781')
+            ->and($partial['lead']['ip_address'])->toBe('203.0.113.9')
+            ->and($partial['lead']['attribution'])->toBe(['first_utm_source' => 'linkedin']);
+    });
+
+    test('the outgoing lead webhook defaults to the n8n endpoint with nothing configured', function () {
+        $services = require __DIR__.'/../../config/services.php';
+
+        expect($services['webhooks']['lead_webhook_url'])
+            ->toBe('https://n8n.srv1338052.hstgr.cloud/webhook/gravityforms-leads');
+    });
+
     test('the Slack booking alert stays silent unless it is switched on', function () {
         // Default behaviour: the legacy feed's condition is `submission_type is not Final`, so
         // a completed booking produces no second alert and no consumption row.

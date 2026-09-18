@@ -2552,8 +2552,16 @@ class LeadsAdminDashboard
                         </tr>
                         <tr>
                             <th scope="row"><label for="lead_webhook_url">Outgoing lead webhook URL</label></th>
-                            <td><input type="url" id="lead_webhook_url" name="lead_webhook_url" class="regular-text"
-                                    value="<?php echo esc_attr($settings['lead_webhook_url']); ?>" placeholder="https://api.example.com/webhooks/leads" /></td>
+                            <td>
+                                <input type="url" id="lead_webhook_url" name="lead_webhook_url" class="regular-text"
+                                    value="<?php echo esc_attr($settings['lead_webhook_url']); ?>" placeholder="https://api.example.com/webhooks/leads" />
+                                <p class="description">
+                                    Last resort only. The endpoint is configured in <code>config/services.php</code>
+                                    (defaulting to n8n) and <code>LEAD_WEBHOOK_URL</code> overrides that &mdash; this
+                                    field is read only when both are empty, so a value here has no effect on an
+                                    environment that has either.
+                                </p>
+                            </td>
                         </tr>
                     </table>
                 </div>

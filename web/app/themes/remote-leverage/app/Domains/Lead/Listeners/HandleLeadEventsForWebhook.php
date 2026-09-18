@@ -18,7 +18,15 @@ class HandleLeadEventsForWebhook
     ) {}
 
     /**
-     * Handle LeadCreated event.
+     * Handle LeadCreated event — the step-one partial capture *and* the completed submission.
+     *
+     * Both go out under `lead.partial_captured`, which is a name the wire is stuck with: the
+     * n8n flow on the other end filters on it, so renaming the second one would stop it seeing
+     * completed submissions until the flow grew a branch. What separates them is
+     * `lead.submission_type` — `Partial` on the step-one capture, `Final` once the form is
+     * completed — which is the same column the legacy Gravity Forms feed branched on. It is in
+     * the payload because the payload is now the whole lead; it was not before, and a
+     * consumer therefore could not tell the two apart at all.
      */
     public function handleCreated(LeadCreated $event): void
     {
@@ -60,6 +68,11 @@ class HandleLeadEventsForWebhook
 
     /**
      * Post JSON webhook payload to configured outgoing webhook endpoint.
+     *
+     * The URL comes from `config/services.php`, which now carries the n8n endpoint as a
+     * committed default; `LEAD_WEBHOOK_URL` overrides it and the wp-admin setting is the last
+     * resort. Blanking the env var in an environment that also has no setting is still how the
+     * feed is switched off.
      */
     protected function dispatchWebhook(Lead $lead, string $eventName, array $context = []): void
     {
@@ -72,36 +85,24 @@ class HandleLeadEventsForWebhook
             return;
         }
 
+        /*
+         * The whole lead, not a curated subset.
+         *
+         * This used to be a hand-written list of 27 columns, which is a second schema kept in
+         * sync by hand: every attribution column added since — `submission_type`, `device_id`,
+         * `li_fat_id`, `fbc`, `oppref`, `partner`, `ip_address`, the HubSpot lifecycle mirror —
+         * existed on the lead and never reached n8n, and nothing failed to say so. Sending
+         * `toArray()` means a new column is on the wire the moment it is on the model.
+         *
+         * The key set is whatever the model holds, so a caller must hand this a hydrated lead
+         * rather than the return of a bare `create()` — every current one does
+         * (`CaptureLeadAction` refreshes after `IdentityResolver`, the Calendly webhook reads
+         * the row back), and a half-hydrated one would quietly ship a shorter payload.
+         */
         $payload = [
             'event' => $eventName,
             'timestamp' => Carbon::now()->toIso8601String(),
-            'lead' => [
-                'id' => $lead->id,
-                'uuid' => $lead->uuid,
-                'name' => $lead->name,
-                'first_name' => $lead->first_name,
-                'last_name' => $lead->last_name,
-                'email' => $lead->email,
-                'phone' => $lead->phone,
-                'phone_country' => $lead->phone_country,
-                'company' => $lead->company,
-                'role_needed' => $lead->role_needed,
-                'monthly_revenue' => $lead->monthly_revenue,
-                'status' => $lead->status,
-                'source_type' => $lead->source_type,
-                'source_id' => $lead->source_id,
-                'referral_code' => $lead->referral_code,
-                'utm_source' => $lead->utm_source,
-                'utm_medium' => $lead->utm_medium,
-                'utm_campaign' => $lead->utm_campaign,
-                'utm_term' => $lead->utm_term,
-                'utm_content' => $lead->utm_content,
-                'gclid' => $lead->gclid,
-                'fbclid' => $lead->fbclid,
-                'session_id' => $lead->session_id,
-                'landing_url' => $lead->landing_url,
-                'created_at' => $lead->created_at?->toIso8601String(),
-            ],
+            'lead' => $lead->toArray(),
             'context' => $context,
         ];
 

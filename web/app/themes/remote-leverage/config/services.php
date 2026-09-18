@@ -172,8 +172,29 @@ return [
         'data_source' => env('LEAD_DATA_SOURCE', 'Remote Leverage v2'),
     ],
 
+    /*
+     * The outgoing lead webhook: `HandleLeadEventsForWebhook` POSTs here on the step-one
+     * partial capture, on the completed (Final) submission, and again when the booking
+     * confirms. It is the v2 replacement for the Gravity Forms feed that eight production
+     * forms posted to, which is why the path still says `gravityforms-leads` — the n8n flow on
+     * the other end is the same one, and renaming the endpoint would orphan it.
+     *
+     * Defaulted here rather than left to `.env`, the same treatment `config/live-transfer.php`
+     * gives its endpoint. This is a destination, not a credential: with no default, an
+     * environment that never set `LEAD_WEBHOOK_URL` posts nowhere at all, and a feed that
+     * silently sends nothing is indistinguishable from n8n dropping every lead. An env value
+     * still overrides it, and the wp-admin setting (`lead_webhook_url`, mirrored to
+     * `rl_lead_webhook_url`) is the last resort for an environment that has neither.
+     *
+     * `LEAD_WEBHOOK_URL=` with nothing after it is not the same as the variable being absent:
+     * phpdotenv hands back an empty string, which beats the default and falls through to the
+     * setting. That is the off switch, and it is why `.env.example` leaves the key commented.
+     */
     'webhooks' => [
-        'lead_webhook_url' => env('LEAD_WEBHOOK_URL'),
+        'lead_webhook_url' => (string) env(
+            'LEAD_WEBHOOK_URL',
+            'https://n8n.srv1338052.hstgr.cloud/webhook/gravityforms-leads',
+        ),
     ],
 
     'referral' => [
