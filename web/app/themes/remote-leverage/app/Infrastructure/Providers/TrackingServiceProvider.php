@@ -8,6 +8,7 @@ use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Tracking\Gateways\CustomerIOClient;
 use App\Domains\Tracking\Gateways\PostHogClient;
 use App\Domains\Tracking\Listeners\HandleLeadCreatedForTracking;
+use App\Infrastructure\WordPress\Hooks\ConversionHooks;
 use App\Infrastructure\WordPress\Hooks\MarketingPixelHooks;
 use App\Infrastructure\WordPress\Hooks\SiteKitHooks;
 use App\Infrastructure\WordPress\Hooks\TrackingHooks;
@@ -26,6 +27,7 @@ class TrackingServiceProvider extends ServiceProvider
         $this->app->singleton(TrackingHooks::class, fn () => new TrackingHooks);
         $this->app->singleton(SiteKitHooks::class, fn () => new SiteKitHooks);
         $this->app->singleton(MarketingPixelHooks::class, fn () => new MarketingPixelHooks);
+        $this->app->singleton(ConversionHooks::class, fn () => new ConversionHooks);
         $this->app->singleton(HandleLeadCreatedForTracking::class);
     }
 
@@ -51,6 +53,13 @@ class TrackingServiceProvider extends ServiceProvider
          * these are not simply tags in the container.
          */
         $this->app->make(MarketingPixelHooks::class)->register();
+
+        /*
+         * After the pixels: the conversions call `gtag`, which MarketingPixelHooks defines, and
+         * its own consent defaults sit at wp_head priority 3 so they still precede the Google
+         * tag at 4 regardless of registration order here.
+         */
+        $this->app->make(ConversionHooks::class)->register();
 
         // Deferred: Customer.io + PostHog are both live API calls that nothing
         // in the request depends on — see LeadServiceProvider::boot() for why

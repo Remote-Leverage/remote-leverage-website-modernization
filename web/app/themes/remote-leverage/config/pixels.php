@@ -112,7 +112,7 @@ return [
     'linkedin' => [
         'partner_ids' => array_values(array_filter(array_map(
             'trim',
-            explode(',', trim((string) env('LINKEDIN_PARTNER_IDS', '')) ?: '6411876'),
+            explode(',', trim((string) env('LINKEDIN_PARTNER_IDS', '')) ?: '6411876,9514236'),
         ))),
     ],
 
@@ -132,7 +132,7 @@ return [
     'openai' => [
         'pixel_ids' => array_values(array_filter(array_map(
             'trim',
-            explode(',', trim((string) env('OPENAI_PIXEL_IDS', '')) ?: '7QY9HDVocGyeNvMMW1gLWb'),
+            explode(',', trim((string) env('OPENAI_PIXEL_IDS', '')) ?: '7QY9HDVocGyeNvMMW1gLWb,GtXTy8ihLz5qrMUanZ3fqf'),
         ))),
         'debug' => filter_var(env('OPENAI_PIXEL_DEBUG', false), FILTER_VALIDATE_BOOLEAN),
 
@@ -240,6 +240,119 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Rewardful
+    |--------------------------------------------------------------------------
+    |
+    | Referral attribution. Ported out of the container on 2026-09-18 verbatim,
+    | including appending to `body` rather than `head` as its snippet does.
+    |
+    | `rewardful_id` on a lead comes from this; without it a referred booking
+    | still arrives, it just stops paying the person who referred it.
+    */
+    'rewardful' => [
+        'api_key' => trim((string) env('REWARDFUL_API_KEY', '')) ?: '39ea7a',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Consent defaults
+    |--------------------------------------------------------------------------
+    |
+    | What the container's "Consent - Default Granted" tag set, reproduced
+    | exactly: both granted, on initialisation.
+    |
+    | This is not a consent manager and does not pretend to be one. It is the
+    | default state Google's tags read before any CMP speaks. If a real CMP is
+    | ever added it has to run ahead of this and set these itself.
+    */
+    'consent' => [
+        'enabled' => filter_var(env('PIXEL_CONSENT_DEFAULTS', true), FILTER_VALIDATE_BOOLEAN),
+        'defaults' => [
+            'ad_storage' => 'granted',
+            'analytics_storage' => 'granted',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Conversions and events, ported out of GTM-53JDTQCZ
+    |--------------------------------------------------------------------------
+    |
+    | Read off the published container on 2026-09-18 before it was retired, tag
+    | by tag, so these are transcriptions rather than reconstructions. The
+    | labels are the part that cannot be guessed: a wrong one reports a
+    | conversion into nothing and the only symptom is a campaign that looks bad.
+    |
+    | `trigger` is one of:
+    |
+    |   path:<fragment>   request path contains <fragment>, case-insensitively.
+    |                     Rendered server-side on that page, so it cannot miss.
+    |   dl:<event>        a `dataLayer` push with that `event` name, which is
+    |                     what GTM's Custom Event triggers watched. The wizard
+    |                     already pushes `form_submit` on a successful capture
+    |                     -- see `MultistepBookingWizard::pushToDataLayer()`.
+    |   click_text:<s>    a click whose element text contains <s>.
+    |   click_class:<s>   a click whose element classes contain <s>.
+    |
+    | The container matched `VAThankYou` case-sensitively and the wizard's
+    | redirect preserves the capitals. Matched case-insensitively here for the
+    | same reason `openai.conversions` is -- there is no reason to inherit a
+    | trap we already had to work around once.
+    */
+    'google_ads' => [
+        'conversion_id' => trim((string) env('GOOGLE_ADS_CONVERSION_ID', '')) ?: 'AW-11406183013',
+
+        /*
+         * `label => [trigger, value]`. Value is null where the container sent
+         * none; only the second VAThankYou conversion carried one.
+         */
+        'conversions' => [
+            ['label' => 'AyW6CJHZnr8ZEOWU8r4q', 'trigger' => 'path:VAThankYou', 'value' => null],
+            ['label' => 'pTbrCP6-_dIbEOWU8r4q', 'trigger' => 'path:VAThankYou', 'value' => '1'],
+            ['label' => 'oEXvCN-QnpcbEOWU8r4q', 'trigger' => 'click_text:Book a Consultation', 'value' => null],
+            ['label' => 'oqW3CP3jnJcbEOWU8r4q', 'trigger' => 'dl:form_submit', 'value' => null],
+        ],
+    ],
+
+    'ga4' => [
+        'measurement_id' => trim((string) env('GA4_MEASUREMENT_ID', '')) ?: 'G-SCP464C5EH',
+
+        'events' => [
+            ['name' => 'appointment_booked', 'trigger' => 'path:VAThankYou'],
+            ['name' => 'generate_lead', 'trigger' => 'dl:form_submit'],
+            ['name' => 'Book a Consultation Click', 'trigger' => 'click_text:Book a Consultation'],
+
+            /*
+             * Revived on 2026-09-18. The container triggered this on
+             * `e-font-icon-svg e-eicon-play`, an Elementor play icon that v2
+             * never renders, so it had reported nothing since the cutover --
+             * the zero meant "trigger is broken", not "nobody watches".
+             *
+             * It now fires on a `video_play` dataLayer push, which covers all
+             * four players: the runtime turns any `<video>` play into one
+             * (sample-applicant-videos, media-copy), and the two that are not
+             * `<video>` elements push it themselves (testimonials' modal,
+             * case-study's Vimeo embed).
+             */
+            ['name' => 'watched_testimonial_video', 'trigger' => 'dl:video_play'],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | PostHog events, ported out of GTM-53JDTQCZ
+    |--------------------------------------------------------------------------
+    |
+    | The container's "PostHog - Meeting Booked Web" tag, verbatim: it captured
+    | `appointment_booked_web` with the page path. PostHog itself is loaded by
+    | `TrackingHooks`, so this is only the event.
+    */
+    'posthog_events' => [
+        ['name' => 'appointment_booked_web', 'trigger' => 'path:VAThankYou'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Deferred SDK loading
     |--------------------------------------------------------------------------
     |
@@ -313,10 +426,9 @@ return [
     | PostHog initialises twice.
     */
     'delivered_by_gtm' => [
-        'linkedin' => ['9514236'],
-        'openai' => ['GtXTy8ihLz5qrMUanZ3fqf'],
-        'statcounter' => ['13176576'],
-        'rewardful' => ['39ea7a'],
+        // Empty since 2026-09-18: GTM-53JDTQCZ was retired and everything it carried is emitted
+        // here. Kept as a key, not deleted, because `MarketingPixelTest` asserts against it and
+        // the day a tag goes back into a container is the day this needs to be populated again.
     ],
 
     /*
@@ -335,12 +447,22 @@ return [
     */
     'hubspot' => [
         /*
-         * Defaulted like every other id in this file. A portal id is not a secret — it is in
-         * the script URL of every page HubSpot tracks — and leaving it to an unset environment
-         * variable is why browser tracking was dark on production until 2026-09-18 with no
-         * error anywhere. `HUBSPOT_ACCESS_TOKEN`, which *is* a secret, stays in the environment.
+         * **Off by default since 2026-09-18.** Set `HUBSPOT_PORTAL_ID` to switch it back on;
+         * `243484989` is the production portal.
+         *
+         * It was defaulted on earlier the same day, because an unset variable had left browser
+         * tracking silently dark. Measuring it once it ran settled the question the other way:
+         * `hs-analytics.net` was the single most expensive script on the page, 5,582ms of
+         * main-thread time on a throttled mobile profile against 189ms on desktop. The absolute
+         * figure is inflated by contention -- a 29x gap is far more than 4x throttling explains
+         * -- but it was the top entry either way, and it is the only script here whose cost is
+         * measured in seconds.
+         *
+         * What is lost is page-view history and visitor de-anonymisation. Contacts themselves
+         * are unaffected: `HubSpotGateway` creates and updates them server-side from
+         * `HUBSPOT_ACCESS_TOKEN`, which is a different credential and stays in the environment.
          */
-        'portal_id' => trim((string) env('HUBSPOT_PORTAL_ID', '')) ?: '243484989',
+        'portal_id' => trim((string) env('HUBSPOT_PORTAL_ID', '')),
         'region' => trim((string) env('HUBSPOT_SCRIPT_REGION', '')) ?: 'na2',
     ],
 ];

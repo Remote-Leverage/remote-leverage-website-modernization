@@ -309,7 +309,7 @@ describe('Google tag', function () {
         $out = renderPixel(fn ($h) => $h->injectGoogleTag());
 
         expect($out)->toContain('googletagmanager.com/gtag/js?id=GT-NCNQ6N2')
-            ->and($out)->toContain('gtag("config", "GT-NCNQ6N2")')
+            ->and($out)->toContain('gtag("config", "GT-NCNQ6N2", {"url_passthrough": true})')
             // Cross-domain linker, as production configures it.
             ->and($out)->toContain('"domains":["remoteleverage.com"]')
             // Must not clobber a dataLayer GTM already created.
@@ -564,7 +564,8 @@ describe('defaults that used to depend on an unset variable', function () {
     test('the HubSpot portal id is defaulted, so browser tracking is not silently off', function () {
         $config = require __DIR__.'/../../config/pixels.php';
 
-        expect($config['hubspot']['portal_id'])->toBe('243484989')
+        // HubSpot is deliberately off: the portal id defaults to empty. See config/pixels.php.
+        expect($config['hubspot']['portal_id'])->toBe('')
             ->and($config['hubspot']['region'])->toBe('na2');
     });
 
@@ -638,11 +639,11 @@ describe('an empty environment variable falls through to the default', function 
 
             expect($config['meta']['pixel_ids'])->toBe(['1430907207548734', '1482937899395718'])
                 ->and($config['bing_uet']['tag_id'])->toBe('97187250')
-                ->and($config['linkedin']['partner_ids'])->toBe(['6411876'])
-                ->and($config['openai']['pixel_ids'])->toBe(['7QY9HDVocGyeNvMMW1gLWb'])
+                // Both accounts are emitted here since GTM-53JDTQCZ was retired.
+                ->and($config['linkedin']['partner_ids'])->toBe(['6411876', '9514236'])
+                ->and($config['openai']['pixel_ids'])->toBe(['7QY9HDVocGyeNvMMW1gLWb', 'GtXTy8ihLz5qrMUanZ3fqf'])
                 ->and($config['tiktok']['pixel_ids'])->toBe(['CPMB51BC77U75I0QMMAG'])
                 ->and($config['google_tag']['ids'])->toBe(['GT-NCNQ6N2'])
-                ->and($config['hubspot']['portal_id'])->toBe('243484989')
                 ->and($config['hubspot']['region'])->toBe('na2');
         } finally {
             foreach ($vars as $var) {
@@ -665,5 +666,22 @@ describe('an empty environment variable falls through to the default', function 
             unset($_ENV['POSTHOG_API_KEY'], $_SERVER['POSTHOG_API_KEY']);
             putenv('POSTHOG_API_KEY');
         }
+    });
+});
+
+describe('HubSpot browser tracking is off', function () {
+    test('nothing is emitted while no portal id is configured', function () {
+        config(['pixels.hubspot.portal_id' => '']);
+
+        expect(renderPixel(fn (MarketingPixelHooks $h) => $h->injectHubSpot()))->toBe('');
+    });
+
+    test('setting the portal id switches it back on, still deferred', function () {
+        config(['pixels.hubspot.portal_id' => '243484989', 'pixels.defer.vendors' => ['hubspot']]);
+
+        $out = renderPixel(fn (MarketingPixelHooks $h) => $h->injectHubSpot());
+
+        expect($out)->toContain('rlDefer')
+            ->and($out)->toContain('js-na2.hs-scripts.com/243484989.js');
     });
 });

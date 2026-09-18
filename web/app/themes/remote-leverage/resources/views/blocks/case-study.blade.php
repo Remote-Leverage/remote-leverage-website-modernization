@@ -207,7 +207,7 @@
                 @endif
 
                 <div class="relative w-full aspect-video rounded-card overflow-hidden bg-slate-900 cursor-pointer group"
-                    @click="playing = true" x-show="! playing">
+                    @click="playing = true; window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: 'video_play', video_src: 'vimeo:{{ $video['vimeoId'] }}' })" x-show="! playing">
                     @if (! empty($video['poster']))
                         <img src="{{ $video['poster'] }}" alt="{{ $video['name'] }}" loading="lazy" decoding="async"
                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">

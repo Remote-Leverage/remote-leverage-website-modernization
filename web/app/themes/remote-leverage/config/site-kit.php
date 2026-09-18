@@ -51,12 +51,25 @@ return [
     | count: Site Kit holds one container id, so the moment a second is wanted
     | this is the only place that can express it.
     |
+    | **Empty since 2026-09-18.** `GTM-53JDTQCZ` was retired: everything it
+    | still carried is emitted by `MarketingPixelHooks` and `ConversionHooks`
+    | from `config/pixels.php`, which is version controlled and covered by
+    | tests. That removes 159KB and ~319ms of main-thread work, and ends the
+    | drift between two systems that each believed they owned the same pixel --
+    | which cost a duplicated LinkedIn, a duplicated OpenAI, a Meta pixel
+    | published twice, and a PostHog owned by neither.
+    |
+    | The cost is real and was accepted deliberately: marketing can no longer
+    | ship a tag without a deploy. Set `GTM_CONTAINER_IDS` to put a container
+    | back, and move whatever it carries out of `config/pixels.php` in the same
+    | change -- `delivered_by_gtm` is the guard for exactly that.
+    |
     | Comma-separated in the environment, so an environment can carry a
     | different set without a deploy of this file.
     */
     'containers' => array_values(array_filter(array_map(
         'trim',
-        explode(',', (string) env('GTM_CONTAINER_IDS', 'GTM-53JDTQCZ')),
+        explode(',', (string) env('GTM_CONTAINER_IDS', '')),
     ))),
 
     /*

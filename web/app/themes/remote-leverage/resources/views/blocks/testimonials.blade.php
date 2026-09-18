@@ -4,6 +4,10 @@
     activeVideo: null,
     expanded: false,
     openModal(url) {
+        /* Not a video element, so the global play listener cannot see it. See ConversionHooks. */
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({ event: 'video_play', video_src: url });
+
         this.activeVideo = url;
         document.body.style.overflow = 'hidden';
     },

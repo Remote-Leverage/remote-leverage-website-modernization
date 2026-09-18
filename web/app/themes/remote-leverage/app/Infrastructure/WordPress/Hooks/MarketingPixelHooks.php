@@ -516,14 +516,23 @@ HTML;
             (array) config('pixels.google_tag.linker_domains', []),
         )));
 
+        /*
+         * `accept_incoming` and `url_passthrough` reproduce the container's Conversion Linker
+         * (`__gclidw` with cross-domain and URL passthrough enabled), which was retired with
+         * GTM-53JDTQCZ. Without them a gclid stops surviving a cross-domain hop and the click
+         * that paid for a booking stops being attributable to it.
+         */
         $linker = $domains === []
             ? ''
-            : 'gtag("set","linker",'.json_encode(['domains' => $domains], JSON_UNESCAPED_SLASHES).');'."\n";
+            : 'gtag("set","linker",'.json_encode(
+                ['domains' => $domains, 'accept_incoming' => true],
+                JSON_UNESCAPED_SLASHES,
+            ).');'."\n";
 
         $configs = '';
 
         foreach ($ids as $id) {
-            $configs .= 'gtag("config", "'.esc_js($id).'");'."\n";
+            $configs .= 'gtag("config", "'.esc_js($id).'", {"url_passthrough": true});'."\n";
         }
 
         echo <<<HTML
