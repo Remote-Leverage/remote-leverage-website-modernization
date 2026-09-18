@@ -42,11 +42,17 @@ class ContentAgentProvisioner
      *
      * edit_pages is absent because it comes with the role and nothing here
      * should be able to produce an agent that cannot do its job at all.
+     *
+     * upload_files is the odd one out: the editor role grants it, so unlike the
+     * others it is revoked rather than merely withheld when its flag is off.
+     * That works only because ensure() writes an explicit per-user denial, which
+     * beats the role — remove_cap() would hand it straight back.
      */
     private const MANAGED_CAPABILITIES = [
         'publish_pages' => 'can_publish',
         'edit_published_pages' => 'can_edit_published',
         InsightsCapability::NAME => 'can_read_leads',
+        'upload_files' => 'can_upload_media',
     ];
 
     /**

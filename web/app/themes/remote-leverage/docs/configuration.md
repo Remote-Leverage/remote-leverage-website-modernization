@@ -189,5 +189,5 @@ The keys that fall in the second group: `DB_HOST`, `DB_PREFIX`, `CALENDLY_DEFAUL
 | Variable | Read by |
 | :--- | :--- |
 | `AI_AGENT_LOGIN`, `AI_AGENT_EMAIL`, `AI_AGENT_ROLE` | The provisioned agent user (`ai-content-agent`, `…@remoteleverage.com`, `editor`) |
-| `AI_AGENT_CAN_PUBLISH`, `AI_AGENT_CAN_EDIT_PUBLISHED`, `AI_AGENT_CAN_READ_LEADS` | Capability grants; all default `false` |
+| `AI_AGENT_CAN_PUBLISH`, `AI_AGENT_CAN_EDIT_PUBLISHED`, `AI_AGENT_CAN_READ_LEADS`, `AI_AGENT_CAN_UPLOAD_MEDIA` | Capability grants; all default `false`. `CAN_UPLOAD_MEDIA` is the odd one — the `editor` role already grants `upload_files`, so leaving it unset actively revokes the capability rather than merely withholding it |
 | `AI_AGENT_PROVISION_ON_DEPLOY` | Default `true`; set `false` to skip reconciliation |

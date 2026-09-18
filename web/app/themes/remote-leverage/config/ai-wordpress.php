@@ -9,6 +9,7 @@ use App\Ai\Abilities\ListPatternsAbility;
 use App\Ai\Abilities\QueryLeadsAbility;
 use App\Ai\Abilities\UpdateLandingPageContentAbility;
 use App\Ai\Abilities\UpdatePageSectionsAbility;
+use App\Ai\Abilities\UploadMediaAbility;
 use App\Domains\Sync\Abilities\BeginTransferAbility;
 use App\Domains\Sync\Abilities\CheckMediaFilesAbility;
 use App\Domains\Sync\Abilities\ExportLandingPageAbility;
@@ -71,6 +72,11 @@ return [
         // Let query-leads return real customer contact details.
         'can_read_leads' => env('AI_AGENT_CAN_READ_LEADS', false),
 
+        // Let upload-media add files to the media library. Off by default
+        // because an upload writes to the shared uploads volume and there is
+        // no undo — the file stays until somebody deletes it by hand.
+        'can_upload_media' => env('AI_AGENT_CAN_UPLOAD_MEDIA', false),
+
         // Set false to stop rl:deploy reconciling the user on this environment.
         'provision_on_deploy' => env('AI_AGENT_PROVISION_ON_DEPLOY', true),
     ],
@@ -89,6 +95,11 @@ return [
         DescribePageAbility::class,
         ClonePageAbility::class,
         UpdatePageSectionsAbility::class,
+
+        // The other half of image editing: page fields address art by
+        // attachment id, so without this one a session can rearrange existing
+        // images but never introduce a new one.
+        UploadMediaAbility::class,
 
         // Read-only enquiry data, gated on InsightsCapability rather than
         // edit_pages — query-leads returns customer PII, so a content agent

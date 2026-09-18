@@ -60,6 +60,7 @@ a bounded blast radius.
   | `AI_AGENT_CAN_PUBLISH` | `publish_pages` — `clone-page` may publish directly |
   | `AI_AGENT_CAN_EDIT_PUBLISHED` | `edit_published_pages` — may change live pages |
   | `AI_AGENT_CAN_READ_LEADS` | `rl_read_business_data` — may read enquiry data |
+  | `AI_AGENT_CAN_UPLOAD_MEDIA` | `upload_files` — may add files to the media library |
   | `AI_AGENT_PROVISION_ON_DEPLOY` | set `false` to skip reconciliation entirely |
 
   Because reconciliation runs every deploy, these tighten as well as widen:
@@ -140,8 +141,8 @@ overwrite without saying so.
 
 ## The landing-page abilities
 
-Nine abilities carry `meta.mcp.public`, so they are the ones an MCP client sees.
-They fall into three groups.
+Ten abilities carry `meta.mcp.public`, so they are the ones an MCP client sees.
+They fall into four groups.
 
 **Read — always start here.**
 
@@ -159,6 +160,22 @@ They fall into three groups.
 | `app/update-page-sections` | Edit named sections of a page in place, leaving the rest untouched. |
 | `app/create-landing-page` | Compose a new page from whole patterns, verbatim. |
 | `app/update-landing-page-content` | Replace a page's whole content from a list of patterns. |
+
+**Media** — gated on `upload_files`, which is revoked by default:
+
+| Ability | What it is for |
+| --- | --- |
+| `app/upload-media` | Add a file to the media library and get back the `attachment_id`. |
+
+`upload-media` closes the gap that made image editing a half-measure: every image field is
+addressed by attachment ID, so the abilities above could move existing art around but could never
+introduce new art — that step had to happen by hand in wp-admin. It takes either a `source_url` or
+inline `data_base64` (capped at 8MB decoded, because it travels inside a JSON-RPC message) and
+returns the ID to pass to `update-page-sections`.
+
+`upload_files` is the one managed capability the `editor` role already grants, so unlike the
+others the agent lacks it only because `ensure()` writes an explicit per-user denial. It is off by
+default because an upload writes to the shared uploads volume and nothing here can undo one.
 
 **Enquiry data** — gated on `rl_read_business_data`, not `edit_pages`:
 
@@ -217,7 +234,7 @@ place, promote it back into git: export it with `wp acorn rl:sync:page <id>
 ## Connecting an MCP client to the landing-page abilities
 
 The `WordPress/mcp-adapter` plugin's default server exposes any ability with
-`meta.mcp.public => true` — the nine listed above — discoverable and executable
+`meta.mcp.public => true` — the ten listed above — discoverable and executable
 via `mcp-adapter/discover-abilities` and `mcp-adapter/execute-ability` on that
 server. Adding an ability to that set is a one-line `meta()` change; everything
 else in `config/ai-wordpress.php` stays REST-only and invisible to MCP.
@@ -365,19 +382,33 @@ guide: Claude Desktop, the Automattic STDIO proxy, and an `ai-content-agent` app
 password. It is written for someone who does not know WordPress, and it deliberately does not
 explain anything they cannot act on.
 
-**A claude.ai custom connector is not an option here, and it is worth recording why** so nobody
-spends a day rediscovering it. Custom connectors authenticate as authless or OAuth; the
-`static_headers` beta is org-admin-only and the HTTP Basic case — which is exactly what a
-WordPress Application Password is — is an open, unresolved bug ([claude-ai-mcp#990][mcp990], and
-duplicates #112, #240, #506, #644, #690): the configured header is not sent on the initial
-request and the connector falls back to OAuth discovery, 401ing. Claude Desktop with the STDIO
-proxy sidesteps this entirely because the proxy holds the credential locally.
+**A claude.ai custom connector now works — corrected 2026-09-17.** This section previously
+recorded that it was impossible, because the HTTP Basic case (which is exactly what a WordPress
+Application Password is) was an open bug ([claude-ai-mcp#990][mcp990], and duplicates #112, #240,
+#506, #644, #690) where the configured header was not sent on the initial request and the
+connector fell back to OAuth discovery and 401ed.
+
+Anthropic's connector documentation now states the opposite outright: a custom connector has a
+**Request headers** section, Claude "sends the value exactly as you enter it… does not add an
+authentication scheme or any other prefix", and Basic is called out by name — "enter `Basic `
+followed by the base64-encoded credentials". Two conditions carry over from the old note and are
+the part still worth knowing:
+
+- **It is beta and gated per organisation.** If the *Request headers* section is absent from the
+  Add-custom-connector dialog, the org does not have it, and Claude Desktop with the STDIO proxy
+  remains the answer.
+- **The connector must be set to "No sign-in".** OAuth owns the `Authorization` header and it
+  "cannot be configured as a request header on an OAuth connection", so choosing OAuth makes the
+  Basic header unsettable.
+
+Setup for both routes, against production:
+[connecting-claude-to-production.md](connecting-claude-to-production.md).
 
 If the connector experience is wanted later, the path is the
 [Enable Abilities for MCP][enable-abilities] plugin, which ships an embedded OAuth 2.1 server
 with CIMD and **coexists with** `wordpress/mcp-adapter` rather than replacing it. Two caveats
 before reaching for it: it enables all 112 of its own abilities by default and would need
-locking down to this theme's nine, and it does nothing about the session-header requirement
+locking down to this theme's ten, and it does nothing about the session-header requirement
 below.
 
 [mcp990]: https://github.com/anthropics/claude-ai-mcp/issues/990

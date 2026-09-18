@@ -51,6 +51,8 @@ All project documentation lives here. Start with the [repository README](../../.
 | :--- | :--- |
 | [environment-sync.md](environment-sync.md) | Design of the bi-directional sync, including its four production gates |
 | [ai-mcp-and-sync.md](ai-mcp-and-sync.md) | One-time setup: MCP users, application passwords, client config |
+| [connecting-claude-to-production.md](connecting-claude-to-production.md) | Connecting claude.ai / Claude Desktop to the live site, for marketing |
+| [claude-desktop-for-editors.md](claude-desktop-for-editors.md) | Staging guide written for a non-technical editor |
 | [building-forms-with-livewire.md](building-forms-with-livewire.md) | Building a form the way this codebase does it |
 | [qa-attribution-webhooks.md](qa-attribution-webhooks.md) | Manual QA runbook for attribution and webhook integrations |
 | [partner-hub-gap-analysis.md](partner-hub-gap-analysis.md) | Legacy plugin vs. ported hub (gap closed 2026-09-09; kept for reference) |

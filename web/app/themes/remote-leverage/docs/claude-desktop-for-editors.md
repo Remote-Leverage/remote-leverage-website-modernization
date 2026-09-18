@@ -9,6 +9,9 @@ once, carefully, and you will need about twenty minutes.
 Everything here points at **staging** — a private copy of the site. Nothing you do can change
 the live site that customers see. That is deliberate: staging is where you try things.
 
+> Connecting to the **live** site is a different document with different stakes:
+> [connecting-claude-to-production.md](connecting-claude-to-production.md). Learn here first.
+
 ---
 
 ## Before you start
@@ -93,7 +96,7 @@ something you did wrong, and it cannot be fixed from your machine.
 
 ## What you can ask for
 
-Claude has nine tools for this site. You never need to name them — just describe what you want.
+Claude has ten tools for this site. You never need to name them — just describe what you want.
 
 **Finding your way around**
 
@@ -112,6 +115,17 @@ can change anything. The section names are what you will refer to afterwards.
 
 > Make a copy of the Athena comparison page called "Remote Leverage vs Boldly", and swap every
 > mention of Athena for Boldly.
+
+**Adding an image**
+
+> Here's the new hero photo — upload it and put it on the Belay comparison page.
+
+You can paste an image straight into the chat, or give Claude a link to one. Always tell it what
+the image shows, so it can write the alternative text that screen readers announce — if you do not,
+it will guess.
+
+Very large files are the one thing this cannot take. If Claude says the file is too big, upload it
+in WordPress under Media → Add New, and then ask Claude to use it by name.
 
 **Checking performance**
 

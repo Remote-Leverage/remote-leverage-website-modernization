@@ -2,7 +2,7 @@
 
 A ground-up rebuild of [remoteleverage.com](https://remoteleverage.com) on **Roots Bedrock + Sage + Acorn**, replacing an Elementor site and eight bespoke plugins with one version-controlled WordPress application.
 
-This repository *is* the new platform. It is not live yet — it runs locally and on staging while content is migrated off production. See [Replacing production](#replacing-production) for exactly what stands between here and the DNS flip.
+This repository *is* the new platform, and it **is** live: `remoteleverage.com` serves this theme as of 2026-09-17, verified by probing the origin (the REST index registers the `mcp` and `wp-abilities/v1` namespaces, which the old Elementor stack had no way to expose). [Replacing production](#replacing-production) below still describes the pre-cutover state and has not been re-verified since — treat its statuses as historical until someone re-audits them.
 
 > **Status of this document.** Verified against the code and the local database on **2026-09-15**. Production-side counts come from the audit in [`docs/content-migration-checklist.md`](web/app/themes/remote-leverage/docs/content-migration-checklist.md) (2026-09-10), which counted **233** published pages; [`PAGE-MIGRATION-STATUS.md`](PAGE-MIGRATION-STATUS.md) says **235** as of 2026-09-15. The two-page gap has not been chased and does not affect scope — both agree on the 44 production URLs being migrated. Everything describing *local* state was re-queried directly (54 published pages + 1 draft, 56 blocks, 102 patterns, 774 passing tests, 198 redirect entries).
 
@@ -17,6 +17,7 @@ This repository *is* the new platform. It is not live yet — it runs locally an
 - [How it fits together](#how-it-fits-together)
 - [The eight domains](#the-eight-domains)
 - [Replacing production](#replacing-production)
+- [Editing the site with Claude](#editing-the-site-with-claude)
 - [Documentation index](#documentation-index)
 - [Known issues](#known-issues)
 
@@ -273,6 +274,55 @@ Full plan, per-page inventory and sequencing: [`docs/production-cutover.md`](web
 
 ---
 
+## Editing the site with Claude
+
+The marketing team edits live landing pages, reads enquiry data and uploads media by asking Claude,
+without opening WordPress and without a deploy. This works from **claude.ai, Claude Desktop and
+mobile** — any Claude, not just Claude Code — over MCP.
+
+Full setup, both halves: [**connecting-claude-to-production.md**](web/app/themes/remote-leverage/docs/connecting-claude-to-production.md).
+
+**What it exposes.** Ten abilities on the default MCP server, each permission-gated by its own
+`permission()` method:
+
+| Group | Abilities |
+| :--- | :--- |
+| Read | `list-pages`, `describe-page`, `list-patterns` |
+| Write | `clone-page`, `update-page-sections`, `create-landing-page`, `update-landing-page-content` |
+| Media | `upload-media` |
+| Enquiries | `lead-stats`, `query-leads` |
+
+**The identity.** A dedicated `ai-content-agent` WordPress user, provisioned and reconciled by
+`ContentAgentProvisioner::ensure()` on every container start — never by hand. Deploy reconciles but
+**never mints a credential**, because deploy output goes to CloudWatch and a password printed there
+is a password leaked. `wp acorn rl:ai:agent --rotate` is the only thing that issues one.
+
+**Everything is off by default.** All four capability flags default to `false`, so an environment
+that sets nothing gets an agent that can draft a page and nothing else:
+
+| Variable | Grants |
+| :--- | :--- |
+| `AI_AGENT_CAN_PUBLISH` | `publish_pages` — may publish a cloned page directly |
+| `AI_AGENT_CAN_EDIT_PUBLISHED` | `edit_published_pages` — may change a page that is already live |
+| `AI_AGENT_CAN_READ_LEADS` | `rl_read_business_data` — `lead-stats` and `query-leads` |
+| `AI_AGENT_CAN_UPLOAD_MEDIA` | `upload_files` — `upload-media` |
+
+Because `ensure()` runs every deploy, these **tighten as well as widen** — removing a flag revokes
+the capability on the next release rather than leaving a stale grant behind.
+
+**Connecting a client.** Three routes, detailed in the doc. A claude.ai custom connector using
+`Authorization: Basic` under the Request-headers beta needs nobody to install anything but is gated
+per organisation; Claude Desktop with the `@automattic/mcp-wordpress-remote` STDIO proxy always
+works; and this repo's `.mcp.json` wires Claude Code from `PRODUCTION_MCP_APP_PASSWORD`.
+
+**Two things to know before granting production access.** Edits to a published page are live the
+moment they return, with no review step. And because most pages are a single `wp:pattern`
+reference, the first edit **detaches the page from its `patterns/<slug>.php` file in git** and
+leaves it as database-resident markup, which the next refresh overwrites — the ability returns a
+`detached_from_patterns` warning naming the file, and that warning is a task, not a notification.
+
+---
+
 ## Documentation index
 
 Everything lives under [`web/app/themes/remote-leverage/docs/`](web/app/themes/remote-leverage/docs/) — start at its [README](web/app/themes/remote-leverage/docs/README.md).
@@ -285,6 +335,9 @@ Everything lives under [`web/app/themes/remote-leverage/docs/`](web/app/themes/r
 | Verified environment-variable reference | [configuration.md](web/app/themes/remote-leverage/docs/configuration.md) |
 | Tokens, blocks, patterns, templates | [design-system.md](web/app/themes/remote-leverage/docs/design-system.md) |
 | WP Admin surfaces this theme adds | [admin-screens.md](web/app/themes/remote-leverage/docs/admin-screens.md) |
+| **Connecting Claude to production (marketing)** | [**connecting-claude-to-production.md**](web/app/themes/remote-leverage/docs/connecting-claude-to-production.md) |
+| MCP abilities, agent users, local↔remote sync | [ai-mcp-and-sync.md](web/app/themes/remote-leverage/docs/ai-mcp-and-sync.md) |
+| Claude Desktop guide for non-technical editors | [claude-desktop-for-editors.md](web/app/themes/remote-leverage/docs/claude-desktop-for-editors.md) |
 | **Migration scope & per-URL status** | [**PAGE-MIGRATION-STATUS.md**](PAGE-MIGRATION-STATUS.md) |
 | Cutover plan & content inventory | [production-cutover.md](web/app/themes/remote-leverage/docs/production-cutover.md) |
 | Domain guides (8) | [domains/](web/app/themes/remote-leverage/docs/domains/) |

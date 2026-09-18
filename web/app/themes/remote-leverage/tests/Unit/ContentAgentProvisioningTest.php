@@ -41,12 +41,24 @@ it('maps every managed capability to a config flag that exists', function () {
     }
 });
 
-it('manages the three capabilities that widen what an agent may do', function () {
+it('manages the four capabilities that widen what an agent may do', function () {
     expect(managedCapabilities())->toBe([
         'publish_pages' => 'can_publish',
         'edit_published_pages' => 'can_edit_published',
         InsightsCapability::NAME => 'can_read_leads',
+        'upload_files' => 'can_upload_media',
     ]);
+});
+
+/**
+ * upload_files is the one managed capability the editor role already grants, so
+ * it is the one where "default closed" depends on ensure() writing an explicit
+ * denial rather than simply never granting it. If it were ever moved out of this
+ * list to sit alongside edit_pages, the agent would silently regain uploads on
+ * every environment.
+ */
+it('manages upload_files rather than letting the role decide it', function () {
+    expect(managedCapabilities())->toHaveKey('upload_files');
 });
 
 /**
@@ -58,7 +70,7 @@ it('defaults every capability flag closed', function (string $flag) {
     // env() falls back to the default when the variable is unset, which is the
     // state a fresh environment is in.
     expect(agentConfig()[$flag])->toBeFalse();
-})->with(['can_publish', 'can_edit_published', 'can_read_leads']);
+})->with(['can_publish', 'can_edit_published', 'can_read_leads', 'can_upload_media']);
 
 it('does not grant edit_pages through this list', function () {
     // edit_pages comes with the role. If it were managed here, a missing config
