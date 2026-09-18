@@ -10,7 +10,11 @@ test('homepage layout defers Livewire scripts and does not preload a missing Map
         ->toContain('@livewireScripts')
         ->not->toContain('Map.webp')
         ->not->toContain('Map.png')
-        ->not->toContain('fonts.googleapis.com');
+        ->not->toContain('fonts.googleapis.com')
+        ->toContain('PageChrome::usesHireVaHero()')
+        ->toContain('rel="preload" as="image"')
+        ->toContain('(max-width: 1023px)')
+        ->toContain('(min-width: 1024px)');
 });
 
 /*

@@ -1152,8 +1152,9 @@
        * `onSessionId` is PostHog's own callback for exactly this, and it is in the snippet's
        * stubbed method list — so registering it before array.js lands is safe, and it fires the
        * moment the id exists. It replaced a 500ms x 20 poll that only existed because PostHog
-       * arrived from the GTM container at an unpredictable time. `TrackingHooks` now loads it in
-       * `wp_head` ahead of this component, so there is no longer a race to wait out.
+       * arrived from the GTM container at an unpredictable time. `TrackingHooks` installs
+       * the stub in `wp_head` ahead of this component (array.js waits for idle/load), so
+       * registering `onSessionId` here is safe.
        *
        * `false` on the set() keeps it out of the request queue: this is a passive stamp and
        * must never cost the visitor a round trip mid-form.

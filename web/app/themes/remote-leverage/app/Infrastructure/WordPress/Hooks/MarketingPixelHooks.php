@@ -98,10 +98,12 @@ class MarketingPixelHooks
     /**
      * Defines `window.rlDefer`, which holds a callback until the page is done being busy.
      *
-     * Flushes on the earliest of: the first real user interaction, browser idle, or
-     * `pixels.defer.timeout_ms`. Interaction is included because an engaged visitor should not
-     * wait out the timeout to be tracked, and idle alone never arrives on a page that stays
-     * busy — which is the page this exists for.
+     * Flushes on the earliest of: the first real user interaction, `window` load,
+     * browser idle, or `pixels.defer.timeout_ms`. Interaction is included because
+     * an engaged visitor should not wait out the timeout to be tracked. Load is
+     * included so a visit that already painted does not sit on the Lighthouse
+     * ceiling. Idle alone never arrives on a page that stays busy — which is
+     * the page this exists for.
      *
      * The flush also pushes `rl_idle` onto `dataLayer`. That is the hook for deferring a tag
      * that lives in the container rather than here: retrigger it on `rl_idle` instead of
@@ -117,7 +119,7 @@ class MarketingPixelHooks
             return;
         }
 
-        $timeout = (int) config('pixels.defer.timeout_ms', 2500);
+        $timeout = (int) config('pixels.defer.timeout_ms', 6000);
 
         echo <<<HTML
 <!-- Deferred pixel loading (config/pixels.php) -->
@@ -138,6 +140,8 @@ class MarketingPixelHooks
       w.removeEventListener(EVENTS[i], flush, true);
     }
 
+    w.removeEventListener('load', flush);
+
     for (var j = 0; j < queue.length; j++) {
       try { queue[j](); } catch (e) {}
     }
@@ -153,6 +157,7 @@ class MarketingPixelHooks
     w.addEventListener(EVENTS[k], flush, { once: true, passive: true, capture: true });
   }
 
+  w.addEventListener('load', flush);
   timer = w.setTimeout(flush, {$timeout});
 
   if (typeof w.requestIdleCallback === 'function') {
@@ -160,6 +165,10 @@ class MarketingPixelHooks
   }
 
   w.rlDefer = function (fn) { flushed ? fn() : queue.push(fn); };
+
+  if (d.readyState === 'complete') {
+    flush();
+  }
 })(window, document);
 </script>
 

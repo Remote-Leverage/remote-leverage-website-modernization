@@ -16,6 +16,8 @@
 
   // $checklist is supplied by HireVaHeroBlock::with(); it falls back to the
   // standard six English items when the block's repeater is empty.
+
+  $heroBg = BlockDefaults::hireVaHeroBackground();
 @endphp
 
 {{-- pt-24 below lg clears the fixed 90px CTA-only header (sections/header-cta.blade.php).
@@ -25,9 +27,18 @@
 <section class="relative overflow-hidden bg-[#1E0B38] text-white min-h-dvh flex flex-col justify-between pt-24 lg:pt-8 pb-6 sm:pb-8 lg:pb-10">
   {{-- Hero Background Graphic with Candidate Grid --}}
   <div class="absolute inset-0 z-0 pointer-events-none select-none">
-    <img src="{{ BlockDefaults::themeImg('hire-va-4/hire-va-bg.webp') }}"
-         alt="" width="1366" height="945"
-         class="w-full h-full object-cover object-[70%_top] lg:object-top" />
+    {{-- LCP on every page that uses this block. fetchpriority high and no lazy
+         attribute, matching home-hero. The 750px source is the Moto G / PSI
+         viewport; the 1366px original stays the desktop candidate. Preloads
+         with the same media queries live in layouts/app.blade.php because
+         wp_head has already run by the time this markup is emitted. --}}
+    <picture>
+      <source media="(max-width: 1023px)" srcset="{{ $heroBg['mobile'] }}" type="image/webp" width="750" height="519" />
+      <img src="{{ $heroBg['desktop'] }}"
+           alt="" width="1366" height="945"
+           fetchpriority="high" decoding="async"
+           class="w-full h-full object-cover object-[70%_top] lg:object-top" />
+    </picture>
     {{-- Dark gradient overlay for mobile/tablet text readability --}}
     <div class="absolute inset-0 bg-gradient-to-r from-[#1E0B38]/95 via-[#1E0B38]/75 to-transparent lg:hidden"></div>
   </div>

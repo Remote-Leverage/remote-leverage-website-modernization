@@ -365,7 +365,10 @@ return [
     | stub and drains it when the SDK arrives, so the stub and the `init` /
     | `track` calls still run immediately and only the network fetch waits. See
     | `MarketingPixelHooks::injectDeferBootstrap()` for the flush conditions:
-    | the earliest of first user interaction, browser idle, or `timeout_ms`.
+    | the earliest of first user interaction, `window` load, browser idle, or
+    | `timeout_ms`. Load is included so a real visit that paints in ~2s does
+    | not wait out the Lighthouse-oriented ceiling; the timeout is the floor
+    | for a lab run that never goes idle and never fires `load` before LCP.
     |
     | Two are deliberately NOT deferrable, and adding them here does nothing:
     |
@@ -379,21 +382,23 @@ return [
     | The flush also pushes `rl_idle` onto `dataLayer`, which is the intended
     | way to defer a tag that lives in the container rather than here: retrigger
     | it on that custom event instead of on `gtm.js`. TikTok (162KB, the largest
-    | single non-Google third party) is the reason that hook exists.
+    | single non-Google third party) is the reason that hook exists, and it is
+    | in the default vendor list for that reason.
     */
     'defer' => [
         'vendors' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('PIXEL_DEFER_VENDORS', 'linkedin,openai,hubspot,bing_uet')),
+            explode(',', trim((string) env('PIXEL_DEFER_VENDORS', '')) ?: 'linkedin,openai,hubspot,bing_uet,tiktok'),
         ))),
 
         /*
-         * Upper bound on the wait, in milliseconds. `requestIdleCallback`
-         * normally fires well inside this; the timeout is the floor for a page
-         * that never goes idle, which is precisely the busy page that made
-         * deferring worth doing.
+         * Upper bound on the wait, in milliseconds. 6000 is past the hire-va
+         * LCP window on Slow 4G (5.7s staging, 13s production on 2026-09-18).
+         * The previous 2500ms ceiling flushed during LCP, so deferred pixels
+         * still fought the hero image. `?:` so an empty PIXEL_DEFER_TIMEOUT_MS
+         * falls through the same way the pixel ids do.
          */
-        'timeout_ms' => max(0, (int) env('PIXEL_DEFER_TIMEOUT_MS', 2500)),
+        'timeout_ms' => max(0, (int) (trim((string) env('PIXEL_DEFER_TIMEOUT_MS', '')) ?: 6000)),
     ],
 
     /*

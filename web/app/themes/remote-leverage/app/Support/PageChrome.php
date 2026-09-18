@@ -60,6 +60,54 @@ class PageChrome
     private const MAX_PATTERN_DEPTH = 4;
 
     /**
+     * Whether the current page renders `acf/hire-va-hero`.
+     *
+     * Used to emit the LCP image preloads from the layout head — `wp_head` has
+     * already run by the time the block itself renders, so the block cannot
+     * register them. Same pattern walk as the CTA-only header: page content is
+     * a single pattern reference, and the hero sits inside it.
+     */
+    public static function usesHireVaHero(): bool
+    {
+        if (! is_singular()) {
+            return false;
+        }
+
+        $post = get_post();
+
+        if (! $post || ! is_string($post->post_content) || $post->post_content === '') {
+            return false;
+        }
+
+        return self::contentHasBlock($post->post_content, 'acf/hire-va-hero');
+    }
+
+    /**
+     * Whether a block comment appears in this content or in any pattern it references.
+     *
+     * Matched textually rather than via `has_block()` so unit tests can assert
+     * against pattern files without booting WordPress.
+     */
+    public static function contentHasBlock(string $content, string $block, int $depth = 0): bool
+    {
+        if ($depth > self::MAX_PATTERN_DEPTH || trim($content) === '' || $block === '') {
+            return false;
+        }
+
+        if (str_contains($content, '<!-- wp:'.$block.' ')) {
+            return true;
+        }
+
+        foreach (self::patternSlugsIn($content) as $slug) {
+            if (self::contentHasBlock(self::patternContent($slug), $block, $depth + 1)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Whether the current page takes the CTA-only header (sections.header-cta)
      * in place of the global site header.
      */

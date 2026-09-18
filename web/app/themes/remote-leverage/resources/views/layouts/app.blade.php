@@ -6,6 +6,18 @@
     <meta name="theme-color" content="#8A2BE2">
     <meta name="description" content="Hire pre-vetted bilingual virtual assistants and remote professionals across Latin America and Europe. No contracts, zero salary markup, and a 12-month replacement guarantee.">
 
+    {{-- LCP preload for acf/hire-va-hero. Must sit above wp_head(): production
+         pixels also land there, and a preload after those scripts loses the
+         race the preload exists to win. Media-split so a phone does not
+         download the 1366px original. --}}
+    @if (\App\Support\PageChrome::usesHireVaHero())
+      @php($hireVaLcp = \App\Support\BlockDefaults::hireVaHeroBackground())
+      <link rel="preload" as="image" type="image/webp" fetchpriority="high"
+            href="{{ $hireVaLcp['mobile'] }}" media="(max-width: 1023px)">
+      <link rel="preload" as="image" type="image/webp" fetchpriority="high"
+            href="{{ $hireVaLcp['desktop'] }}" media="(min-width: 1024px)">
+    @endif
+
     <link rel="icon" type="image/svg+xml" href="{{ Vite::asset('resources/images/logo-icon-black.svg') }}">
 
     <script type="application/ld+json">

@@ -1175,11 +1175,14 @@ if (sentryDsn && !SENTRY_BOT_UA.test(navigator.userAgent || '')) {
   }).catch((err) => console.error('Sentry initialization failed:', err));
 }
 
-// PostHog is NOT initialised here. TrackingHooks::injectPostHogSnippet() already loads it on
-// `wp_head` (priority 2) with the official array.js snippet, which is earlier than this module
-// and is what production does. This block used to import the `posthog-js` package and call
-// `init()` a second time against the same key, which loaded two copies of the SDK and captured
-// every pageview twice. It was invisible only because POSTHOG_API_KEY has never been set.
+// PostHog is NOT initialised here. TrackingHooks::injectPostHogSnippet() already
+// installs the queueing stub on `wp_head` (priority 2) and defers `array.js`
+// until idle/load/interaction, which is earlier than this module and is what
+// production does. This block used to import the `posthog-js` package and call
+// `init()` a second time against the same key, which loaded two copies of the
+// SDK and captured every pageview twice. It was invisible only because
+// POSTHOG_API_KEY has never been set.
 //
-// `window.posthog` is the snippet's queueing stub until array.js lands, so callers such as
-// resources/js/payment-gateway.js can call `posthog.capture()` immediately either way.
+// `window.posthog` is the snippet's queueing stub until array.js lands, so
+// callers such as resources/js/payment-gateway.js can call `posthog.capture()`
+// immediately either way.

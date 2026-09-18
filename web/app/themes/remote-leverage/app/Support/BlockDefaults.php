@@ -428,6 +428,48 @@ class BlockDefaults
     }
 
     /**
+     * Theme `public/images/` URL, or null when the file is missing or empty.
+     *
+     * `themeImg()` falls through to `homeImg(basename)` so a missing theme file
+     * can still resolve from EFS. That is the wrong fallback for an optional
+     * sibling (the 750px LCP crop): a miss should use the desktop original,
+     * not search uploads for a filename that never lived there.
+     */
+    public static function themeImgIfPresent(string $path): ?string
+    {
+        $path = ltrim($path, '/');
+
+        if (! function_exists('get_theme_file_path') || ! function_exists('get_template_directory_uri')) {
+            return null;
+        }
+
+        $themePath = get_theme_file_path('public/images/'.$path);
+
+        if (! self::isUsableFile($themePath)) {
+            return null;
+        }
+
+        return esc_url(set_url_scheme(get_template_directory_uri().'/public/images/'.$path, 'https'));
+    }
+
+    /**
+     * Desktop and mobile URLs for the hire-va hero LCP background.
+     *
+     * The 750px sibling is emitted by `vite/theme-images.js` at build time.
+     * Until that file exists (a cold `public/` directory), both keys point at
+     * the 1366px original so the `<picture>` and the head preloads still resolve.
+     *
+     * @return array{desktop: string, mobile: string}
+     */
+    public static function hireVaHeroBackground(): array
+    {
+        $desktop = self::themeImg('hire-va-4/hire-va-bg.webp');
+        $mobile = self::themeImgIfPresent('hire-va-4/hire-va-bg-750.webp') ?? $desktop;
+
+        return compact('desktop', 'mobile');
+    }
+
+    /**
      * Basename => attachment ID for every file in the media library.
      *
      * Built once per request from a single query rather than one lookup per

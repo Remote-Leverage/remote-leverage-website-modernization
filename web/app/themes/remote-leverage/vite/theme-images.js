@@ -24,6 +24,46 @@ const CACHE_FILE = 'node_modules/.cache/theme-images.json'
 const RASTER = new Set(['.png', '.jpg', '.jpeg'])
 const PASSTHROUGH = new Set(['.gif', '.webp'])
 
+/**
+ * Extra widths emitted next to a source. The hire-va hero is LCP on every
+ * landing that uses it, and the 1366×945 original is what PSI was decoding
+ * into a 412px Moto G viewport. Filenames stay unhashed (BlockDefaults
+ * builds the URL by hand) and use `-{width}` before the extension:
+ * `hire-va-bg.webp` → `hire-va-bg-750.webp`.
+ *
+ * Folded into the cache digest below so adding a variant rebuilds that
+ * source even when its bytes have not changed.
+ *
+ * @type {Record<string, Array<{ width: number, quality?: number }>>}
+ */
+const RESPONSIVE_VARIANTS = {
+  'hire-va-4/hire-va-bg.webp': [{ width: 750, quality: 80 }],
+}
+
+function variantTarget(relative, variant) {
+  const parsed = path.parse(relative)
+
+  return path.join(OUT_DIR, parsed.dir, `${parsed.name}-${variant.width}${parsed.ext}`)
+}
+
+async function writeResponsiveVariants(sharp, input, relative) {
+  const variants = RESPONSIVE_VARIANTS[relative] ?? []
+  const outputs = []
+
+  for (const variant of variants) {
+    const dest = variantTarget(relative, variant)
+    const buf = await sharp(input, { failOn: 'none' })
+      .resize({ width: variant.width, withoutEnlargement: true })
+      .webp({ quality: variant.quality ?? 80, effort: 5 })
+      .toBuffer()
+
+    await write(dest, buf)
+    outputs.push(dest)
+  }
+
+  return outputs
+}
+
 // Sharp and svgo are only needed during a build; importing them lazily keeps `vite dev`
 // startup from paying for the native binding.
 async function loadTooling() {
@@ -102,7 +142,7 @@ async function processFile({ sharp, optimize }, relative) {
   if (PASSTHROUGH.has(ext)) {
     await write(target, input)
 
-    return [target]
+    return [target, ...await writeResponsiveVariants(sharp, input, relative)]
   }
 
   if (! RASTER.has(ext)) {
@@ -182,7 +222,13 @@ export function themeImages() {
           async () => {
             let relative
             while ((relative = queue.shift()) !== undefined) {
-              const digest = hash(await fs.readFile(path.join(SOURCE_DIR, relative)))
+              const input = await fs.readFile(path.join(SOURCE_DIR, relative))
+              // Variants are part of the identity of a source: adding hire-va-bg-750
+              // must rebuild even though hire-va-bg.webp itself did not change.
+              const digest = hash(Buffer.concat([
+                input,
+                Buffer.from('\0' + JSON.stringify(RESPONSIVE_VARIANTS[relative] ?? [])),
+              ]))
               const cached = cache[relative]
 
               if (cached?.hash === digest && await outputsExist(cached.outputs)) {

@@ -445,6 +445,7 @@ describe('deferred SDK loading', function () {
             ->and($out)->toContain('pointerdown')
             ->and($out)->toContain('requestIdleCallback')
             ->and($out)->toContain('w.setTimeout(flush, 1800)')
+            ->and($out)->toContain("w.addEventListener('load', flush)")
             // The hook a container tag retriggers on, so TikTok can be deferred without
             // leaving GTM. A tag would point at this event name.
             ->and($out)->toContain("event: 'rl_idle'");
@@ -512,6 +513,14 @@ describe('deferred SDK loading', function () {
             ->and($out)->toContain('js-na2.hs-scripts.com/243484989.js')
             // The undeferred path emits a plain tag; the deferred one must not also do that.
             ->and($out)->not->toContain('<script id="hs-script-loader"');
+    });
+
+    test('the shipped defaults defer TikTok and wait past LCP', function () {
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/config/pixels.php');
+
+        expect($src)
+            ->toContain("'linkedin,openai,hubspot,bing_uet,tiktok'")
+            ->toContain('?: 6000');
     });
 });
 
@@ -608,7 +617,14 @@ describe('defaults that used to depend on an unset variable', function () {
 
         expect($out)->toContain('posthog.init(')
             // Surveys are the 33KB nothing in this codebase asks for.
-            ->and($out)->toContain('disable_surveys:true');
+            ->and($out)->toContain('disable_surveys:true')
+            // Stub and init stay synchronous; only array.js waits for idle/load.
+            ->and($out)->toContain('/static/array.js')
+            ->and($out)->toContain('requestIdleCallback')
+            ->and($out)->not->toContain('parentNode.insertBefore');
+
+        expect(strpos($out, 'posthog.init('))
+            ->toBeLessThan(strpos($out, '/static/array.js'));
     });
 });
 
