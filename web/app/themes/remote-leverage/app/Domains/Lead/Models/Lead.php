@@ -14,6 +14,19 @@ class Lead extends Model
 {
     use SoftDeletes;
 
+    /**
+     * Where the leads dashboard's KPI aggregates are cached.
+     *
+     * A constant because six places invalidate it and only one writes it. While it was a literal
+     * repeated in each, changing what the cache holds meant changing the key in seven files or
+     * silently orphaning the five that clear it — the cache would still be written, never
+     * cleared, and the cards would go stale until the TTL happened to expire.
+     *
+     * The `_v2` suffix is that change: "Partial Form Drops" now counts `submission_type`, so any
+     * value cached under the old key is a number this dashboard no longer means.
+     */
+    public const KPI_CACHE_KEY = 'rl_lead_dashboard_kpi_metrics_v2';
+
     protected $table = 'rl_leads';
 
     protected $fillable = [

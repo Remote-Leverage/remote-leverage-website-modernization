@@ -47,7 +47,7 @@ class PurgeOldLeadsAction
             ]);
         }
 
-        Cache::forget('rl_lead_dashboard_kpi_metrics');
+        Cache::forget(Lead::KPI_CACHE_KEY);
 
         return $count;
     }

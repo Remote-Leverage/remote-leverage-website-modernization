@@ -16,6 +16,7 @@ use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Listeners\HandleLeadEventsForEmailNotification;
 use App\Domains\Lead\Listeners\HandleLeadEventsForSlack;
 use App\Domains\Lead\Listeners\HandleLeadEventsForWebhook;
+use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\GatedAssetResolver;
 use App\Domains\Lead\Services\HubSpotGateway;
 use App\Domains\Lead\Services\LeadActivityLogger;
@@ -170,7 +171,7 @@ class LeadServiceProvider extends ServiceProvider
 
         // 5. Invalidate admin dashboard KPI cache on lead lifecycle events
         Event::listen([LeadCreated::class, LeadBookingCompleted::class], function () {
-            Cache::forget('rl_lead_dashboard_kpi_metrics');
+            Cache::forget(Lead::KPI_CACHE_KEY);
         });
 
         // 6. Hourly WP-Cron: process leads abandoned before completing booking (ADR-0008)

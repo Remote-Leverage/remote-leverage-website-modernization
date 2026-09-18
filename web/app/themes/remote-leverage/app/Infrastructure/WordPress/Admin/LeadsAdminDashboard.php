@@ -10,9 +10,12 @@ use App\Domains\Lead\Data\LeadAudience;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Models\LeadProfile;
+use App\Domains\Lead\Services\LeadAvatar;
 use App\Domains\Lead\Services\LeadPlatform;
 use App\Domains\Lead\Services\LeadSearch;
 use App\Domains\Lead\Services\LeadSettingsService;
+use App\Domains\Lead\Services\LeadStatus;
+use App\Domains\Lead\Services\LeadSubmission;
 use App\Domains\Scheduling\Actions\RetryFailedBookingAction;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
@@ -128,7 +131,7 @@ class LeadsAdminDashboard
         if ($action === 'purge_leads') {
             check_admin_referer('rl_purge_leads_nonce');
             $purgedCount = app(PurgeOldLeadsAction::class)->execute(30);
-            Cache::forget('rl_lead_dashboard_kpi_metrics');
+            Cache::forget(Lead::KPI_CACHE_KEY);
             wp_safe_redirect(admin_url('admin.php?page=rl-leads&purged_count='.$purgedCount));
             exit;
         }
@@ -139,10 +142,16 @@ class LeadsAdminDashboard
             $newStatus = sanitize_text_field($_POST['new_status'] ?? '');
             $lead = Lead::find($leadId);
 
-            if ($lead && in_array($newStatus, ['captured', 'qualified', 'booked', 'partial', 'abandoned', 'canceled'], true)) {
+            /*
+             * Checked against the enum rather than a list kept by hand. The list here used to
+             * admit 'qualified' and 'partial', neither of which the column accepts — so the
+             * guard passed and the UPDATE was what failed, which under STRICT_TRANS_TABLES is a
+             * 500 rather than a message anyone can act on.
+             */
+            if ($lead && LeadStatus::isKnown($newStatus)) {
                 $oldStatus = $lead->status;
                 $lead->update(['status' => $newStatus]);
-                Cache::forget('rl_lead_dashboard_kpi_metrics');
+                Cache::forget(Lead::KPI_CACHE_KEY);
 
                 LeadActivityLog::create([
                     'lead_id' => $lead->id,
@@ -217,7 +226,7 @@ class LeadsAdminDashboard
             check_admin_referer('rl_retry_booking_nonce');
             $leadId = absint($_REQUEST['lead_id'] ?? 0);
             $result = app(RetryFailedBookingAction::class)->execute($leadId);
-            Cache::forget('rl_lead_dashboard_kpi_metrics');
+            Cache::forget(Lead::KPI_CACHE_KEY);
             wp_safe_redirect(admin_url('admin.php?page=rl-leads-diagnostics&retry_result='.($result['success'] ? 'success' : 'failed').'&lead_id='.$leadId));
             exit;
         }
@@ -230,7 +239,7 @@ class LeadsAdminDashboard
             if ($lead) {
                 $lead->activityLogs()->delete();
                 $lead->delete();
-                Cache::forget('rl_lead_dashboard_kpi_metrics');
+                Cache::forget(Lead::KPI_CACHE_KEY);
                 wp_safe_redirect(admin_url('admin.php?page=rl-leads&lead_deleted=1'));
                 exit;
             }
@@ -597,19 +606,42 @@ class LeadsAdminDashboard
                 align-items: center;
                 gap: 12px;
             }
+            .rl-avatar {
+                position: relative;
+                width: var(--rl-avatar-size, 36px);
+                height: var(--rl-avatar-size, 36px);
+                flex-shrink: 0;
+            }
             .rl-avatar-initials {
-                width: 36px;
-                height: 36px;
+                width: var(--rl-avatar-size, 36px);
+                height: var(--rl-avatar-size, 36px);
                 border-radius: 9999px;
                 background: #f4f4f5;
                 border: 1px solid #e4e4e7;
                 color: #09090b;
                 font-weight: 600;
-                font-size: 12px;
+                font-size: calc(var(--rl-avatar-size, 36px) / 3);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 flex-shrink: 0;
+            }
+            /*
+             * The logo sits over the initials rather than replacing them, so a favicon that
+             * 404s can simply delete itself and reveal what was always underneath. White
+             * background because most favicons are dark marks cut for a light tab bar.
+             */
+            .rl-avatar-logo {
+                position: absolute;
+                inset: 0;
+                width: var(--rl-avatar-size, 36px);
+                height: var(--rl-avatar-size, 36px);
+                border-radius: 9999px;
+                border: 1px solid #e4e4e7;
+                background: #ffffff;
+                object-fit: contain;
+                padding: calc(var(--rl-avatar-size, 36px) / 6);
+                box-sizing: border-box;
             }
             .rl-contact-info {
                 display: flex;
@@ -1027,6 +1059,24 @@ class LeadsAdminDashboard
         $dateFilter = sanitize_text_field($_GET['date_range'] ?? '');
         $platformFilter = sanitize_text_field($_GET['platform'] ?? '');
         $audienceFilter = sanitize_text_field($_GET['audience'] ?? '');
+        $submissionFilter = sanitize_text_field($_GET['submission'] ?? '');
+
+        /*
+         * `status=partial` is where the Partial Form Drops card used to point, and it is in
+         * whatever bookmarks that card produced. It never matched anything — `partial` is not in
+         * the status enum — so rather than leave those links returning an empty list, they are
+         * read as what they were always asking for.
+         */
+        if (strtolower($statusFilter) === 'partial') {
+            $submissionFilter = LeadSubmission::PARTIAL;
+            $statusFilter = '';
+        }
+
+        // A status the column cannot hold would filter the list down to nothing and look like an
+        // answer; treat it as no filter at all.
+        if ($statusFilter !== '' && ! LeadStatus::isKnown($statusFilter)) {
+            $statusFilter = '';
+        }
 
         /*
          * Newest first means newest *submission*, not highest id. The Gravity Forms import
@@ -1054,11 +1104,12 @@ class LeadsAdminDashboard
 
         LeadPlatform::apply($query, $platformFilter);
         LeadAudience::constrain($query, $audienceFilter);
+        LeadSubmission::apply($query, $submissionFilter);
 
         $this->applyDateRange($query, $dateFilter);
 
         // Cache executive KPI metric counts for 3 minutes to avoid full table aggregate scans on every filter
-        $metrics = Cache::remember('rl_lead_dashboard_kpi_metrics', 180, function () {
+        $metrics = Cache::remember(Lead::KPI_CACHE_KEY, 180, function () {
             return [
                 'total' => Lead::count(),
                 'booked' => Lead::where('status', 'booked')->count(),
@@ -1066,7 +1117,8 @@ class LeadsAdminDashboard
                     ->whereNotNull('monthly_revenue')
                     ->where('monthly_revenue', '!=', '')
                     ->count(),
-                'partial' => Lead::where('status', 'partial')->count(),
+                // `status` has no 'partial' — the drop-off lives in submission_type.
+                'partial' => tap(Lead::query(), fn ($q) => LeadSubmission::apply($q, LeadSubmission::PARTIAL))->count(),
                 'logs' => LeadActivityLog::count(),
             ];
         });
@@ -1084,6 +1136,7 @@ class LeadsAdminDashboard
             'date_range' => $dateFilter,
             'platform' => $platformFilter,
             'audience' => $audienceFilter,
+            'submission' => $submissionFilter,
         ]);
 
         ?>
@@ -1128,7 +1181,7 @@ class LeadsAdminDashboard
 
             <!-- KPI Metrics Grid -->
             <div class="rl-stats-grid">
-                <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads')); ?>" class="rl-card <?php echo ! $statusFilter && ! $mrrFilter && ! $platformFilter && ! $audienceFilter ? 'rl-card-active' : ''; ?>">
+                <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads')); ?>" class="rl-card <?php echo ! $statusFilter && ! $mrrFilter && ! $platformFilter && ! $audienceFilter && ! $submissionFilter ? 'rl-card-active' : ''; ?>">
                     <div class="rl-card-header">
                         <span class="rl-card-title">Total Submissions</span>
                         <?php echo $this->iconUsers(); ?>
@@ -1152,7 +1205,7 @@ class LeadsAdminDashboard
                     <div class="rl-card-value"><?php echo esc_html((string) $t10Leads); ?></div>
                     <div class="rl-card-subtext">&ge; $10k/mo revenue tier</div>
                 </a>
-                <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads&status=partial')); ?>" class="rl-card <?php echo $statusFilter === 'partial' ? 'rl-card-active' : ''; ?>">
+                <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads&submission=partial')); ?>" class="rl-card <?php echo $submissionFilter === LeadSubmission::PARTIAL ? 'rl-card-active' : ''; ?>">
                     <div class="rl-card-header">
                         <span class="rl-card-title">Partial Form Drops</span>
                         <?php echo $this->iconAlert(); ?>
@@ -1182,11 +1235,20 @@ class LeadsAdminDashboard
                     
                     <select name="status" class="rl-select">
                         <option value="">All Statuses</option>
-                        <option value="booked" <?php selected($statusFilter, 'booked'); ?>>Booked</option>
-                        <option value="captured" <?php selected($statusFilter, 'captured'); ?>>Captured / Qualified</option>
-                        <option value="partial" <?php selected($statusFilter, 'partial'); ?>>Partial (Step 1)</option>
-                        <option value="abandoned" <?php selected($statusFilter, 'abandoned'); ?>>Abandoned</option>
-                        <option value="canceled" <?php selected($statusFilter, 'canceled'); ?>>Canceled</option>
+                        <?php foreach (LeadStatus::options() as $slug => $label) { ?>
+                            <option value="<?php echo esc_attr($slug); ?>" <?php selected($statusFilter, $slug); ?>>
+                                <?php echo esc_html($label); ?>
+                            </option>
+                        <?php } ?>
+                    </select>
+
+                    <select name="submission" class="rl-select">
+                        <option value="">All Submissions</option>
+                        <?php foreach (LeadSubmission::options() as $slug => $label) { ?>
+                            <option value="<?php echo esc_attr($slug); ?>" <?php selected($submissionFilter, $slug); ?>>
+                                <?php echo esc_html($label); ?>
+                            </option>
+                        <?php } ?>
                     </select>
 
                     <select name="mrr" class="rl-select">
@@ -1218,7 +1280,7 @@ class LeadsAdminDashboard
                     </select>
 
                     <button type="submit" class="rl-btn rl-btn-primary">Filter</button>
-                    <?php if ($search || $statusFilter || $mrrFilter || $dateFilter || $platformFilter || $audienceFilter) { ?>
+                    <?php if ($search || $statusFilter || $mrrFilter || $dateFilter || $platformFilter || $audienceFilter || $submissionFilter) { ?>
                         <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads')); ?>" class="rl-btn rl-btn-outline">Reset</a>
                     <?php } ?>
                 </form>
@@ -1264,7 +1326,7 @@ class LeadsAdminDashboard
                                     </td>
                                     <td>
                                         <div class="rl-contact-cell">
-                                            <div class="rl-avatar-initials"><?php echo esc_html($this->getInitials($lead->name, $lead->email)); ?></div>
+                                            <?php $this->renderAvatar($lead->name, $lead->email); ?>
                                             <div class="rl-contact-info">
                                                 <span class="rl-contact-name">
                                                     <?php echo esc_html($lead->name ?: 'Partial Contact'); ?>
@@ -1302,9 +1364,9 @@ class LeadsAdminDashboard
                                         <?php } ?>
                                     </td>
                                     <td>
-                                        <span class="rl-badge rl-badge-<?php echo esc_attr($lead->status); ?>">
+                                        <span class="rl-badge <?php echo esc_attr(LeadStatus::badgeClass($lead->status)); ?>">
                                             <span class="rl-status-dot"></span>
-                                            <?php echo esc_html(ucfirst($lead->status)); ?>
+                                            <?php echo esc_html(LeadStatus::label($lead->status)); ?>
                                         </span>
                                     </td>
                                     <td>
@@ -1374,7 +1436,7 @@ class LeadsAdminDashboard
                  * because an export started from a filtered list should cover what the list was
                  * showing — the term is resolved through the same LeadSearch the screen uses.
                  */
-                app(LeadExportPanel::class)->renderModal($search, $statusFilter, $platformFilter, $audienceFilter);
+                app(LeadExportPanel::class)->renderModal($search, $statusFilter, $platformFilter, $audienceFilter, $submissionFilter);
         ?>
         </div>
         <?php
@@ -1415,23 +1477,26 @@ class LeadsAdminDashboard
 
             <!-- Lead Header -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
-                <div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <h1 class="rl-admin-title" style="margin: 0;">
-                            <?php echo esc_html($lead->name ?: 'Lead #'.$lead->id); ?>
-                        </h1>
-                        <span class="rl-badge rl-badge-<?php echo esc_attr($lead->status); ?>">
-                            <span class="rl-status-dot"></span>
-                            <?php echo esc_html(ucfirst($lead->status)); ?>
-                        </span>
-                        <?php $audience = $lead->audience(); ?>
-                        <?php if ($audience->label()) { ?>
-                            <span class="rl-badge rl-badge-va" title="<?php echo esc_attr((string) $audience->note()); ?>"><?php echo esc_html($audience->label()); ?></span>
-                        <?php } ?>
-                    </div>
-                    <div style="color: #71717a; font-size: 13px; margin-top: 6px;">
-                        Captured: <strong><?php echo esc_html($lead->created_at?->format('F j, Y \a\t g:i:s A')); ?></strong> &bull; 
-                        UUID: <code style="background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 4px; padding: 2px 6px; font-size: 11px;"><?php echo esc_html($lead->uuid); ?></code>
+                <div style="display: flex; align-items: flex-start; gap: 14px;">
+                    <?php $this->renderAvatar($lead->name, $lead->email, 48); ?>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <h1 class="rl-admin-title" style="margin: 0;">
+                                <?php echo esc_html($lead->name ?: 'Lead #'.$lead->id); ?>
+                            </h1>
+                            <span class="rl-badge <?php echo esc_attr(LeadStatus::badgeClass($lead->status)); ?>">
+                                <span class="rl-status-dot"></span>
+                                <?php echo esc_html(LeadStatus::label($lead->status)); ?>
+                            </span>
+                            <?php $audience = $lead->audience(); ?>
+                            <?php if ($audience->label()) { ?>
+                                <span class="rl-badge rl-badge-va" title="<?php echo esc_attr((string) $audience->note()); ?>"><?php echo esc_html($audience->label()); ?></span>
+                            <?php } ?>
+                        </div>
+                        <div style="color: #71717a; font-size: 13px; margin-top: 6px;">
+                            Captured: <strong><?php echo esc_html($lead->created_at?->format('F j, Y \a\t g:i:s A')); ?></strong> &bull; 
+                            UUID: <code style="background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 4px; padding: 2px 6px; font-size: 11px;"><?php echo esc_html($lead->uuid); ?></code>
+                        </div>
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -1441,12 +1506,11 @@ class LeadsAdminDashboard
                         <input type="hidden" name="rl_action" value="update_status" />
                         <input type="hidden" name="lead_id" value="<?php echo esc_attr((string) $lead->id); ?>" />
                         <select name="new_status" class="rl-select" style="font-weight: 500;">
-                            <option value="captured" <?php selected($lead->status, 'captured'); ?>>Captured</option>
-                            <option value="qualified" <?php selected($lead->status, 'qualified'); ?>>Qualified</option>
-                            <option value="booked" <?php selected($lead->status, 'booked'); ?>>Booked</option>
-                            <option value="partial" <?php selected($lead->status, 'partial'); ?>>Partial</option>
-                            <option value="abandoned" <?php selected($lead->status, 'abandoned'); ?>>Abandoned</option>
-                            <option value="canceled" <?php selected($lead->status, 'canceled'); ?>>Canceled</option>
+                            <?php foreach (LeadStatus::options() as $slug => $label) { ?>
+                                <option value="<?php echo esc_attr($slug); ?>" <?php selected($lead->status, $slug); ?>>
+                                    <?php echo esc_html($label); ?>
+                                </option>
+                            <?php } ?>
                         </select>
                         <button type="submit" class="rl-btn rl-btn-primary">Update Status</button>
                     </form>
@@ -1528,7 +1592,7 @@ class LeadsAdminDashboard
                             </div>
                         <?php } ?>
                         <table class="rl-key-value-table">
-                            <tr><td>Meeting Status:</td><td><span class="rl-badge rl-badge-<?php echo esc_attr($lead->status); ?>"><span class="rl-status-dot"></span><?php echo esc_html(ucfirst($lead->status)); ?></span></td></tr>
+                            <tr><td>Meeting Status:</td><td><span class="rl-badge <?php echo esc_attr(LeadStatus::badgeClass($lead->status)); ?>"><span class="rl-status-dot"></span><?php echo esc_html(LeadStatus::label($lead->status)); ?></span></td></tr>
                             <?php if (! empty($meeting['meeting_id'])) { ?>
                                 <tr><td>Meeting ID:</td><td><code><?php echo esc_html($meeting['meeting_id']); ?></code></td></tr>
                             <?php } ?>
@@ -1979,7 +2043,7 @@ class LeadsAdminDashboard
                                     <td>
                                         <?php if ($log->lead) { ?>
                                             <div class="rl-contact-cell">
-                                                <div class="rl-avatar-initials"><?php echo esc_html($this->getInitials($log->lead->name, $log->lead->email)); ?></div>
+                                                <?php $this->renderAvatar($log->lead->name, $log->lead->email); ?>
                                                 <div class="rl-contact-info">
                                                     <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads&view_lead='.$log->lead_id)); ?>" class="rl-contact-name" style="text-decoration: none;">
                                                         <?php echo esc_html($log->lead->name ?: $log->lead->email); ?>
@@ -2523,20 +2587,42 @@ class LeadsAdminDashboard
 
     protected function getInitials(?string $name, ?string $email): string
     {
-        $name = trim((string) $name);
-        if ($name !== '') {
-            $parts = preg_split('/\s+/', $name);
-            if (count($parts) >= 2) {
-                return strtoupper(mb_substr($parts[0], 0, 1).mb_substr(end($parts), 0, 1));
-            }
+        return LeadAvatar::initials($name, $email);
+    }
 
-            return strtoupper(mb_substr($name, 0, 2));
-        }
-        if ($email) {
-            return strtoupper(mb_substr($email, 0, 2));
-        }
-
-        return 'RL';
+    /**
+     * The avatar beside a lead: their company's logo over their tinted initials.
+     *
+     * The initials are always in the markup, underneath. The logo is an <img> laid over them
+     * that deletes itself if the request fails — which is what an unknown domain does, because
+     * the favicon service answers 404 rather than handing back a generic globe with a 200. So a
+     * row degrades to initials on its own, with no probe from PHP and no placeholder to detect.
+     *
+     * `referrerpolicy` matters more than it looks: without it the admin URL, filters and all,
+     * rides along to Google on every row.
+     */
+    protected function renderAvatar(?string $name, ?string $email, int $size = 36): void
+    {
+        [$background, $foreground] = LeadAvatar::tint($email, $name);
+        $logo = LeadAvatar::logoUrl($email);
+        $domain = LeadAvatar::domain($email);
+        ?>
+        <div class="rl-avatar" style="--rl-avatar-size: <?php echo esc_attr((string) $size); ?>px;">
+            <span class="rl-avatar-initials" style="background: <?php echo esc_attr($background); ?>; color: <?php echo esc_attr($foreground); ?>;">
+                <?php echo esc_html(LeadAvatar::initials($name, $email)); ?>
+            </span>
+            <?php if ($logo !== null) { ?>
+                <img class="rl-avatar-logo"
+                     src="<?php echo esc_url($logo); ?>"
+                     alt=""
+                     title="<?php echo esc_attr((string) $domain); ?>"
+                     loading="lazy"
+                     decoding="async"
+                     referrerpolicy="no-referrer"
+                     onerror="this.remove();" />
+            <?php } ?>
+        </div>
+        <?php
     }
 
     protected function iconUsers(): string

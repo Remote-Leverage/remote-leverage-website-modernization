@@ -10,7 +10,56 @@ Every analytics or marketing event the site fires, across three sources, audited
 
 > **The backup's SQL dump is truncated.** It holds 49 tables, alphabetically `actionscheduler_actions` … `options`, and stops there — verified by `grep -c '^CREATE TABLE'` and by the absence of any `_posts` or `_snippets` CREATE. Table prefix is `wp_add9221751_`, not `wp_`.
 >
-> So `wp_posts` (WPCode snippet bodies), `wp_snippets` (Code Snippets — **the plugin is active**), `wp_usermeta` and every `rl_*` custom table are **not in this audit**. Anything running from those is an unmeasured blind spot. Export `wp_add9221751_snippets` and `wp_posts`/`wp_postmeta` before cutover.
+> So `wp_posts` (WPCode snippet bodies), `wp_snippets` (Code Snippets — **the plugin is active**), `wp_usermeta` and every `rl_*` custom table are **not in this audit**. That was the blind spot. **It has since been closed over SSH for `snippets` and the `wpcode` posts** — see the next section; `postmeta` remains unscanned by choice, because a full `LIKE` sweep of a 2.7 GB table on a live site is not a safe thing to run.
+
+## Production SSH audit, 2026-09-17 — what it corrected
+
+Read-only session against the live server. Four things the offline sources got wrong or could not see:
+
+**1. The backup is materially stale.** `themes/hello-theme-child/functions.php` was modified
+**2026-09-05**, after the backup was taken, and no longer contains the GTM loader or any pixel.
+GTM is now delivered by **Site Kit**, which is why the live HTML carries
+`<!-- Google Tag Manager snippet added by Site Kit -->`. Any statement sourced from the backup's
+`functions.php` is describing a site that no longer exists.
+
+**2. The Code Snippets blind spot is closed, and it is empty.** `wp_add9221751_snippets` holds 8
+rows, **2 active**, neither doing any tracking: "Redact and Download Resumes" (hooks
+`wpforms_process_complete_14353` — WPForms is not installed, so it is dead code, and its
+`redact_resume()` returns an undefined variable) and "Expose Yoast SEO meta to REST API".
+
+**3. The LinkedIn partner id is very likely `9514236`.** WPCode draft #42187 is titled
+*"Linkedin Pixel (Already inserted as GTM)"* and its body carries `9514236` — someone went to
+paste the pixel, found it already in the container, and left the draft. That makes `9514236` the
+one being actively deployed and `6411876` the older leftover.
+
+Not changed here, deliberately: `6411876` is still firing on production today, and a draft title
+is strong evidence rather than proof. Confirm in LinkedIn Campaign Manager -> Account Assets ->
+Insight Tag, then drop `6411876` from `config/pixels.php`. Both keep firing until then.
+
+**4. The pixels are in no file at all.** Grepping the whole docroot for `1430907207548734`,
+`6411876` and `7QY9HDVocGyeNvMMW1gLWb` returns only page-cache HTML. They are served from the
+`uicore_theme_options` row — a theme-options blob. **Pixels held in a theme's options panel do not
+survive a theme change**, which is exactly why they are ported into `config/pixels.php`.
+
+Also confirmed: WPCode draft #38942 contains `posthog.capture('form_submitted')` and
+`posthog.capture('thankyou_page_viewed')` but has never been published, so neither event has ever
+fired. They are correctly absent from the matrix.
+
+### Scale, for the cutover
+
+| | Production | v2 release artifact |
+| :--- | ---: | ---: |
+| Database | **7 GB** | 39 MB |
+| Uploads | **3.3 GB** | 752 MB |
+
+74% of the database is `postmeta` (2.7 GB over 85k rows) and `posts` (2.5 GB over 21k rows) —
+Elementor page data and revisions, none of which migrates. The rest that matters:
+`gf_entry_meta` 479 MB / 1.87M rows, `rl_cio_events` 296 MB, `rl_cio_pageviews` 183 MB,
+`rl_calendly_logs` 98 MB.
+
+Uploads are 3.15 GB of real media across 2023-2026 plus ~130 MB of plugin cruft
+(`wp-file-manager-pro`, `backup`, `complianz`). **v2 carries 752 MB**, so either v2 is missing
+media or the remainder is unreferenced legacy. Worth resolving before the flip.
 
 Legend: **OK** parity · **FIXED** was missing, now present · **GAP** still missing · **N/A** no v2 equivalent by design · **NEW** v2 addition.
 

@@ -8,6 +8,8 @@ use App\Domains\Lead\Data\LeadAudience;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadPlatform;
 use App\Domains\Lead\Services\LeadSearch;
+use App\Domains\Lead\Services\LeadStatus;
+use App\Domains\Lead\Services\LeadSubmission;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -42,6 +44,7 @@ readonly class LeadExportOptions
         public string $search = '',
         public string $platform = '',
         public string $audience = '',
+        public string $submission = '',
     ) {}
 
     /**
@@ -64,9 +67,7 @@ readonly class LeadExportOptions
 
         return new self(
             groups: $groups,
-            status: self::oneOf((string) ($input['status'] ?? ''), [
-                'captured', 'qualified', 'booked', 'partial', 'abandoned', 'canceled',
-            ]),
+            status: self::oneOf((string) ($input['status'] ?? ''), LeadStatus::slugs()),
             sourceType: self::slug((string) ($input['source_type'] ?? '')),
             from: self::date((string) ($input['from'] ?? '')),
             to: self::date((string) ($input['to'] ?? '')),
@@ -75,6 +76,7 @@ readonly class LeadExportOptions
             search: trim((string) ($input['search'] ?? '')),
             platform: self::oneOf((string) ($input['platform'] ?? ''), array_keys(LeadPlatform::options())),
             audience: self::oneOf((string) ($input['audience'] ?? ''), ['clients', 'va']),
+            submission: self::oneOf((string) ($input['submission'] ?? ''), array_keys(LeadSubmission::options())),
         );
     }
 
@@ -98,6 +100,7 @@ readonly class LeadExportOptions
             'search' => $this->search,
             'platform' => $this->platform,
             'audience' => $this->audience,
+            'submission' => $this->submission,
         ];
     }
 
@@ -138,6 +141,7 @@ readonly class LeadExportOptions
 
         LeadPlatform::apply($query, $this->platform);
         LeadAudience::constrain($query, $this->audience);
+        LeadSubmission::apply($query, $this->submission);
 
         return $query;
     }
@@ -183,7 +187,11 @@ readonly class LeadExportOptions
             : 'Newest '.number_format($this->limit).' leads';
 
         if ($this->status !== '') {
-            $parts[] = 'status '.$this->status;
+            $parts[] = 'status '.LeadStatus::label($this->status);
+        }
+
+        if ($this->submission !== '') {
+            $parts[] = LeadSubmission::label($this->submission);
         }
 
         if ($this->sourceType !== '') {

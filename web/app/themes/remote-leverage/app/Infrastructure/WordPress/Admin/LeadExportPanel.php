@@ -10,6 +10,8 @@ use App\Domains\Lead\Export\LeadExportJobStore;
 use App\Domains\Lead\Export\LeadExportOptions;
 use App\Domains\Lead\Export\LeadExportRunner;
 use App\Domains\Lead\Services\LeadPlatform;
+use App\Domains\Lead\Services\LeadStatus;
+use App\Domains\Lead\Services\LeadSubmission;
 
 /**
  * The CSV export modal on the leads list, and the endpoints behind it.
@@ -142,8 +144,9 @@ class LeadExportPanel
      * @param  string  $status  The list's current status filter, used as the modal's default.
      * @param  string  $platform  The list's current platform filter, same reason.
      * @param  string  $audience  The list's current possible-VA filter, same reason.
+     * @param  string  $submission  The list's current partial/final filter, same reason.
      */
-    public function renderModal(string $search = '', string $status = '', string $platform = '', string $audience = ''): void
+    public function renderModal(string $search = '', string $status = '', string $platform = '', string $audience = '', string $submission = ''): void
     {
         $groups = LeadExportColumns::groups();
         $recent = array_values(array_filter(
@@ -198,9 +201,9 @@ class LeadExportPanel
                             <span class="rl-export-label">Status</span>
                             <select id="rl-export-status" class="rl-select">
                                 <option value="">Any status</option>
-                                <?php foreach (['captured', 'qualified', 'booked', 'partial', 'abandoned', 'canceled'] as $option) { ?>
-                                    <option value="<?php echo esc_attr($option); ?>" <?php selected($status, $option); ?>>
-                                        <?php echo esc_html(ucfirst($option)); ?>
+                                <?php foreach (LeadStatus::options() as $slug => $label) { ?>
+                                    <option value="<?php echo esc_attr($slug); ?>" <?php selected($status, $slug); ?>>
+                                        <?php echo esc_html($label); ?>
                                     </option>
                                 <?php } ?>
                             </select>
@@ -224,6 +227,18 @@ class LeadExportPanel
                                 <option value="">Any platform</option>
                                 <?php foreach (LeadPlatform::options() as $slug => $label) { ?>
                                     <option value="<?php echo esc_attr($slug); ?>" <?php selected($platform, $slug); ?>>
+                                        <?php echo esc_html($label); ?>
+                                    </option>
+                                <?php } ?>
+                            </select>
+                        </label>
+
+                        <label class="rl-export-field">
+                            <span class="rl-export-label">Submission</span>
+                            <select id="rl-export-submission" class="rl-select">
+                                <option value="">Any submission</option>
+                                <?php foreach (LeadSubmission::options() as $slug => $label) { ?>
+                                    <option value="<?php echo esc_attr($slug); ?>" <?php selected($submission, $slug); ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php } ?>
@@ -355,6 +370,7 @@ class LeadExportPanel
                     source_type: document.getElementById('rl-export-source').value,
                     platform: document.getElementById('rl-export-platform').value,
                     audience: document.getElementById('rl-export-audience').value,
+                    submission: document.getElementById('rl-export-submission').value,
                     from: document.getElementById('rl-export-from').value,
                     to: document.getElementById('rl-export-to').value,
                     include_deleted: document.getElementById('rl-export-deleted').checked ? '1' : '',
