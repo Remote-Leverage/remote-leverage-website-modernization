@@ -613,6 +613,112 @@ class BlockDefaults
     /**
      * Resolve an image value (attachment ID, URL string, or ACF image array) to a valid URL string.
      */
+    /**
+     * Intrinsic `width` and `height` for an image URL, as a ready-to-print attribute string.
+     *
+     * Returns `''` when the size cannot be resolved, so a caller can interpolate it
+     * unconditionally and simply get nothing for an image we know nothing about. Emitting a
+     * guessed dimension would be worse than emitting none: the browser reserves the wrong box
+     * and the shift it was meant to prevent happens anyway, at the wrong size.
+     *
+     * Resolution order, cheapest first:
+     *
+     *  1. The attachment's stored metadata, when the URL belongs to one. No file access.
+     *  2. `getimagesize()` on the file, for theme art that is not in the media library
+     *     (`public/images/...`, which `pageImg()` and friends build by hand).
+     *
+     * Cached in the object cache for a day, keyed by URL. `getimagesize()` opens the file, and
+     * a grid of twelve role cards would otherwise do that on every uncached request.
+     */
+    public static function imageSizeAttrs(string $url): string
+    {
+        $url = trim($url);
+
+        if ($url === '') {
+            return '';
+        }
+
+        $key = 'rl_img_size_'.md5($url);
+        $cached = function_exists('wp_cache_get') ? wp_cache_get($key, 'rl_images') : false;
+
+        if (is_array($cached)) {
+            return $cached === [] ? '' : sprintf(' width="%d" height="%d"', $cached[0], $cached[1]);
+        }
+
+        $size = self::lookupImageSize($url);
+
+        if (function_exists('wp_cache_set')) {
+            wp_cache_set($key, $size ?? [], 'rl_images', DAY_IN_SECONDS);
+        }
+
+        return $size === null ? '' : sprintf(' width="%d" height="%d"', $size[0], $size[1]);
+    }
+
+    /**
+     * The intrinsic size behind a URL, or null when it cannot be determined.
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    private static function lookupImageSize(string $url): ?array
+    {
+        if (function_exists('attachment_url_to_postid')) {
+            $id = attachment_url_to_postid($url);
+
+            if ($id > 0) {
+                $meta = wp_get_attachment_metadata($id);
+
+                if (! empty($meta['width']) && ! empty($meta['height'])) {
+                    return [(int) $meta['width'], (int) $meta['height']];
+                }
+            }
+        }
+
+        // Theme art: map the public URL back to a path inside the theme and measure it.
+        $path = self::localPathForUrl($url);
+
+        if ($path !== null && is_readable($path)) {
+            $size = @getimagesize($path);
+
+            if (is_array($size) && ! empty($size[0]) && ! empty($size[1])) {
+                return [(int) $size[0], (int) $size[1]];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The on-disk path for a theme URL, or null when the URL is not ours.
+     */
+    private static function localPathForUrl(string $url): ?string
+    {
+        if (! function_exists('get_theme_file_path') || ! function_exists('get_theme_file_uri')) {
+            return null;
+        }
+
+        $base = rtrim((string) get_theme_file_uri(), '/');
+        $path = parse_url($url, PHP_URL_PATH);
+
+        if ($base === '' || ! is_string($path)) {
+            return null;
+        }
+
+        $basePath = parse_url($base, PHP_URL_PATH);
+
+        if (! is_string($basePath) || ! str_starts_with($path, $basePath)) {
+            return null;
+        }
+
+        $relative = ltrim(substr($path, strlen($basePath)), '/');
+
+        // No traversal out of the theme, whatever the URL claims.
+        if ($relative === '' || str_contains($relative, '..')) {
+            return null;
+        }
+
+        return get_theme_file_path($relative);
+    }
+
     public static function resolveImageUrl(mixed $image): string
     {
         if (empty($image)) {

@@ -1,0 +1,119 @@
+<?php
+
+// ---- Paste into config/redirects.php ----
+
+    /*
+    | Vanity / operational short links carried over from the GoDaddy install.
+    | Source: wp_add9221751_wf301_redirect_rules. Hit counts are lifetime since 2024-10-20.
+    */
+    'apply' => 'https://remoteleveragejobs.com/?ref=https://remoteleverage.com/apply', // 43636 hits
+    'recruitinginterview' => 'https://calendly.com/pacific-recruiters/job-interview-remote-leverage-team-clone', // 19272 hits
+    'jobinterviewinstructions' => 'https://vimeo.com/1143608840/e4c8dc87eb?fl=tl&fe=ec', // 7648 hits
+    'recruiterszoom' => 'https://us02web.zoom.us/j/6153893236', // 5355 hits
+    'zoom' => 'https://us02web.zoom.us/j/9794933436?pwd=dENpRHJLL2h2RVlTZjJaODRndVJnQT09', // 4897 hits
+    'submitvideo' => 'https://forms.gle/rqHADHQk1M31TjGPA', // 3999 hits
+    'typing' => 'https://www.livechat.com/typing-speed-test/#/', // 3367 hits
+    'adminassessment' => 'https://forms.gle/3oUqzMLizn6bfPAS9', // 2104 hits
+    'nyxzoom' => 'https://us02web.zoom.us/j/9907147461?pwd=hwOW946MrYD3cpZYbIa9Fa6zkfpj1I.1', // 1412 hits
+    'it' => 'https://remoteleveragetech.atlassian.net/servicedesk/customer/portal/1/group/1/create/1', // 1235 hits
+    'zoom2' => 'https://us02web.zoom.us/j/7172910526?pwd=ryHFp0X4eFvSMerLFsae3LG2RArcno.1', // 1231 hits
+    'claireinterview' => 'https://calendly.com/claire-remoteleverage/job-interview-remote-leverage-team-clone', // 1049 hits
+    'salesassessment' => 'https://forms.gle/Ntxhgn9hNfxBKjQN7', // 957 hits
+    'adminzoom' => 'https://us02web.zoom.us/j/4055248514?pwd=XwiKkIbXlEoaaWjCP3wOqzratPxmqV.1', // 943 hits
+    'w9' => 'https://drive.google.com/file/d/1w1_Pi54QZBe5k2xxtbE3rCvClNaeWX0l/view?usp=sharing', // 813 hits
+    'interviewzoom' => 'https://us02web.zoom.us/j/4469787983?pwd=iwK8oQenKMxgxGHSeEiteUs1G34KD8.1', // 699 hits
+    'seifszoom' => 'https://us02web.zoom.us/j/8438962979?pwd=BtNW4PHSBO1CXfkJ0kF46Kkzxrbonr.1', // 525 hits
+    'dashboards' => 'https://sso.online.tableau.com/public/idp/SSO', // 493 hits
+    'estrecruitinginterview' => 'https://calendly.com/eastern-recruiters-remoteleverage/job-interview-remote-leverage-team', // 447 hits
+    'virtual-assistant-posts/salary-guide-for-businesses-hiring-virtual-assistants-guide' => 'https://anyshore.ai/blog/latin-american-va-salary-guide/', // 439 hits
+    'googlereview' => 'https://g.page/r/CTuB-J467qJwEAE/review', // 336 hits
+    'angelicagomez' => 'https://recruitcrm.io/apply/17811178058780133835zgp', // 279 hits
+    'christinaszoom' => 'https://us02web.zoom.us/j/4821528296?pwd=aG5Q6HhLv8Bwuf0b2Sr6xtqmDvzMaw.1', // 278 hits
+    'testimonial' => 'https://calendly.com/d/cs4r-k2g-d2p/remote-leverage-testimonial-session', // 276 hits
+    'angie' => 'https://recruitcrm.io/apply/17806985112870087768JmC', // 184 hits
+    'miry' => 'https://recruitcrm.io/apply/17811401732160133835JtX', // 144 hits
+    'marketingmaterials' => 'https://docs.google.com/document/d/1UUGApiJ0W21RKI3GQ5QHncYJF1Wf1RraPjg1LG4un1Q/edit?usp=sharing', // 137 hits
+    'uptime' => 'https://stats.uptimerobot.com/c7mpGQmbnC', // 76 hits
+    'deel' => 'https://get.deel.com/eotkl4au2m8w', // 62 hits
+    'interviewvideo' => 'https://vimeo.com/1124026646/649fff7922?share=copy', // 58 hits
+    'abbascalendar' => 'https://calendly.com/abbas-remoteleverage/30min', // 55 hits
+    'lead' => 'https://forms.gle/8ZMPNRKwBveBa67M7', // 46 hits
+    'ideas' => 'https://form.jotform.com/260564755295164', // 36 hits
+    'fire' => 'https://form.jotform.com/252558126272155', // 35 hits
+    'natasha' => 'https://us02web.zoom.us/j/7543604107?pwd=cm1BQzRlOWNocklwOHNMTDBKODFRQT09', // 35 hits
+    'vaonboarding' => 'https://calendly.com/remoteleverage/client-va-onboarding-call', // 34 hits
+    'introcall' => 'https://calendly.com/d/cqnx-7z2-2rq/remote-leverage-onboarding-applicant-criteria', // 27 hits
+    'jobinvitation' => 'https://form.jotform.com/243466875000052', // 24 hits
+    'join' => 'https://buy.stripe.com/6oEeWM0EUegh1qgdQW', // 19 hits
+    'cordeposit' => 'https://buy.stripe.com/3cIfZh1B8cQT29D0eWfrW0F', // 18 hits
+    'princessinterview' => 'https://calendly.com/remoteleverage/job-interview-test', // 18 hits
+    'interview' => 'https://calendly.com/remoteleverage/job-interview-test', // 15 hits
+    'replit' => 'https://recruiting-helper.replit.app/', // 7 hits
+    'laura' => 'https://recruitcrm.io/apply/17806984609920087768oJQ', // 6 hits
+    'lina' => 'https://recruitcrm.io/apply/17811180148840133835icy', // 6 hits
+    'splitpayment' => 'https://form.jotform.com/243395973807471', // 6 hits
+    'firefighting' => 'https://form.jotform.com/252558126272155', // 5 hits
+    'onboardingmeeting' => 'https://calendly.com/remoteleverage/onboarding', // 3 hits
+    'it2' => 'https://remoteleveragetech.atlassian.net/servicedesk/customer/portal/1/group/1/create/1', // 2 hits
+    'training' => 'https://calendly.com/remoteleverage/coldcallingtraining', // 2 hits
+    'vatraining' => 'https://docs.google.com/document/d/1GoY3pWKRwPVmH7fyCWbNL-5PCeNDcxkX-eNp2mn91TA/edit?usp=sharing', // 2 hits
+    '12monthlyfee' => 'https://buy.stripe.com/7sIg0QcnCa01d8Y5kB', // 0 hits
+    '15' => 'https://calendly.com/remoteleverage/15-minute-meeting', // 0 hits
+    '1500' => 'https://buy.stripe.com/fZe4i81IY6NP2uk00o', // 0 hits
+    '2000' => 'https://buy.stripe.com/7sIdSI3R6fklfh6cNd', // 0 hits
+    '6monthlyfee' => 'https://buy.stripe.com/5kAbKAfzOdcdfh6aEU', // 0 hits
+    'cruzcalendar' => 'https://calendly.com/cruzremoteleverage/virtual-assistant-hiring-consultation-clone', // 0 hits
+    'estinterviewzoom' => 'https://us02web.zoom.us/j/6990050267?pwd=RpNwxbjq22OrcMAe36gJJfxUNuI0Ha.1', // 0 hits
+    'extendedguarantee' => 'https://buy.stripe.com/6oE2a01IY2xz7OE6oT', // 0 hits
+    'followupmonthlyfee' => 'https://buy.stripe.com/14kaGwcnC7RT4Cs8wL', // 0 hits
+    'monthlyfee' => 'https://buy.stripe.com/eVacOEafu5JL1qg28g', // 0 hits
+    'natashacalendar' => 'https://calendly.com/remoteleveragesales/natasha-1-on-1-meeting', // 0 hits
+    'vaexam' => 'https://forms.gle/jGL2PVu11C9189WN6', // 0 hits
+
+    /*
+    | Internal legacy paths with recorded traffic.
+    */
+    'partnership-program' => 'referral-program', // 604 hits
+    'case-studies' => 'case-study', // 504 hits
+    'virtual-assistant-posts/how-much-does-athena-virtual-assistant-cost-guide' => 'blog/athena-virtual-assistant', // 467 hits
+    'virtual-assistant-posts/virtual-medical-receptionist-revolutionizing-healthcare-support-guide' => 'blog/5-best-medical-receptionist-services-for-clinics-and-private-practices', // 373 hits
+    'virtual-assistant-posts/medical-coordinator-key-requirements-duties-responsibilities-and-skills-guide' => 'blog/patient-care-coordinator-cost', // 317 hits
+    'landing-page-2' => '', // 250 hits
+    'virtual-assistant-posts/why-hiring-a-marketing-assistant-can-transform-your-business-guide' => 'blog/marketing-virtual-assistant-vs-marketing-agency', // 225 hits
+    'virtual-assistant-posts/understanding-the-role-of-an-executive-administrative-assistant-guide' => 'blog/executive-assistant-vs-virtual-assistant', // 202 hits
+    'marketing-assistants-b' => 'marketing-assistants', // 149 hits
+    'blog/how-ku%ca%bbulei-found-high-level-social-media-marketing-talent-through-remote-leverage' => 'case-study/hawaiian-philanthropy', // 143 hits
+    'partnership-program-form' => '', // 135 hits
+    'blog/how-remote-leverage-helped-a-u-s-law-firm-build-a-high-performing-remote-team' => 'case-study/smiley-injury-law', // 128 hits
+    'blog/case-study-how-a-texas-auto-shop-doubled-local-hiring-power-with-remote-leverage' => 'case-study/jeremis-auto-repair', // 80 hits
+    'blog/case-study-how-on-the-outskirt-marketing-hired-their-first-virtual-employee-with-ease' => 'case-study/on-the-outskirt', // 76 hits
+    'blog/finding-the-perfect-hire-for-a-private-practice-with-remote-leverage' => 'case-study/watson-psychiatry', // 71 hits
+    'blog/how-anchorage-care-coordination-gained-reliable-daily-support-with-remote-leverage' => 'case-study/anchorage-care-coordination', // 71 hits
+    'blog/case-study-mobile-mixologists-hires-a-bilingual-va-fast-and-frees-up-the-founder-to-scale' => 'case-study/mobile-mixologist', // 70 hits
+    'blog/goldsoil-realty-investments-hires-a-closer-on-the-spot' => 'case-study/the-acre-hub', // 70 hits
+    'blog/how-doran-industries-scaled-event-sales-with-a-virtual-assistant-from-remote-leverage' => 'case-study/doran-industries', // 70 hits
+    'blog/how-haus-of-her-studios-saved-money-gained-a-highly-qualified-va-with-remote-leverage' => 'case-study/haus-of-her', // 70 hits
+    'blog/how-bench-accounting-scaled-fast-by-hiring-31-virtual-assistants-through-remote-leverage' => 'case-study/bench-accounting', // 66 hits
+    'blog/how-sales-leader-zack-beck-reclaimed-his-focus-with-a-virtual-assistant' => 'case-study/conservice', // 62 hits
+    'blog/how-fast-real-estate-hired-a-cold-calling-va-and-built-scalable-systems-with-remote-leverage' => 'case-study/fast-real-estate', // 61 hits
+    'footer-fix-test' => '', // 45 hits
+    'the-secret-to-scaling-your-ebay-store-hire-an-ebay-virtual-assistant' => 'the-secret-to-scaling-your-ebay-store-hire-an-ebay-virtual-assistant-guide', // 34 hits
+    'partnership-program-thank-you' => '', // 33 hits
+    'coldcallscript' => 'download/2637', // 24 hits
+    'followupscript' => 'download/2640', // 24 hits
+    'real-estate-cold-calling-virtual-assistants-the-secret-to-real-estate-success' => 'real-estate-cold-calling-virtual-assistants-the-secret-to-real-estate-success-guide', // 11 hits
+    'virtual-administrative-assistant' => 'virtual-administrative-assistant-guide-2', // 8 hits
+    'hire-social-media-content-creator-everything-you-need-to-know' => 'hire-social-media-content-creator-everything-you-need-to-know-guide', // 7 hits
+    'virtual-assistants-and-time-management-how-to-delegate-effectively' => 'virtual-assistants-and-time-management-how-to-delegate-effectively-guide', // 5 hits
+    'virtual-assistants-for-different-industries-tailoring-services-to-your-needs' => 'virtual-assistants-for-different-industries-tailoring-services-to-your-needs-guide', // 5 hits
+    'virtual-medical-administrative-assistant' => 'virtual-medical-administrative-assistant-guide', // 5 hits
+    'what-is-an-example-kpi-for-administrative-assistant' => 'what-is-an-example-kpi-for-administrative-assistant-guide', // 5 hits
+    'live-session-what-to-automate-from-day-1' => 'live-session-build-ai-tools-for-businesses', // 4 hits
+    'cal' => '', // 3 hits
+    'tasks-landing-page' => '', // 3 hits
+    'essential-guide-to-a-virtual-assistant-contract-template' => 'essential-guide-to-a-virtual-assistant-contract-template-guide', // 1 hits
+    'how-much-does-athena-virtual-assistant-cost' => 'how-much-does-athena-virtual-assistant-cost-guide', // 1 hits
+    'the-virtual-financial-planning-assistant-your-secret-weapon-to-scaling-your-business' => 'the-virtual-financial-planning-assistant-your-secret-weapon-to-scaling-your-business-guide', // 1 hits
+    'understanding-white-label-virtual-assistant-services' => 'understanding-white-label-virtual-assistant-services-guide', // 1 hits
+    'virtual-assistant-vs-in-house-employee-pros-and-cons' => 'virtual-assistant-vs-in-house-employee-pros-and-cons-guide', // 1 hits
+    'why-hiring-an-admin-assistant-working-from-home-is-a-game-changer-for-busy-business-owners' => 'why-hiring-an-admin-assistant-working-from-home-is-a-game-changer-for-busy-business-owners-guide', // 1 hits

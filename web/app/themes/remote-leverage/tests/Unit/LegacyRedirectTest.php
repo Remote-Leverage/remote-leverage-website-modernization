@@ -162,7 +162,19 @@ describe('external targets cannot be turned into an open redirect', function () 
 
         // buy.stripe.com added 2026-09-16: production 301s /deposit/ to a Stripe payment link.
         // form.jotform.com added 2026-09-17: production 301s /refund/ to a JostForm refund link.
-        expect(LegacyRedirectMiddleware::externalHosts($config))->toBe(['anyshore.ai', 'buy.stripe.com', 'form.jotform.com']);
+        // The rest added 2026-09-18 with the ported vanity short links; order follows the map.
+        expect(LegacyRedirectMiddleware::externalHosts($config))->toBe([
+            'anyshore.ai', 'buy.stripe.com', 'form.jotform.com',
+            // The 2026-09-18 legacy audit ported 63 vanity short links off the GoDaddy box,
+            // where they lived in the `301-redirects` plugin and had never reached v2. They
+            // are operational links (recruiting, Zoom rooms, Calendly, assessment forms), so
+            // each one widens this allowlist. Full audit: docs/legacy-redirects-audit.md.
+            'remoteleveragejobs.com', 'calendly.com', 'vimeo.com', 'us02web.zoom.us',
+            'forms.gle', 'www.livechat.com', 'remoteleveragetech.atlassian.net',
+            'drive.google.com', 'sso.online.tableau.com', 'g.page', 'recruitcrm.io',
+            'docs.google.com', 'stats.uptimerobot.com', 'get.deel.com',
+            'recruiting-helper.replit.app',
+        ]);
     });
 });
 

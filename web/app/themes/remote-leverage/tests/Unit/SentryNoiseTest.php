@@ -67,8 +67,15 @@ describe('browser-side filtering', function () {
         // engines generate a disproportionate share of the volume.
         $js = file_get_contents(__DIR__.'/../../resources/js/app.js');
 
+        /*
+         * `navigator.webdriver` joined the check on 2026-09-18. The user-agent list alone used
+         * to catch Lighthouse because it appended `Chrome-Lighthouse`; it no longer does, so
+         * every audit and headless bot was pulling 133KB of Sentry it would never report from.
+         */
         expect($js)->toContain('SENTRY_BOT_UA')
-            ->and($js)->toContain('!SENTRY_BOT_UA.test(navigator.userAgent');
+            ->and($js)->toContain('navigator.webdriver === true')
+            ->and($js)->toContain('SENTRY_BOT_UA.test(navigator.userAgent')
+            ->and($js)->toContain('if (sentryDsn && !isAutomated())');
     });
 
     test('an event with no stack frames is dropped', function () {

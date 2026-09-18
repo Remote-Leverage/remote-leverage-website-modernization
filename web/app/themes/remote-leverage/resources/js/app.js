@@ -1131,7 +1131,24 @@ const SENTRY_BOT_UA = /bot|crawl|spider|slurp|headless|phantom|puppeteer|playwri
 
 const sentryDsn = window.SENTRY_DSN || import.meta.env.VITE_SENTRY_DSN;
 
-if (sentryDsn && !SENTRY_BOT_UA.test(navigator.userAgent || '')) {
+/*
+ * Automation reports `navigator.webdriver`, and it is the only reliable signal left.
+ *
+ * The user-agent list below used to catch Lighthouse because it appended `Chrome-Lighthouse`;
+ * it no longer does. Measured 2026-09-18, a Lighthouse run reports a plain
+ * `Chrome/153.0.0.0 Mobile Safari/537.36`, so the guard had silently stopped working and every
+ * audit and headless bot was pulling 133KB of Sentry it would never report from. The UA list
+ * stays for the crawlers that still identify themselves honestly.
+ */
+const isAutomated = () => {
+  try {
+    return navigator.webdriver === true || SENTRY_BOT_UA.test(navigator.userAgent || '');
+  } catch (e) {
+    return false;
+  }
+};
+
+if (sentryDsn && !isAutomated()) {
   import('@sentry/browser').then((Sentry) => {
     window.Sentry = Sentry;
 

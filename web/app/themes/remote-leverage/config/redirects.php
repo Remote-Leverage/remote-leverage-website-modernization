@@ -398,4 +398,166 @@ return [
     // Verified against production 2026-09-17: 301 -> https://form.jotform.com/252185178652665
     'refund' => 'https://form.jotform.com/252185178652665',
 
+    /*
+    |--------------------------------------------------------------------------
+    | Vanity / operational short links ported from the GoDaddy install
+    |--------------------------------------------------------------------------
+    |
+    | Audited 2026-09-18 by reading the legacy box directly
+    | (339104.us18.ssh.myftpupload.com:/html). Two redirect stores were found there
+    | and neither had been carried into v2: the `301-redirects` plugin
+    | (table `wp_add9221751_wf301_redirect_rules`, 328 rules) and Yoast SEO Premium
+    | (option `wpseo-premium-redirects-export-plain`, 355 rules). The `.htaccess` is
+    | empty; there is no server-level rule anywhere. Full findings and the complete
+    | rule dump: docs/legacy-redirects-audit.md.
+    |
+    | These are the operational short links staff and candidates paste into emails,
+    | job posts and Slack. They are not marketing pages and have no v2 equivalent by
+    | design -- the destination is a third-party tool. Trailing hit counts are
+    | lifetime totals since 2024-10-20, read off the plugin's `last_count` column;
+    | they are why these are ported ahead of the SEO long tail. /apply alone has
+    | served 43,636 redirects and is the entry point of the whole recruiting funnel.
+    |
+    | Every URL below is also declared in $externalTargets in
+    | tests/Feature/RoutesTest.php, which is what confines wp_safe_redirect()'s
+    | allowlist to these hosts.
+    |
+    */
+
+    'apply' => 'https://remoteleveragejobs.com/?ref=https://remoteleverage.com/apply',
+    'recruitinginterview' => 'https://calendly.com/pacific-recruiters/job-interview-remote-leverage-team-clone',
+    'jobinterviewinstructions' => 'https://vimeo.com/1143608840/e4c8dc87eb?fl=tl&fe=ec',
+    'recruiterszoom' => 'https://us02web.zoom.us/j/6153893236',
+    'zoom' => 'https://us02web.zoom.us/j/9794933436?pwd=dENpRHJLL2h2RVlTZjJaODRndVJnQT09',
+    'submitvideo' => 'https://forms.gle/rqHADHQk1M31TjGPA',
+    'typing' => 'https://www.livechat.com/typing-speed-test/#/',
+    'adminassessment' => 'https://forms.gle/3oUqzMLizn6bfPAS9',
+    'nyxzoom' => 'https://us02web.zoom.us/j/9907147461?pwd=hwOW946MrYD3cpZYbIa9Fa6zkfpj1I.1',
+    'it' => 'https://remoteleveragetech.atlassian.net/servicedesk/customer/portal/1/group/1/create/1',
+    'zoom2' => 'https://us02web.zoom.us/j/7172910526?pwd=ryHFp0X4eFvSMerLFsae3LG2RArcno.1',
+    'claireinterview' => 'https://calendly.com/claire-remoteleverage/job-interview-remote-leverage-team-clone',
+    'salesassessment' => 'https://forms.gle/Ntxhgn9hNfxBKjQN7',
+    'adminzoom' => 'https://us02web.zoom.us/j/4055248514?pwd=XwiKkIbXlEoaaWjCP3wOqzratPxmqV.1',
+    'w9' => 'https://drive.google.com/file/d/1w1_Pi54QZBe5k2xxtbE3rCvClNaeWX0l/view?usp=sharing',
+    'interviewzoom' => 'https://us02web.zoom.us/j/4469787983?pwd=iwK8oQenKMxgxGHSeEiteUs1G34KD8.1',
+    'seifszoom' => 'https://us02web.zoom.us/j/8438962979?pwd=BtNW4PHSBO1CXfkJ0kF46Kkzxrbonr.1',
+    'dashboards' => 'https://sso.online.tableau.com/public/idp/SSO',
+    'estrecruitinginterview' => 'https://calendly.com/eastern-recruiters-remoteleverage/job-interview-remote-leverage-team',
+    'virtual-assistant-posts/salary-guide-for-businesses-hiring-virtual-assistants-guide' => 'https://anyshore.ai/blog/latin-american-va-salary-guide/',
+    'googlereview' => 'https://g.page/r/CTuB-J467qJwEAE/review',
+    'angelicagomez' => 'https://recruitcrm.io/apply/17811178058780133835zgp',
+    'christinaszoom' => 'https://us02web.zoom.us/j/4821528296?pwd=aG5Q6HhLv8Bwuf0b2Sr6xtqmDvzMaw.1',
+    'testimonial' => 'https://calendly.com/d/cs4r-k2g-d2p/remote-leverage-testimonial-session',
+    'angie' => 'https://recruitcrm.io/apply/17806985112870087768JmC',
+    'miry' => 'https://recruitcrm.io/apply/17811401732160133835JtX',
+    'marketingmaterials' => 'https://docs.google.com/document/d/1UUGApiJ0W21RKI3GQ5QHncYJF1Wf1RraPjg1LG4un1Q/edit?usp=sharing',
+    'uptime' => 'https://stats.uptimerobot.com/c7mpGQmbnC',
+    'deel' => 'https://get.deel.com/eotkl4au2m8w',
+    'interviewvideo' => 'https://vimeo.com/1124026646/649fff7922?share=copy',
+    'abbascalendar' => 'https://calendly.com/abbas-remoteleverage/30min',
+    'lead' => 'https://forms.gle/8ZMPNRKwBveBa67M7',
+    'ideas' => 'https://form.jotform.com/260564755295164',
+    'fire' => 'https://form.jotform.com/252558126272155',
+    'natasha' => 'https://us02web.zoom.us/j/7543604107?pwd=cm1BQzRlOWNocklwOHNMTDBKODFRQT09',
+    'vaonboarding' => 'https://calendly.com/remoteleverage/client-va-onboarding-call',
+    'introcall' => 'https://calendly.com/d/cqnx-7z2-2rq/remote-leverage-onboarding-applicant-criteria',
+    'jobinvitation' => 'https://form.jotform.com/243466875000052',
+    'join' => 'https://buy.stripe.com/6oEeWM0EUegh1qgdQW',
+    'cordeposit' => 'https://buy.stripe.com/3cIfZh1B8cQT29D0eWfrW0F',
+    'princessinterview' => 'https://calendly.com/remoteleverage/job-interview-test',
+    'interview' => 'https://calendly.com/remoteleverage/job-interview-test',
+    'replit' => 'https://recruiting-helper.replit.app/',
+    'laura' => 'https://recruitcrm.io/apply/17806984609920087768oJQ',
+    'lina' => 'https://recruitcrm.io/apply/17811180148840133835icy',
+    'splitpayment' => 'https://form.jotform.com/243395973807471',
+    'firefighting' => 'https://form.jotform.com/252558126272155',
+    'onboardingmeeting' => 'https://calendly.com/remoteleverage/onboarding',
+    'it2' => 'https://remoteleveragetech.atlassian.net/servicedesk/customer/portal/1/group/1/create/1',
+    'training' => 'https://calendly.com/remoteleverage/coldcallingtraining',
+    'vatraining' => 'https://docs.google.com/document/d/1GoY3pWKRwPVmH7fyCWbNL-5PCeNDcxkX-eNp2mn91TA/edit?usp=sharing',
+    '12monthlyfee' => 'https://buy.stripe.com/7sIg0QcnCa01d8Y5kB',
+    '15' => 'https://calendly.com/remoteleverage/15-minute-meeting',
+    '1500' => 'https://buy.stripe.com/fZe4i81IY6NP2uk00o',
+    '2000' => 'https://buy.stripe.com/7sIdSI3R6fklfh6cNd',
+    '6monthlyfee' => 'https://buy.stripe.com/5kAbKAfzOdcdfh6aEU',
+    'cruzcalendar' => 'https://calendly.com/cruzremoteleverage/virtual-assistant-hiring-consultation-clone',
+    'estinterviewzoom' => 'https://us02web.zoom.us/j/6990050267?pwd=RpNwxbjq22OrcMAe36gJJfxUNuI0Ha.1',
+    'extendedguarantee' => 'https://buy.stripe.com/6oE2a01IY2xz7OE6oT',
+    'followupmonthlyfee' => 'https://buy.stripe.com/14kaGwcnC7RT4Cs8wL',
+    'monthlyfee' => 'https://buy.stripe.com/eVacOEafu5JL1qg28g',
+    'natashacalendar' => 'https://calendly.com/remoteleveragesales/natasha-1-on-1-meeting',
+    'vaexam' => 'https://forms.gle/jGL2PVu11C9189WN6',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Legacy internal paths with recorded traffic (same 2026-09-18 audit)
+    |--------------------------------------------------------------------------
+    |
+    | Same two stores, targets that stay on this site. Each target was resolved
+    | against the v2 database rather than copied from the legacy row, because the
+    | legacy targets are stale in three ways:
+    |
+    |   - Redirect chains. Legacy pointed some of these at slugs that are themselves
+    |     keys in this map. Those are collapsed to the final destination here, so no
+    |     visitor takes two hops.
+    |   - Renamed content. /blog/<old-slug> pairs were re-pointed at the slug the post
+    |     actually carries in v2 (the 15 case studies moved to the case_study CPT).
+    |   - Content v2 does not have. Thirteen Yoast rules target '-guide' blog slugs
+    |     that were never migrated. Fuzzy-matching them to surviving posts produced
+    |     nothing convincing, so they follow this map's existing editorial policy and
+    |     land on /blog/ rather than on a guessed article.
+    |
+    | Two entries are flagged inline as unresolved: /coldcallscript/ and
+    | /followupscript/ served Download Monitor PDFs (download/2637 and 2640) that have
+    | no v2 equivalent because the PDFs were not migrated. They fall back to the root
+    | under this map's documented no-live-equivalent policy; re-point them if the
+    | collateral is ever brought over.
+    |
+    */
+
+    'partnership-program' => 'referral-program', // 604 hits
+    'case-studies' => 'case-study', // 504 hits  // CPT archive (case_study has_archive => 'case-study')
+    'virtual-assistant-posts/how-much-does-athena-virtual-assistant-cost-guide' => 'blog/athena-virtual-assistant', // 467 hits
+    'virtual-assistant-posts/virtual-medical-receptionist-revolutionizing-healthcare-support-guide' => 'blog/best-medical-receptionist-services', // 373 hits  // legacy target slug was renamed in v2
+    'virtual-assistant-posts/medical-coordinator-key-requirements-duties-responsibilities-and-skills-guide' => 'blog/patient-care-coordinator-cost', // 317 hits
+    'landing-page-2' => '', // 250 hits
+    'virtual-assistant-posts/why-hiring-a-marketing-assistant-can-transform-your-business-guide' => 'blog/marketing-virtual-assistant-vs-marketing-agency', // 225 hits
+    'virtual-assistant-posts/understanding-the-role-of-an-executive-administrative-assistant-guide' => 'blog/executive-assistant-vs-virtual-assistant', // 202 hits
+    'marketing-assistants-b' => 'marketing-virtual-assistants', // 149 hits  // chain collapsed: legacy -> marketing-assistants, which is itself a key here
+    'blog/how-ku%ca%bbulei-found-high-level-social-media-marketing-talent-through-remote-leverage' => 'case-study/hawaiian-philanthropy', // 143 hits
+    'partnership-program-form' => '', // 135 hits
+    'blog/how-remote-leverage-helped-a-u-s-law-firm-build-a-high-performing-remote-team' => 'case-study/smiley-injury-law', // 128 hits
+    'blog/case-study-how-a-texas-auto-shop-doubled-local-hiring-power-with-remote-leverage' => 'case-study/jeremis-auto-repair', // 80 hits
+    'blog/case-study-how-on-the-outskirt-marketing-hired-their-first-virtual-employee-with-ease' => 'case-study/on-the-outskirt', // 76 hits
+    'blog/finding-the-perfect-hire-for-a-private-practice-with-remote-leverage' => 'case-study/watson-psychiatry', // 71 hits
+    'blog/how-anchorage-care-coordination-gained-reliable-daily-support-with-remote-leverage' => 'case-study/anchorage-care-coordination', // 71 hits
+    'blog/case-study-mobile-mixologists-hires-a-bilingual-va-fast-and-frees-up-the-founder-to-scale' => 'case-study/mobile-mixologist', // 70 hits
+    'blog/goldsoil-realty-investments-hires-a-closer-on-the-spot' => 'case-study/the-acre-hub', // 70 hits
+    'blog/how-doran-industries-scaled-event-sales-with-a-virtual-assistant-from-remote-leverage' => 'case-study/doran-industries', // 70 hits
+    'blog/how-haus-of-her-studios-saved-money-gained-a-highly-qualified-va-with-remote-leverage' => 'case-study/haus-of-her', // 70 hits
+    'blog/how-bench-accounting-scaled-fast-by-hiring-31-virtual-assistants-through-remote-leverage' => 'case-study/bench-accounting', // 66 hits
+    'blog/how-sales-leader-zack-beck-reclaimed-his-focus-with-a-virtual-assistant' => 'case-study/conservice', // 62 hits
+    'blog/how-fast-real-estate-hired-a-cold-calling-va-and-built-scalable-systems-with-remote-leverage' => 'case-study/fast-real-estate', // 61 hits
+    'footer-fix-test' => '', // 45 hits
+    'the-secret-to-scaling-your-ebay-store-hire-an-ebay-virtual-assistant' => 'blog', // 34 hits  // legacy '-guide' target absent from v2's blog
+    'partnership-program-thank-you' => '', // 33 hits
+    'coldcallscript' => '', // 24 hits  // Download Monitor PDF (download/2637) has no v2 equivalent - PDF not migrated
+    'followupscript' => '', // 24 hits  // Download Monitor PDF (download/2640) has no v2 equivalent - PDF not migrated
+    'real-estate-cold-calling-virtual-assistants-the-secret-to-real-estate-success' => 'blog', // 11 hits  // legacy '-guide' target absent from v2's blog
+    'virtual-administrative-assistant' => 'blog', // 8 hits  // legacy '-guide' target absent from v2's blog
+    'hire-social-media-content-creator-everything-you-need-to-know' => 'blog', // 7 hits  // legacy '-guide' target absent from v2's blog
+    'virtual-assistants-and-time-management-how-to-delegate-effectively' => 'blog', // 5 hits  // legacy '-guide' target absent from v2's blog
+    'virtual-assistants-for-different-industries-tailoring-services-to-your-needs' => 'blog', // 5 hits  // legacy '-guide' target absent from v2's blog
+    'virtual-medical-administrative-assistant' => 'blog', // 5 hits  // legacy '-guide' target absent from v2's blog
+    'what-is-an-example-kpi-for-administrative-assistant' => 'blog', // 5 hits  // legacy '-guide' target absent from v2's blog
+    'live-session-what-to-automate-from-day-1' => '', // 4 hits  // chain collapsed: legacy -> live-session-build-ai-tools-for-businesses, which is itself a key here -> /
+    'cal' => '', // 3 hits
+    'tasks-landing-page' => '', // 3 hits
+    'essential-guide-to-a-virtual-assistant-contract-template' => 'blog', // 1 hits  // legacy '-guide' target absent from v2's blog
+    'how-much-does-athena-virtual-assistant-cost' => 'blog/athena-virtual-assistant', // 1 hits  // legacy '-guide' slug absent from v2; this post is the real equivalent
+    'the-virtual-financial-planning-assistant-your-secret-weapon-to-scaling-your-business' => 'blog', // 1 hits  // legacy '-guide' target absent from v2's blog
+    'understanding-white-label-virtual-assistant-services' => 'blog', // 1 hits  // legacy '-guide' target absent from v2's blog
+    'virtual-assistant-vs-in-house-employee-pros-and-cons' => 'blog', // 1 hits  // legacy '-guide' target absent from v2's blog
+    'why-hiring-an-admin-assistant-working-from-home-is-a-game-changer-for-busy-business-owners' => 'blog', // 1 hits  // legacy '-guide' target absent from v2's blog
+
 ];

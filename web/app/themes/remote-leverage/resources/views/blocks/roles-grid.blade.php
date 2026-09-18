@@ -47,7 +47,7 @@
       </h2>
 
       <div class="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-white border border-black/5 shadow-xs mt-8">
-        <img src="{{ $eyebrowImg }}" alt="Candidate Avatars" class="h-6 w-auto" loading="lazy" decoding="async">
+        <img {!! \App\Support\BlockDefaults::imageSizeAttrs($eyebrowImg) !!} src="{{ $eyebrowImg }}" alt="Candidate Avatars" class="h-6 w-auto" loading="lazy" decoding="async">
         <span class="text-xs sm:text-sm font-bold text-brand-hero tracking-wide">{{ $eyebrow ?? '2.5K+ pre-vetted candidates' }}</span>
       </div>
     </div>
@@ -67,7 +67,7 @@
             </p>
           </div>
           <div class="mt-6 flex justify-center -mb-8 pointer-events-none">
-            <img src="{{ $slot(0, 'img') }}" alt="{{ $slot(0, 'title') }}" loading="lazy" decoding="async" class="h-64 sm:h-72 w-auto object-contain object-bottom transition-transform duration-500 group-hover:scale-105">
+            <img {!! \App\Support\BlockDefaults::imageSizeAttrs($slot(0, 'img')) !!} src="{{ $slot(0, 'img') }}" alt="{{ $slot(0, 'title') }}" loading="lazy" decoding="async" class="h-64 sm:h-72 w-auto object-contain object-bottom transition-transform duration-500 group-hover:scale-105">
           </div>
         </div>
 
@@ -80,7 +80,7 @@
             </p>
           </div>
           <div class="shrink-0">
-            <img src="{{ $slot(4, 'img') }}" alt="{{ $slot(4, 'title') }}" loading="lazy" decoding="async" class="w-28 sm:w-32 h-auto object-contain">
+            <img {!! \App\Support\BlockDefaults::imageSizeAttrs($slot(4, 'img')) !!} src="{{ $slot(4, 'img') }}" alt="{{ $slot(4, 'title') }}" loading="lazy" decoding="async" class="w-28 sm:w-32 h-auto object-contain">
           </div>
         </div>
 
@@ -93,7 +93,7 @@
             </p>
           </div>
           <div class="shrink-0">
-            <img src="{{ $slot(5, 'img') }}" alt="{{ $slot(5, 'title') }}" loading="lazy" decoding="async" class="w-24 sm:w-28 h-auto object-contain">
+            <img {!! \App\Support\BlockDefaults::imageSizeAttrs($slot(5, 'img')) !!} src="{{ $slot(5, 'img') }}" alt="{{ $slot(5, 'title') }}" loading="lazy" decoding="async" class="w-24 sm:w-28 h-auto object-contain">
           </div>
         </div>
       </div>
@@ -109,7 +109,7 @@
             </p>
           </div>
           <div class="shrink-0">
-            <img src="{{ $slot(1, 'img') }}" alt="{{ $slot(1, 'title') }}" loading="lazy" decoding="async" class="w-28 sm:w-32 h-auto object-contain">
+            <img {!! \App\Support\BlockDefaults::imageSizeAttrs($slot(1, 'img')) !!} src="{{ $slot(1, 'img') }}" alt="{{ $slot(1, 'title') }}" loading="lazy" decoding="async" class="w-28 sm:w-32 h-auto object-contain">
           </div>
         </div>
 
@@ -122,7 +122,7 @@
             </p>
           </div>
           <div class="shrink-0">
-            <img src="{{ $slot(2, 'img') }}" alt="{{ $slot(2, 'title') }}" loading="lazy" decoding="async" class="w-28 sm:w-32 h-auto object-contain">
+            <img {!! \App\Support\BlockDefaults::imageSizeAttrs($slot(2, 'img')) !!} src="{{ $slot(2, 'img') }}" alt="{{ $slot(2, 'title') }}" loading="lazy" decoding="async" class="w-28 sm:w-32 h-auto object-contain">
           </div>
         </div>
 
@@ -135,7 +135,7 @@
             </p>
           </div>
           <div class="mt-6 flex justify-center -mb-8 pointer-events-none">
-            <img src="{{ $slot(6, 'img') }}" alt="{{ $slot(6, 'title') }}" loading="lazy" decoding="async" class="h-64 sm:h-72 w-auto object-contain object-bottom transition-transform duration-500 group-hover:scale-105">
+            <img {!! \App\Support\BlockDefaults::imageSizeAttrs($slot(6, 'img')) !!} src="{{ $slot(6, 'img') }}" alt="{{ $slot(6, 'title') }}" loading="lazy" decoding="async" class="h-64 sm:h-72 w-auto object-contain object-bottom transition-transform duration-500 group-hover:scale-105">
           </div>
         </div>
       </div>
@@ -151,7 +151,7 @@
             </p>
           </div>
           <div class="mt-6 flex justify-center">
-            <img src="{{ $slot(3, 'img') }}" alt="{{ $slot(3, 'title') }}" loading="lazy" decoding="async" class="max-h-52 w-auto object-contain">
+            <img {!! \App\Support\BlockDefaults::imageSizeAttrs($slot(3, 'img')) !!} src="{{ $slot(3, 'img') }}" alt="{{ $slot(3, 'title') }}" loading="lazy" decoding="async" class="max-h-52 w-auto object-contain">
           </div>
         </div>
 
@@ -165,7 +165,7 @@
           </div>
           
           <div class="mt-6 flex justify-center items-center">
-            <img src="{{ $slot(7, 'img') }}" alt="{{ $slot(7, 'title') }}" loading="lazy" decoding="async" class="w-full max-w-[280px] h-auto object-contain">
+            <img {!! \App\Support\BlockDefaults::imageSizeAttrs($slot(7, 'img')) !!} src="{{ $slot(7, 'img') }}" alt="{{ $slot(7, 'title') }}" loading="lazy" decoding="async" class="w-full max-w-[280px] h-auto object-contain">
           </div>
         </div>
       </div>
