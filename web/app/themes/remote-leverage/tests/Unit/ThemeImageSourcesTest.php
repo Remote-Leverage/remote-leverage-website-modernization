@@ -79,6 +79,29 @@ it('builds every file in public/images from a tracked source', function () use (
         $expected[count($stems[$stem]) > 1 ? $source.'.webp' : $stem.'.webp'] = true;
     }
 
+    // Responsive variants: a source listed in RESPONSIVE_VARIANTS (vite/theme-images.js) also
+    // emits `{name}-{width}{ext}` siblings next to itself — the hire-va hero's 750px LCP crop
+    // is the first. Parsed out of the plugin rather than restated here, because a second copy
+    // of the width list is exactly how this guard fell out of date with the build and started
+    // reading a correct output as an orphan.
+    $plugin = (string) file_get_contents($theme.'/vite/theme-images.js');
+
+    if (preg_match('/const RESPONSIVE_VARIANTS = \{(.*?)\n\}/s', $plugin, $block) === 1) {
+        preg_match_all("/'([^']+)':\s*\[(.*?)\]/s", $block[1], $entries, PREG_SET_ORDER);
+
+        foreach ($entries as $entry) {
+            preg_match_all('/width:\s*(\d+)/', $entry[2], $widths);
+
+            // Mirrors variantTarget(): same directory, `-{width}` before the original extension.
+            $stem = preg_replace('/\.[^.]+$/', '', $entry[1]);
+            $extension = pathinfo($entry[1], PATHINFO_EXTENSION);
+
+            foreach ($widths[1] as $width) {
+                $expected[$stem.'-'.$width.'.'.$extension] = true;
+            }
+        }
+    }
+
     $orphans = array_values(array_diff($built, array_keys($expected)));
 
     expect($orphans)->toBe([], "These files are in public/images but no build step produces them, so they are lost on the next deploy.\nMove each one to resources/images/pages/ and run `npm run build`:\n  ".implode("\n  ", $orphans));
