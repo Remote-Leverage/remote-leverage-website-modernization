@@ -121,7 +121,8 @@ from a wrong password. `config/wordfence.php` sets it to `false`, and the settin
 | Variable | Notes |
 | :--- | :--- |
 | `SENTRY_LARAVEL_DSN` (or `SENTRY_DSN`) | Optional. **The DSN is committed as the `config/sentry.php` default** since 2026-09-16 — a DSN is not a secret, and ECS maps Secrets Manager keys to env vars one at a time, so waiting on a task-definition change left Sentry silent. Set this only to point an environment somewhere else. |
-| `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE`, `SENTRY_TRACES_SAMPLE_RATE`, `SENTRY_PROFILES_SAMPLE_RATE` | Optional |
+| `APP_VERSION` | Optional — already wired, and not a `SENTRY_*` name because it feeds more than Sentry's config. Read by `config/sentry.php` as the `release`. The Docker build writes it into `/var/www/html/.env`: the `v-YYYYMMDD-vN` release tag in production, the commit SHA in staging (not tag-triggered). Bedrock's own Dotenv loader (`config/application.php`) picks it up from there, and never overwrites a real environment variable, so PHP-side events are tagged without a task-definition change. `config('sentry.release')` also feeds `window.APP_VERSION` (`app.blade.php`) for the browser SDK's `release` option (`resources/js/app.js`). Set the env var only to override the baked value. |
+| `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE`, `SENTRY_PROFILES_SAMPLE_RATE` | Optional |
 
 Every other `SENTRY_*` key in `config/sentry.php` is the package's own default set — breadcrumb and tracing toggles — and needs no project value.
 

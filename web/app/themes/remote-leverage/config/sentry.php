@@ -37,9 +37,10 @@ return [
     // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#logger
     // 'logger' => Sentry\Logger\DebugFileLogger::class, // By default this will log to `storage_path('logs/sentry.log')`
 
-    // The release version of your application
-    // Example with dynamic git hash: trim(exec('git --git-dir ' . base_path('.git') . ' log --pretty="%h" -n1 HEAD'))
-    'release' => env('SENTRY_RELEASE'),
+    // The release version of your application. Read from APP_VERSION rather than a
+    // SENTRY_*-prefixed name because the same value also feeds window.APP_VERSION for the
+    // browser SDK (see app.blade.php) — one env var, not a Sentry-specific one.
+    'release' => env('APP_VERSION'),
 
     // When left empty or `null` the Laravel environment will be used (usually discovered from `APP_ENV` in your `.env`)
     'environment' => env('SENTRY_ENVIRONMENT'),
