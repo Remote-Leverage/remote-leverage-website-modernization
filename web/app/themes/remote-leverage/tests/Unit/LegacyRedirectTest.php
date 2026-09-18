@@ -93,7 +93,15 @@ describe('external targets cannot be turned into an open redirect', function () 
 
         // The complete set of destinations this map can ever produce, computed from the map.
         $permitted = array_map(
-            fn (string $to): string => LegacyRedirectMiddleware::isExternalTarget($to) ? $to : '/'.trim($to, '/'),
+            function (string $to): string {
+                if (LegacyRedirectMiddleware::isExternalTarget($to)) {
+                    return $to;
+                }
+
+                $path = '/'.trim($to, '/');
+
+                return $path === '/' ? $path : $path.'/';
+            },
             array_values($map)
         );
 
@@ -203,13 +211,13 @@ describe('config/redirects.php map', function () {
         $middleware = new LegacyRedirectMiddleware;
 
         expect($middleware->resolve('/tools/', $config))->toBe('/')
-            ->and($middleware->resolve('/tools/signature-generator/', $config))->toBe('/social-media-kit')
-            ->and($middleware->resolve('/tools/signature-generator', $config))->toBe('/social-media-kit');
+            ->and($middleware->resolve('/tools/signature-generator/', $config))->toBe('/social-media-kit/')
+            ->and($middleware->resolve('/tools/signature-generator', $config))->toBe('/social-media-kit/');
     });
 
     test('duplicate thank-you slug 301s to the canonical vathankyou page', function () use ($config) {
         $middleware = new LegacyRedirectMiddleware;
 
-        expect($middleware->resolve('/thank-you/', $config))->toBe('/vathankyou');
+        expect($middleware->resolve('/thank-you/', $config))->toBe('/vathankyou/');
     });
 });
