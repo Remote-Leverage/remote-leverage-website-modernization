@@ -7,6 +7,7 @@ namespace App\Domains\Tracking\Gateways;
 use App\Domains\Tracking\Data\AnalyticsEventData;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class PostHogClient
 {
@@ -30,10 +31,17 @@ class PostHogClient
         }
 
         try {
-            // Timeout, because this is called from a Livewire round trip. Laravel's default
-            // is 30s, so an unreachable PostHog would hold a keystroke response open for
-            // half a minute. Analytics must never be able to stall the form.
-            $response = Http::timeout(3)->connectTimeout(2)->post("{$this->host}/capture/", [
+            /*
+             * 8s/5s, not the 3s/2s this carried until 2026-09-18.
+             *
+             * The tight budget was set when this ran inside a Livewire round trip, where it
+             * genuinely could stall the form. Every caller now defers to after the response, so
+             * the only thing a short timeout buys is lost events — and it did: a cold TLS
+             * handshake to us.i.posthog.com measured over 3s from this host, while a warm one
+             * takes 0.3s. Each PHP request opens a fresh connection, so "cold" is the common
+             * case, and the failure was invisible because nothing reads the return value.
+             */
+            $response = Http::timeout(8)->connectTimeout(5)->post("{$this->host}/capture/", [
                 'api_key' => $this->apiKey,
                 'event' => $event->event,
                 'distinct_id' => $event->distinctId,
@@ -41,7 +49,22 @@ class PostHogClient
                 'timestamp' => gmdate('Y-m-d\TH:i:s\Z', $event->timestamp ?? time()),
             ]);
 
-            return $response->successful();
+            if (! $response->successful()) {
+                // A rejected event used to return false and say nothing anywhere. PostHog
+                // answers a bad key or a malformed payload with a 4xx and a reason; losing it
+                // means the only symptom is an empty funnel.
+                Log::error(sprintf(
+                    'PostHogClient Capture Rejected: %s returned %d for [%s] — %s',
+                    $this->host,
+                    $response->status(),
+                    $event->event,
+                    Str::limit($response->body(), 200),
+                ));
+
+                return false;
+            }
+
+            return true;
         } catch (\Throwable $e) {
             Log::error('PostHogClient Capture Error: '.$e->getMessage());
 

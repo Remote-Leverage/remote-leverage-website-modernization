@@ -168,8 +168,27 @@ loaded two copies of the SDK and captured every pageview twice. Removed 2026-09-
 The names below are **verbatim from the legacy form** (`rl-elementor-blocks`
 `assets/js/headless-calendly-multistep.js`), which fired them client-side via `posthog.capture()`.
 The PostHog funnels, Customer.io campaigns and n8n flows are keyed to them, so they are not free to
-rename. `MultistepBookingWizard` emits them **server-side** now, which is strictly more reliable —
-no ad-blockers, no lost beacon on unload.
+rename.
+
+**PostHog is captured in the browser; Customer.io is sent from PHP.** `MultistepBookingWizard::trackStepEvent()`
+drives both from one call: `capturePostHog()` hands the browser a guarded `posthog.capture()` through
+Livewire's `js()` effect, and `deferTracking()` queues a `CustomerIOClient::track()` for after the
+response.
+
+These were briefly *both* sent server-side, on the reasoning that a server call cannot be
+ad-blocked. That cost the funnel entirely and was reverted on 2026-09-18. Two things were wrong
+with it:
+
+- **PostHog's identity lives in the browser.** A server event carries no person, no `$current_url`,
+  no `$lib` and no session to attach to unless the component first ships the browser's distinct id
+  back to PHP — a round trip `form_loaded` always loses. Worse, nothing in the booking form ever
+  called `posthog.identify()`, so with `person_profiles: 'identified_only'` there was no person for
+  those events to land on at all. The legacy funnel had the visitor's email against every row; the
+  server-side one had an empty Person column.
+- **Nothing was arriving anyway.** See *Deferred work and `terminate()`* below.
+
+`posthog.identify()` is now sent at partial capture, keyed to email, which is the same moment and
+the same key the legacy form used.
 
 | Event | Raised when | Extra properties |
 | :--- | :--- | :--- |
@@ -184,6 +203,28 @@ no ad-blockers, no lost beacon on unload.
 
 Every event also carries the legacy common shape: `form_id` (the Livewire component id, where
 legacy used the Gravity Forms id), `session_id`, `form_type: 'multistep'`, `is_isolated`.
+
+### Deferred work and `terminate()`
+
+`dispatch(...)->afterResponse()` registers a *terminating callback*, which runs only when something
+calls `$app->terminate()`. Acorn calls it in two places (`Bootable::registerRequestHandler`): the
+route it handles itself, and the `wordpress` route when `handlesWordPressRequests()` is true. This
+theme renders through WordPress' template hierarchy, so an ordinary page view matches neither and
+Acorn returns before registering its shutdown hook — as do `/wp-admin`, `/wp-login.php`, `/wp-json`
+and any `.php` path.
+
+On all of those the container never terminated and **every deferred job was discarded** — silently,
+with no exception and no log line. That is fourteen call sites: Customer.io, PostHog, the Slack
+alerts, the outgoing lead webhook, the notification mail, the referral notifications.
+
+`ThemeServiceProvider::ensureApplicationTerminates()` closes it with a `shutdown` hook at priority
+999 that terminates the container when Acorn has not. It is guarded by a sentinel terminating
+callback, because `Application::terminate()` walks its callbacks **without clearing them** — calling
+it twice re-runs all of them, which on the paths Acorn *does* handle would mean a duplicate of every
+deferred job.
+
+Measured on 2026-09-18, before the fix: a front-end page render logged the dispatch and never the
+closure; the Livewire update endpoint logged both.
 
 **Fixed at the same time (2026-09-15):** these were briefly emitted as `booking_wizard_<name>`,
 which no downstream consumer listened for. And `distinctId` was `$email ?: session()->getId()` —

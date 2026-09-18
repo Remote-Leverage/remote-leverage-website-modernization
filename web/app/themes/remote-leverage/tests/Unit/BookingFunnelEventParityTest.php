@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Application\Livewire\Booking\MultistepBookingWizard;
-use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
 use App\Domains\Tracking\Data\AnalyticsEventData;
+use App\Domains\Tracking\Gateways\CustomerIOClient;
 
 /*
  * Booking-funnel event parity with the legacy form.
@@ -18,38 +18,47 @@ use App\Domains\Tracking\Data\AnalyticsEventData;
  * refactor — if one of these fails, the integrations have to move first.
  */
 
-/** Capture every event the wizard emits, by swapping the recorder in the container. */
+/**
+ * Capture every event the wizard emits, by swapping the Customer.io gateway in the container.
+ *
+ * Customer.io is the only destination the component still sends to from PHP. PostHog is captured
+ * in the browser (see `postHogCaptureExpression()` and the assertions further down), so it is not
+ * observable here — but both are driven from the same `trackStepEvent()` call with the same name
+ * and the same payload, which is what these tests pin.
+ */
 function captureWizardEvents(callable $exercise): array
 {
     // A property, not a captured reference: PHP properties cannot be references, and an
     // invalid recorder fails *silently* here because trackStepEvent() swallows throwables to
     // keep analytics from breaking a booking. An empty result is the only symptom.
-    $recorder = new class extends RecordBehaviorEventAction
+    $recorder = new class extends CustomerIOClient
     {
         /** @var AnalyticsEventData[] */
         public array $seen = [];
 
         public function __construct()
         {
-            // Deliberately does not call parent::__construct(): the real gateways would try to
-            // reach PostHog and Customer.io over the network.
+            // Deliberately does not call parent::__construct(): the real gateway would try to
+            // reach Customer.io over the network.
         }
 
-        public function execute(AnalyticsEventData $event): void
+        public function track(AnalyticsEventData $event): bool
         {
             $this->seen[] = $event;
+
+            return true;
         }
     };
 
-    app()->instance(RecordBehaviorEventAction::class, $recorder);
+    app()->instance(CustomerIOClient::class, $recorder);
 
     try {
-        // Tracking is dispatched `afterResponse()` in production so two outbound HTTP calls
-        // never run inside a Livewire round trip — see MultistepBookingWizard::deferTracking().
+        // Tracking is dispatched `afterResponse()` in production so an outbound HTTP call never
+        // runs inside a Livewire round trip — see MultistepBookingWizard::deferTracking().
         // Under the bare test container that seam runs inline, so events are observable here.
         $exercise();
     } finally {
-        app()->forgetInstance(RecordBehaviorEventAction::class);
+        app()->forgetInstance(CustomerIOClient::class);
     }
 
     return $recorder->seen;
@@ -121,6 +130,74 @@ describe('booking funnel emits the legacy event names', function () {
         foreach (eventNames($events) as $name) {
             expect($name)->not->toStartWith('booking_wizard_');
         }
+    });
+});
+
+describe('PostHog is captured in the browser, not from PHP', function () {
+    /*
+     * The funnel went silent at cutover because these events were moved server-side. A server
+     * capture has no person, no $current_url and no session to attach to, and the booking form
+     * never called identify() at all — so PostHog had nothing to file the events against.
+     *
+     * These assertions are on the JS the component hands the browser. Reverting to a PHP
+     * capture, or dropping the identify, has to fail here.
+     */
+    test('a funnel event is handed to the browser as a posthog.capture call', function () {
+        $wizard = new MultistepBookingWizard;
+
+        $expression = (fn () => $this->postHogCaptureExpression('hour_selected', [
+            'form_type' => 'multistep',
+            'selected_time' => '2026-10-01T15:00:00Z',
+            'selected_date' => null,
+        ]))->call($wizard);
+
+        expect($expression)
+            ->toContain('window.posthog.capture(')
+            ->toContain('"hour_selected"')
+            ->toContain('"selected_time":"2026-10-01T15:00:00Z"')
+            // Guarded, because PostHog is absent for anyone blocking it and a bare call would
+            // throw inside Livewire's effect runner and take the rest of the effects with it.
+            ->toContain('window.posthog && typeof window.posthog.capture === "function"')
+            // Nulls stripped: an untouched field must not land as an empty property.
+            ->not->toContain('selected_date');
+    });
+
+    test('the visitor is identified by email, with the funnel person properties', function () {
+        $wizard = new MultistepBookingWizard;
+        $wizard->email = 'lead@example.com';
+        $wizard->name = 'Ada Lovelace';
+        $wizard->roleNeeded = 'Executive Assistant';
+
+        $expression = (fn () => $this->postHogIdentifyExpression())->call($wizard);
+
+        expect($expression)
+            ->toContain('window.posthog.identify("lead@example.com"')
+            ->toContain('"name":"Ada Lovelace"')
+            ->toContain('"role_needed":"Executive Assistant"');
+    });
+
+    test('identify is sent once and only once the email is known', function () {
+        $wizard = new MultistepBookingWizard;
+
+        // No email yet: nothing to identify with, and identifying on a blank string would
+        // merge every anonymous visitor into one person.
+        (fn () => $this->identifyInBrowser())->call($wizard);
+        expect($wizard->identifiedInBrowser)->toBeFalse();
+
+        $wizard->email = 'lead@example.com';
+        (fn () => $this->identifyInBrowser())->call($wizard);
+        expect($wizard->identifiedInBrowser)->toBeTrue();
+    });
+
+    test('no funnel event is captured into PostHog from PHP', function () {
+        $source = file_get_contents(
+            __DIR__.'/../../app/Application/Livewire/Booking/MultistepBookingWizard.php'
+        );
+
+        // RecordBehaviorEventAction is the dual-dispatch action: PostHog *and* Customer.io.
+        // The wizard must reach Customer.io directly, or PostHog gets a second, orphan copy of
+        // every event under a distinct id the browser has never heard of.
+        expect($source)->not->toContain('RecordBehaviorEventAction');
     });
 });
 

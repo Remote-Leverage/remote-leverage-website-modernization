@@ -13,8 +13,8 @@ use App\Domains\Scheduling\Actions\FetchAvailableSlotsAction;
 use App\Domains\Scheduling\Services\AvailabilityHealthMonitor;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use App\Domains\Scheduling\Services\TierUtilizationProbe;
-use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
 use App\Domains\Tracking\Data\AnalyticsEventData;
+use App\Domains\Tracking\Gateways\CustomerIOClient;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
@@ -198,12 +198,12 @@ class MultistepBookingWizard extends Component
     public string $posthogSessionId = '';
 
     /**
-     * PostHog's distinct id for this browser.
+     * Whether `posthog.identify()` has already been sent for this visitor.
      *
-     * Without it the server-side funnel events are filed under a different identity from
-     * everything the browser captured — two half-people per visitor, and no funnel joins up.
+     * A public property because it has to survive the component's re-hydration between
+     * requests — a local flag would reset on every one and re-identify on each step.
      */
-    public string $posthogDistinctId = '';
+    public bool $identifiedInBrowser = false;
 
     /**
      * Whether the interstitial warning screen is showing.
@@ -621,6 +621,9 @@ class MultistepBookingWizard extends Component
             $lead = $captureAction->execute($leadData);
             $this->leadId = $lead->id;
 
+            // Identify before the event, so `partial_form_submitted` is the first thing on the
+            // identified person rather than the last thing on the anonymous one.
+            $this->identifyInBrowser();
             $this->trackStepEvent('partial_form_submitted', ['lead_id' => $lead->id]);
         } catch (\Throwable $e) {
             Log::warning('Could not capture partial lead on Step 1: '.$e->getMessage());
@@ -1155,57 +1158,160 @@ class MultistepBookingWizard extends Component
      * id there and is the Livewire component id here — different value, same role: a stable
      * handle for one form instance on one page.
      *
-     * These fire **server-side** now, from the component, rather than from the browser. That
-     * is strictly more reliable (no ad-blockers, no lost beacon on unload), but it does mean
-     * an event only exists where the component has a lifecycle hook to hang it on — see
-     * `form_started`, which is the one that had to change meaning slightly.
+     * ## Where each destination is fired from, and why they differ
+     *
+     * **PostHog is captured in the browser**, by `capturePostHog()` below. It was briefly sent
+     * server-side, on the reasoning that a server call cannot be ad-blocked. That traded away
+     * the thing PostHog is built around: the browser owns the identity. A server event carries
+     * no person, no `$current_url`, no `$lib`, and no link to the session recording unless the
+     * component first ships the browser's distinct id back to PHP — which is a round trip the
+     * component loses, every time, for `form_loaded`. The result was a funnel of orphan events
+     * under throwaway UUIDs and an empty Person column, against a legacy funnel whose rows all
+     * carried the visitor's email. Reverted 2026-09-18.
+     *
+     * **Customer.io stays server-side**, deferred, because its Track API is keyed to credentials
+     * that belong nowhere near a browser, and because it is identified by email rather than by
+     * a browser-held id, so it loses nothing by being sent from here.
      */
     protected function trackStepEvent(string $eventName, array $properties = []): void
     {
         try {
+            $payload = array_merge([
+                'form_id' => (string) $this->getId(),
+                'session_id' => $this->sessionId,
+                'form_type' => 'multistep',
+                'is_isolated' => ! empty($this->isolatedSteps),
+                'step' => $this->currentStep,
+                'selected_date' => $this->selectedDate,
+                'selected_slot' => $this->selectedSlot,
+                'role_needed' => $this->roleNeeded,
+            ], $properties);
+
             /*
              * Deferred, not inline.
              *
-             * `RecordBehaviorEventAction` makes two outbound HTTP calls (PostHog and
-             * Customer.io). Called inline, those ran *inside the Livewire round trip* — so a
-             * keystroke on a `wire:model.live` field waited on two third-party endpoints before
-             * the component could respond. The visible symptom is the form eating characters:
-             * the response lands late and patches the DOM over what was typed meanwhile.
-             *
-             * Every other listener in this codebase already dispatches `afterResponse()` for
-             * exactly this reason; this one did not, which was an oversight rather than a
-             * decision. The event data is captured now and sent after the response is flushed,
-             * so the component returns at local speed regardless of how slow analytics is.
+             * `CustomerIOClient::track()` is an outbound HTTP call. Run inline it sat *inside
+             * the Livewire round trip*, so a keystroke on a `wire:model.live` field waited on a
+             * third-party endpoint before the component could respond. The visible symptom is
+             * the form eating characters: the response lands late and patches the DOM over what
+             * was typed meanwhile.
              */
             $event = new AnalyticsEventData(
                 event: $eventName,
                 distinctId: $this->resolveDistinctId(),
-                properties: array_merge([
-                    'form_id' => (string) $this->getId(),
-                    'session_id' => $this->sessionId,
-                    'form_type' => 'multistep',
-                    'is_isolated' => ! empty($this->isolatedSteps),
-                    'step' => $this->currentStep,
-                    'selected_date' => $this->selectedDate,
-                    'selected_slot' => $this->selectedSlot,
-                    'role_needed' => $this->roleNeeded,
-
-                    /*
-                     * Ties this server-side event to the browser's session replay. Without
-                     * `$session_id` PostHog has no way to place the event on the recording's
-                     * timeline, which is why the replay inspector showed 30 autocaptured events
-                     * and zero custom ones — the events were arriving, just not attached.
-                     */
-                    '$session_id' => $this->posthogSessionId ?: null,
-                ], $properties)
+                properties: $payload,
             );
 
-            $this->deferTracking(static fn () => app(RecordBehaviorEventAction::class)->execute($event));
+            $this->deferTracking(static fn () => app(CustomerIOClient::class)->track($event));
 
+            // Browser-side effects last, and each one isolated: a Livewire lifecycle that
+            // cannot accept a `js()` effect must not take the Customer.io dispatch with it.
+            $this->capturePostHog($eventName, $payload);
             $this->pushToDataLayer($eventName, $properties);
         } catch (\Throwable $e) {
-            // Silently swallow analytics errors to avoid breaking booking UX
+            // Analytics must never break a booking. It must not vanish either — this catch
+            // hid a funnel that had been dead since cutover, so the exception goes to Sentry.
+            $this->reportException($e);
         }
+    }
+
+    /**
+     * Capture a funnel event in the visitor's browser, through the PostHog snippet.
+     *
+     * `js()` reaches the browser on every lifecycle the component has, including the initial
+     * server render — Livewire serialises the call into `wire:effects.xjs`, which is why
+     * `form_loaded` works here despite having no round trip of its own to ride on.
+     *
+     * The snippet in `TrackingHooks::injectPostHogSnippet()` installs a queueing stub that
+     * accepts `capture` before `array.js` has landed, so there is no load order to wait for.
+     * When PostHog is blocked or absent, `window.posthog` is simply undefined and the guard
+     * drops the call — the same outcome the legacy form had, and the honest one: the visitor
+     * opted out.
+     *
+     * @param  array<string, mixed>  $properties
+     */
+    protected function capturePostHog(string $eventName, array $properties = []): void
+    {
+        try {
+            $this->js($this->postHogCaptureExpression($eventName, $properties));
+        } catch (\Throwable $e) {
+            // No Livewire lifecycle to attach the effect to (a bare unit test, a console call).
+        }
+    }
+
+    /**
+     * Identify the visitor to PostHog, by email, from the browser.
+     *
+     * Legacy did this and it is why every row in the funnel had a person against it. Nothing in
+     * v2 did it for the booking form until 2026-09-18 — `posthog.identify()` appeared exactly
+     * once in the theme, in the checkout block — so booking events could only ever have landed
+     * on anonymous profiles. `person_profiles: 'identified_only'` means the browsing session has
+     * no profile to merge into either, so without this call there is no person at all.
+     *
+     * Called at partial capture: the email has been validated by then, and it is the same
+     * moment the legacy form identified. PostHog aliases the anonymous id to the email itself,
+     * so everything already captured in this session follows the person over.
+     */
+    protected function identifyInBrowser(): void
+    {
+        if ($this->email === '' || $this->identifiedInBrowser) {
+            return;
+        }
+
+        $this->identifiedInBrowser = true;
+
+        try {
+            $this->js($this->postHogIdentifyExpression());
+        } catch (\Throwable $e) {
+            // As above: no lifecycle to carry the effect.
+        }
+    }
+
+    /**
+     * The `posthog.capture()` call for one funnel event.
+     *
+     * Built as a string rather than inlined so it can be asserted on directly — the whole point
+     * of moving back to the browser is the shape of this call, and a unit test cannot observe a
+     * Livewire `js()` effect.
+     *
+     * `$session_id` is deliberately not forwarded: captured here, the browser stamps its own
+     * session, URL and library onto the event. Nulls are stripped so an untouched field does not
+     * land in PostHog as a property with no value.
+     *
+     * @param  array<string, mixed>  $properties
+     */
+    protected function postHogCaptureExpression(string $eventName, array $properties = []): string
+    {
+        $properties = array_filter($properties, static fn ($value) => $value !== null);
+
+        return sprintf(
+            'if (window.posthog && typeof window.posthog.capture === "function") { window.posthog.capture(%s, %s); }',
+            json_encode($eventName, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            json_encode((object) $properties, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+        );
+    }
+
+    /**
+     * The `posthog.identify()` call, with the person properties the funnel reports on.
+     *
+     * Only what a funnel or a cohort is built from. `phone` is not among them: it buys nothing
+     * in PostHog that the Lead row does not already hold, and person properties are readable by
+     * anyone with project access.
+     */
+    protected function postHogIdentifyExpression(): string
+    {
+        $traits = array_filter([
+            'email' => $this->email,
+            'name' => $this->name,
+            'role_needed' => $this->roleNeeded,
+            'monthly_revenue' => $this->monthlyRevenue,
+        ], static fn ($value) => $value !== null && $value !== '');
+
+        return sprintf(
+            'if (window.posthog && typeof window.posthog.identify === "function") { window.posthog.identify(%s, %s); }',
+            json_encode($this->email, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            json_encode((object) $traits, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+        );
     }
 
     /**
@@ -1388,17 +1494,20 @@ class MultistepBookingWizard extends Component
         ]), static fn ($value) => $value !== null && $value !== '');
     }
 
+    /**
+     * Who the deferred Customer.io event is about.
+     *
+     * Email first, because Customer.io is identified by email everywhere else in this codebase
+     * — `HandleLeadCreatedForTracking` calls `identify()` with it, and the lead-scoring map is
+     * keyed to that person. Anything sent under a different id creates a second profile that no
+     * campaign will ever match.
+     *
+     * This used to prefer PostHog's browser distinct id, from back when the same payload was
+     * dual-dispatched to PostHog as well. PostHog is captured in the browser now, so that id has
+     * no reader here and the honest fallback is the component's own session.
+     */
     protected function resolveDistinctId(): string
     {
-        /*
-         * The browser's own distinct id wins when we have it. PostHog joins client and server
-         * events by this value, so using the email here — which the browser never sees — files
-         * the funnel under a second identity and breaks every funnel that spans both.
-         */
-        if ($this->posthogDistinctId !== '') {
-            return $this->posthogDistinctId;
-        }
-
         if ($this->email !== '') {
             return $this->email;
         }

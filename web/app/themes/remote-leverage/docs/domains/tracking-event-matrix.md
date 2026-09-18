@@ -67,7 +67,7 @@ Legend: **OK** parity · **FIXED** was missing, now present · **GAP** still mis
 
 ## 1. PostHog — booking funnel
 
-Legacy fired these client-side from `headless-calendly-multistep.js`; v2 fires them **server-side** from `MultistepBookingWizard::trackStepEvent()`, which is strictly more reliable. Names are pinned by `tests/Unit/BookingFunnelEventParityTest.php`.
+Legacy fired these client-side from `headless-calendly-multistep.js`. v2 briefly moved them server-side, which took the whole funnel off the air between cutover and 2026-09-18 — no person, no identify, and a deferred dispatch that never ran on a page render. They are captured **in the browser** again, from `MultistepBookingWizard::capturePostHog()`, with `posthog.identify()` at partial capture. Customer.io still receives the same events from PHP. Names are pinned by `tests/Unit/BookingFunnelEventParityTest.php`.
 
 | Event | Fires on | Legacy | v2 | Status |
 | :--- | :--- | :---: | :---: | :--- |
@@ -84,6 +84,7 @@ Legacy fired these client-side from `headless-calendly-multistep.js`; v2 fires t
 | `step_viewed` | any step change | no | yes | NEW |
 | `pricing_warning_shown` | revenue-band warning shown | no | yes | NEW |
 | `pricing_warning_accepted` | warning dismissed | no | yes | NEW |
+| `posthog.identify(email)` | partial capture | yes | yes | **FIXED 2026-09-18** — the booking form never identified in v2, so every row above had an empty Person |
 
 ## 2. PostHog / Customer.io — checkout funnel
 
