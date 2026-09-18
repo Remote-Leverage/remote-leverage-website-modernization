@@ -86,8 +86,38 @@ return [
     ],
 
     'posthog' => [
-        'api_key' => env('POSTHOG_API_KEY'),
+        /*
+         * The `phc_` project key, defaulted because it is publishable by design — it is emitted
+         * into the page HTML for every visitor, and it was committed in `config/pixels.php` as
+         * the container's id until PostHog moved into the theme on 2026-09-18. Leaving it to an
+         * unset environment variable is why the theme's snippet was dormant on production while
+         * PostHog quietly arrived from GTM instead.
+         *
+         * Not a credential: it can only write events. `POSTHOG_PERSONAL_API_KEY`-class secrets
+         * are a different thing and do not belong here.
+         */
+        'api_key' => env('POSTHOG_API_KEY', 'phc_3PbasnDYndH8YVEky0ksHrB3SFwBZKmzkf5bl37o8u0'),
         'host' => env('POSTHOG_HOST', 'https://us.i.posthog.com'),
+
+        /*
+         * Which `wp_get_environment_type()` values load the browser snippet.
+         *
+         * Production only, and required rather than cosmetic now that the key above has a
+         * default: without it every local page load and every staging smoke test would ingest
+         * into the production project, polluting the funnels and filling replay with traffic
+         * that was never a customer. Mirrors `pixels.environments`, so one switch still moves
+         * the whole tracking surface together.
+         *
+         * This preserves behaviour rather than changing it: PostHog used to arrive from GTM,
+         * and `GTM_ENVIRONMENTS` already gated the container to production.
+         */
+        'environments' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env(
+                'POSTHOG_ENVIRONMENTS',
+                env('PIXEL_ENVIRONMENTS', env('GTM_ENVIRONMENTS', 'production')),
+            )),
+        ))),
 
         /*
          * Numeric project id — the one in the dashboard URL, NOT the `phc_` key. Used only to

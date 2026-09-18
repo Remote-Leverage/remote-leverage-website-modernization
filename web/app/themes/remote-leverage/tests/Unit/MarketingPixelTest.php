@@ -25,6 +25,8 @@ beforeEach(function () {
         'pixels.linkedin.partner_ids' => ['6411876'],
         'pixels.openai.pixel_ids' => ['7QY9HDVocGyeNvMMW1gLWb'],
         'pixels.openai.debug' => false,
+        'pixels.tiktok.pixel_ids' => ['CPMB51BC77U75I0QMMAG'],
+        'pixels.tiktok.track_page_view' => true,
         'pixels.google_tag.ids' => ['GT-NCNQ6N2'],
         'pixels.google_tag.linker_domains' => ['remoteleverage.com'],
     ]);
@@ -279,6 +281,7 @@ describe('LinkedIn and OpenAI, ported from the page', function () {
         $emitted = [
             'linkedin' => $config['linkedin']['partner_ids'],
             'openai' => $config['openai']['pixel_ids'],
+            'tiktok' => $config['tiktok']['pixel_ids'],
         ];
 
         foreach ($emitted as $vendor => $ids) {
@@ -509,5 +512,101 @@ describe('deferred SDK loading', function () {
             ->and($out)->toContain('js-na2.hs-scripts.com/243484989.js')
             // The undeferred path emits a plain tag; the deferred one must not also do that.
             ->and($out)->not->toContain('<script id="hs-script-loader"');
+    });
+});
+
+describe('TikTok, moved out of the container', function () {
+    test('the production sdkid loads and a PageView is queued', function () {
+        $out = renderPixel(fn (MarketingPixelHooks $h) => $h->injectTikTok());
+
+        expect($out)->toContain("ttq.load('CPMB51BC77U75I0QMMAG')")
+            ->and($out)->toContain('ttq.page();')
+            ->and($out)->toContain('analytics.tiktok.com/i18n/pixel/events.js')
+            // One SDK regardless of how many ids are configured.
+            ->and(substr_count($out, 'analytics.tiktok.com'))->toBe(1);
+    });
+
+    test('a junk sdkid is refused rather than interpolated into the script', function () {
+        config(['pixels.tiktok.pixel_ids' => ['CPMB51BC77U75I0QMMAG', "'); alert(1); //", 'short']]);
+
+        $hooks = new MarketingPixelHooks;
+
+        expect($hooks->tikTokPixelIds())->toBe(['CPMB51BC77U75I0QMMAG']);
+    });
+
+    test('the stub and the PageView stay synchronous while only ttq.load waits', function () {
+        /*
+         * `ttq.load()` is the call that inserts events.js, so it is the one deferred. The method
+         * stubs and `ttq.page()` must not be: the queued PageView is what events.js drains.
+         */
+        config(['pixels.defer.vendors' => ['tiktok']]);
+
+        $out = renderPixel(fn (MarketingPixelHooks $h) => $h->injectTikTok());
+
+        expect(strpos($out, 'ttq.setAndDefer'))->toBeLessThan(strpos($out, 'rlDefer'));
+        expect(strpos($out, 'rlDefer'))->toBeLessThan(strpos($out, 'ttq.page();'));
+        expect($out)->toContain("window.rlDefer(function(){ttq.load('CPMB51BC77U75I0QMMAG');});");
+    });
+
+    test('nothing is emitted when no id is configured', function () {
+        config(['pixels.tiktok.pixel_ids' => []]);
+
+        expect(renderPixel(fn (MarketingPixelHooks $h) => $h->injectTikTok()))->toBe('');
+    });
+});
+
+describe('defaults that used to depend on an unset variable', function () {
+    /*
+     * Both of these were dark on production with no error anywhere, because an unset
+     * environment variable is indistinguishable from a deliberate opt-out. Neither value is a
+     * secret — both ship in the page HTML — so both are defaulted in config and asserted here.
+     */
+    test('the HubSpot portal id is defaulted, so browser tracking is not silently off', function () {
+        $config = require __DIR__.'/../../config/pixels.php';
+
+        expect($config['hubspot']['portal_id'])->toBe('243484989')
+            ->and($config['hubspot']['region'])->toBe('na2');
+    });
+
+    test('the PostHog publishable key is defaulted', function () {
+        $config = require __DIR__.'/../../config/services.php';
+
+        expect($config['posthog']['api_key'])->toBe('phc_3PbasnDYndH8YVEky0ksHrB3SFwBZKmzkf5bl37o8u0');
+    });
+
+    test('PostHog is gated to production, now that its key has a default', function () {
+        /*
+         * The guard that stops the default becoming a regression. Without it, every local page
+         * load and staging smoke test would ingest into the production project. PostHog used to
+         * arrive via GTM, which `GTM_ENVIRONMENTS` already gated to production — so this keeps
+         * behaviour rather than changing it.
+         */
+        config([
+            // Set explicitly: the test harness does not resolve this file's env() defaults,
+            // and the shipped default is asserted by the test above instead.
+            'services.posthog.api_key' => 'phc_3PbasnDYndH8YVEky0ksHrB3SFwBZKmzkf5bl37o8u0',
+            'services.posthog.host' => 'https://us.i.posthog.com',
+            'services.posthog.environments' => ['production'],
+        ]);
+
+        $hooks = new TrackingHooks;
+
+        $GLOBALS['wp_environment_type'] = 'development';
+        expect($hooks->postHogEnvironmentAllowed())->toBeFalse();
+
+        ob_start();
+        $hooks->injectPostHogSnippet();
+        expect((string) ob_get_clean())->toBe('');
+
+        $GLOBALS['wp_environment_type'] = 'production';
+        expect($hooks->postHogEnvironmentAllowed())->toBeTrue();
+
+        ob_start();
+        $hooks->injectPostHogSnippet();
+        $out = (string) ob_get_clean();
+
+        expect($out)->toContain('posthog.init(')
+            // Surveys are the 33KB nothing in this codebase asks for.
+            ->and($out)->toContain('disable_surveys:true');
     });
 });

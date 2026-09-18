@@ -194,6 +194,34 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | TikTok Pixel
+    |--------------------------------------------------------------------------
+    |
+    | Moved out of `GTM-53JDTQCZ` on 2026-09-18. It was the largest single
+    | non-Google third party on the page — 162KB transferred, 94ms of blocking
+    | time — and a tag inside the container cannot have its fetch held back
+    | from here. Emitted as code, it goes through the `defer` block below like
+    | every other pixel.
+    |
+    | **The GTM tag must be deleted in the same change.** Two TikTok pixels on
+    | one page is two PageViews into the account the bidding optimises against.
+    | `MarketingPixelTest` asserts this id is not also in `delivered_by_gtm` —
+    | that guard catches the config mistake, not a tag left live in GTM.
+    |
+    | If marketing needs to change this without a deploy, put it back in the
+    | container and retrigger it on the `rl_idle` event the defer bootstrap
+    | pushes. That keeps the deferral and hands back the control.
+    */
+    'tiktok' => [
+        'pixel_ids' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('TIKTOK_PIXEL_IDS', 'CPMB51BC77U75I0QMMAG')),
+        ))),
+        'track_page_view' => filter_var(env('TIKTOK_TRACK_PAGE_VIEW', true), FILTER_VALIDATE_BOOLEAN),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Deferred SDK loading
     |--------------------------------------------------------------------------
     |
@@ -252,6 +280,9 @@ return [
     | If a tag is removed from the container, move its id up into the relevant
     | block in the same change.
     |
+    | **TikTok left this list on 2026-09-18** — it is emitted above so that it
+    | can be deferred. The container tag must be deleted to match.
+    |
     | **PostHog left this list on 2026-09-18.** It is now loaded by
     | `TrackingHooks::injectPostHogSnippet()` from `POSTHOG_API_KEY`, because
     | theme code has a hard runtime dependency on `window.posthog` -- the
@@ -264,7 +295,6 @@ return [
     'delivered_by_gtm' => [
         'linkedin' => ['9514236'],
         'openai' => ['GtXTy8ihLz5qrMUanZ3fqf'],
-        'tiktok' => ['CPMB51BC77U75I0QMMAG'],
         'statcounter' => ['13176576'],
         'rewardful' => ['39ea7a'],
     ],
@@ -284,7 +314,13 @@ return [
     | the script host and differs per account: production serves `na2`.
     */
     'hubspot' => [
-        'portal_id' => (string) env('HUBSPOT_PORTAL_ID', ''),
+        /*
+         * Defaulted like every other id in this file. A portal id is not a secret — it is in
+         * the script URL of every page HubSpot tracks — and leaving it to an unset environment
+         * variable is why browser tracking was dark on production until 2026-09-18 with no
+         * error anywhere. `HUBSPOT_ACCESS_TOKEN`, which *is* a secret, stays in the environment.
+         */
+        'portal_id' => (string) env('HUBSPOT_PORTAL_ID', '243484989'),
         'region' => (string) env('HUBSPOT_SCRIPT_REGION', 'na2'),
     ],
 ];

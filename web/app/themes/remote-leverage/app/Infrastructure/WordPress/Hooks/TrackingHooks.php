@@ -93,7 +93,7 @@ HTML;
         $apiKey = config('services.posthog.api_key');
         $host = config('services.posthog.host', 'https://us.i.posthog.com');
 
-        if (! $apiKey) {
+        if (! $apiKey || ! $this->postHogEnvironmentAllowed()) {
             return;
         }
 
@@ -192,5 +192,24 @@ analytics.page();
 {$pageEvents}}}}();
 </script>
 HTML;
+    }
+
+    /**
+     * Whether this environment loads the PostHog browser snippet.
+     *
+     * See `services.posthog.environments`. This exists because the `phc_` key now has a
+     * default: before that, an unset variable was doing the gating by accident, and the
+     * accident was the only thing keeping local and staging traffic out of the production
+     * project.
+     */
+    public function postHogEnvironmentAllowed(): bool
+    {
+        $allowed = (array) config('services.posthog.environments', ['production']);
+
+        if (! function_exists('wp_get_environment_type')) {
+            return in_array('production', $allowed, true);
+        }
+
+        return in_array(wp_get_environment_type(), $allowed, true);
     }
 }

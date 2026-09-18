@@ -16,7 +16,8 @@ namespace App\Infrastructure\WordPress\Hooks;
  *   1  TrackingHooks  visitor cookie
  *   2  TrackingHooks  PostHog
  *   3  SiteKitHooks   GTM containers
- *   4  here           defer bootstrap, then Meta, UET, HubSpot, LinkedIn, OpenAI, Google tag
+ *   4  here           defer bootstrap, then Meta, UET, HubSpot, LinkedIn, OpenAI, TikTok,
+ *                     Google tag
  *
  * Last deliberately. A pixel here is a fallback for something the container does not carry, so
  * if a tag inside GTM ever starts doing the same job it wins the race to define `fbq` and this
@@ -43,6 +44,7 @@ class MarketingPixelHooks
         add_action('wp_head', [$this, 'injectHubSpot'], 4);
         add_action('wp_head', [$this, 'injectLinkedIn'], 4);
         add_action('wp_head', [$this, 'injectOpenAi'], 4);
+        add_action('wp_head', [$this, 'injectTikTok'], 4);
         add_action('wp_head', [$this, 'injectGoogleTag'], 4);
         add_action('wp_head', [$this, 'injectOpenAiConversion'], 5);
         add_action('wp_body_open', [$this, 'injectMetaNoscript'], 2);
@@ -56,7 +58,7 @@ class MarketingPixelHooks
      * block in `config/pixels.php`. Intersecting against this list means a stray
      * `PIXEL_DEFER_VENDORS=meta` is ignored rather than half-honoured.
      */
-    private const DEFERRABLE = ['linkedin', 'openai', 'hubspot', 'bing_uet'];
+    private const DEFERRABLE = ['linkedin', 'openai', 'hubspot', 'bing_uet', 'tiktok'];
 
     /**
      * The vendors actually being deferred, in a stable order.
@@ -408,6 +410,88 @@ HTML;
 <!-- End OpenAI pixel -->
 
 HTML;
+    }
+
+    /**
+     * TikTok's pixel, ported out of the GTM container.
+     *
+     * The snippet is the container's own, unchanged apart from the split: `ttq` and its method
+     * stubs stay synchronous and `ttq.page()` queues on them immediately, while `ttq.load()` —
+     * the call that actually inserts `events.js` — is what waits. By the time the SDK executes,
+     * `load()` has registered the pixel id and the queued PageView is still there to drain, so
+     * deferring costs no event.
+     *
+     * See `config/pixels.php`: the container tag has to be deleted, or the account gets two
+     * PageViews per visit and the bidding optimises against an inflated number.
+     */
+    public function injectTikTok(): void
+    {
+        $ids = $this->tikTokPixelIds();
+
+        if ($ids === []) {
+            return;
+        }
+
+        [$defer, $endDefer] = $this->deferWrap('tiktok');
+
+        $loads = '';
+
+        foreach ($ids as $id) {
+            $loads .= "{$defer}ttq.load('".esc_js($id)."');{$endDefer}\n";
+        }
+
+        if ((bool) config('pixels.tiktok.track_page_view', true)) {
+            $loads .= "ttq.page();\n";
+        }
+
+        echo <<<HTML
+<!-- TikTok Pixel (config/pixels.php) -->
+<script>
+!function (w, d, t) {
+  w.TiktokAnalyticsObject = t;
+  var ttq = w[t] = w[t] || [];
+  ttq.methods = "page track identify instances debug on off once ready alias group enableCookie disableCookie holdConsent revokeConsent grantConsent".split(" ");
+  ttq.setAndDefer = function (a, b) { a[b] = function () { a.push([b].concat(Array.prototype.slice.call(arguments, 0))) } };
+  for (var i = 0; i < ttq.methods.length; i++) ttq.setAndDefer(ttq, ttq.methods[i]);
+  ttq.instance = function (a) {
+    var b = ttq._i[a] || [];
+    for (var c = 0; c < ttq.methods.length; c++) ttq.setAndDefer(b, ttq.methods[c]);
+    return b
+  };
+  ttq.load = function (a, b) {
+    var u = "https://analytics.tiktok.com/i18n/pixel/events.js";
+    ttq._i = ttq._i || {};
+    ttq._i[a] = [];
+    ttq._i[a]._u = u;
+    ttq._t = ttq._t || {};
+    ttq._t[a] = +new Date;
+    ttq._o = ttq._o || {};
+    ttq._o[a] = b || {};
+    var s = d.createElement("script");
+    s.type = "text/javascript";
+    s.async = !0;
+    s.src = u + "?sdkid=" + a + "&lib=" + t;
+    var f = d.getElementsByTagName("script")[0];
+    f.parentNode.insertBefore(s, f)
+  };
+}(window, document, 'ttq');
+{$loads}</script>
+<!-- End TikTok Pixel -->
+
+HTML;
+    }
+
+    /**
+     * Valid TikTok pixel ids from config, de-duplicated.
+     *
+     * TikTok's sdkid is an uppercase alphanumeric string; anything else would be interpolated
+     * into an inline script, so it is checked rather than trusted.
+     *
+     * @return array<int, string>
+     */
+    public function tikTokPixelIds(): array
+    {
+        return $this->validIds((array) config('pixels.tiktok.pixel_ids', []), '/^[A-Z0-9]{10,}$/i');
     }
 
     /**
