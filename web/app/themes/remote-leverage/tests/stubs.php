@@ -1177,3 +1177,36 @@ if (! function_exists('get_post_types')) {
         return $GLOBALS['rl_post_types'] ?? ['post' => 'post', 'page' => 'page'];
     }
 }
+
+if (! defined('HOUR_IN_SECONDS')) {
+    define('HOUR_IN_SECONDS', 3600);
+}
+
+/*
+ * In-memory transients. No expiry clock: every caller here wants "is it cached", and a test
+ * that needs a cold cache clears $GLOBALS['_wp_mock_transients'] rather than waiting.
+ */
+if (! function_exists('get_transient')) {
+    function get_transient($key)
+    {
+        return $GLOBALS['_wp_mock_transients'][$key] ?? false;
+    }
+}
+
+if (! function_exists('set_transient')) {
+    function set_transient($key, $value, $expiration = 0)
+    {
+        $GLOBALS['_wp_mock_transients'][$key] = $value;
+
+        return true;
+    }
+}
+
+if (! function_exists('delete_transient')) {
+    function delete_transient($key)
+    {
+        unset($GLOBALS['_wp_mock_transients'][$key]);
+
+        return true;
+    }
+}

@@ -266,6 +266,27 @@ class HubSpotGateway
             'landing_page' => $lead->landing_page_base ?: $lead->landing_url,
 
             /*
+             * The two fields Meta's Conversions API matches on, mirrored into HubSpot so the two
+             * systems can be reconciled against each other on a per-contact basis — when Meta
+             * reports a conversion nobody can find in the CRM, these are what you join on.
+             *
+             * Deliberately NOT folded into `landing_page`: that one prefers `landing_page_base`,
+             * which is the URL with the query string stripped, and is the right thing for
+             * grouping in HubSpot reporting. `event_source_url` is the full URL including
+             * `fbclid` and the UTM set, byte-identical to what MetaConversionsApiClient sends,
+             * because its whole value is being the same string on both sides.
+             *
+             * Like every key in this map, both must exist in the portal before this ships —
+             * HubSpot 400s the entire request over one unknown property and every other field on
+             * it is lost with it. Create them as single-line text under `conversioninformation`,
+             * matching `fbc` / `landing_page`. The private app token could not create them
+             * itself on 2026-09-18: it reads the schema fine but lacks
+             * `crm.schemas.contacts.write`.
+             */
+            'event_source_url' => $lead->landing_url,
+            'client_user_agent' => ((array) ($lead->attribution ?? []))['user_agent'] ?? null,
+
+            /*
              * The MRR band the visitor selected, into HubSpot's **Annual** Revenue.
              *
              * That is the mapping the legacy Gravity Forms feed used, carried over deliberately
@@ -283,9 +304,101 @@ class HubSpotGateway
 
         // HubSpot treats an explicit null as "clear this property". Sending one would let a
         // later partial submission wipe attribution the first touch established.
-        return array_filter(
+        $properties = array_filter(
             $properties,
             static fn ($value) => $value !== null && $value !== '',
         );
+
+        return $this->dropUnknownProperties($properties);
+    }
+
+    /**
+     * Remove properties this portal does not define.
+     *
+     * HubSpot rejects the **entire** request with a 400 over a single unknown property, taking
+     * every other field on it down with it. This map has hit that three times now — the `rl_*`
+     * names, the `intake_form` value, and `event_source_url` / `client_user_agent` on
+     * 2026-09-18 — and each time the symptom was every attribution field silently missing from
+     * the CRM rather than an error anyone saw.
+     *
+     * Filtering against the live schema turns that class of mistake from "all attribution is
+     * lost until someone reads the response body" into "the new field is quietly skipped until
+     * it is created", and it means a property added in the portal starts flowing on its own
+     * without a deploy.
+     *
+     * Cached for an hour: the schema changes on human timescales, and this must not add a round
+     * trip to every lead. If the fetch fails we do not filter — that is exactly today's
+     * behaviour, so a HubSpot outage cannot make this worse than it already was.
+     *
+     * @param  array<string, mixed>  $properties
+     * @return array<string, mixed>
+     */
+    protected function dropUnknownProperties(array $properties): array
+    {
+        $known = $this->knownPropertyNames();
+
+        if ($known === null) {
+            return $properties;
+        }
+
+        $filtered = array_intersect_key($properties, array_flip($known));
+
+        $dropped = array_diff(array_keys($properties), array_keys($filtered));
+
+        if ($dropped !== []) {
+            Log::warning(
+                'HubSpotGateway: skipped propert'.(count($dropped) === 1 ? 'y' : 'ies').' missing from portal '
+                .$this->portalId.': '.implode(', ', $dropped).'. Create them in HubSpot to start syncing them.'
+            );
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * Every contact property name this portal defines, or null when it cannot be determined.
+     *
+     * @return list<string>|null
+     */
+    protected function knownPropertyNames(): ?array
+    {
+        // Key deliberately not prefixed `rl_`: AttributionCaptureTest greps this file for that
+        // literal to catch invented HubSpot property names, and a cache key is not one.
+        $cacheKey = 'hs_contact_props_'.md5($this->portalId);
+        $cached = get_transient($cacheKey);
+
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        try {
+            $response = Http::withToken($this->accessToken)
+                ->timeout(8)
+                ->connectTimeout(5)
+                ->get('https://api.hubapi.com/crm/v3/properties/contacts', ['archived' => 'false']);
+
+            if (! $response->successful()) {
+                Log::warning('HubSpotGateway: could not read the contact property schema ('.$response->status().'); sending unfiltered.');
+
+                return null;
+            }
+
+            $names = array_values(array_filter(array_map(
+                static fn ($property): string => (string) ($property['name'] ?? ''),
+                (array) $response->json('results', []),
+            )));
+
+            if ($names === []) {
+                return null;
+            }
+
+            set_transient($cacheKey, $names, HOUR_IN_SECONDS);
+
+            return $names;
+        } catch (\Throwable $e) {
+            Log::warning('HubSpotGateway: could not read the contact property schema: '.$e->getMessage());
+
+            return null;
+        }
     }
 }

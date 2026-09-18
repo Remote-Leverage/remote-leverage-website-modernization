@@ -221,3 +221,121 @@ it('honours a portal that tracks status on a different property', function () {
     expect($lead->fresh()->hubspot_lifecycle_stage)->toBe('CONNECTED')
         ->and($referral->fresh()->status)->toBe('fulfilled');
 });
+
+/*
+ * The two Meta match fields mirrored into HubSpot, added 2026-09-18.
+ *
+ * They exist so a conversion Meta reports can be joined to a CRM contact. That only works if
+ * `event_source_url` is byte-identical on both sides, which is why it is the full landing_url
+ * and not the stripped `landing_page` sitting next to it.
+ */
+
+/** Fake the contact property schema, and reset the cache so each test controls it. */
+function fakeHubSpotSchema(array $names): void
+{
+    $GLOBALS['_wp_mock_transients'] = [];
+
+    Http::fake([
+        'api.hubapi.com/crm/v3/properties/contacts*' => Http::response([
+            'results' => array_map(static fn (string $n): array => ['name' => $n], $names),
+        ], 200),
+    ]);
+}
+
+function hubSpotPropertiesFor(Lead $lead): array
+{
+    $method = new ReflectionMethod(HubSpotGateway::class, 'propertiesFor');
+    $method->setAccessible(true);
+
+    return $method->invoke(new HubSpotGateway, $lead);
+}
+
+test('the contact payload carries event_source_url and client_user_agent', function () {
+    fakeHubSpotSchema(['email', 'firstname', 'lastname', 'landing_page', 'event_source_url', 'client_user_agent']);
+
+    $lead = Lead::query()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Match Quality',
+        'first_name' => 'Match',
+        'last_name' => 'Quality',
+        'email' => 'match-quality+'.Str::random(6).'@example.com',
+        'landing_url' => 'https://remoteleverage.com/hire-va-4/?fbclid=IwAR-xyz&utm_source=facebook',
+        'landing_page_base' => 'https://remoteleverage.com/hire-va-4/',
+        'source_type' => 'ad',
+        'status' => 'captured',
+        'attribution' => ['user_agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)'],
+    ]);
+
+    $properties = hubSpotPropertiesFor($lead);
+
+    expect($properties['event_source_url'])
+        ->toBe('https://remoteleverage.com/hire-va-4/?fbclid=IwAR-xyz&utm_source=facebook')
+        ->and($properties['client_user_agent'])->toBe('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)')
+        // landing_page keeps the stripped base — the two are not duplicates of each other.
+        ->and($properties['landing_page'])->toBe('https://remoteleverage.com/hire-va-4/');
+});
+
+test('a property the portal does not define is dropped instead of 400ing the whole sync', function () {
+    // The real failure of 2026-09-18: both new names were absent from the portal, HubSpot
+    // rejected the entire request, and every other attribution field was lost with it.
+    fakeHubSpotSchema(['email', 'firstname', 'lastname', 'landing_page']);
+
+    $lead = Lead::query()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Unknown Props',
+        'first_name' => 'Unknown',
+        'email' => 'unknown-props+'.Str::random(6).'@example.com',
+        'landing_url' => 'https://remoteleverage.com/hire-va-4/?fbclid=IwAR-xyz',
+        'landing_page_base' => 'https://remoteleverage.com/hire-va-4/',
+        'source_type' => 'ad',
+        'status' => 'captured',
+        'attribution' => ['user_agent' => 'Mozilla/5.0 (iPhone)'],
+    ]);
+
+    $properties = hubSpotPropertiesFor($lead);
+
+    expect($properties)->not->toHaveKey('event_source_url')
+        ->and($properties)->not->toHaveKey('client_user_agent')
+        // The rest of the payload still goes, which is the entire point.
+        ->and($properties['landing_page'])->toBe('https://remoteleverage.com/hire-va-4/')
+        ->and($properties['email'])->toBe($lead->email);
+});
+
+test('an unreadable schema sends unfiltered rather than sending nothing', function () {
+    $GLOBALS['_wp_mock_transients'] = [];
+    Http::fake(['api.hubapi.com/crm/v3/properties/contacts*' => Http::response([], 500)]);
+
+    $lead = Lead::query()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Schema Down',
+        'email' => 'schema-down+'.Str::random(6).'@example.com',
+        'landing_url' => 'https://remoteleverage.com/1monthonus/',
+        'source_type' => 'organic',
+        'status' => 'captured',
+        'attribution' => ['user_agent' => 'Mozilla/5.0 (iPhone)'],
+    ]);
+
+    // A HubSpot outage must not silently strip the payload down to nothing — that would be a
+    // worse failure than the one this filter exists to prevent.
+    expect(hubSpotPropertiesFor($lead)['event_source_url'])->toBe('https://remoteleverage.com/1monthonus/');
+});
+
+test('a lead with no captured user agent simply omits the property', function () {
+    fakeHubSpotSchema(['email', 'landing_page', 'event_source_url', 'client_user_agent']);
+
+    $lead = Lead::query()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'No UA',
+        'email' => 'no-ua+'.Str::random(6).'@example.com',
+        'landing_url' => 'https://remoteleverage.com/1monthonus/',
+        'source_type' => 'organic',
+        'status' => 'captured',
+        'attribution' => [],
+    ]);
+
+    $properties = hubSpotPropertiesFor($lead);
+
+    // HubSpot reads an explicit null as "clear this property", so absent must mean absent.
+    expect($properties)->not->toHaveKey('client_user_agent')
+        ->and($properties['event_source_url'])->toBe('https://remoteleverage.com/1monthonus/');
+});
