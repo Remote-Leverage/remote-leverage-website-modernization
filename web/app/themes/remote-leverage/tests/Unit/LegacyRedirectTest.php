@@ -13,8 +13,8 @@ describe('LegacyRedirectMiddleware (WR-103, ADR-0006 § SEO & Risk Mitigation)',
     test('resolves a mapped legacy path to its canonical target', function () use ($map) {
         $middleware = new LegacyRedirectMiddleware;
 
-        expect($middleware->resolve('/hire-va-old/', $map))->toBe('/hire-va-4');
-        expect($middleware->resolve('hire-va-old', $map))->toBe('/hire-va-4');
+        expect($middleware->resolve('/hire-va-old/', $map))->toBe('/hire-va-4/');
+        expect($middleware->resolve('hire-va-old', $map))->toBe('/hire-va-4/');
     });
 
     test('returns null for unmapped paths', function () use ($map) {
@@ -29,7 +29,7 @@ describe('LegacyRedirectMiddleware (WR-103, ADR-0006 § SEO & Risk Mitigation)',
 
         $target = $middleware->resolve('/hire-va-old/?utm_source=google&utm_campaign=spring', $map, 'utm_source=google&utm_campaign=spring');
 
-        expect($target)->toBe('/hire-va-4?utm_source=google&utm_campaign=spring');
+        expect($target)->toBe('/hire-va-4/?utm_source=google&utm_campaign=spring');
     });
 });
 
@@ -145,7 +145,7 @@ describe('external targets cannot be turned into an open redirect', function () 
 
         $internal = $middleware->resolve('/hire-va-old/?next=https://evil.example', $map, 'next=https%3A%2F%2Fevil.example');
 
-        expect($internal)->toStartWith('/hire-va-4?')
+        expect($internal)->toStartWith('/hire-va-4/?')
             ->and(LegacyRedirectMiddleware::isExternalTarget((string) $internal))->toBeFalse();
     });
 

@@ -80,6 +80,12 @@ class LegacyRedirectMiddleware
         }
 
         $target = '/'.trim($mapped, '/');
+        // Permalinks are slashed. Emitting /hire-va-4 used to force a second
+        // redirect_canonical hop — which is a PHP miss, and is what made
+        // "the redirects are down" look the same as /hire-va-4 hanging.
+        if ($target !== '/') {
+            $target .= '/';
+        }
 
         return $queryString !== '' ? $target.'?'.$queryString : $target;
     }
