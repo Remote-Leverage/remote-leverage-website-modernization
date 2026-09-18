@@ -211,7 +211,7 @@ HTML;
     {
         $writeKey = config('services.customer_io.cdp_write_key');
 
-        if (! $writeKey) {
+        if (! $writeKey || ! $this->customerIoEnvironmentAllowed()) {
             return;
         }
 
@@ -244,6 +244,23 @@ HTML;
     public function postHogEnvironmentAllowed(): bool
     {
         $allowed = (array) config('services.posthog.environments', ['production']);
+
+        if (! function_exists('wp_get_environment_type')) {
+            return in_array('production', $allowed, true);
+        }
+
+        return in_array(wp_get_environment_type(), $allowed, true);
+    }
+
+    /**
+     * Whether this environment loads the Customer.io browser snippet.
+     *
+     * See `services.customer_io.environments`. Required now that the CDP write
+     * key is defaulted — the same accident the PostHog key had.
+     */
+    public function customerIoEnvironmentAllowed(): bool
+    {
+        $allowed = (array) config('services.customer_io.environments', ['production']);
 
         if (! function_exists('wp_get_environment_type')) {
             return in_array('production', $allowed, true);

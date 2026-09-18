@@ -626,6 +626,32 @@ describe('defaults that used to depend on an unset variable', function () {
         expect(strpos($out, 'posthog.init('))
             ->toBeLessThan(strpos($out, '/static/array.js'));
     });
+
+    test('Customer.io is gated to production, now that its write key has a default', function () {
+        config([
+            'services.customer_io.cdp_write_key' => 'ebb5281c53e9fca6b1a5',
+            'services.customer_io.environments' => ['production'],
+        ]);
+
+        $hooks = new TrackingHooks;
+
+        $GLOBALS['wp_environment_type'] = 'staging';
+        expect($hooks->customerIoEnvironmentAllowed())->toBeFalse();
+
+        ob_start();
+        $hooks->injectCustomerIOSnippet();
+        expect((string) ob_get_clean())->toBe('');
+
+        $GLOBALS['wp_environment_type'] = 'production';
+        expect($hooks->customerIoEnvironmentAllowed())->toBeTrue();
+
+        ob_start();
+        $hooks->injectCustomerIOSnippet();
+        $out = (string) ob_get_clean();
+
+        expect($out)->toContain('cioanalytics')
+            ->and($out)->toContain('cdp.customer.io');
+    });
 });
 
 describe('an empty environment variable falls through to the default', function () {

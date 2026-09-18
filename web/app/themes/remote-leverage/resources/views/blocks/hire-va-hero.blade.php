@@ -27,15 +27,15 @@
 <section class="relative overflow-hidden bg-[#1E0B38] text-white min-h-dvh flex flex-col justify-between pt-24 lg:pt-8 pb-6 sm:pb-8 lg:pb-10">
   {{-- Hero Background Graphic with Candidate Grid --}}
   <div class="absolute inset-0 z-0 pointer-events-none select-none">
-    {{-- LCP on every page that uses this block. fetchpriority high and no lazy
-         attribute, matching home-hero. The 750px source is the Moto G / PSI
-         viewport; the 1366px original stays the desktop candidate. Preloads
-         with the same media queries live in layouts/app.blade.php because
-         wp_head has already run by the time this markup is emitted. --}}
+    {{-- LCP on every page that uses this block. Mobile-first: `img src` is the
+         750px file PSI actually paints. A desktop `src` here is what the
+         2026-09-18 staging re-run fetched on a 412px viewport (85 KB decode
+         during TBT) despite the picture source. Desktop is a min-width source
+         so the preload scanner does not discover it on a phone. --}}
     <picture>
-      <source media="(max-width: 1023px)" srcset="{{ $heroBg['mobile'] }}" type="image/webp" width="750" height="519" />
-      <img src="{{ $heroBg['desktop'] }}"
-           alt="" width="1366" height="945"
+      <source media="(min-width: 1024px)" srcset="{{ $heroBg['desktop'] }}" type="image/webp" width="1366" height="945" />
+      <img src="{{ $heroBg['mobile'] }}"
+           alt="" width="750" height="519"
            fetchpriority="high" decoding="async"
            class="w-full h-full object-cover object-[70%_top] lg:object-top" />
     </picture>

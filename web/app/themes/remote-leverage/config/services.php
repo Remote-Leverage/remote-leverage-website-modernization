@@ -83,6 +83,20 @@ return [
          * secret, and holding it in Secrets Manager only made it unreachable.
          */
         'cdp_write_key' => env('CUSTOMERIO_CDP_WRITE_KEY', 'ebb5281c53e9fca6b1a5'),
+
+        /*
+         * Same production-only gate as PostHog and the pixels. The write key is
+         * defaulted, so without this every staging PSI run and every test booking
+         * would ingest into the production CDP source. Verified 2026-09-18: staging
+         * /hire-va-4/ emitted the snippet and PSI TBT went 0 ms → 710 ms.
+         */
+        'environments' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env(
+                'CUSTOMERIO_ENVIRONMENTS',
+                env('PIXEL_ENVIRONMENTS', env('GTM_ENVIRONMENTS', 'production')),
+            )),
+        ))),
     ],
 
     'posthog' => [

@@ -19,13 +19,18 @@ describe('the hire-va hero is discoverable as LCP', function () {
             ->toContain('fetchpriority="high"')
             ->toContain('decoding="async"')
             ->toContain('hireVaHeroBackground()')
-            ->toContain('(max-width: 1023px)');
+            ->toContain('(min-width: 1024px)');
 
         preg_match('/<picture>.*?<\/picture>/s', $blade, $match);
+        $picture = $match[0] ?? '';
 
-        expect($match[0] ?? '')
+        expect($picture)
             ->not->toBe('')
-            ->not->toContain('loading="lazy"');
+            ->not->toContain('loading="lazy"')
+            // `img src` must be the 750px file. A desktop src is what the 2026-09-18
+            // staging PSI run fetched on a phone, which put an 85 KB decode on TBT.
+            ->toContain('<img src="{{ $heroBg[\'mobile\'] }}"')
+            ->toContain('srcset="{{ $heroBg[\'desktop\'] }}"');
     });
 
     test('theme-images emits the 750px sibling from the 1366px original', function () {
