@@ -237,6 +237,28 @@ return [
     | pushes. That keeps the deferral and hands back the control.
     */
     'tiktok' => [
+        /*
+         * **Off by default since 2026-09-19.** Set `TIKTOK_PIXEL_ENABLED=true` to switch it back
+         * on; nothing else has to change, because the id below stays configured either way.
+         *
+         * Turned off because nothing is currently spending against the account, and an unused
+         * pixel is not free: it was the largest single non-Google third party on the page — 162KB
+         * transferred, 94ms of blocking time — which is why it was pulled out of the container and
+         * deferred in the first place. Deferring reduced that cost; it did not remove it.
+         *
+         * This is the one flag here that is a plain boolean rather than an id, so it does **not**
+         * follow the `?:` fallthrough the rest of this file uses. That is deliberate: for an
+         * id, empty means "not configured" and the default underneath is the right answer; for a
+         * switch, empty means off, and off is already the default. An empty `TIKTOK_PIXEL_ENABLED`
+         * and an absent one both leave the pixel dark, which is what someone clearing the variable
+         * means by it.
+         *
+         * When it goes back on, check TikTok Events Manager for a second source before assuming
+         * this is the only one — a tag put back into a container would double every PageView, and
+         * the only symptom is bidding optimising against an inflated number.
+         */
+        'enabled' => filter_var(env('TIKTOK_PIXEL_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+
         'pixel_ids' => array_values(array_filter(array_map(
             'trim',
             explode(',', trim((string) env('TIKTOK_PIXEL_IDS', '')) ?: 'CPMB51BC77U75I0QMMAG'),
@@ -246,18 +268,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Rewardful
+    | Rewardful — removed 2026-09-19
     |--------------------------------------------------------------------------
     |
-    | Referral attribution. Ported out of the container on 2026-09-18 verbatim,
-    | including appending to `body` rather than `head` as its snippet does.
+    | Deleted rather than switched off. The theme runs its own referral program
+    | (`app/Domains/Referral`), which is where `Lead::$referral_code` comes from, so the
+    | third-party script was attributing referrals a second time for a system we do not use.
     |
-    | `rewardful_id` on a lead comes from this; without it a referred booking
-    | still arrives, it just stops paying the person who referred it.
+    | Nothing live depended on it. The `rewardful_id` handling that remains in
+    | `GravityLeadMapper` reads a column in the legacy Gravity export and stays for the
+    | historical backfill; `HubSpotGateway` still writes a HubSpot property *named*
+    | `referrer_rewardful_id`, but the value it sends is our own `referral_code` and the name
+    | is HubSpot's field key, not a dependency on this.
+    |
+    | If a Rewardful account is ever opened again, it is a new decision and a new snippet, not
+    | an env var someone can flip back on.
     */
-    'rewardful' => [
-        'api_key' => trim((string) env('REWARDFUL_API_KEY', '')) ?: '39ea7a',
-    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -365,7 +391,9 @@ return [
     | Which pixels wait before fetching their SDK. Script *evaluation* is the
     | expensive part of this page -- 4,959ms of main-thread work in the
     | 2026-09-18 Lighthouse run -- and six pixels all fetching at `wp_head`
-    | priority 4 contend for it during the load.
+    | priority 4 contend for it during the load. Three of those six are now gone
+    | (HubSpot and Rewardful removed, TikTok switched off), so the figure above
+    | is the before, not the current state.
     |
     | **No event is lost by deferring.** Every vendor here installs a queueing
     | stub and drains it when the SDK arrives, so the stub and the `init` /
@@ -388,13 +416,14 @@ return [
     | The flush also pushes `rl_idle` onto `dataLayer`, which is the intended
     | way to defer a tag that lives in the container rather than here: retrigger
     | it on that custom event instead of on `gtm.js`. TikTok (162KB, the largest
-    | single non-Google third party) is the reason that hook exists, and it is
-    | in the default vendor list for that reason.
+    | single non-Google third party) is the reason that hook exists. It stays in
+    | the default vendor list while switched off, so that the deferral is already
+    | in place on the day it goes back on rather than something to remember.
     */
     'defer' => [
         'vendors' => array_values(array_filter(array_map(
             'trim',
-            explode(',', trim((string) env('PIXEL_DEFER_VENDORS', '')) ?: 'linkedin,openai,hubspot,bing_uet,tiktok'),
+            explode(',', trim((string) env('PIXEL_DEFER_VENDORS', '')) ?: 'linkedin,openai,bing_uet,tiktok'),
         ))),
 
         /*
@@ -444,36 +473,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | HubSpot tracking code
+    | HubSpot browser tracking — removed 2026-09-19
     |--------------------------------------------------------------------------
     |
-    | The browser-side script, which is a different thing from the server-side
-    | CRM sync `HubSpotGateway` already does with `HUBSPOT_ACCESS_TOKEN`. This
-    | one does page-view history and visitor de-anonymisation; without it a
-    | contact created by the API arrives with no browsing history attached.
+    | Deleted, not switched off, and not coming back: no `hubspot` key here and no
+    | `injectHubSpot()` in `MarketingPixelHooks`.
     |
-    | Portal id is shared with the server-side integration, so it is read from
-    | the same variable rather than duplicated. The region prefix is part of
-    | the script host and differs per account: production serves `na2`.
+    | It was the most expensive script on the site by a wide margin — 5,582ms of main-thread
+    | time on a throttled mobile profile against 189ms on desktop, the top entry either way and
+    | the only one here measured in seconds. What it bought was page-view history and visitor
+    | de-anonymisation.
+    |
+    | Switching it off with a flag did not hold, which is the second reason it is gone. The flag
+    | was "is `HUBSPOT_PORTAL_ID` empty", and `HubSpotGateway` reads that same variable as the
+    | fallback credential for the server-side CRM sync — so setting it for the sync, which the
+    | cutover notes require, silently reloaded the browser script. One variable cannot be both a
+    | credential and an off-switch.
+    |
+    | **Contacts are unaffected.** `HubSpotGateway` creates and updates them server-side from
+    | `HUBSPOT_ACCESS_TOKEN` / `HUBSPOT_PORTAL_ID` via `config/services.php`, which is a separate
+    | config key and stays exactly as it was.
     */
-    'hubspot' => [
-        /*
-         * **Off by default since 2026-09-18.** Set `HUBSPOT_PORTAL_ID` to switch it back on;
-         * `243484989` is the production portal.
-         *
-         * It was defaulted on earlier the same day, because an unset variable had left browser
-         * tracking silently dark. Measuring it once it ran settled the question the other way:
-         * `hs-analytics.net` was the single most expensive script on the page, 5,582ms of
-         * main-thread time on a throttled mobile profile against 189ms on desktop. The absolute
-         * figure is inflated by contention -- a 29x gap is far more than 4x throttling explains
-         * -- but it was the top entry either way, and it is the only script here whose cost is
-         * measured in seconds.
-         *
-         * What is lost is page-view history and visitor de-anonymisation. Contacts themselves
-         * are unaffected: `HubSpotGateway` creates and updates them server-side from
-         * `HUBSPOT_ACCESS_TOKEN`, which is a different credential and stays in the environment.
-         */
-        'portal_id' => trim((string) env('HUBSPOT_PORTAL_ID', '')),
-        'region' => trim((string) env('HUBSPOT_SCRIPT_REGION', '')) ?: 'na2',
-    ],
+
 ];

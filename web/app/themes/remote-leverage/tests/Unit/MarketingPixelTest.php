@@ -20,11 +20,12 @@ beforeEach(function () {
         'pixels.meta.pixel_ids' => ['1430907207548734', '1482937899395718'],
         'pixels.meta.track_page_view' => true,
         'pixels.bing_uet.tag_id' => '97187250',
-        'pixels.hubspot.portal_id' => '243484989',
-        'pixels.hubspot.region' => 'na2',
         'pixels.linkedin.partner_ids' => ['6411876'],
         'pixels.openai.pixel_ids' => ['7QY9HDVocGyeNvMMW1gLWb'],
         'pixels.openai.debug' => false,
+        // Switched off in the shipped config since 2026-09-19; on here so the emission below
+        // stays covered for whenever it goes back on.
+        'pixels.tiktok.enabled' => true,
         'pixels.tiktok.pixel_ids' => ['CPMB51BC77U75I0QMMAG'],
         'pixels.tiktok.track_page_view' => true,
         'pixels.google_tag.ids' => ['GT-NCNQ6N2'],
@@ -85,7 +86,7 @@ describe('Meta Pixel', function () {
     });
 });
 
-describe('Microsoft UET and HubSpot', function () {
+describe('Microsoft UET', function () {
     test('the UET tag carries the production tag id', function () {
         // This is what stamps `msclkid`, which the lead export carries and AttributionCollector
         // stores. Without it a Bing booking still arrives, just unattributable to the paid click.
@@ -95,21 +96,10 @@ describe('Microsoft UET and HubSpot', function () {
             ->and($out)->toContain('bat.bing.com/bat.js');
     });
 
-    test('the HubSpot loader uses the account region', function () {
-        // Distinct from the server-side CRM sync: this attaches page-view history to the contact
-        // the API creates. The region is part of the host and differs per account.
-        expect(renderPixel(fn ($h) => $h->injectHubSpot()))
-            ->toContain('js-na2.hs-scripts.com/243484989.js');
-    });
-
     test('a malformed id renders nothing rather than a broken script', function () {
-        config([
-            'pixels.bing_uet.tag_id' => 'not-a-tag',
-            'pixels.hubspot.portal_id' => '',
-        ]);
+        config(['pixels.bing_uet.tag_id' => 'not-a-tag']);
 
-        expect(renderPixel(fn ($h) => $h->injectBingUet()))->toBe('')
-            ->and(renderPixel(fn ($h) => $h->injectHubSpot()))->toBe('');
+        expect(renderPixel(fn ($h) => $h->injectBingUet()))->toBe('');
     });
 });
 
@@ -503,23 +493,11 @@ describe('deferred SDK loading', function () {
         expect($out)->toContain('ti:"97187250"');
     });
 
-    test('HubSpot is injected on flush and keeps the id its own code looks for', function () {
-        config(['pixels.defer.vendors' => ['hubspot']]);
-
-        $out = renderPixel(fn (MarketingPixelHooks $h) => $h->injectHubSpot());
-
-        expect($out)->toContain('rlDefer')
-            ->and($out)->toContain('s.id="hs-script-loader"')
-            ->and($out)->toContain('js-na2.hs-scripts.com/243484989.js')
-            // The undeferred path emits a plain tag; the deferred one must not also do that.
-            ->and($out)->not->toContain('<script id="hs-script-loader"');
-    });
-
     test('the shipped defaults defer TikTok and wait past LCP', function () {
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/config/pixels.php');
 
         expect($src)
-            ->toContain("'linkedin,openai,hubspot,bing_uet,tiktok'")
+            ->toContain("'linkedin,openai,bing_uet,tiktok'")
             ->toContain('?: 6000');
     });
 });
@@ -562,6 +540,46 @@ describe('TikTok, moved out of the container', function () {
 
         expect(renderPixel(fn (MarketingPixelHooks $h) => $h->injectTikTok()))->toBe('');
     });
+
+    test('the switch emits nothing at all, not a dormant stub', function () {
+        /*
+         * Off has to mean no bytes. A `ttq` stub with no `load()` would still ship the snippet
+         * and still queue a PageView that drains the moment anything else loads events.js.
+         */
+        config(['pixels.tiktok.enabled' => false]);
+
+        $hooks = new MarketingPixelHooks;
+
+        expect($hooks->tikTokPixelIds())->toBe([])
+            ->and(renderPixel(fn (MarketingPixelHooks $h) => $h->injectTikTok()))->toBe('');
+    });
+
+    test('the shipped config has it off, with the id kept for switching back on', function () {
+        /*
+         * Reads the real config rather than the fixture: the point is what the site serves.
+         * `TIKTOK_PIXEL_ENABLED` is the only lever — if this starts failing, somebody either set
+         * that variable or flipped the default, and both are decisions worth noticing.
+         */
+        $config = require __DIR__.'/../../config/pixels.php';
+
+        expect($config['tiktok']['enabled'])->toBeFalse()
+            ->and($config['tiktok']['pixel_ids'])->toBe(['CPMB51BC77U75I0QMMAG']);
+    });
+
+    test('TIKTOK_PIXEL_ENABLED switches it back on', function () {
+        $_ENV['TIKTOK_PIXEL_ENABLED'] = 'true';
+        $_SERVER['TIKTOK_PIXEL_ENABLED'] = 'true';
+        putenv('TIKTOK_PIXEL_ENABLED=true');
+
+        try {
+            $config = require __DIR__.'/../../config/pixels.php';
+
+            expect($config['tiktok']['enabled'])->toBeTrue();
+        } finally {
+            unset($_ENV['TIKTOK_PIXEL_ENABLED'], $_SERVER['TIKTOK_PIXEL_ENABLED']);
+            putenv('TIKTOK_PIXEL_ENABLED');
+        }
+    });
 });
 
 describe('defaults that used to depend on an unset variable', function () {
@@ -570,14 +588,6 @@ describe('defaults that used to depend on an unset variable', function () {
      * environment variable is indistinguishable from a deliberate opt-out. Neither value is a
      * secret — both ship in the page HTML — so both are defaulted in config and asserted here.
      */
-    test('the HubSpot portal id is defaulted, so browser tracking is not silently off', function () {
-        $config = require __DIR__.'/../../config/pixels.php';
-
-        // HubSpot is deliberately off: the portal id defaults to empty. See config/pixels.php.
-        expect($config['hubspot']['portal_id'])->toBe('')
-            ->and($config['hubspot']['region'])->toBe('na2');
-    });
-
     test('the PostHog publishable key is defaulted', function () {
         $config = require __DIR__.'/../../config/services.php';
 
@@ -667,7 +677,6 @@ describe('an empty environment variable falls through to the default', function 
         $vars = [
             'META_PIXEL_IDS', 'BING_UET_TAG_ID', 'LINKEDIN_PARTNER_IDS', 'OPENAI_PIXEL_IDS',
             'TIKTOK_PIXEL_IDS', 'GOOGLE_TAG_IDS', 'GOOGLE_TAG_LINKER_DOMAINS',
-            'HUBSPOT_PORTAL_ID', 'HUBSPOT_SCRIPT_REGION',
         ];
 
         foreach ($vars as $var) {
@@ -685,8 +694,7 @@ describe('an empty environment variable falls through to the default', function 
                 ->and($config['linkedin']['partner_ids'])->toBe(['6411876', '9514236'])
                 ->and($config['openai']['pixel_ids'])->toBe(['7QY9HDVocGyeNvMMW1gLWb', 'GtXTy8ihLz5qrMUanZ3fqf'])
                 ->and($config['tiktok']['pixel_ids'])->toBe(['CPMB51BC77U75I0QMMAG'])
-                ->and($config['google_tag']['ids'])->toBe(['GT-NCNQ6N2'])
-                ->and($config['hubspot']['region'])->toBe('na2');
+                ->and($config['google_tag']['ids'])->toBe(['GT-NCNQ6N2']);
         } finally {
             foreach ($vars as $var) {
                 unset($_ENV[$var], $_SERVER[$var]);
@@ -711,19 +719,34 @@ describe('an empty environment variable falls through to the default', function 
     });
 });
 
-describe('HubSpot browser tracking is off', function () {
-    test('nothing is emitted while no portal id is configured', function () {
-        config(['pixels.hubspot.portal_id' => '']);
+describe('HubSpot browser tracking is gone', function () {
+    test('there is no injector and no config key to switch back on', function () {
+        /*
+         * Removed 2026-09-19. It was the most expensive script on the site — 5,582ms of
+         * main-thread time on throttled mobile — and the flag that was meant to hold it off did
+         * not, because it was "is HUBSPOT_PORTAL_ID empty" and `HubSpotGateway` reads that same
+         * variable as a credential. Asserted structurally for that reason: an empty-value check
+         * is exactly what failed last time.
+         */
+        $config = require __DIR__.'/../../config/pixels.php';
 
-        expect(renderPixel(fn (MarketingPixelHooks $h) => $h->injectHubSpot()))->toBe('');
+        expect($config)->not->toHaveKey('hubspot')
+            ->and(method_exists(MarketingPixelHooks::class, 'injectHubSpot'))->toBeFalse();
     });
 
-    test('setting the portal id switches it back on, still deferred', function () {
-        config(['pixels.hubspot.portal_id' => '243484989', 'pixels.defer.vendors' => ['hubspot']]);
+    test('server-side CRM sync keeps its own credentials, untouched', function () {
+        /*
+         * The whole point of removing the browser script rather than blanking the portal id:
+         * contacts still sync. Different config file, different key, unaffected.
+         */
+        $services = require __DIR__.'/../../config/services.php';
 
-        $out = renderPixel(fn (MarketingPixelHooks $h) => $h->injectHubSpot());
+        expect($services)->toHaveKey('hubspot');
+    });
 
-        expect($out)->toContain('rlDefer')
-            ->and($out)->toContain('js-na2.hs-scripts.com/243484989.js');
+    test('HubSpot is no longer a deferrable vendor', function () {
+        config(['pixels.defer.vendors' => ['hubspot']]);
+
+        expect((new MarketingPixelHooks)->deferredVendors())->toBe([]);
     });
 });

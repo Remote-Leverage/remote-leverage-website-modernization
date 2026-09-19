@@ -33,7 +33,6 @@ beforeEach(function () {
         'pixels.posthog_events' => [
             ['name' => 'appointment_booked_web', 'trigger' => 'path:VAThankYou'],
         ],
-        'pixels.rewardful.api_key' => '39ea7a',
         'pixels.consent.enabled' => true,
         'pixels.consent.defaults' => ['ad_storage' => 'granted', 'analytics_storage' => 'granted'],
         'pixels.defer.vendors' => [],
@@ -139,7 +138,7 @@ describe('GA4 and PostHog events', function () {
     });
 });
 
-describe('consent defaults and Rewardful', function () {
+describe('consent defaults', function () {
     test('consent defaults are granted, as the container set them', function () {
         ob_start();
         (new ConversionHooks)->injectConsentDefaults();
@@ -150,25 +149,17 @@ describe('consent defaults and Rewardful', function () {
             ->and($out)->toContain('"analytics_storage":"granted"');
     });
 
-    test('Rewardful keeps its key and its append-to-body behaviour', function () {
-        ob_start();
-        (new ConversionHooks)->injectRewardful();
-        $out = (string) ob_get_clean();
+    test('Rewardful is gone, not merely unconfigured', function () {
+        /*
+         * Removed 2026-09-19: the theme runs its own referral program, so the third-party script
+         * was tracking referrals for a system we do not use. Asserted against the class and the
+         * shipped config rather than rendered output, because "emits nothing" is also what an
+         * empty api key looked like — and that was a flag someone could flip back.
+         */
+        $config = require __DIR__.'/../../config/pixels.php';
 
-        expect($out)->toContain("data-rewardful', '39ea7a'")
-            ->and($out)->toContain('r.wdfl.co/rw.js')
-            ->and($out)->toContain('document.body.appendChild');
-    });
-
-    test('Rewardful defers its fetch but not its queue', function () {
-        config(['pixels.defer.vendors' => ['rewardful']]);
-
-        ob_start();
-        (new ConversionHooks)->injectRewardful();
-        $out = (string) ob_get_clean();
-
-        expect(strpos($out, 'w[r] = w[r] ||'))->toBeLessThan(strpos($out, 'rlDefer'));
-        expect(strpos($out, 'r.wdfl.co'))->toBeGreaterThan(strpos($out, 'rlDefer'));
+        expect($config)->not->toHaveKey('rewardful')
+            ->and(method_exists(ConversionHooks::class, 'injectRewardful'))->toBeFalse();
     });
 });
 

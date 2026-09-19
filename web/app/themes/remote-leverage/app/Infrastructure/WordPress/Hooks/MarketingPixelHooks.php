@@ -16,8 +16,7 @@ namespace App\Infrastructure\WordPress\Hooks;
  *   1  TrackingHooks  visitor cookie
  *   2  TrackingHooks  PostHog
  *   3  SiteKitHooks   GTM containers
- *   4  here           defer bootstrap, then Meta, UET, HubSpot, LinkedIn, OpenAI, TikTok,
- *                     Google tag
+ *   4  here           defer bootstrap, then Meta, UET, LinkedIn, OpenAI, TikTok, Google tag
  *
  * Last deliberately. A pixel here is a fallback for something the container does not carry, so
  * if a tag inside GTM ever starts doing the same job it wins the race to define `fbq` and this
@@ -41,7 +40,6 @@ class MarketingPixelHooks
         add_action('wp_head', [$this, 'injectDeferBootstrap'], 4);
         add_action('wp_head', [$this, 'injectMetaPixel'], 4);
         add_action('wp_head', [$this, 'injectBingUet'], 4);
-        add_action('wp_head', [$this, 'injectHubSpot'], 4);
         add_action('wp_head', [$this, 'injectLinkedIn'], 4);
         add_action('wp_head', [$this, 'injectOpenAi'], 4);
         add_action('wp_head', [$this, 'injectTikTok'], 4);
@@ -58,7 +56,7 @@ class MarketingPixelHooks
      * block in `config/pixels.php`. Intersecting against this list means a stray
      * `PIXEL_DEFER_VENDORS=meta` is ignored rather than half-honoured.
      */
-    private const DEFERRABLE = ['linkedin', 'openai', 'hubspot', 'bing_uet', 'tiktok'];
+    private const DEFERRABLE = ['linkedin', 'openai', 'bing_uet', 'tiktok'];
 
     /**
      * The vendors actually being deferred, in a stable order.
@@ -270,42 +268,6 @@ HTML;
     }
 
     /**
-     * HubSpot's browser tracking code.
-     *
-     * Distinct from the server-side CRM sync in `HubSpotGateway`: that creates and updates the
-     * contact, this attaches the page-view history to it. A contact created by the API without
-     * this arrives in HubSpot with no idea which pages sold them.
-     */
-    public function injectHubSpot(): void
-    {
-        $portalId = trim((string) config('pixels.hubspot.portal_id', ''));
-        $region = trim((string) config('pixels.hubspot.region', 'na2'));
-
-        if ($portalId === '' || ! preg_match('/^\d{5,}$/', $portalId) || ! preg_match('/^[a-z0-9]{2,6}$/i', $region)) {
-            return;
-        }
-
-        $src = esc_url("https://js-{$region}.hs-scripts.com/{$portalId}.js");
-
-        if (! $this->isDeferred('hubspot')) {
-            printf('<script id="hs-script-loader" async defer src="%s"></script>'."\n", $src);
-
-            return;
-        }
-
-        /*
-         * Injected rather than emitted so the fetch waits. The element keeps its
-         * `hs-script-loader` id: HubSpot's own chat and forms code looks for it.
-         */
-        printf(
-            '<script>window.rlDefer(function(){var s=document.createElement("script");'
-            .'s.id="hs-script-loader";s.async=true;s.defer=true;s.src=%s;'
-            .'document.head.appendChild(s);});</script>'."\n",
-            wp_json_encode($src, JSON_UNESCAPED_SLASHES),
-        );
-    }
-
-    /**
      * LinkedIn's Insight Tag.
      *
      * Only the partner id production hardcodes into the page. The container carries a second,
@@ -430,6 +392,9 @@ HTML;
      * `load()` has registered the pixel id and the queued PageView is still there to drain, so
      * deferring costs no event.
      *
+     * **Switched off by default since 2026-09-19** — `tikTokPixelIds()` returns nothing unless
+     * `pixels.tiktok.enabled` is true, and this emits nothing at all rather than a dormant stub.
+     *
      * See `config/pixels.php`: the container tag has to be deleted, or the account gets two
      * PageViews per visit and the bidding optimises against an inflated number.
      */
@@ -491,7 +456,11 @@ HTML;
     }
 
     /**
-     * Valid TikTok pixel ids from config, de-duplicated.
+     * Valid TikTok pixel ids from config, de-duplicated, or none while the pixel is switched off.
+     *
+     * The `enabled` check lives here rather than in the injector so that there is one answer to
+     * "does TikTok fire", and a future caller cannot read the configured ids and act on them while
+     * the switch is off. The id stays in config either way — see `pixels.tiktok.enabled`.
      *
      * TikTok's sdkid is an uppercase alphanumeric string; anything else would be interpolated
      * into an inline script, so it is checked rather than trusted.
@@ -500,6 +469,10 @@ HTML;
      */
     public function tikTokPixelIds(): array
     {
+        if (! (bool) config('pixels.tiktok.enabled', false)) {
+            return [];
+        }
+
         return $this->validIds((array) config('pixels.tiktok.pixel_ids', []), '/^[A-Z0-9]{10,}$/i');
     }
 

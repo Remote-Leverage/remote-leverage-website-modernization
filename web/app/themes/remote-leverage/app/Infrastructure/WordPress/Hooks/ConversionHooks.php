@@ -50,7 +50,6 @@ class ConversionHooks
         }
 
         add_action('wp_head', [$this, 'injectConsentDefaults'], 3);
-        add_action('wp_footer', [$this, 'injectRewardful'], 5);
         add_action('wp_footer', [$this, 'injectConversions'], 6);
     }
 
@@ -82,41 +81,6 @@ window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('consent', 'default', {$json});
 </script>
-
-HTML;
-    }
-
-    /**
-     * Rewardful's referral tracking, ported verbatim.
-     *
-     * Appended to `body` rather than `head` because that is what its own snippet does, and it is
-     * emitted in the footer so the element exists. Deferrable like any other SDK: the `rewardful`
-     * queue is installed synchronously and only the fetch waits.
-     */
-    public function injectRewardful(): void
-    {
-        $key = trim((string) config('pixels.rewardful.api_key', ''));
-
-        if ($key === '' || ! preg_match('/^[a-z0-9]{4,}$/i', $key)) {
-            return;
-        }
-
-        $id = esc_js($key);
-        [$defer, $endDefer] = $this->deferWrap('rewardful');
-
-        echo <<<HTML
-<!-- Rewardful (config/pixels.php) -->
-<script>
-(function (w, r) { w._rwq = r; w[r] = w[r] || function () { (w[r].q = w[r].q || []).push(arguments) } })(window, 'rewardful');
-{$defer}(function () {
-  var s = document.createElement('script');
-  s.async = true;
-  s.setAttribute('src', 'https://r.wdfl.co/rw.js');
-  s.setAttribute('data-rewardful', '{$id}');
-  document.body.appendChild(s);
-})();{$endDefer}
-</script>
-<!-- End Rewardful -->
 
 HTML;
     }

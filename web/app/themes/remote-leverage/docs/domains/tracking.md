@@ -50,10 +50,18 @@ Both destinations receive the same DTO. `RecordBehaviorEventAction` is the only 
 | `CUSTOMERIO_SITE_ID`, `CUSTOMERIO_API_KEY` | `CustomerIOClient` (Track API v1, server side). Region is **us** (`track.customer.io`), confirmed against the legacy `rl_cio_region` option. |
 | `CUSTOMERIO_CDP_WRITE_KEY` | The browser `cioanalytics` snippet only. A **different credential** from the site id above — CDP source write key vs Track API site id. Blank -> no snippet is emitted. Value recovered 2026-09-15 from the `analytics.load("…")` argument in the page source of `remoteleverage.com` and `rl-testing.test`, identical on both; it is a publishable browser key, not a secret. |
 
-LinkedIn Insight is a tag inside the GTM container. **Meta Pixel, Microsoft UET and the HubSpot
-tracking code are not** — production hardcodes all three into the page, outside GTM, so nothing
-carried them across the cutover. They are emitted by `MarketingPixelHooks` from
-`config/pixels.php`. See the container audit below. GTM itself is delivered by `SiteKitHooks` (`app/Infrastructure/WordPress/Hooks`) from `config/site-kit.php`.
+LinkedIn Insight is a tag inside the GTM container. **Meta Pixel and Microsoft UET are not** —
+production hardcodes them into the page, outside GTM, so nothing carried them across the cutover.
+They are emitted by `MarketingPixelHooks` from `config/pixels.php`. See the container audit below.
+
+Three things production loads are deliberately **not** reproduced, and the reasons are in
+`config/pixels.php` next to where each one used to be configured:
+
+| Gone | When | Why |
+| :--- | :--- | :--- |
+| HubSpot browser tracking | 2026-09-19 | 5,582ms of main-thread time on throttled mobile, the most expensive script on the site. Removed outright, not flagged off, because the flag was "is `HUBSPOT_PORTAL_ID` empty" and `HubSpotGateway` reads that same variable as a credential. **Server-side contact sync is unaffected** — different config key, still live. |
+| Rewardful | 2026-09-19 | The theme runs its own referral program (`app/Domains/Referral`), so this was second-guessing a system we do not use. `Lead::$referral_code` was never sourced from it. |
+| TikTok pixel | 2026-09-19 | Switched off, not removed: `pixels.tiktok.enabled`, back on with `TIKTOK_PIXEL_ENABLED=true`. Nothing is spending against the account, and it was the largest non-Google third party at 162KB. | GTM itself is delivered by `SiteKitHooks` (`app/Infrastructure/WordPress/Hooks`) from `config/site-kit.php`.
 
 **This reverses the earlier plan of having Site Kit ship the snippet.** Site Kit's Tag Manager module holds exactly one container: `Modules\Tag_Manager::register_tag()` builds `new Web_Tag($settings['containerID'])` from a single value, and `ampContainerID` is a separate AMP-only render path, not a second container on the same page (verified against Site Kit 1.187.0). Production serves **two** containers ([cutover-decisions.md §32](../cutover-decisions.md)), so connecting Site Kit to one would have silently stopped every tag in the other — exactly the ad-spend parity that decision exists to protect.
 
@@ -61,7 +69,7 @@ Site Kit stays installed and is still *configured* from the same file: `SiteKitH
 
 | Setting | Default | Does |
 | :--- | :--- | :--- |
-| `GTM_CONTAINER_IDS` | `GTM-53JDTQCZ,GTM-P4KZNJWL` | Containers to load, in order |
+| `GTM_CONTAINER_IDS` | *(blank)* | Containers to load, in order. Empty since `GTM-53JDTQCZ` was retired on 2026-09-18 and everything it carried moved into `config/pixels.php` |
 | `GTM_EMIT_SNIPPET` | `true` | Theme renders them; `false` hands delivery back to Site Kit, and back to one container |
 | `GTM_ENVIRONMENTS` | `production` | Which `wp_get_environment_type()` values load them |
 | `GTM_ACCOUNT_ID` | *(blank)* | GTM account, for Site Kit's dashboards only |
