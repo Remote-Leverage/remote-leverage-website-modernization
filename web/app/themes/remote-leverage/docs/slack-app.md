@@ -44,6 +44,7 @@ values for `{{ placeholders }}`.
 | `live_call_routed` | `LiveCallRequested`, routed | Always on — a live call starts within 15 minutes. |
 | `live_call_declined` | `LiveCallRequested`, declined | The reason this event exists; see below. |
 | `referrer_registered`, `referral_recorded`, `payout_completed` | The referral domain | Top level, not threaded — no lead thread to hang them on. |
+| `marketing_cost_alert` | The hourly `rl_marketing_cost_alert` cron, through `SendCostAlertAction` | Its own channel, and the one template that is edited rather than reposted. See below. |
 
 Two rules the renderer enforces, both there because the alternative shows up in a channel people
 watch all day: an unresolved placeholder renders **empty**, never as the literal `{{ key }}`; and
@@ -53,6 +54,38 @@ does not render a grid of dashes.
 **House rule: no emoji, anywhere.** Hierarchy comes from headers, dividers and field grouping.
 Each family of templates has a test asserting it, because the Block Kit Builder picker is one
 click away from the JSON you are about to paste.
+
+### The cost alert edits itself
+
+`marketing_cost_alert` breaks the pattern every other template in this file follows. The rest post
+a card when something happens; this one is a running total, refreshed every hour between 09:00 and
+18:00, and posting nine near-identical cards a day is how a channel becomes something people mute.
+The history is worse than the noise: scrolling back a week would mean paging through sixty cards to
+find the six that mattered.
+
+So the first run of the day posts and every run after it edits that same message — one live card in
+the channel, one row per day in the history. `SendCostAlertAction::STATE_OPTION` is the memory that
+makes it possible, holding the `ts`, the channel id and **the date the card belongs to**. The date
+is the part that matters: without it the first run after midnight would edit yesterday's card into
+today's numbers and quietly destroy the only record of yesterday. A stale date posts fresh instead.
+If the edit fails — somebody deleted the message, the channel moved underneath it — it posts a new
+card rather than dropping the run, because a duplicate card is a visible annoyance and a silent gap
+in a cost alert is neither visible nor harmless.
+
+It is also the first thing to post outside `#new-appts`. `SlackTransport::post()` grew an optional
+`$channel` argument for it, filled from `marketing.cost_alert.channel`; omitted, everything else
+resolves the default channel exactly as before. The webhook path cannot honour it, because an
+incoming webhook URL is bound to the channel it was created for — so the override is logged loudly
+and the message is sent anyway, to the webhook's own channel. A cost digest landing in the wrong
+channel is obvious and somebody fixes it within the hour; sending nothing is the failure that goes
+unnoticed for a month.
+
+`SlackTransport::update()` is new for the same reason, and it is bot-token-only in a way the
+threading degradation is not. A webhook cannot edit anything and never returned a `ts` to try it
+with, so the action refuses to remember a card it cannot edit: storing a null `ts` would send every
+later run down the update path, fail, and post anyway — a duplicate card once an hour, in exactly
+the environment that has no bot token because nobody has finished wiring it up. `update()` returns
+false rather than silently reposting, so the caller decides.
 
 ## One thread per lead
 

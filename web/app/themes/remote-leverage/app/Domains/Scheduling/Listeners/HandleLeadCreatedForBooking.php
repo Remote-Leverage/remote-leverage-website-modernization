@@ -7,6 +7,7 @@ namespace App\Domains\Scheduling\Listeners;
 use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Services\LeadActivityLogger;
+use App\Domains\Lead\Services\LeadQualification;
 use App\Domains\Scheduling\Actions\BookMeetingAction;
 use App\Domains\Scheduling\Concerns\HandlesBookingRetryBackoff;
 use App\Domains\Scheduling\Data\BookingRequestData;
@@ -76,7 +77,7 @@ class HandleLeadCreatedForBooking
             $extraData = $event->context['extra_data'] ?? [];
             $calendlyEventUri = $extraData['event_uri'] ?? null;
             if (! $calendlyEventUri && $lead->monthly_revenue) {
-                $isUnder10k = in_array($lead->monthly_revenue, ['$0 to $5k Per Month', '$5k to $10k Per Month', '<10k', 'under_10k'], true);
+                $isUnder10k = in_array($lead->monthly_revenue, LeadQualification::SUB_T10_BANDS, true);
                 $calendlyEventUri = $isUnder10k
                     ? $this->eventTypeRoleResolver->get('t0')
                     : $this->eventTypeRoleResolver->get('t10');

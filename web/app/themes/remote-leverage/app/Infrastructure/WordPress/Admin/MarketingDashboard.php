@@ -7,6 +7,7 @@ namespace App\Infrastructure\WordPress\Admin;
 use App\Domains\ContentAudit\Services\ElementorAuditService;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
+use App\Domains\Lead\Services\LeadQualification;
 use App\Domains\Referral\Models\Payout;
 use App\Domains\Referral\Models\Referral;
 use App\Domains\Referral\Models\Referrer;
@@ -16,6 +17,21 @@ use Illuminate\Support\Facades\DB;
 
 class MarketingDashboard
 {
+    /**
+     * How far back the marketing KPI widget looks.
+     *
+     * The widget used to report lifetime totals — 3,973 submissions, 2,571 consultations, a 64.7%
+     * conversion rate — directly above its own trailing-7-day chart. Two different periods in one
+     * card, neither labelled with its period, and the big numbers were the ones nobody could act
+     * on: a lifetime conversion rate barely moves, so it says nothing about whether last week
+     * worked. Scoped to the same window as the chart underneath it, the card answers one question
+     * consistently.
+     *
+     * The all-time figures have not gone anywhere: the domain overview widget and the Leads
+     * screen both still report them, which is where a lifetime number belongs.
+     */
+    public const KPI_WINDOW_DAYS = 7;
+
     /**
      * Register WordPress dashboard customization hooks.
      */
@@ -44,7 +60,7 @@ class MarketingDashboard
         // 2. Left Column (normal): Performance, Ingestion Charts, Channels, Recent Leads
         wp_add_dashboard_widget(
             'rl_dashboard_kpis',
-            'Marketing Performance & Ingestion Volume',
+            'Marketing Performance — Last 7 Days',
             [$this, 'renderKpisWidget'],
             null,
             null,
@@ -115,7 +131,10 @@ class MarketingDashboard
     }
 
     /**
-     * Render the Marketing KPIs & 7-Day Ingestion Volume Chart widget.
+     * Render the marketing KPI cards, the conversion funnel and the daily ingestion chart.
+     *
+     * Every figure on this card covers {@see self::KPI_WINDOW_DAYS} days, including the ones that
+     * used to be lifetime totals. See that constant for why.
      */
     public function renderKpisWidget(): void
     {
@@ -133,11 +152,11 @@ class MarketingDashboard
             <div class="rl-dash-kpi-grid">
                 <div class="rl-dash-kpi-card">
                     <div class="rl-dash-kpi-header">
-                        <span class="rl-dash-kpi-label">TOTAL SUBMISSIONS</span>
+                        <span class="rl-dash-kpi-label">SUBMISSIONS</span>
                         <svg class="rl-dash-kpi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     </div>
                     <div class="rl-dash-kpi-number"><?php echo esc_html((string) $total); ?></div>
-                    <div class="rl-dash-kpi-meta">All captured records</div>
+                    <div class="rl-dash-kpi-meta">Captured in the last <?php echo esc_html((string) self::KPI_WINDOW_DAYS); ?> days</div>
                 </div>
 
                 <div class="rl-dash-kpi-card">
@@ -155,7 +174,7 @@ class MarketingDashboard
                         <svg class="rl-dash-kpi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
                     </div>
                     <div class="rl-dash-kpi-number"><?php echo esc_html((string) $booked); ?></div>
-                    <div class="rl-dash-kpi-meta">Confirmed on calendar</div>
+                    <div class="rl-dash-kpi-meta">Of those leads, now booked</div>
                 </div>
 
                 <div class="rl-dash-kpi-card">
@@ -164,7 +183,7 @@ class MarketingDashboard
                         <svg class="rl-dash-kpi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
                     </div>
                     <div class="rl-dash-kpi-number"><?php echo esc_html($conversionRate.'%'); ?></div>
-                    <div class="rl-dash-kpi-meta">Booked / Submissions</div>
+                    <div class="rl-dash-kpi-meta">Booked / submissions, same cohort</div>
                 </div>
             </div>
 
@@ -172,7 +191,7 @@ class MarketingDashboard
             <div class="rl-dash-funnel-box">
                 <div class="rl-dash-funnel-header">
                     <span class="rl-dash-box-subtitle">Pipeline Conversion Funnel</span>
-                    <span class="rl-dash-box-meta"><?php echo esc_html((string) $total); ?> Ingested &rarr; <?php echo esc_html((string) $booked); ?> Booked</span>
+                    <span class="rl-dash-box-meta">Last <?php echo esc_html((string) self::KPI_WINDOW_DAYS); ?> days: <?php echo esc_html((string) $total); ?> ingested &rarr; <?php echo esc_html((string) $booked); ?> booked</span>
                 </div>
                 <div class="rl-dash-funnel-stages">
                     <div class="rl-dash-funnel-stage">
@@ -528,8 +547,7 @@ class MarketingDashboard
                             $name = 'Anonymous Lead';
                         }
                         $initials = $this->getInitials($name);
-                        $isT10 = ! in_array($lead->monthly_revenue, ['$0 to $5k Per Month', '$5k to $10k Per Month', '<10k', 'under_10k'], true)
-                            && ! empty($lead->monthly_revenue);
+                        $isT10 = LeadQualification::isT10($lead);
                         $statusClass = match (strtolower((string) $lead->status)) {
                             'booked' => 'rl-badge-emerald',
                             'final' => 'rl-badge-zinc',
@@ -743,16 +761,32 @@ class MarketingDashboard
     protected function getDashboardMetrics(): array
     {
         try {
-            return Cache::remember('rl_admin_dashboard_metrics', 180, function () {
-                $total = Lead::count();
-                $booked = Lead::where('status', 'booked')->count();
-                $t10 = Lead::whereNotIn('monthly_revenue', ['$0 to $5k Per Month', '$5k to $10k Per Month', '<10k', 'under_10k'])
-                    ->whereNotNull('monthly_revenue')
-                    ->where('monthly_revenue', '!=', '')
-                    ->count();
+            /*
+             * `_7d` on the key because the numbers under it changed meaning, not just value.
+             * Anything cached under the old key is a lifetime figure this widget no longer
+             * reports, and it would have rendered as a trailing-week one until the TTL expired.
+             * Same reasoning as the `_v2` suffix on Lead::KPI_CACHE_KEY.
+             */
+            return Cache::remember('rl_admin_dashboard_metrics_7d', 180, function () {
+                $since = now()->subDays(self::KPI_WINDOW_DAYS - 1)->startOfDay();
+
+                $total = Lead::where('created_at', '>=', $since)->count();
+
+                /*
+                 * A cohort, not a period.
+                 *
+                 * "Leads captured in the window that have since booked", rather than "bookings
+                 * that happened in the window". It has to be the cohort for the conversion rate
+                 * below to mean anything — dividing bookings made this week by leads captured
+                 * this week mixes two populations and can exceed 100% in a week that converts a
+                 * backlog.
+                 */
+                $booked = Lead::where('created_at', '>=', $since)->where('status', 'booked')->count();
+                $t10 = LeadQualification::t10Query()->where('created_at', '>=', $since)->count();
 
                 // Top 6 attribution sources
                 $sources = Lead::select('utm_source', DB::raw('count(*) as total'))
+                    ->where('created_at', '>=', $since)
                     ->whereNotNull('utm_source')
                     ->where('utm_source', '!=', '')
                     ->groupBy('utm_source')
@@ -764,8 +798,7 @@ class MarketingDashboard
                 // 7-day volume calculation
                 $dailyCounts = [];
                 try {
-                    $sevenDaysAgo = now()->subDays(6)->startOfDay();
-                    $dailyCounts = Lead::where('created_at', '>=', $sevenDaysAgo)
+                    $dailyCounts = Lead::where('created_at', '>=', $since)
                         ->select(DB::raw('DATE(created_at) as date'), DB::raw('count(*) as count'))
                         ->groupBy('date')
                         ->pluck('count', 'date')
@@ -775,7 +808,7 @@ class MarketingDashboard
                 }
 
                 $dailyVolume = [];
-                for ($i = 6; $i >= 0; $i--) {
+                for ($i = self::KPI_WINDOW_DAYS - 1; $i >= 0; $i--) {
                     $date = now()->subDays($i)->format('Y-m-d');
                     $dayLabel = now()->subDays($i)->format('D');
                     $dailyVolume[] = [
@@ -795,7 +828,7 @@ class MarketingDashboard
             });
         } catch (\Throwable) {
             $fallbackDays = [];
-            for ($i = 6; $i >= 0; $i--) {
+            for ($i = self::KPI_WINDOW_DAYS - 1; $i >= 0; $i--) {
                 $fallbackDays[] = [
                     'date' => date('Y-m-d', strtotime("-{$i} days")),
                     'label' => date('D', strtotime("-{$i} days")),
@@ -823,10 +856,7 @@ class MarketingDashboard
         try {
             return Cache::remember('rl_admin_domain_overview', 180, function () {
                 $leadTotal = Lead::count();
-                $leadT10 = Lead::whereNotIn('monthly_revenue', ['$0 to $5k Per Month', '$5k to $10k Per Month', '<10k', 'under_10k'])
-                    ->whereNotNull('monthly_revenue')
-                    ->where('monthly_revenue', '!=', '')
-                    ->count();
+                $leadT10 = LeadQualification::t10Query()->count();
                 $leadLogs = LeadActivityLog::count();
                 $booked = Lead::where('status', 'booked')->count();
 

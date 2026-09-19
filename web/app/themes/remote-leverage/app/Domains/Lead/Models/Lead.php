@@ -51,6 +51,7 @@ class Lead extends Model
         'utm_content',
         'gclid',
         'fbclid',
+        'msclkid',
         'referral_code',
         'landing_url',
         'referrer_url',

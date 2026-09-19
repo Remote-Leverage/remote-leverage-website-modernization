@@ -35,6 +35,7 @@ function recordingSlackTransport(): SlackTransport
             ?string $color = null,
             ?string $threadTs = null,
             bool $broadcast = false,
+            ?string $channel = null,
         ): ?array {
             $this->posts[] = ['text' => $text, 'thread_ts' => $threadTs, 'broadcast' => $broadcast];
 

@@ -249,6 +249,7 @@ if (! Capsule::schema()->hasTable('rl_leads')) {
         $table->string('utm_content', 100)->nullable();
         $table->string('gclid', 150)->nullable();
         $table->string('fbclid', 150)->nullable();
+        $table->string('msclkid', 150)->nullable();
         $table->string('referral_code', 100)->nullable();
         $table->string('landing_url', 500)->nullable();
         $table->string('referrer_url', 500)->nullable();

@@ -83,13 +83,32 @@ describe('AttributionCollector', function () {
     test('the HandL first-touch set is recorded without needing a column', function () {
         $collected = (new AttributionCollector)->collect(attributionRequest([
             'first_utm_source' => 'reddit',
-            'msclkid' => 'MS1',
             'gbraid' => 'GB1',
             'organic_source' => 'google.com',
         ]));
 
         expect($collected['attribution']['handl'])
-            ->toHaveKeys(['first_utm_source', 'msclkid', 'gbraid', 'organic_source'])
+            ->toHaveKeys(['first_utm_source', 'gbraid', 'organic_source'])
+            ->and($collected['attribution']['unmapped'] ?? [])->toBe([]);
+    });
+
+    /*
+     * `msclkid` moved out of the blob and into a column on 2026-09-19, because LeadPlatform now
+     * falls back to click IDs and a value only reachable through JSON_EXTRACT cannot be queried
+     * the same way on MySQL and on the SQLite this suite runs.
+     *
+     * Asserting both halves — present as a named value, absent from `handl` — because a
+     * half-done promotion that writes to both places is the failure that looks like it worked:
+     * the column fills, nothing breaks, and the blob quietly keeps a second copy that drifts.
+     */
+    test('msclkid is collected as a column value rather than into the blob', function () {
+        $collected = (new AttributionCollector)->collect(attributionRequest([
+            'msclkid' => 'MS1',
+            'gbraid' => 'GB1',
+        ]));
+
+        expect($collected['named']['msclkid'] ?? null)->toBe('MS1')
+            ->and($collected['attribution']['handl'] ?? [])->not->toHaveKey('msclkid')
             ->and($collected['attribution']['unmapped'] ?? [])->toBe([]);
     });
 

@@ -656,4 +656,207 @@ return [
             ],
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Marketing cost alert
+    |--------------------------------------------------------------------------
+    |
+    | One card per day, edited in place through the working day rather than reposted — see
+    | App\Domains\Marketing\Actions\SendCostAlertAction. Nothing else in this file updates
+    | itself, so the layout is built to survive being redrawn: no counters, no "since the last
+    | message" phrasing, every line true standing alone at the moment it is rendered.
+    |
+    | The platform table arrives pre-formatted in `platform_table` rather than as a repeated
+    | block, because this renderer substitutes scalars and has no loop. That is the same trick
+    | `attribution_line` uses on the lead alert, and it keeps the column alignment here — Slack
+    | renders a fenced block in a monospace font, which is the only way a table of costs lines
+    | up in a channel people read on a phone.
+    |
+    | Most sections are `_when`-gated on a value the alert may not have. Phase 1 ships with no ad
+    | platform integration at all, so `spend_summary` is empty and `spend_pending` explains why
+    | in its place. When spend lands the two swap over with no change to this file.
+    */
+    'marketing_cost_alert' => [
+
+        /*
+         * Red only when the reconciliation found something. A daily digest that is permanently
+         * coloured is a daily digest nobody's eye stops on.
+         */
+        'color' => null,
+
+        'fallback' => "Marketing Cost Alert — {{ subheading }}\n{{ headline_metrics }}",
+
+        /*
+         * Structured as labelled text, not as tiles.
+         *
+         * This was a grid of `section.fields`, then three carousels of cards. Both looked better
+         * in isolation and both read as busy in the channel — the feedback that settled it was
+         * from the person who reads it daily: "great info, i wonder if we can structure it like
+         * the previous ones, easy to read through text". The legacy alert was a wall of terse
+         * `Label: value` lines under bold headings, and that is genuinely faster to scan than a
+         * card you have to parse the shape of first.
+         *
+         * So the layout is back to text and the *content* keeps everything the rewrite earned:
+         * paid cost separated from blended, the attribution gap broken down by channel, the
+         * reconciliation findings at the top, the VA exclusion counted out loud.
+         *
+         * Four sections, one line per idea. Adding a fifth is how this becomes busy again.
+         */
+        'blocks' => [
+            /*
+             * Only ever filled by `--demo`. Above the header rather than below it: a card of
+             * plausible marketing figures in a channel where people read real ones needs to
+             * announce itself before anyone has read a number, not after.
+             */
+            [
+                'type' => 'section',
+                '_when' => ['demo_notice'],
+                'text' => ['type' => 'mrkdwn', 'text' => '{{ demo_notice }}'],
+            ],
+            [
+                'type' => 'header',
+                'text' => ['type' => 'plain_text', 'text' => 'Marketing Cost Alert', 'emoji' => false],
+            ],
+            [
+                'type' => 'context',
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => '{{ subheading }}'],
+                ],
+            ],
+
+            /*
+             * The audit, first and unmissable, because its whole purpose is to stop someone
+             * acting on the figures below it.
+             */
+            [
+                'type' => 'section',
+                '_when' => ['warnings'],
+                'text' => ['type' => 'mrkdwn', 'text' => "*Check before trusting these numbers*\n{{ warnings }}"],
+            ],
+
+            [
+                'type' => 'section',
+                'text' => ['type' => 'mrkdwn', 'text' => '{{ today_block }}'],
+            ],
+            /*
+             * The platforms stay boxed, but stacked rather than in a carousel.
+             *
+             * A carousel scrolls sideways, which on a phone is the one gesture people do not
+             * expect inside a message — the third platform is behind a chevron on the surface
+             * where most of these are read. Stacked cards keep the boxes and lose the scroll.
+             *
+             * Top-level cards also fail better than carousel items. The renderer prunes an empty
+             * optional text object on a top-level block, so a platform with no subtitle loses its
+             * subtitle; nested in a carousel the same emptiness tripped `hasEmptyTextObject` and
+             * took every platform with it.
+             *
+             * Six slots because the renderer substitutes scalars and cannot loop. Six covers every
+             * platform that has ever carried spend here; `LeadPlatform` knows seven in total.
+             */
+            [
+                'type' => 'section',
+                '_when' => ['platform_1_title'],
+                'text' => ['type' => 'mrkdwn', 'text' => '*By platform*'],
+            ],
+            [
+                'type' => 'card',
+                '_when' => ['platform_1_title'],
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ platform_1_title }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ platform_1_subtitle }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ platform_1_body }}', 'verbatim' => false],
+            ],
+            [
+                'type' => 'card',
+                '_when' => ['platform_2_title'],
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ platform_2_title }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ platform_2_subtitle }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ platform_2_body }}', 'verbatim' => false],
+            ],
+            [
+                'type' => 'card',
+                '_when' => ['platform_3_title'],
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ platform_3_title }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ platform_3_subtitle }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ platform_3_body }}', 'verbatim' => false],
+            ],
+            [
+                'type' => 'card',
+                '_when' => ['platform_4_title'],
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ platform_4_title }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ platform_4_subtitle }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ platform_4_body }}', 'verbatim' => false],
+            ],
+            [
+                'type' => 'card',
+                '_when' => ['platform_5_title'],
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ platform_5_title }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ platform_5_subtitle }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ platform_5_body }}', 'verbatim' => false],
+            ],
+            [
+                'type' => 'card',
+                '_when' => ['platform_6_title'],
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ platform_6_title }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ platform_6_subtitle }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ platform_6_body }}', 'verbatim' => false],
+            ],
+            [
+                'type' => 'context',
+                '_when' => ['platform_notes'],
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => '{{ platform_notes }}'],
+                ],
+            ],
+            [
+                'type' => 'section',
+                '_when' => ['activity_block'],
+                'text' => ['type' => 'mrkdwn', 'text' => '{{ activity_block }}'],
+            ],
+
+            /*
+             * Definitions and exclusions, as one line of small print. The reasoning behind each
+             * lives in docs/marketing-cost-alerts.md; only the numbers that move belong here.
+             */
+            [
+                'type' => 'context',
+                '_when' => ['footnotes'],
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => '{{ footnotes }}'],
+                ],
+            ],
+
+            /*
+             * Link buttons, not interactive ones. A link needs no signing secret and no handler,
+             * so it works the moment the card posts — where an interactive button renders a "not
+             * configured to handle interactive responses" notice under every card in any
+             * environment that has not finished its Slack setup. Each is gated on its URL,
+             * because a button pointing nowhere is worse than no button.
+             */
+            [
+                'type' => 'actions',
+                '_when' => ['dashboard_url'],
+                'elements' => [
+                    [
+                        'type' => 'button',
+                        '_when' => ['dashboard_url'],
+                        'text' => ['type' => 'plain_text', 'text' => 'Dashboard', 'emoji' => false],
+                        'url' => '{{ dashboard_url }}',
+                    ],
+                    [
+                        'type' => 'button',
+                        '_when' => ['leads_url'],
+                        'text' => ['type' => 'plain_text', 'text' => "Today's leads", 'emoji' => false],
+                        'url' => '{{ leads_url }}',
+                    ],
+                    [
+                        'type' => 'button',
+                        '_when' => ['unattributed_url'],
+                        'text' => ['type' => 'plain_text', 'text' => 'Unattributed', 'emoji' => false],
+                        'url' => '{{ unattributed_url }}',
+                    ],
+                ],
+            ],
+        ],
+    ],
 ];

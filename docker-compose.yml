@@ -52,6 +52,12 @@ services:
       WP_REDIS_PORT: "6379"
       WP_REDIS_CLIENT: phpredis
       WP_REDIS_PREFIX: "local:"
+      # Acorn's Cache facade, which is a separate cache from the object cache above.
+      # Laravel reads these without the WP_ prefix; REDIS_CACHE_DB defaults to 1, so the two
+      # share one server without sharing a keyspace.
+      CACHE_STORE: redis
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
     depends_on:
       db:
         condition: service_healthy

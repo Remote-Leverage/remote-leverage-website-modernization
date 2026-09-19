@@ -8,6 +8,7 @@ use App\Domains\Lead\Actions\CaptureLeadAction;
 use App\Domains\Lead\Data\LeadCaptureData;
 use App\Domains\Lead\Services\AttributionCollector;
 use App\Domains\Lead\Services\EmailValidationService;
+use App\Domains\Lead\Services\LeadQualification;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Scheduling\Actions\FetchAvailableSlotsAction;
 use App\Domains\Scheduling\Services\AvailabilityHealthMonitor;
@@ -443,12 +444,7 @@ class MultistepBookingWizard extends Component
 
     public function isUnder10kMrr(): bool
     {
-        return in_array($this->monthlyRevenue, [
-            '$0 to $5k Per Month',
-            '$5k to $10k Per Month',
-            '<10k',
-            'under_10k',
-        ], true);
+        return in_array($this->monthlyRevenue, LeadQualification::SUB_T10_BANDS, true);
     }
 
     public function isJobSeeker(): bool

@@ -27,6 +27,24 @@ use Illuminate\Support\Facades\Log;
  * succeeds with a null `ts`, and a caller that wanted to thread simply posts at top level next
  * time. That is a degradation, not a failure: an environment with no bot token still gets its
  * alerts, it just gets them flat.
+ *
+ * ## The channel override, and what the webhook does with it
+ *
+ * `$channel` was added for the marketing cost alert, which belongs in its own channel rather
+ * than in the per-lead stream everything else posts to. It is an override, not a requirement:
+ * omitted, the configured default channel is used exactly as before.
+ *
+ * A webhook URL is bound to the channel it was created for, so the override cannot be honoured
+ * on that path. It is logged loudly and the message is sent anyway, to the webhook's own
+ * channel. Sending a cost digest to the wrong channel is visible and someone fixes it; silently
+ * sending nothing is the failure mode that goes unnoticed for a month.
+ *
+ * ## Updating rather than reposting
+ *
+ * `update()` exists so a recurring alert can hold one message and edit it through the day
+ * instead of stacking nine near-identical cards in a channel. It needs the channel *id* Slack
+ * returned when the message was posted, not the name it was addressed to, which is why `post()`
+ * hands back both.
  */
 class SlackTransport
 {
@@ -40,6 +58,8 @@ class SlackTransport
      * @param  bool  $broadcast  Also surface a threaded reply in the channel. For the replies
      *                           that people must not miss — a booking, a block — where burying
      *                           it in a collapsed thread would be worse than not threading.
+     * @param  string|null  $channel  Post here instead of the configured default. See the class
+     *                                docblock for what the webhook path does with it.
      * @return array{ts: ?string, channel: ?string}|null Null when nothing was sent.
      */
     public function post(
@@ -48,17 +68,89 @@ class SlackTransport
         ?string $color = null,
         ?string $threadTs = null,
         bool $broadcast = false,
+        ?string $channel = null,
     ): ?array {
         // Environment first, admin setting second — see SlackCredentials for why the setting
         // exists at all.
         $token = SlackCredentials::botToken();
-        $channel = SlackCredentials::channel();
+        $override = trim((string) $channel);
+        $target = $override !== '' ? $override : SlackCredentials::channel();
 
-        if ($token !== '' && $channel !== '') {
-            return $this->postWithToken($token, $channel, $text, $blocks, $color, $threadTs, $broadcast);
+        if ($token !== '' && $target !== '') {
+            return $this->postWithToken($token, $target, $text, $blocks, $color, $threadTs, $broadcast);
+        }
+
+        if ($override !== '') {
+            Log::warning('SlackTransport: no bot token, so the channel override cannot be honoured; falling back to the webhook\'s own channel.', [
+                'requested_channel' => $override,
+            ]);
         }
 
         return $this->postWithWebhook($text, $blocks, $threadTs);
+    }
+
+    /**
+     * Edit a message posted earlier.
+     *
+     * Bot token only: an incoming webhook cannot edit anything, and it never returned the `ts`
+     * that would be needed to try. A caller that gets false back should decide whether to post
+     * fresh — this does not silently do it, because a caller editing a daily card wants to know
+     * that the card is gone rather than quietly acquiring a second one.
+     *
+     * @param  array<int, array<string, mixed>>  $blocks
+     * @param  string  $channel  The channel *id* from the original post's response.
+     */
+    public function update(
+        string $channel,
+        string $ts,
+        string $text,
+        array $blocks = [],
+        ?string $color = null,
+    ): bool {
+        $token = SlackCredentials::botToken();
+
+        if ($token === '' || $channel === '' || $ts === '') {
+            return false;
+        }
+
+        $payload = [
+            'channel' => $channel,
+            'ts' => $ts,
+            'text' => $text,
+            'link_names' => false,
+        ];
+
+        if ($blocks !== []) {
+            if ($color !== null) {
+                $payload['attachments'] = [['color' => $color, 'blocks' => $blocks]];
+
+                /*
+                 * An edit replaces only the fields it carries. A message that had top-level
+                 * blocks and is now being given an attachment keeps the old blocks alongside the
+                 * new ones unless they are explicitly cleared, which renders the card twice.
+                 */
+                $payload['blocks'] = [];
+            } else {
+                $payload['blocks'] = $blocks;
+                $payload['attachments'] = [];
+            }
+        }
+
+        $response = Http::withToken($token)
+            ->timeout(5)
+            ->post('https://slack.com/api/chat.update', $payload);
+
+        if ($response->successful() && $response->json('ok') === true) {
+            return true;
+        }
+
+        Log::warning('SlackTransport: chat.update rejected', [
+            'status' => $response->status(),
+            'error' => $response->json('error'),
+            'ts' => $ts,
+        ]);
+
+        return false;
     }
 
     /**

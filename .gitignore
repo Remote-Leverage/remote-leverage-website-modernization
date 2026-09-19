@@ -57,3 +57,12 @@ wp-cli.local.yml
 # macOS
 .DS_Store
 **/.DS_Store
+
+# Legacy site snapshots — local reference only, never pushed (2026-09-19).
+# 238 rendered pages + the legacy Elementor CSS + ~712MB of uploads. Far too large for git,
+# and the decision was taken to keep them off the remote entirely; they may move to their own
+# repo later. Regenerate with the bulk render documented in legacy-snapshots/README.md.
+/legacy-snapshots/
+
+# Symlink exposing legacy-snapshots under the .test docroot (see /legacy-snapshots/).
+/web/legacy-snapshots

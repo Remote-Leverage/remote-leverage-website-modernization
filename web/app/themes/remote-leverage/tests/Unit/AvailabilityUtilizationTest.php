@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\Http;
 /** Captures what would have been sent, so the band logic can be asserted without a Slack double. */
 class RecordingSlackTransport extends SlackTransport
 {
-    /** @var array<int, array{text: string, blocks: array}> */
+    /** @var array<int, array{text: string, blocks: array, channel: ?string}> */
     public array $sent = [];
 
     public function post(
@@ -35,8 +35,9 @@ class RecordingSlackTransport extends SlackTransport
         ?string $color = null,
         ?string $threadTs = null,
         bool $broadcast = false,
+        ?string $channel = null,
     ): ?array {
-        $this->sent[] = ['text' => $text, 'blocks' => $blocks];
+        $this->sent[] = ['text' => $text, 'blocks' => $blocks, 'channel' => $channel];
 
         return ['ts' => (string) count($this->sent), 'channel' => 'C1'];
     }

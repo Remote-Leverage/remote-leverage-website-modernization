@@ -117,6 +117,12 @@ class SlackMessageRenderer
             }
         }
 
+        /*
+         * A carousel's cards arrive under `elements`, the same key an actions block uses, so they
+         * prune here without anything being added: a carousel whose every card dropped out has
+         * nothing to scroll through, and Slack rejects an empty one outright — which costs the
+         * entire message, not the one block.
+         */
         foreach (['fields', 'elements'] as $collection) {
             if (! isset($block[$collection]) || ! is_array($block[$collection])) {
                 continue;

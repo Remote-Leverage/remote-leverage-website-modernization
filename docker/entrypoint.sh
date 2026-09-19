@@ -100,8 +100,16 @@ if wp core is-installed --allow-root >/dev/null 2>&1; then
   wp acorn optimize --allow-root || true
   chown -R www-data:www-data /var/www/html/web/app/cache || true
 
-  if [ -n "${REDIS_HOST:-}" ]; then
-    wp plugin activate redis-cache --allow-root || true
+  # Gate on WP_REDIS_HOST, which is what config/application.php and docker-compose.yml
+  # actually set. This read REDIS_HOST until 2026-09-19 — a variable nothing defined — so
+  # `wp redis enable` never ran in any environment. It was survivable only because the
+  # Dockerfile already copies the drop-in to web/app/object-cache.php at image build, which
+  # is what really turns the object cache on; the visible symptom was the redis-cache plugin
+  # reporting itself disabled on a site whose object cache was working.
+  #
+  # REDIS_HOST is Laravel's variable, read by Acorn's config/database.php for CACHE_STORE=redis.
+  # The two are deliberately distinct and an environment using Redis for both sets both.
+  if [ -n "${WP_REDIS_HOST:-}" ]; then
     wp redis enable --allow-root || true
   fi
 fi

@@ -12,10 +12,12 @@ use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Models\LeadProfile;
 use App\Domains\Lead\Services\LeadAvatar;
 use App\Domains\Lead\Services\LeadPlatform;
+use App\Domains\Lead\Services\LeadQualification;
 use App\Domains\Lead\Services\LeadSearch;
 use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Lead\Services\LeadStatus;
 use App\Domains\Lead\Services\LeadSubmission;
+use App\Domains\Marketing\Support\AdPlatformCredentials;
 use App\Domains\Scheduling\Actions\RetryFailedBookingAction;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
@@ -212,6 +214,12 @@ class LeadsAdminDashboard
                 'slack_webhook_url' => $_POST['slack_webhook_url'] ?? '',
                 'slack_signing_secret' => $_POST['slack_signing_secret'] ?? '',
                 'lead_webhook_url' => $_POST['lead_webhook_url'] ?? '',
+                /*
+                 * Spread rather than listed: the ad credentials are driven off
+                 * AdPlatformCredentials::KEYS, and typing seventeen of them here is seventeen
+                 * chances to omit the one that then gets wiped on every save.
+                 */
+                ...$this->submittedAdCredentials(),
             ]);
 
             if ($result['success']) {
@@ -1084,7 +1092,18 @@ class LeadsAdminDashboard
          * take fresh auto-increment ids, so ordering by id put 2023 backfill at the top and
          * buried today's leads on the last page. Id only breaks ties within the same second.
          */
-        $query = Lead::query()->latest('created_at')->latest('id');
+        /*
+         * Both of these serve the table below, which touches every row's activity logs twice: the
+         * meeting details come from the collection and the pill prints how many entries there
+         * are. Lazily, that was a full relation load *and* a separate count per row — 42 queries
+         * for 20 leads, and the load pulled every log payload to read one of them. Eager, it is
+         * three. `withCount` is the same trick `LeadExportColumns` already uses for this relation.
+         */
+        $query = Lead::query()
+            ->with('activityLogs')
+            ->withCount('activityLogs')
+            ->latest('created_at')
+            ->latest('id');
 
         if ($search) {
             $this->applyOptimizedSearch($query, $search);
@@ -1095,11 +1114,9 @@ class LeadsAdminDashboard
         }
 
         if ($mrrFilter === 't10') {
-            $query->whereNotIn('monthly_revenue', ['$0 to $5k Per Month', '$5k to $10k Per Month', '<10k', 'under_10k'])
-                ->whereNotNull('monthly_revenue')
-                ->where('monthly_revenue', '!=', '');
+            LeadQualification::constrainT10($query);
         } elseif ($mrrFilter === 't0') {
-            $query->whereIn('monthly_revenue', ['$0 to $5k Per Month', '$5k to $10k Per Month', '<10k', 'under_10k']);
+            $query->whereIn('monthly_revenue', LeadQualification::SUB_T10_BANDS);
         }
 
         LeadPlatform::apply($query, $platformFilter);
@@ -1113,10 +1130,7 @@ class LeadsAdminDashboard
             return [
                 'total' => Lead::count(),
                 'booked' => Lead::where('status', 'booked')->count(),
-                't10' => Lead::whereNotIn('monthly_revenue', ['$0 to $5k Per Month', '$5k to $10k Per Month', '<10k', 'under_10k'])
-                    ->whereNotNull('monthly_revenue')
-                    ->where('monthly_revenue', '!=', '')
-                    ->count(),
+                't10' => LeadQualification::t10Query()->count(),
                 // `status` has no 'partial' — the drop-off lives in submission_type.
                 'partial' => tap(Lead::query(), fn ($q) => LeadSubmission::apply($q, LeadSubmission::PARTIAL))->count(),
                 'logs' => LeadActivityLog::count(),
@@ -1315,7 +1329,7 @@ class LeadsAdminDashboard
                         <?php } else { ?>
                             <?php foreach ($leads as $lead) {
                                 $meeting = $this->extractMeetingDetails($lead);
-                                $isT10 = ! in_array($lead->monthly_revenue, ['$0 to $5k Per Month', '$5k to $10k Per Month', '<10k', 'under_10k'], true) && ! empty($lead->monthly_revenue);
+                                $isT10 = LeadQualification::isT10($lead);
                                 ?>
                                 <tr>
                                     <td>
@@ -1399,7 +1413,7 @@ class LeadsAdminDashboard
                                     </td>
                                     <td>
                                         <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads&view_lead='.$lead->id)); ?>" class="rl-audit-pill">
-                                            <?php echo esc_html((string) $lead->activityLogs()->count()); ?> events <?php echo $this->iconArrowRight(); ?>
+                                            <?php echo esc_html((string) ($lead->activity_logs_count ?? 0)); ?> events <?php echo $this->iconArrowRight(); ?>
                                         </a>
                                     </td>
                                     <td style="text-align: right;">
@@ -2364,6 +2378,30 @@ class LeadsAdminDashboard
         <?php
     }
 
+    /**
+     * The ad platform credentials this form submitted, as `setting key => value`.
+     *
+     * Only keys actually present in the request are returned. LeadSettingsService treats an
+     * absent key as "leave it alone" and a submitted empty one as "clear it", and that
+     * distinction is load-bearing — see the `$keep` comment there.
+     *
+     * @return array<string, string>
+     */
+    private function submittedAdCredentials(): array
+    {
+        $submitted = [];
+
+        foreach (AdPlatformCredentials::settingKeys() as $keys) {
+            foreach ($keys as $key) {
+                if (array_key_exists($key, $_POST)) {
+                    $submitted[$key] = sanitize_text_field(wp_unslash((string) $_POST[$key]));
+                }
+            }
+        }
+
+        return $submitted;
+    }
+
     public function renderSettings(): void
     {
         $settings = app(LeadSettingsService::class)->get();
@@ -2564,6 +2602,78 @@ class LeadsAdminDashboard
                             </td>
                         </tr>
                     </table>
+                </div>
+
+                <?php
+                /*
+                 * Ad platform read credentials.
+                 *
+                 * Rendered from AdPlatformCredentials::KEYS rather than hand-written, so the form
+                 * cannot fall behind the code that reads it — a credential with nowhere to be
+                 * pasted is indistinguishable from one that is simply not set.
+                 *
+                 * Nothing consumes these yet. The card says so, because a settings screen full of
+                 * fields that do nothing, with no note explaining it, gets filled in once and then
+                 * reported as broken.
+                 */
+                $adLabels = [
+                    'developer_token' => 'Developer token',
+                    'client_id' => 'OAuth client ID',
+                    'client_secret' => 'OAuth client secret',
+                    'refresh_token' => 'OAuth refresh token',
+                    'customer_id' => 'Customer ID',
+                    'login_customer_id' => 'Login customer ID (manager accounts only)',
+                    'access_token' => 'Access token',
+                    'ad_account_id' => 'Ad account ID',
+                    'api_version' => 'API version',
+                    'account_id' => 'Account ID',
+                ];
+        $adPlatformNames = [
+            'google' => 'Google Ads',
+            'meta' => 'Meta (Facebook / Instagram)',
+            'microsoft' => 'Microsoft Advertising (Bing)',
+        ];
+        $adSecretKeys = ['developer_token', 'client_secret', 'refresh_token', 'access_token'];
+        ?>
+                <div class="rl-detail-card" style="margin-bottom: 20px;">
+                    <h3 class="rl-detail-title">Ad Platform Read Credentials</h3>
+                    <p class="description" style="margin: 0 0 16px;">
+                        For the marketing cost alert&rsquo;s spend, CPB, CPQB and account-health figures.
+                        <strong>Meta is live:</strong> fill in both its fields and the next hourly run starts
+                        calling the Graph API, so make sure the token carries <code>ads_read</code> before saving
+                        &mdash; without it every card reports Meta as unreachable and suppresses all cost figures.
+                        Google and Microsoft have no client yet and are ignored while empty; their fields are here
+                        so the tokens can be pasted ahead of the integrations, which matters most for Google,
+                        whose developer token is issued against a manager account and approved by hand.
+                        An environment variable of the same name always wins over anything set here.
+                    </p>
+                    <?php foreach (AdPlatformCredentials::KEYS as $adPlatform => $adKeys) { ?>
+                        <h4 style="margin: 16px 0 4px;"><?php echo esc_html($adPlatformNames[$adPlatform] ?? $adPlatform); ?></h4>
+                        <table class="form-table" role="presentation">
+                            <?php foreach ($adKeys as $adKey) {
+                                $adField = AdPlatformCredentials::settingKey($adPlatform, $adKey); ?>
+                                <tr>
+                                    <th scope="row"><label for="<?php echo esc_attr($adField); ?>"><?php echo esc_html($adLabels[$adKey] ?? $adKey); ?></label></th>
+                                    <td>
+                                        <input type="<?php echo in_array($adKey, $adSecretKeys, true) ? 'password' : 'text'; ?>"
+                                               id="<?php echo esc_attr($adField); ?>"
+                                               name="<?php echo esc_attr($adField); ?>"
+                                               class="regular-text"
+                                               autocomplete="off"
+                                               value="<?php echo esc_attr((string) ($settings[$adField] ?? '')); ?>" />
+                                        <?php if ($adPlatform === 'meta' && $adKey === 'access_token' && AdPlatformCredentials::metaTokenIsShared()) { ?>
+                                            <p class="description">
+                                                Currently the same token as the Conversions API uses. That is usually fine &mdash;
+                                                one Business Manager system user can hold both grants &mdash; but they are separate
+                                                permissions, and a Conversions-only token authenticates perfectly and returns no
+                                                insights. If the card reports Meta as unreachable, that is the first thing to check.
+                                            </p>
+                                        <?php } ?>
+                                    </td>
+                                </tr>
+                            <?php } ?>
+                        </table>
+                    <?php } ?>
                 </div>
 
                 <p>

@@ -44,6 +44,7 @@ class DomainServiceProvider extends ServiceProvider
         SyncServiceProvider::class,
         AiServiceProvider::class,
         ObservabilityServiceProvider::class,
+        MarketingServiceProvider::class,
     ];
 
     /**

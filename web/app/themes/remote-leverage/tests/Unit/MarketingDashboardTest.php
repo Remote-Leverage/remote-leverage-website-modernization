@@ -44,12 +44,24 @@ describe('MarketingDashboard Executive Modernization', function () {
         $dashboard->renderKpisWidget();
         $output = ob_get_clean();
 
-        expect($output)->toContain('TOTAL SUBMISSIONS')
+        expect($output)->toContain('SUBMISSIONS')
             ->toContain('QUALIFIED (>= $10K)')
             ->toContain('CONSULTATIONS')
             ->toContain('CALL CONVERSION')
             ->toContain('rl-dash-kpi-grid')
             ->toContain('admin.php?page=rl-leads');
+
+        /*
+         * Every tile has to say what period it covers.
+         *
+         * This card reported lifetime totals directly above its own trailing-7-day chart, with
+         * nothing on either saying so — a conversion rate that had not moved in months sitting
+         * over a chart of last week. The numbers are now scoped to the window; a tile that loses
+         * its period label is how they silently go back to being read as all-time.
+         */
+        expect($output)->toContain('last '.MarketingDashboard::KPI_WINDOW_DAYS.' days')
+            ->toContain('Last '.MarketingDashboard::KPI_WINDOW_DAYS.' days:')
+            ->not->toContain('All captured records');
 
         // Verify strictly zero emojis
         $emojiPattern = '/[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F700}-\x{1F77F}\x{1F780}-\x{1F7FF}\x{1F800}-\x{1F8FF}\x{1F900}-\x{1F9FF}\x{1FA00}-\x{1FA6F}\x{1FA70}-\x{1FAFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u';

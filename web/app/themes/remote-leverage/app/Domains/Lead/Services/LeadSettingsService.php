@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Lead\Services;
 
+use App\Domains\Marketing\Support\AdPlatformCredentials;
+
 class LeadSettingsService
 {
     public const OPTION_KEY = 'rl_lead_settings';
@@ -61,6 +63,17 @@ class LeadSettingsService
             'lead_webhook_url' => '',
 
             /*
+             * Ad platform read credentials, for the marketing cost alert.
+             *
+             * Meta's pair is live — set both and the cost alert reports Meta spend. Google and
+             * Microsoft have no client yet and are skipped while unset; their keys are here so
+             * the tokens can be pasted early, because Google issues its developer token through
+             * an MCC and approves it by hand and the wait is days. Merged in from
+             * AdPlatformCredentials so a credential added there does not need a second edit here.
+             */
+            ...self::adCredentialDefaults(),
+
+            /*
              * Email gatekeeping, ported from three Gravity Forms plugins over one field.
              * See EmailValidationService for why the order and the fail-open behaviour matter.
              */
@@ -76,6 +89,24 @@ class LeadSettingsService
             'blacklisted_emails' => '',          // comma separated
             'email_validation_message' => '',
         ];
+    }
+
+    /**
+     * Every ad platform credential key, defaulting to empty.
+     *
+     * @return array<string, string>
+     */
+    private static function adCredentialDefaults(): array
+    {
+        $defaults = [];
+
+        foreach (AdPlatformCredentials::settingKeys() as $keys) {
+            foreach ($keys as $key) {
+                $defaults[$key] = '';
+            }
+        }
+
+        return $defaults;
     }
 
     /**
@@ -182,6 +213,18 @@ class LeadSettingsService
             'slack_webhook_url' => $this->sanitizeUrl($keep('slack_webhook_url')),
             'lead_webhook_url' => $this->sanitizeUrl($keep('lead_webhook_url')),
         ];
+
+        /*
+         * Ad credentials go through the same `$keep` rule as every other secret here: submitted
+         * empty clears it, absent leaves it alone. That distinction is why the Slack bot token
+         * survived a settings save it was never on the form for, and these will not be on every
+         * form either.
+         */
+        foreach (AdPlatformCredentials::settingKeys() as $keys) {
+            foreach ($keys as $key) {
+                $settings[$key] = $keep($key);
+            }
+        }
 
         if (function_exists('update_option')) {
             update_option(self::OPTION_KEY, $settings);

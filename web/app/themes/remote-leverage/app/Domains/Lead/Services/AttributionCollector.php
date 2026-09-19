@@ -44,6 +44,16 @@ class AttributionCollector
         'utm_id' => ['utm_id'],
         'gclid' => ['gclid'],
         'fbclid' => ['fbclid'],
+
+        /*
+         * Promoted out of EXTRA on 2026-09-19. It is now a selection criterion rather than
+         * audit trail: LeadPlatform falls back to click IDs when `utm_source` is missing, and
+         * a value living in the JSON blob cannot be queried the same way on MySQL and on the
+         * SQLite the tests run. `wbraid` and `gbraid` stay in EXTRA below — they are Google
+         * click IDs too, but iOS-only and rare enough that `gclid` already covers the paid
+         * Google traffic that matters to the cost alert.
+         */
+        'msclkid' => ['msclkid'],
         'li_fat_id' => ['li_fat_id'],
         'fbc' => ['_fbc', 'fbc'],
         'oppref' => ['oppref'],
@@ -70,7 +80,7 @@ class AttributionCollector
     public const EXTRA = [
         'first_utm_source', 'first_utm_medium', 'first_utm_campaign',
         'first_utm_term', 'first_utm_content',
-        'msclkid', 'wbraid', 'gbraid', '_fbp', 'gaclientid',
+        'wbraid', 'gbraid', '_fbp', 'gaclientid',
         'traffic_source', 'first_traffic_source',
         'organic_source', 'organic_source_str',
         'handl_original_ref', 'handl_landing_page', 'handl_ip',

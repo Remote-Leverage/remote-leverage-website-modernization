@@ -82,8 +82,9 @@ return [
          * The Lead settings blob (LeadSettingsService::OPTION_KEY).
          *
          * One row carrying every admin-set integration value: the Slack bot token and channel,
-         * the HubSpot access token and portal id, the ZeroBounce key, and the email
-         * domain/address lists. It is here because those are exactly the "environment-specific
+         * the HubSpot access token and portal id, the ZeroBounce key, the email domain/address
+         * lists, and — since 2026-09-19 — the ad platform read credentials the marketing cost
+         * alert reads. It is here because those are exactly the "environment-specific
          * data that has no other way to reach staging" this whitelist exists for — ECS maps
          * Secrets Manager keys to environment variables one at a time in the task definition,
          * so a newly added credential cannot reach staging any other way today.
