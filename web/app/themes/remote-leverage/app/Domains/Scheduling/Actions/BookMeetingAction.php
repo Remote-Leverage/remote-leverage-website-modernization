@@ -103,7 +103,13 @@ class BookMeetingAction
                     if (stripos($qName, 'phone') !== false || stripos($qName, 'cell') !== false || stripos($qName, 'whatsapp') !== false) {
                         $ans = $data->phone;
                     } elseif (stripos($qName, 'website') !== false || stripos($qName, 'company') !== false) {
-                        $ans = $data->company ?: 'remoteleverage.com';
+                        // No fallback on purpose. This used to answer 'remoteleverage.com' when
+                        // the lead had no company — and the booking wizard never collects one, so
+                        // it fired on essentially every booking. Calendly's HubSpot integration
+                        // writes the answer onto the contact, which is how the CRM filled up with
+                        // our own domain in the Company column. An unanswered question leaves
+                        // whatever HubSpot already holds intact; a wrong answer overwrites it.
+                        $ans = $data->company;
                     } elseif (stripos($qName, 'prepare') !== false || stripos($qName, 'help') !== false) {
                         $ans = $data->notes ?: 'VA Consultation';
                     } elseif (stripos($qName, 'role') !== false || stripos($qName, 'position') !== false) {
