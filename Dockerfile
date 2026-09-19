@@ -108,6 +108,24 @@ RUN chmod +x /usr/local/bin/entrypoint.sh \
 WORKDIR /var/www/html
 COPY --from=build --chown=www-data:www-data /app /var/www/html
 
+# Identifies this image's version — the `v-YYYYMMDD-vN` tag that triggered deploy-production.yml,
+# or the commit SHA for deploy-staging.yml, which isn't tag-triggered. config/sentry.php reads
+# APP_VERSION as the Sentry release; not a SENTRY_*-prefixed name because the same value also
+# feeds window.APP_VERSION for the browser SDK (see app.blade.php).
+#
+# Baked in at build time because CI is the only place that value is known — the task definition
+# is static across deploys, and ECS's `--force-new-deployment` does not carry anything per-build
+# into the environment.
+#
+# Written straight into .env rather than a real environment variable so config/application.php's
+# existing Dotenv loader (see the `file_exists($root_dir.'/.env')` block there) picks it up for
+# free. That loader never overwrites a variable the task definition already set, so this is
+# strictly a fallback — same "existing environment always wins" rule the app already follows
+# elsewhere. .dockerignore excludes .env from the build context, so this RUN is what creates it;
+# nothing here can leak a real secret.
+ARG RELEASE_VERSION=unknown
+RUN printf 'APP_VERSION=%s\n' "$RELEASE_VERSION" > /var/www/html/.env
+
 ENV WP_ENV=staging
 EXPOSE 80
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

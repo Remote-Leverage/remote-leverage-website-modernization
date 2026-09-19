@@ -60,6 +60,7 @@ jobs:
           DOCKER_BUILDKIT=1 docker build \
             --platform linux/amd64 \
             --secret id=composer_auth,src="$RUNNER_TEMP/composer-auth.json" \
+            --build-arg RELEASE_VERSION="${GITHUB_SHA}" \
             --tag "$IMAGE:$IMAGE_TAG" \
             --tag "$IMAGE:${GITHUB_SHA}" \
             .

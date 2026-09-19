@@ -61,6 +61,9 @@
       @if (config('sentry.dsn'))
         window.SENTRY_DSN = '{{ config('sentry.dsn') }}';
       @endif
+      @if (config('sentry.release'))
+        window.APP_VERSION = '{{ config('sentry.release') }}';
+      @endif
     </script>
 
     {{-- Font preload. `font-display: swap` means an un-preloaded face paints a fallback
