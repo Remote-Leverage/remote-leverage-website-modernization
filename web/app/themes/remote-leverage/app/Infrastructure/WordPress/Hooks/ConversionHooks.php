@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\WordPress\Hooks;
 
+use App\Domains\Tracking\Support\GoogleEnhancedConversion;
+
 /**
  * The conversion and event tags that used to live in `GTM-53JDTQCZ`.
  *
@@ -24,8 +26,8 @@ namespace App\Infrastructure\WordPress\Hooks;
  *                      revision of this class listened for a native `submit` instead, which a
  *                      Livewire form never fires, so `generate_lead` and its Ads conversion
  *                      would have reported nothing.
- *   click_text:<s>     a click whose element text contains <s>.
- *   click_class:<s>    a click whose element classes contain <s>.
+ *   click_text:<s>     a click whose element text contains <s>, case-insensitively.
+ *   click_class:<s>    a click whose element classes contain <s>, case-insensitively.
  *
  * A native `<video>` play is turned into a `video_play` dataLayer push by the runtime below, so
  * video events are configured as `dl:video_play` like everything else. The two players that are
@@ -148,7 +150,40 @@ HTML;
             return;
         }
 
+        /*
+         * Enhanced conversions, for the one page that knows which lead it is confirming.
+         *
+         * Only the path-matched calls get this. The wired table fires on clicks and dataLayer
+         * pushes anywhere on the site, where there is no lead and a `transaction_id` from a
+         * previous booking still sitting in the session would be flatly wrong.
+         *
+         * **The gate is what keeps the HTML cache alive.** Reading the session opens one, and an
+         * open session means a `Set-Cookie` on the response — which `docker/nginx.conf` treats,
+         * correctly, as "never cache this". Calling it unconditionally from `wp_footer` would
+         * therefore have turned every page on the site into `private, no-store`. Only a page
+         * that already has a gtag conversion to decorate touches the session, which today is
+         * `/VAThankYou/` alone, and that page is excluded from the cache anyway.
+         */
+        $enhanced = $this->hasGtagConversion($immediate) ? $this->enhancedConversion() : null;
+
+        if ($enhanced !== null) {
+            foreach ($immediate as $i => $call) {
+                if (($call['vendor'] ?? '') === 'gtag' && ($call['name'] ?? '') === 'conversion') {
+                    $immediate[$i]['params']['transaction_id'] = $enhanced['transaction_id'];
+                }
+            }
+        }
+
         $calls = '';
+
+        /*
+         * `set` before `event`: gtag applies user data to conversions sent after it, so emitting
+         * this below the sends would attach it to nothing.
+         */
+        if (($enhanced['user_data'] ?? []) !== []) {
+            $userData = wp_json_encode($enhanced['user_data'], JSON_UNESCAPED_SLASHES);
+            $calls .= '  if (typeof w.gtag === "function") w.gtag("set", "user_data", '.$userData.");\n";
+        }
 
         foreach ($immediate as $call) {
             $calls .= '  '.$this->renderCall($call)."\n";
@@ -226,13 +261,19 @@ HTML;
     // GTM's Click Text is the text of the clicked element; a click usually lands on a child,
     // so the nearest clickable ancestor is what the trigger meant.
     var clickable = el.closest ? (el.closest('a,button,[role="button"]') || el) : el;
-    var text = (clickable.textContent || '').replace(/\s+/g, ' ').trim();
+    // Lower-cased on both sides: the CTA copy is authored as `BOOK A CONSULTATION` in
+    // HomeHeroBlock, AboutHeroBlock, RolePages and several patterns, so a case-sensitive
+    // `indexOf` matched only the title-case half of the buttons and the Ads conversion
+    // `oEXvCN-QnpcbEOWU8r4q` under-reported for every uppercase one. Same reasoning as
+    // `pathMatches()` and `openai.conversions` — no reason to inherit GTM's case-sensitive
+    // `_cn` predicate a third time.
+    var text = (clickable.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
     var classes = String(clickable.className && clickable.className.baseVal !== undefined
       ? clickable.className.baseVal
-      : (clickable.className || ''));
+      : (clickable.className || '')).toLowerCase();
 
-    matching('click_text:', function (needle) { return text.indexOf(needle) !== -1; });
-    matching('click_class:', function (needle) { return classes.indexOf(needle) !== -1; });
+    matching('click_text:', function (needle) { return text.indexOf(needle.toLowerCase()) !== -1; });
+    matching('click_class:', function (needle) { return classes.indexOf(needle.toLowerCase()) !== -1; });
   }, true);
 })(window, document);
 </script>
@@ -302,6 +343,58 @@ HTML;
         }
 
         return $out;
+    }
+
+    /**
+     * Whether any of these calls is a Google Ads conversion, and so has somewhere to put a
+     * `transaction_id`.
+     *
+     * @param  array<int, array<string, mixed>>  $calls
+     */
+    private function hasGtagConversion(array $calls): bool
+    {
+        foreach ($calls as $call) {
+            if (($call['vendor'] ?? '') === 'gtag' && ($call['name'] ?? '') === 'conversion') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The enhanced-conversion payload the booking wizard left in the session, if this request is
+     * the thank-you page load that followed a booking.
+     *
+     * Read rather than pulled, so a reload of `/VAThankYou/` re-sends the same `transaction_id`
+     * and Google collapses the two into one conversion instead of counting both.
+     *
+     * Returns null on every other page, on a direct visit that never booked, and in any context
+     * without a session — which keeps this a no-op for the WIRED table and for tests that do not
+     * boot one.
+     *
+     * @return array{transaction_id: string, user_data: array<string, mixed>}|null
+     */
+    public function enhancedConversion(): ?array
+    {
+        if (! function_exists('session')) {
+            return null;
+        }
+
+        try {
+            $payload = session()->get(GoogleEnhancedConversion::SESSION_KEY);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (! is_array($payload) || ($payload['transaction_id'] ?? '') === '') {
+            return null;
+        }
+
+        return [
+            'transaction_id' => (string) $payload['transaction_id'],
+            'user_data' => (array) ($payload['user_data'] ?? []),
+        ];
     }
 
     /**

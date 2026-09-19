@@ -509,6 +509,16 @@ if (! isset($GLOBALS['_test_session'])) {
     $GLOBALS['_test_session'] = [];
 }
 
+/*
+ * Counts reads, not just values. ConversionHooks must not touch the session on a page with no
+ * conversion to decorate: opening one sets a cookie, and docker/nginx.conf treats a Set-Cookie
+ * as "never cache this", so a stray read from wp_footer would make the whole site uncacheable.
+ * That is invisible in the rendered output, so it needs a counter to be testable at all.
+ */
+if (! isset($GLOBALS['_test_session_reads'])) {
+    $GLOBALS['_test_session_reads'] = 0;
+}
+
 if (! function_exists('session')) {
     function session($key = null, $default = null)
     {
@@ -522,6 +532,8 @@ if (! function_exists('session')) {
 
                 public function get($key, $default = null)
                 {
+                    $GLOBALS['_test_session_reads']++;
+
                     return $GLOBALS['_test_session'][$key] ?? $default;
                 }
 
@@ -539,6 +551,8 @@ if (! function_exists('session')) {
 
             return null;
         }
+
+        $GLOBALS['_test_session_reads']++;
 
         return $GLOBALS['_test_session'][$key] ?? $default;
     }

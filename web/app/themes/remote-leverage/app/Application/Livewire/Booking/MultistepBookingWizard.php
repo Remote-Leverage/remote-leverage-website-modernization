@@ -15,6 +15,7 @@ use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use App\Domains\Scheduling\Services\TierUtilizationProbe;
 use App\Domains\Tracking\Data\AnalyticsEventData;
 use App\Domains\Tracking\Gateways\CustomerIOClient;
+use App\Domains\Tracking\Support\GoogleEnhancedConversion;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
@@ -834,6 +835,23 @@ class MultistepBookingWizard extends Component
                     'booked_slot' => false,
                 ]);
             }
+
+            /*
+             * Hand the thank-you page what it needs for Google Ads enhanced conversions. The
+             * conversion itself is emitted there (see ConversionHooks), and that page has no
+             * other way to know which lead it is confirming — the redirect carries no id, and
+             * putting one in the URL would leak it to every pixel on the page via
+             * `page_location`.
+             *
+             * `/VAThankYou/` is excluded from the HTML cache in docker/nginx.conf for this
+             * reason: it now renders per-lead hashed data, and a shared cache entry would serve
+             * one booker's identifiers — and one booker's transaction_id — to everybody else in
+             * the TTL window.
+             */
+            session()->put(
+                GoogleEnhancedConversion::SESSION_KEY,
+                GoogleEnhancedConversion::payload($lead),
+            );
 
             /*
              * A successful booking now navigates to a dedicated thank-you page (with its own
