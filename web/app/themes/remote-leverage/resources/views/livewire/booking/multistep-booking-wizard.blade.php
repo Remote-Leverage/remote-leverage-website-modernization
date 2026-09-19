@@ -633,7 +633,7 @@
                         <label 
                           class="cursor-pointer inline-flex items-center justify-center px-4 py-2 rounded-full border text-xs sm:text-sm font-medium transition-all duration-150 select-none"
                           :class="$wire.monthlyRevenue === '{{ $val }}' 
-                            ? 'border-2 border-[#F8248A] text-[#F8248A] bg-white ring-1 ring-[#F8248A]/20 font-semibold shadow-xs' 
+                            ? 'border-[#F8248A] text-[#F8248A] bg-white ring-1 ring-[#F8248A]/40 shadow-xs' 
                             : 'border border-slate-200 bg-[#F8F9FA] text-slate-800 hover:border-slate-300 hover:bg-slate-100/80'"
                         >
                           <input 

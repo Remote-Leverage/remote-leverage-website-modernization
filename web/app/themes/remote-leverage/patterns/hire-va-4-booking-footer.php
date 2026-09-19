@@ -69,7 +69,7 @@ $bookingCss = <<<'CSS'
         padding: 30px;
     }
 
-    button.w-full {
+    button.w-full.rounded-full {
         min-height: 50px;
         padding-top: 0;
         padding-bottom: 0;
@@ -77,7 +77,7 @@ $bookingCss = <<<'CSS'
         color: #ffffff;
     }
 
-    button.w-full:hover {
+    button.w-full.rounded-full:hover {
         background-color: #D60057;
         color: #ffffff;
     }

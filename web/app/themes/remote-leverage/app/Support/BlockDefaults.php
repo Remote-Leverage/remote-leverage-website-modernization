@@ -1768,11 +1768,20 @@ class BlockDefaults
             "    .order-1 > .inline-flex { display: none }\n".
             "    .order-3 > .grid { grid-template-columns: repeat(2, 1fr); column-gap: 12px; row-gap: 10px }\n".
             "    & > div:last-child > .grid { margin-top: 0; row-gap: 20px; padding-top: 0; padding-bottom: 0 }\n".
-            "    .bg-white { padding: 20px }\n".
-            "    .bg-white > .mb-6 { margin-bottom: 16px }\n".
+            // `div.` is load-bearing, exactly as `.rounded-full` is on the button rule below.
+            // Production's rule was a bare `.bg-white`, and the revenue pills add `bg-white`
+            // when selected — so selecting one gave that <label> the form card's 20px padding,
+            // growing the pill 8px and jolting the whole row from 34px to 58px. The form card is
+            // the only <div> carrying `bg-white` in this block; the pills are <label>s.
+            "    div.bg-white { padding: 20px }\n".
+            "    div.bg-white > .mb-6 { margin-bottom: 16px }\n".
             "}\n".
-            "button.w-full { background-color: #F90066; opacity: 1 }\n".
-            'button.w-full:hover { background-color: #D60057 }',
+            // `.rounded-full` is load-bearing. Production's rule was a bare `button.w-full`,
+            // and the booking wizard renders every available time slot as a full-width button
+            // too (`rounded-card`), so the bare selector painted the whole slot list magenta and
+            // destroyed the Confirm affordance. Only the submit button is `rounded-full`.
+            "button.w-full.rounded-full { background-color: #F90066; opacity: 1 }\n".
+            'button.w-full.rounded-full:hover { background-color: #D60057 }',
 
         // Roles grid sits directly under the hero, so it opens tighter than the other bands.
         'roles' => "@media (max-width: 639.98px) {\n".
