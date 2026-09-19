@@ -1,0 +1,591 @@
+<!-- ===== Remote Leverage — revenue router → Calendly (v5) ===== -->
+
+<div id="rl-router">
+
+
+
+  <!-- STEP 1: the question -->
+
+  <form id="rl-form" class="rl-card">
+
+    <div class="rl-head">
+
+      <img class="rl-logo"
+
+           src="https://remoteleverage.com/wp-content/uploads/2026/06/rl-26-logo.svg"
+
+           alt="Remote Leverage">
+
+    </div>
+
+
+
+    <div class="rl-form-col">
+
+      <fieldset class="rl-fieldset">
+
+        <legend class="rl-legend">Revenue <span class="rl-req">*</span></legend>
+
+
+
+        <label class="rl-option">
+
+          <input type="radio" name="revenue" value="small" required>
+
+          <span>0 to 5k Per Month</span>
+
+        </label>
+
+
+
+        <label class="rl-option">
+
+          <input type="radio" name="revenue" value="small">
+
+          <span>5k to 10k Per Month</span>
+
+        </label>
+
+
+
+        <label class="rl-option">
+
+          <input type="radio" name="revenue" value="mid">
+
+          <span>10k to 50k Per Month</span>
+
+        </label>
+
+
+
+        <label class="rl-option">
+
+          <input type="radio" name="revenue" value="enterprise">
+
+          <span>50k to 100k Per Month</span>
+
+        </label>
+
+
+
+        <label class="rl-option">
+
+          <input type="radio" name="revenue" value="enterprise">
+
+          <span>100k+ Per Month</span>
+
+        </label>
+
+
+
+        <label class="rl-option">
+
+          <input type="radio" name="revenue" value="small">
+
+          <span>Blank</span>
+
+        </label>
+
+      </fieldset>
+
+
+
+      <p id="rl-error" class="rl-error" hidden>Pick a revenue range to see available times.</p>
+
+
+
+      <button type="submit" class="rl-submit">See available times</button>
+
+    </div>
+
+  </form>
+
+
+
+  <!-- STEP 2: the booking calendar -->
+
+  <div id="rl-booking" class="rl-card" hidden>
+
+    <div class="rl-booking-head">
+
+      <button type="button" id="rl-back" class="rl-back">Change revenue range</button>
+
+      <a id="rl-newtab" class="rl-newtab" href="#" target="_blank" rel="noopener">Open in a new tab</a>
+
+    </div>
+
+    <div id="rl-frame-wrap" class="rl-frame-wrap"></div>
+
+  </div>
+
+
+
+</div>
+
+
+
+<style>
+
+  /* Every selector is prefixed with #rl-router so theme styles can't win */
+
+  #rl-router {
+
+    --rl-purple: #6b21b8;
+
+    --rl-ink: #1c1233;
+
+    --rl-line: #d9d4e4;
+
+    --rl-blue: #2f80ed;
+
+    max-width: 1240px;          /* wide enough for Calendly's 2-column layout */
+
+    margin: 0 auto;
+
+    padding: 24px 16px 48px;
+
+    box-sizing: border-box;
+
+  }
+
+  #rl-router *, #rl-router *::before, #rl-router *::after { box-sizing: border-box; }
+
+
+
+  #rl-router .rl-card {
+
+    background: #fff;
+
+    border-radius: 14px;
+
+    box-shadow: 0 10px 40px rgba(20, 5, 50, .18);
+
+  }
+
+
+
+  #rl-router #rl-form {
+
+    max-width: 1060px;
+
+    margin: 0 auto;
+
+    padding: 40px 32px 48px;
+
+    text-align: center;
+
+  }
+
+
+
+  /* The booking card runs full width with tight padding, so the
+
+     iframe clears Calendly's ~1000px two-column threshold */
+
+  #rl-router #rl-booking {
+
+    padding: 22px 20px 26px;
+
+  }
+
+
+
+  /* Logo sits left; the rule spans the card, so it lives on the wrapper
+
+     rather than on the image, which could only ever be as wide as itself. */
+
+  #rl-router .rl-head {
+
+    padding-bottom: 24px;
+
+    margin-bottom: 32px;
+
+    border-bottom: 1px solid var(--rl-line);
+
+    text-align: center;
+
+  }
+
+  #rl-router .rl-logo {
+
+    display: inline-block;
+
+    width: 200px;
+
+    max-width: 60%;
+
+    height: auto;
+
+  }
+
+
+
+  /* Centred column. Options stay left-aligned inside it — centring a radio
+
+     list breaks the vertical line the eye follows down the labels. */
+
+  #rl-router .rl-form-col {
+
+    max-width: 320px;
+
+    margin: 0 auto;
+
+    text-align: left;
+
+  }
+
+
+
+  #rl-router .rl-fieldset { border: 0; margin: 0; padding: 0; }
+
+
+
+  #rl-router .rl-legend {
+
+    font-weight: 700;
+
+    font-size: 15px;
+
+    color: var(--rl-ink);
+
+    padding: 0;
+
+    margin-bottom: 10px;
+
+  }
+
+  #rl-router .rl-req { color: #c0392b; }
+
+
+
+  #rl-router .rl-option {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    padding: 5px 0;
+
+    margin: 0;
+
+    font-size: 15px;
+
+    color: var(--rl-ink);
+
+    line-height: 1.35;
+
+    cursor: pointer;
+
+  }
+
+  #rl-router .rl-option input {
+
+    width: 16px;
+
+    height: 16px;
+
+    accent-color: var(--rl-purple);
+
+    margin: 0;
+
+    flex: none;
+
+    cursor: pointer;
+
+  }
+
+  #rl-router .rl-option:hover span { color: var(--rl-purple); }
+
+
+
+  #rl-router .rl-error {
+
+    margin: 14px 0 0;
+
+    font-size: 14px;
+
+    color: #c0392b;
+
+  }
+
+
+
+  #rl-router .rl-submit {
+
+    display: block;
+
+    width: auto;
+
+    margin: 28px auto 0;
+
+    background: var(--rl-blue);
+
+    color: #fff;
+
+    border: 0;
+
+    border-radius: 999px;
+
+    padding: 13px 34px;
+
+    font-family: inherit;
+
+    font-size: 15px;
+
+    font-weight: 700;
+
+    line-height: 1.2;
+
+    text-transform: none;
+
+    letter-spacing: normal;
+
+    box-shadow: none;
+
+    cursor: pointer;
+
+  }
+
+  #rl-router .rl-submit:hover { background: #1f6fdc; color: #fff; }
+
+
+
+  #rl-router .rl-booking-head {
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 8px 20px;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    margin-bottom: 14px;
+
+  }
+
+
+
+  #rl-router .rl-back,
+
+  #rl-router .rl-newtab {
+
+    display: inline-block;
+
+    width: auto;
+
+    background: none;
+
+    border: 0;
+
+    border-radius: 0;
+
+    margin: 0;
+
+    padding: 0;
+
+    font-family: inherit;
+
+    font-size: 14px;
+
+    font-weight: 600;
+
+    line-height: 1.2;
+
+    text-transform: none;
+
+    letter-spacing: normal;
+
+    text-decoration: underline;
+
+    color: var(--rl-purple);
+
+    box-shadow: none;
+
+    cursor: pointer;
+
+  }
+
+  #rl-router .rl-back:hover,
+
+  #rl-router .rl-newtab:hover { background: none; color: #4c1585; }
+
+
+
+  /* --- iframe sizing -----------------------------------------
+
+     Two-column layout above ~1000px is short and wide.
+
+     Below that Calendly stacks, so the frame needs to be taller. */
+
+  #rl-router .rl-frame-wrap { width: 100%; }
+
+  #rl-router .rl-frame-wrap iframe {
+
+    display: block;
+
+    width: 100%;
+
+    height: 700px;
+
+    border: 0;
+
+  }
+
+
+
+  @media (max-width: 1100px) {
+
+    #rl-router .rl-frame-wrap iframe { height: 1200px; }
+
+  }
+
+
+
+  @media (max-width: 700px) {
+
+    #rl-router #rl-form { padding: 28px 20px 34px; }
+
+    #rl-router #rl-booking { padding: 18px 12px 20px; }
+
+    #rl-router .rl-logo { width: 160px; }
+
+    #rl-router .rl-frame-wrap iframe { height: 1450px; }
+
+  }
+
+
+
+  #rl-router .rl-submit:focus-visible,
+
+  #rl-router .rl-back:focus-visible,
+
+  #rl-router .rl-newtab:focus-visible,
+
+  #rl-router .rl-option input:focus-visible {
+
+    outline: 3px solid var(--rl-purple);
+
+    outline-offset: 2px;
+
+  }
+
+</style>
+
+
+
+<script>
+
+(function () {
+
+  // Revenue tier -> Calendly event link
+
+  var LINKS = {
+
+    small:      'https://calendly.com/d/d2jq-z6m-5yt/kickoff-workforce-planning-meeting-t0',
+
+    mid:        'https://calendly.com/d/dvxh-c8m-p4k/kickoff-workforce-planning-meeting-t10',
+
+    enterprise: 'https://calendly.com/d/d2jp-krr-bng/kickoff-workforce-planning-meeting-t50'
+
+  };
+
+
+
+  var form    = document.getElementById('rl-form');
+
+  var booking = document.getElementById('rl-booking');
+
+  var wrap    = document.getElementById('rl-frame-wrap');
+
+  var errorEl = document.getElementById('rl-error');
+
+  var backBtn = document.getElementById('rl-back');
+
+  var newTab  = document.getElementById('rl-newtab');
+
+
+
+  function embedUrl(base) {
+
+    return base
+
+      + '?embed_domain=' + encodeURIComponent(window.location.hostname)
+
+      + '&embed_type=Inline'
+
+      + '&hide_gdpr_banner=1';
+
+  }
+
+
+
+  form.addEventListener('submit', function (e) {
+
+    e.preventDefault();
+
+
+
+    var picked = form.querySelector('input[name="revenue"]:checked');
+
+    if (!picked) { errorEl.hidden = false; return; }
+
+    errorEl.hidden = true;
+
+
+
+    var base = LINKS[picked.value];
+
+
+
+    var frame = document.createElement('iframe');
+
+    frame.src = embedUrl(base);
+
+    frame.title = 'Book a workforce planning call';
+
+    frame.setAttribute('frameborder', '0');
+
+    frame.allow = 'camera; microphone; fullscreen; payment';
+
+
+
+    wrap.innerHTML = '';
+
+    wrap.appendChild(frame);
+
+
+
+    newTab.href = base;
+
+
+
+    form.hidden = true;
+
+    booking.hidden = false;
+
+    booking.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  });
+
+
+
+  backBtn.addEventListener('click', function () {
+
+    wrap.innerHTML = '';
+
+    booking.hidden = true;
+
+    form.hidden = false;
+
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  });
+
+})();
+
+</script>

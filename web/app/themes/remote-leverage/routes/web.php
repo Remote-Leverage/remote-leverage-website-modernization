@@ -52,6 +52,24 @@ Route::get('live-transfer-contact-creation', function () {
     ]);
 })->name('tools.live-transfer');
 
+/*
+ * Kickoff & Workforce Planning Meeting — the post-sale booking page.
+ *
+ * A revenue router: the visitor picks a monthly-revenue band and the matching Calendly event
+ * embeds inline (T0 / T10 / T50). Recovered from production page 51128, which was created on
+ * 2026-09-15 — after the migration audit froze its scope off `page-sitemap.xml`, which is why
+ * it reached cutover with neither a v2 page nor a 301 and served a hard 404.
+ *
+ * A route rather than a WordPress page because the whole thing is one self-contained markup
+ * and script block with no editable content, exactly like `tools.live-transfer` next to it.
+ *
+ * No forceNoindex() here, unlike that route: production does not noindex this page, and the
+ * point of this port is to match it.
+ */
+Route::get('kickoff-workforce-planning-meeting', function () {
+    return view('pages.kickoff-workforce-planning-meeting');
+})->name('funnel.kickoff-workforce-planning');
+
 // Instant Live Call Router (replaces rl-join-live-call plugin)
 Route::get('live-call/connect', function (Request $request, RouteInstantCallAction $action) {
     $result = $action->execute([
