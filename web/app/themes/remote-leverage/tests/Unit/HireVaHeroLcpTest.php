@@ -43,7 +43,18 @@ describe('the hire-va hero is discoverable as LCP', function () {
     });
 
     test('the hire-va-4 hero pattern is what PageChrome looks for', function () {
-        $pattern = (string) file_get_contents(dirname(__DIR__, 2).'/patterns/hire-va-4-hero.php');
+        // Evaluate the pattern rather than reading it, because that is what WordPress
+        // registers: `WP_Block_Patterns_Registry` stores the file's *output*, and
+        // `PageChrome::patternContent()` reads it back from there. The pattern builds its
+        // block comment through `BlockDefaults::patternBlock()` so it can carry the
+        // /hire-va-4/ mobile design overrides, so the block name is no longer literal text
+        // in the file — asserting on the source would test the authoring style instead of
+        // the contract, and would fail on a pattern that works perfectly at runtime.
+        ob_start();
+        require dirname(__DIR__, 2).'/patterns/hire-va-4-hero.php';
+        $pattern = (string) ob_get_clean();
+
+        expect($pattern)->toContain('<!-- wp:acf/hire-va-hero ');
 
         expect(PageChrome::contentHasBlock($pattern, 'acf/hire-va-hero'))->toBeTrue()
             ->and(PageChrome::contentHasBlock($pattern, 'acf/consult-landing-hero'))->toBeFalse()

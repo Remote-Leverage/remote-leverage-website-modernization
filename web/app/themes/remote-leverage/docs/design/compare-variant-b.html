@@ -1,0 +1,77 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>variant-b — production vs local</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#15131c; color:#e8e6ef;
+         font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:#1d1a27; border-bottom:1px solid #2e2a3d;
+           padding:10px 16px; display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+  h1 { font-size:14px; margin:0; font-weight:600; }
+  label, .tag { color:#b6b2c6; display:flex; gap:6px; align-items:center; }
+  .tag { color:#7d788f; }
+  button { background:#2e2a3d; color:#e8e6ef; border:1px solid #3d3852; border-radius:5px;
+           padding:4px 12px; cursor:pointer; font:inherit; }
+  button[aria-pressed="true"] { background:#5b3fd6; border-color:#6f55e0; }
+  .wrap { display:flex; gap:24px; padding:16px; align-items:flex-start; }
+  .pane h2 { font-size:12px; margin:0 0 8px; color:#b6b2c6; font-weight:600;
+             text-transform:uppercase; letter-spacing:.08em; }
+  .view { overflow:auto; border:1px solid #2e2a3d; border-radius:6px; background:#000;
+          height:calc(100vh - 130px); }
+  .view img { display:block; }
+</style>
+<header>
+  <h1>/hire-virtual-assistants-from-latam-&hellip;-variant-b/</h1>
+  <span>
+    <button id="m" aria-pressed="true">mobile 375</button>
+    <button id="d" aria-pressed="false">desktop 1440</button>
+  </span>
+  <label><input type="checkbox" id="sync" checked> sync scroll</label>
+  <label><input type="checkbox" id="diff"> overlay difference</label>
+  <span class="tag" id="meta"></span>
+</header>
+<div class="wrap">
+  <div class="pane">
+    <h2>Production <span class="tag">remoteleverage.com</span></h2>
+    <div class="view" id="a"><img id="aimg"></div>
+  </div>
+  <div class="pane">
+    <h2>Local <span class="tag">remoteleverage-v2.test</span></h2>
+    <div class="view" id="b"><img id="bimg"></div>
+  </div>
+</div>
+<script>
+  const H = { mobile:{production:18041, local:19345, w:375}, desktop:{production:10778, local:10754, w:1440} };
+  const a=document.getElementById('a'), b=document.getElementById('b');
+  const aimg=document.getElementById('aimg'), bimg=document.getElementById('bimg');
+  const sync=document.getElementById('sync'), diff=document.getElementById('diff');
+  const meta=document.getElementById('meta');
+  let vp='mobile';
+  function render(){
+    aimg.src=`shots/variant-b.${vp}.production.png`;
+    bimg.src=`shots/variant-b.${vp}.local.png`;
+    const w=H[vp].w;
+    for (const el of [aimg,bimg]) el.style.width=w+'px';
+    for (const el of [a,b]) el.style.width=Math.min(w, Math.floor((window.innerWidth-80)/2))+'px';
+    const d=H[vp].local-H[vp].production;
+    meta.textContent=`production ${H[vp].production}px · local ${H[vp].local}px · delta ${d>0?'+':''}${d}px`;
+    document.getElementById('m').setAttribute('aria-pressed', vp==='mobile');
+    document.getElementById('d').setAttribute('aria-pressed', vp==='desktop');
+  }
+  document.getElementById('m').onclick=()=>{vp='mobile';render();};
+  document.getElementById('d').onclick=()=>{vp='desktop';render();};
+  let lock=false;
+  // Proportional, because the two sides are different total heights on mobile.
+  const link=(from,to)=>from.addEventListener('scroll',()=>{
+    if(!sync.checked||lock) return; lock=true;
+    const max=from.scrollHeight-from.clientHeight;
+    to.scrollTop = max>0 ? (from.scrollTop/max)*(to.scrollHeight-to.clientHeight) : 0;
+    to.scrollLeft = from.scrollLeft;
+    requestAnimationFrame(()=>{lock=false;});
+  });
+  link(a,b); link(b,a);
+  diff.onchange=()=>{ bimg.style.mixBlendMode=diff.checked?'difference':'normal';
+                      b.style.background=diff.checked?'#fff':'#000'; };
+  window.addEventListener('resize', render);
+  render();
+</script>

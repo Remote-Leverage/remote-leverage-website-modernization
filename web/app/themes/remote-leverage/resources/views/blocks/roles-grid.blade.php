@@ -21,6 +21,16 @@
 
   $eyebrowImg = BlockDefaults::hireVaImg('Group-207.png');
 
+  // The eyebrow ships as one string in one field, but /hire-va-4/'s mobile comp stacks the
+  // count above the label beside a verified badge. Both the badge and a pre-split copy of the
+  // text are emitted `hidden`, so every page's rendered box is byte-identical to before and
+  // the stacked treatment is opt-in from a block instance's own `rl_design_css` (see
+  // patterns/hire-va-4-roles.php) rather than a second field every page would have to know
+  // about. Splitting the live text node in place is not equivalent: it re-shapes the run and
+  // moved glyphs by a sub-pixel on desktop.
+  $eyebrowText = $eyebrow ?? '2.5K+ pre-vetted candidates';
+  [$eyebrowCount, $eyebrowLabel] = array_pad(explode(' ', $eyebrowText, 2), 2, '');
+
   // Administrative card tint. 'dark' is production's treatment on every page that ships this
   // block today (/hire-va-4/, /hire-va-6/, /hire-va-1st-month-free/ all compute
   // rgb(99,65,162) = #6341A2 with white text, measured 2026-09-15), so it stays the default.
@@ -48,7 +58,17 @@
 
       <div class="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-white border border-black/5 shadow-xs mt-8">
         <img {!! \App\Support\BlockDefaults::imageSizeAttrs($eyebrowImg) !!} src="{{ $eyebrowImg }}" alt="Candidate Avatars" class="h-6 w-auto" loading="lazy" decoding="async">
-        <span class="text-xs sm:text-sm font-bold text-brand-hero tracking-wide">{{ $eyebrow ?? '2.5K+ pre-vetted candidates' }}</span>
+        {{-- Verified badge. `hidden` everywhere by default so no page's render moves; an
+             instance that wants the comp's avatar cluster switches it on in `rl_design_css`. --}}
+        <svg class="hidden shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+          <path fill="#0067FF" d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81C14.67 2.63 13.43 1.75 12 1.75s-2.67.88-3.34 2.19c-1.39-.46-2.9-.2-3.91.81s-1.27 2.52-.81 3.91C2.63 9.33 1.75 10.57 1.75 12s.88 2.67 2.19 3.34c-.46 1.39-.2 2.9.81 3.91s2.52 1.27 3.91.81c.67 1.31 1.91 2.19 3.34 2.19s2.67-.88 3.34-2.19c1.39.46 2.9.2 3.91-.81s1.27-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34Z"/>
+          <path fill="#fff" d="m10.75 16.6-3.6-3.6 1.45-1.45 2.15 2.15 4.65-4.65 1.45 1.45-6.1 6.1Z"/>
+        </svg>
+        <span class="text-xs sm:text-sm font-bold text-brand-hero tracking-wide">{{ $eyebrowText }}</span>
+        {{-- Stacked alternative, `hidden` by default so the span above stays the one text node
+             every page has always rendered — splitting that node in place moved sub-pixel glyph
+             positions on desktop. An instance swaps the two over in `rl_design_css`. --}}
+        <span class="hidden text-xs sm:text-sm font-bold text-brand-hero tracking-wide"><span>{{ $eyebrowCount }}</span><span>{{ $eyebrowLabel }}</span></span>
       </div>
     </div>
 
@@ -56,10 +76,10 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
       
       {{-- COLUMN 1: Tall Admin Card Top + 2 Medium Cards Below --}}
-      <div class="flex flex-col gap-6">
+      <div class="contents lg:flex lg:flex-col lg:gap-6">
         {{-- Card 1: Administrative (tall, woman cutout). Dark by default — that is what every
              production page shipping this block renders; `admin_tint` can flip it to lavender. --}}
-        <div class="relative overflow-hidden {{ $adminSurface }} rounded-card p-6 sm:p-8 border flex flex-col justify-between min-h-[440px] group">
+        <div class="order-1 lg:order-none relative overflow-hidden {{ $adminSurface }} rounded-card p-6 sm:p-8 border flex flex-col justify-between min-h-[440px] group">
           <div>
             <h3 class="text-2xl sm:text-3xl font-bold font-display {{ $adminTitle }} tracking-tight">{{ $slot(0, 'title') }}</h3>
             <p class="text-sm sm:text-base {{ $adminBody }} mt-2 max-w-[280px] leading-relaxed">
@@ -72,7 +92,7 @@
         </div>
 
         {{-- Card 2: Marketing (Lavender, Horizontal Layout) --}}
-        <div class="bg-roles-violet rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
+        <div class="order-5 lg:order-none bg-roles-violet rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
           <div class="flex-1">
             <h3 class="text-xl font-bold font-display text-brand-hero">{{ $slot(4, 'title') }}</h3>
             <p class="text-xs sm:text-sm text-text-muted mt-1.5 leading-relaxed max-w-[220px]">
@@ -85,7 +105,7 @@
         </div>
 
         {{-- Card 3: Graphic Design (Soft Blue, Horizontal Layout) --}}
-        <div class="bg-roles-blue rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
+        <div class="order-6 lg:order-none bg-roles-blue rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
           <div class="flex-1">
             <h3 class="text-xl font-bold font-display text-brand-hero">{{ $slot(5, 'title') }}</h3>
             <p class="text-xs sm:text-sm text-text-muted mt-1.5 leading-relaxed max-w-[220px]">
@@ -99,9 +119,9 @@
       </div>
 
       {{-- COLUMN 2: 2 Medium Cards Top + Tall Support Card Bottom --}}
-      <div class="flex flex-col gap-6">
+      <div class="contents lg:flex lg:flex-col lg:gap-6">
         {{-- Card 4: Lead Generation (Lavender, Horizontal Layout) --}}
-        <div class="bg-roles-lavender rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
+        <div class="order-2 lg:order-none bg-roles-lavender rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
           <div class="flex-1">
             <h3 class="text-xl font-bold font-display text-brand-hero">{{ $slot(1, 'title') }}</h3>
             <p class="text-xs sm:text-sm text-text-muted mt-1.5 leading-relaxed max-w-[220px]">
@@ -114,7 +134,7 @@
         </div>
 
         {{-- Card 5: Sales (SDR) (Soft Blue, Horizontal Layout) --}}
-        <div class="bg-roles-blue rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
+        <div class="order-3 lg:order-none bg-roles-blue rounded-card p-6 sm:p-7 border border-black/5 shadow-xs flex items-center justify-between gap-4 min-h-[165px] hover:shadow-sm transition-all duration-200">
           <div class="flex-1">
             <h3 class="text-xl font-bold font-display text-brand-hero">{{ $slot(2, 'title') }}</h3>
             <p class="text-xs sm:text-sm text-text-muted mt-1.5 leading-relaxed max-w-[220px]">
@@ -127,7 +147,7 @@
         </div>
 
         {{-- Card 6: Customer Support (Tall, light lavender, man cutout) — light on production --}}
-        <div class="relative overflow-hidden bg-roles-lavender rounded-card p-6 sm:p-8 border border-black/5 shadow-xs flex flex-col justify-between min-h-[440px] flex-1 group">
+        <div class="order-7 lg:order-none relative overflow-hidden bg-roles-lavender rounded-card p-6 sm:p-8 border border-black/5 shadow-xs flex flex-col justify-between min-h-[440px] flex-1 group">
           <div>
             <h3 class="text-2xl sm:text-3xl font-bold font-display text-brand-hero tracking-tight">{{ $slot(6, 'title') }}</h3>
             <p class="text-sm sm:text-base text-text-muted mt-2 max-w-[280px] leading-relaxed">
@@ -141,9 +161,9 @@
       </div>
 
       {{-- COLUMN 3: Social Media Top + Custom Role Bottom --}}
-      <div class="flex flex-col gap-6">
+      <div class="contents lg:flex lg:flex-col lg:gap-6">
         {{-- Card 7: Social Media (Soft Grey/Blue Surface, Post Mockup) --}}
-        <div class="bg-roles-sky rounded-card p-6 sm:p-8 border border-black/5 shadow-xs flex flex-col justify-between min-h-[360px]">
+        <div class="order-4 lg:order-none bg-roles-sky rounded-card p-6 sm:p-8 border border-black/5 shadow-xs flex flex-col justify-between min-h-[360px]">
           <div>
             <h3 class="text-2xl font-bold font-display text-brand-hero tracking-tight">{{ $slot(3, 'title') }}</h3>
             <p class="text-sm text-text-muted mt-2 leading-relaxed max-w-[300px]">
@@ -156,7 +176,7 @@
         </div>
 
         {{-- Card 8: Custom Role (Clean White Card, Orbital Graphic) --}}
-        <div class="bg-white rounded-card p-6 sm:p-8 border border-black/5 shadow-xs flex flex-col justify-between min-h-[400px] flex-1">
+        <div class="order-8 lg:order-none bg-white rounded-card p-6 sm:p-8 border border-black/5 shadow-xs flex flex-col justify-between min-h-[400px] flex-1">
           <div>
             <h3 class="text-2xl font-bold font-display text-brand-hero tracking-tight">{{ $slot(7, 'title') }}</h3>
             <p class="text-sm text-text-muted mt-2 leading-relaxed max-w-[300px]">

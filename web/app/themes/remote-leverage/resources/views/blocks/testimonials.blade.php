@@ -15,7 +15,7 @@
         this.activeVideo = null;
         document.body.style.overflow = '';
     }
-}" class="w-full">
+}" class="rl-wall w-full" :class="{ 'is-wall-expanded': expanded }">
     @php
         // Kept as whole class strings so Tailwind's scanner sees them literally.
         $isPlain = ($layout ?? 'cards') === 'plain';
@@ -24,7 +24,12 @@
         // paginates and never disappears. Only worth rendering when it actually reveals
         // something, so a wall no longer than $visible renders exactly as it did before.
         $visible = max(1, (int) ($visible_count ?? 6));
-        $collapsible = ! empty($show_more) && count($testimonials) > $visible;
+        // A phone shows one card per row, so the row count that reads as "a glance" on a
+        // 3-across desktop grid becomes a very long scroll. `mobile_visible_count` collapses
+        // the wall earlier below 640px only; left unset it equals $visible and nothing moves.
+        // Capped at $visible because revealing *more* on the smaller screen is never intended.
+        $mobileVisible = min($visible, max(1, (int) ($mobile_visible_count ?? $visible)));
+        $collapsible = ! empty($show_more) && count($testimonials) > $mobileVisible;
         // The grid's 80px tail is dropped when the control renders: production puts the pill
         // 60px under the wall and lets the section's own padding close the band, so a tail
         // as well would double the space below it.
@@ -68,10 +73,12 @@
                 // whole wall expanded until hydration, which is what a screenshot catches.
                 // x-show removes the inline display on expand, restoring the class display.
                 $hidden = $collapsible && $loop->index >= $visible;
+                // Visible on desktop, collapsed on mobile: index sits between the two counts.
+                $mobileOnlyHidden = $collapsible && ! $hidden && $loop->index >= $mobileVisible;
             @endphp
             @if ($isPlain)
                 <button type="button" @if ($hidden) x-show="expanded" style="display:none" @endif
-                    class="group relative block w-full {{ $plainAspect }} rounded-xl overflow-hidden bg-slate-900 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple"
+                    class="@if ($mobileOnlyHidden) rl-wall-extra @endif group relative block w-full {{ $plainAspect }} rounded-xl overflow-hidden bg-slate-900 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple"
                     @click="openModal('{{ $t['video_url'] }}')"
                     aria-label="Play video testimonial{{ ! empty($t['company']) ? ': '.$t['company'] : '' }}">
                     <img src="{{ $t['image'] }}" alt="{{ $t['company'] ?? '' }}" width="630" height="354"
@@ -108,7 +115,7 @@
                 </button>
             @else
                 <div @if ($hidden) x-show="expanded" style="display:none" @endif
-                    class="bg-transparent hover:bg-white rounded-card p-card flex flex-col justify-between border border-transparent hover:border-black/4 hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
+                    class="@if ($mobileOnlyHidden) rl-wall-extra @endif bg-transparent hover:bg-white rounded-card p-card flex flex-col justify-between border border-transparent hover:border-black/4 hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
                     @click="openModal('{{ $t['video_url'] }}')">
                     <div>
                         <div class="relative w-full aspect-4/3 rounded-xl overflow-hidden mb-4 bg-slate-900">

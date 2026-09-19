@@ -9,8 +9,8 @@ use App\Support\BlockDefaults;
  * Description: Video testimonial cards with client quotes, company branding, and self-contained Vimeo video modals.
  */
 ?>
-<!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"5rem","bottom":"6rem"}}},"backgroundColor":"bg-light","layout":{"type":"constrained","contentSize":"1380px"}} -->
-<div class="wp-block-group alignfull has-bg-light-background-color has-background" style="padding-top:5rem;padding-bottom:6rem">
+<!-- wp:group {"align":"full","className":"rl-hv4-reviews","style":{"spacing":{"padding":{"top":"5rem","bottom":"6rem","left":"1.25rem","right":"1.25rem"}}},"backgroundColor":"bg-light","layout":{"type":"constrained","contentSize":"1380px"}} -->
+<div class="wp-block-group alignfull rl-hv4-reviews has-bg-light-background-color has-background" style="padding-top:5rem;padding-right:1.25rem;padding-bottom:6rem;padding-left:1.25rem">
     <!-- wp:heading {"level":2,"style":{"typography":{"lineHeight":"1.08","letterSpacing":"-0.03em"},"spacing":{"margin":{"bottom":"1rem"}}},"fontSize":"huge"} -->
     <h2 class="wp-block-heading has-huge-font-size" style="letter-spacing:-0.03em;line-height:1.08;margin-bottom:1rem">Client Reviews</h2>
     <!-- /wp:heading -->
@@ -24,7 +24,10 @@ use App\Support\BlockDefaults;
              Feeding only the 6 featured rows (as this did until 2026-09-15) left the block with
              nothing to reveal, so it correctly suppressed the control. */ ?>
     <?= BlockDefaults::renderHireVa4Testimonials(
-        BlockDefaults::withFieldKeys('testimonials_block', ['show_more' => 1, 'visible_count' => 6, 'tone' => 'light']),
+        BlockDefaults::hireVa4Mobile(
+            'testimonials',
+            BlockDefaults::withFieldKeys('testimonials_block', ['show_more' => 1, 'visible_count' => 6, 'mobile_visible_count' => 4, 'tone' => 'light']),
+        ),
         BlockDefaults::testimonials(),
     ) ?>
 </div>

@@ -57,6 +57,9 @@ class TestimonialsBlock extends Block
             // (one row) on the steal family — an even split, so the default is the one
             // that is also two full rows at the block's default three columns.
             'visible_count' => max(1, (int) (get_field('visible_count') ?: 6)),
+            // Null, not a default: the view reads "unset" as "same as visible_count",
+            // so every existing page keeps the wall it already ships.
+            'mobile_visible_count' => ($m = (int) get_field('mobile_visible_count')) > 0 ? $m : null,
             // The control is an outline pill that reads black on the light pages and
             // white on the near-black steal pages.
             'tone' => get_field('tone') ?: 'light',
@@ -113,6 +116,14 @@ class TestimonialsBlock extends Block
                 'label' => 'Cards visible before collapse',
                 'instructions' => 'Only used when "show more" is on. Production uses 6 on the hire-va pages and 3 on the steal pages.',
                 'default_value' => 6,
+                'min' => 1,
+                'step' => 1,
+            ])
+            ->addNumber('mobile_visible_count', [
+                'label' => 'Cards visible before collapse (mobile)',
+                'instructions' => 'Below 640px only, where the grid is one card per row and the '.
+                    'desktop count becomes a long scroll. Leave blank to use the same count as '.
+                    'desktop. Cannot exceed it.',
                 'min' => 1,
                 'step' => 1,
             ])

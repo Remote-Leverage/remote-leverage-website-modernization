@@ -258,6 +258,120 @@ body.admin-bar {
   }
 }
 
+/*
+ * Type defaults.
+ *
+ * The design system has always specified negative tracking — every `--text-*` token above
+ * carries it (`--text-lead` 20px/-0.6px, `--text-card` 15px/-0.45px, `--text-display`
+ * 46px/-1.44px, all -0.03em), and the component classes below repeat it by hand
+ * (`.btn-primary` -0.03em on the display face, `.btn-magenta` -0.02em on the sans face).
+ *
+ * What was missing was a default. Tracking only ever applied where someone remembered to
+ * reach for a token, a component class or a `tracking-[…]` utility, so an audit of 1,958
+ * visible text elements across 12 pages at 375px found **68.4% rendering at
+ * `letter-spacing: normal`** — including 65 headings. It is not one page or one component:
+ * the per-page rate runs from 36% to 99%. Production shows the same thing, because the rule
+ * was never written rather than lost.
+ *
+ * So the pattern is declared once, here, and inherited:
+ *
+ *   sans face     -0.02em   body copy, labels, UI text
+ *   display face  -0.03em   headings and anything on --font-display
+ *
+ * `@layer base` is load-bearing. Base sits below `components` and `utilities` in the cascade,
+ * so every value that is already explicit keeps winning: the 619 elements that set their own
+ * tracking are untouched, including the deliberately *positive* ones (uppercase eyebrows at
+ * 0.06em, pill labels at 0.0455em). This fills the gap; it does not overwrite intent.
+ *
+ * Form controls need naming because the UA stylesheet gives them their own font shorthand and
+ * they do not inherit tracking from `body` on their own.
+ */
+@layer base {
+  body {
+    letter-spacing: -0.02em;
+  }
+
+  button,
+  input,
+  optgroup,
+  select,
+  textarea {
+    letter-spacing: inherit;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-display {
+    letter-spacing: -0.03em;
+  }
+
+  /* WordPress chrome is not ours to restyle — it ships at the browser default. */
+  #wpadminbar,
+  #wpadminbar * {
+    letter-spacing: normal;
+  }
+}
+
+/*
+ * Testimonial wall: cards that collapse on mobile only.
+ *
+ * `mobile_visible_count` shows fewer cards below 640px than the desktop grid does. The state
+ * has to be expressed in CSS rather than through Alpine's `x-show`, because `x-show` writes an
+ * inline `display` and the server cannot know the viewport: rendering these hidden flashes a
+ * gap on desktop, rendering them visible flashes extra cards on mobile, and a screenshot
+ * catches whichever one it is. A media query has no such pre-hydration state.
+ *
+ * The cards between the two counts therefore carry no `x-show` at all — they are plain, always
+ * visible, and this rule hides them below 640px until Alpine puts `is-wall-expanded` on the
+ * root. Cards past the desktop count keep using `x-show` exactly as before.
+ */
+@media (max-width: 639.98px) {
+  .rl-wall:not(.is-wall-expanded) .rl-wall-extra {
+    display: none;
+  }
+}
+
+/*
+ * /hire-va-4/ review band, mobile only.
+ *
+ * The band's heading and intro come from `wp:heading` / `wp:paragraph` in the pattern, not from
+ * the block, so `BlockDesign`'s per-instance CSS cannot reach them and a media query has to live
+ * here. Sizes are measured off docs/design/hire-va-4.png rather than chosen: the comp's
+ * "Client Reviews" ink box is 21px tall and 173px wide against our 28 x 229 at 36px, which puts
+ * the comp at 27px on the same ink-to-size ratio; its intro sets the same sentence in three
+ * lines where ours takes four.
+ *
+ * `!important` is needed only because `.has-huge-font-size` in this file already uses it.
+ */
+@media (max-width: 639.98px) {
+  /* `h2.wp-block-heading` rather than `.wp-block-heading`: the band-heading rules further down
+     this file are already `!important` at the same specificity, and a later rule wins that tie.
+     The paragraph needs `!important` because the pattern sets font-size inline. */
+  .rl-hv4-reviews h2.wp-block-heading {
+    font-size: 27px !important;
+    line-height: 32px !important;
+  }
+
+  .rl-hv4-reviews > p {
+    font-size: 13.5px !important;
+    line-height: 20px !important;
+  }
+
+  /* The band-heading rules give `.wp-block-heading` its own 16px side padding, which existed
+     because this group shipped with no horizontal padding of its own. It has 20px now — for the
+     review cards, which had no gutter at all and bled off both edges — so that padding would
+     double up and set the copy 16px in from the cards it belongs to. */
+  .rl-hv4-reviews h2.wp-block-heading,
+  .rl-hv4-reviews > p {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
 /* Global Component & Utility Presets */
 @layer components {
   /*

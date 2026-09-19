@@ -1713,6 +1713,139 @@ class BlockDefaults
         return rtrim(content_url('/uploads/home'), '/');
     }
 
+    /**
+     * Production's per-instance mobile overrides for /hire-va-4/.
+     *
+     * ## Why this is CSS and not Tailwind classes on the block views
+     *
+     * Production tightens this page's vertical rhythm below 640px, and does it per block
+     * instance through the Design panel's Custom CSS box (`BlockDesign`). The obvious
+     * alternative — editing the `resources/views/blocks/` views — is wrong here because these
+     * blocks are shared: `acf/booking-footer` renders on 12 patterns and `acf/guarantee-card`
+     * on 7. Retuning their mobile padding to suit this one page would silently reflow every
+     * other page that uses them, which is precisely the design-system fork CLAUDE.md's
+     * "Reuse before you build" section exists to prevent.
+     *
+     * `BlockDesign` scopes each of these to a generated `.rl-d-{hash}` class on that one block
+     * instance, so nothing leaks past the block it is attached to.
+     *
+     * ## Why it lives here rather than in production's database
+     *
+     * It was authored in the editor, so it lived only in production's `post_content`. That put
+     * this page's mobile design outside git and outside the pattern, where a database refresh
+     * drops it — the drift CLAUDE.md's "Page content lives in patterns" section warns about.
+     * Holding the strings here puts them back under version control and keeps the three bands
+     * that share `BAND` on a single rule, because `BlockDesign` hashes the payload and two
+     * instances configured identically collapse to one class.
+     *
+     * The values are transcribed from what production emits, not re-derived: each string
+     * compiles through `BlockDesign::compile()` to the same CSS production serves, byte for
+     * byte. Change one and it stops matching production — re-measure before you do.
+     */
+    public const HIRE_VA_4_MOBILE = [
+        // Hero, per docs/design/hire-va-4.png:
+        //
+        //  - The photo montage stays hidden below 640px (`> div:first-child`), as production
+        //    already had it — behind the headline on a phone it is noise. In its place the comp
+        //    puts a flat diagonal gradient, so one goes on the section itself. The stops are
+        //    fitted from the comp, not eyeballed: sampling its background in the text-free
+        //    gutters gives a field brightest at the bottom-left corner (92,20,146) and darkest
+        //    at the top-right (18,14,30); 235deg is that field's axis, where `to bottom left`
+        //    would be 204deg on this box and visibly wrong. The comp also plateaus once it
+        //    reaches full purple rather than ramping evenly, which is what the 78% stop is for.
+        //    Stops were fitted by rendering candidates and scoring them against the comp's own
+        //    background pixels in the text-free gutters: this one lands at RMS 27.7 (~9 per
+        //    channel), against 31.0 for the even two-stop ramp and 40+ for every radial tried.
+        //  - The headline is left-aligned in the comp. That is the block's own default, so the
+        //    rule is simply absent rather than set — production centred it, and that centring is
+        //    the one thing this page should not inherit from production.
+        //  - The trust badge is omitted entirely in the comp. Hidden rather than unset, because
+        //    `badge_text` also feeds desktop, which keeps it.
+        'hero' => "@media (max-width: 639.98px) {\n".
+            "    & > div:first-child { display: none }\n".
+            "    selector { background-image: linear-gradient(235deg, #120E1E 0%, #3E1270 45%, #5C1492 78%, #5C1492 100%) }\n".
+            "    h1 { margin-bottom: 16px }\n".
+            "    .order-1 > .inline-flex { display: none }\n".
+            "    .order-3 > .grid { grid-template-columns: repeat(2, 1fr); column-gap: 12px; row-gap: 10px }\n".
+            "    & > div:last-child > .grid { margin-top: 0; row-gap: 20px; padding-top: 0; padding-bottom: 0 }\n".
+            "    .bg-white { padding: 20px }\n".
+            "    .bg-white > .mb-6 { margin-bottom: 16px }\n".
+            "}\n".
+            "button.w-full { background-color: #F90066; opacity: 1 }\n".
+            'button.w-full:hover { background-color: #D60057 }',
+
+        // Roles grid sits directly under the hero, so it opens tighter than the other bands.
+        'roles' => "@media (max-width: 639.98px) {\n".
+            "    selector { padding-top: 32px; padding-bottom: 40px }\n".
+            '}',
+
+        // Shared by why-hire, the guarantee card and the comparison matrix. One string on
+        // purpose: identical payloads hash to one `.rl-d-` class and one emitted rule.
+        'band' => "@media (max-width: 639.98px) {\n".
+            "    selector { padding-top: 40px; padding-bottom: 40px }\n".
+            '}',
+
+        // Why-hire keeps the band padding and adds the comp's two mobile-only arrangements.
+        // Both exist in the block already but are tied to `layout: banner`, which would also
+        // reshape the desktop grid — and desktop is not in scope — so they are applied here
+        // rather than by switching the block's arrangement:
+        //
+        //  - Reason cards stack the icon above the copy below 640px. `why-hire-cards.blade.php`
+        //    does exactly this for the banner arrangement ("per the role comps' mobile stack").
+        //  - The globe sits bottom-right and bleeds off the card edge. `margin-left: auto` is
+        //    what moves it: the wrapper is a flex row with `justify-center`, and an auto margin
+        //    beats `justify-content` without having to override the wrapper's own class.
+        'why-hire' => "@media (max-width: 639.98px) {\n".
+            "    selector { padding-top: 40px; padding-bottom: 40px }\n".
+            "    .rounded-card-md { flex-direction: column; gap: 16px }\n".
+            "    img[alt=\"Global Talent Distribution\"] { margin-left: auto; margin-right: -8px }\n".
+            '}',
+
+        // The three blocks below sit inside `wp:group` wrappers whose 5rem/6rem padding is far
+        // too loose on a phone. The group padding is left alone and the block is pulled back
+        // into it, which is how production does it.
+        // The wall's card is `bg-transparent hover:bg-white` — designed to surface on hover,
+        // which a phone has no way to trigger, so on mobile every review reads as bare media on
+        // the grey band. The comp shows a settled white card, so it is made unconditional here,
+        // at the comp's 20px padding rather than the theme's 12px `--padding-card`.
+        'testimonials' => "@media (max-width: 639.98px) {\n".
+            "    selector { margin-bottom: -56px }\n".
+            "    .rounded-card { background-color: #FFFFFF; padding: 20px }\n".
+            // Comp sets the quote at 20px/25px, not the block's 16px: its ink box is 20px tall
+            // over three lines where ours is 16px over two.
+            "    h3 { font-size: 20px; line-height: 25px }\n".
+            '}',
+
+        'process' => "@media (max-width: 639.98px) {\n".
+            "    selector { margin-bottom: -56px }\n".
+            "    .rl-process-container { margin-top: 24px }\n".
+            '}',
+
+        'faq' => "@media (max-width: 639.98px) {\n".
+            "    selector { margin-top: -40px; margin-bottom: -56px }\n".
+            '}',
+
+        // The booking footer's own wrapper carries no padding — its first child does.
+        'booking' => "@media (max-width: 639.98px) {\n".
+            "    & > div:first-child { padding-top: 40px; padding-bottom: 40px }\n".
+            '}',
+    ];
+
+    /**
+     * The `data` fragment that attaches one of the overrides above to a block instance.
+     *
+     * `BlockDesign::render()` reads `attrs.data`, so a pattern supplying this is indistinguishable
+     * from an editor having typed the CSS into the block's Design panel.
+     */
+    public static function hireVa4Mobile(string $section, array $data = []): array
+    {
+        if (! isset(self::HIRE_VA_4_MOBILE[$section])) {
+            throw new \InvalidArgumentException("Unknown /hire-va-4/ mobile override: {$section}");
+        }
+
+        return array_merge($data, ['rl_design_css' => self::HIRE_VA_4_MOBILE[$section]]);
+    }
+
     // --- HIRE-VA-4: ROLES GRID ---
     public static function rolesGridCards(): array
     {

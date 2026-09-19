@@ -1,0 +1,55 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>hire-va-4 — comp vs current</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#15131c; color:#e8e6ef;
+         font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:#1d1a27; border-bottom:1px solid #2e2a3d;
+           padding:10px 16px; display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+  h1 { font-size:14px; margin:0; font-weight:600; }
+  label { display:flex; gap:6px; align-items:center; color:#b6b2c6; }
+  .wrap { display:flex; gap:24px; padding:16px; align-items:flex-start; }
+  .pane { flex:0 0 auto; }
+  .pane h2 { font-size:12px; margin:0 0 8px; color:#b6b2c6; font-weight:600;
+             text-transform:uppercase; letter-spacing:.08em; }
+  .view { width:375px; height:calc(100vh - 130px); overflow:auto; border:1px solid #2e2a3d;
+          border-radius:6px; background:#000; }
+  .view img { display:block; width:375px; }
+  .tag { font-weight:400; text-transform:none; letter-spacing:0; color:#7d788f; }
+</style>
+<header>
+  <h1>/hire-va-4/ &mdash; design comp vs current build, 375px</h1>
+  <label><input type="checkbox" id="sync" checked> sync scroll</label>
+  <label><input type="checkbox" id="diff"> overlay difference</label>
+  <span class="tag">comp 13,204px (no footer) &middot; current 12,765px</span>
+</header>
+<div class="wrap">
+  <div class="pane">
+    <h2>Design comp <span class="tag">docs/design/hire-va-4.png</span></h2>
+    <div class="view" id="a"><img src="hire-va-4.png" alt="design comp"></div>
+  </div>
+  <div class="pane">
+    <h2>Current build <span class="tag">remoteleverage-v2.test</span></h2>
+    <div class="view" id="b"><img id="bimg" src="current-375.png" alt="current build"></div>
+  </div>
+</div>
+<script>
+  const a = document.getElementById('a'), b = document.getElementById('b');
+  const sync = document.getElementById('sync'), diff = document.getElementById('diff');
+  let lock = false;
+  // Proportional sync: the two pages are different total heights, so matching raw pixel
+  // offsets drifts apart. Fraction-of-scroll keeps equivalent sections side by side.
+  const link = (from, to) => from.addEventListener('scroll', () => {
+    if (!sync.checked || lock) return;
+    lock = true;
+    const max = from.scrollHeight - from.clientHeight;
+    to.scrollTop = max > 0 ? (from.scrollTop / max) * (to.scrollHeight - to.clientHeight) : 0;
+    requestAnimationFrame(() => { lock = false; });
+  });
+  link(a, b); link(b, a);
+  diff.addEventListener('change', () => {
+    document.getElementById('bimg').style.mixBlendMode = diff.checked ? 'difference' : 'normal';
+    b.style.background = diff.checked ? '#fff' : '#000';
+  });
+</script>
