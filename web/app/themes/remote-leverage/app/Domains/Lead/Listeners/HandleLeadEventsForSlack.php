@@ -67,6 +67,20 @@ class HandleLeadEventsForSlack
             return;
         }
 
+        /*
+         * A second step-one capture for a lead the channel already knows about.
+         *
+         * This is what the revenue-band warning produces: someone picks "$0 to $5k", reads the
+         * warning, goes back, picks "$5k to $10k" and continues. One person amending an answer
+         * a minute later is not a second lead, and posting a second card makes the channel
+         * carry two contradictory ones — the stale first card being the more prominent.
+         */
+        if (is_array($event->lead->slack_announced) && $event->lead->slack_announced !== []) {
+            $this->dispatchAmendment($event->lead);
+
+            return;
+        }
+
         $this->dispatchSlackNotification($event->lead, 'partial');
     }
 
@@ -127,8 +141,8 @@ class HandleLeadEventsForSlack
 
             $success = $result !== null;
 
-            if (! $isFinal) {
-                $this->rememberThread($lead, $result);
+            if (! $isFinal && $success) {
+                $this->rememberAnnouncement($lead, $result);
             }
 
             $this->activityLogger->logConsumption(
@@ -179,25 +193,183 @@ class HandleLeadEventsForSlack
     }
 
     /**
-     * Store where the alert landed, so the rest of this lead's life can reply to it.
+     * Store where the alert landed and what it said.
+     *
+     * The `ts` is what the rest of this lead's life replies to. The snapshot beside it is what
+     * a second step-one capture is compared against, and it is written even when there is no
+     * `ts` — the incoming webhook cannot thread, but a re-submission that changed nothing
+     * should still be silent there rather than posting the same card twice.
      *
      * `saveQuietly` on purpose: this is bookkeeping about a notification, and letting it emit
      * model events would re-enter the very listeners the notification came from. Skipped for a
      * lead that is not in the database — the value would have nowhere to go, and inserting one
      * to hold it would invent a lead.
      */
-    protected function rememberThread(Lead $lead, ?array $result): void
+    protected function rememberAnnouncement(Lead $lead, ?array $result, ?array $announced = null): void
     {
-        $ts = $result['ts'] ?? null;
-
-        if ($ts === null || $ts === '' || ! $lead->exists) {
+        if (! $lead->exists) {
             return;
         }
 
-        $lead->forceFill([
-            'slack_message_ts' => (string) $ts,
-            'slack_channel_id' => $result['channel'] ?? null,
-        ])->saveQuietly();
+        $attributes = ['slack_announced' => $announced ?? $this->announcedSnapshot($lead)];
+
+        $ts = $result['ts'] ?? null;
+
+        if ($ts !== null && $ts !== '') {
+            $attributes['slack_message_ts'] = (string) $ts;
+            $attributes['slack_channel_id'] = $result['channel'] ?? null;
+        }
+
+        $lead->forceFill($attributes)->saveQuietly();
+    }
+
+    /**
+     * Report a re-submitted step one as an amendment to the card already in the channel.
+     *
+     * Three outcomes, in the order they are decided:
+     *
+     *  - **Nothing changed** — the visitor bounced off the warning and continued with the same
+     *    answers. Silence. A second identical card tells the team nothing they cannot already
+     *    see and costs them the reading of it.
+     *  - **Something changed, and the original card is reachable** — the card is edited to the
+     *    current answers so the channel is not showing a revenue band the visitor has since
+     *    corrected, and a context reply records the change. Slack shows no edit marker on a bot
+     *    message, so the thread is the only place the amendment is visible; that is why both
+     *    halves happen rather than only the edit.
+     *  - **Something changed and there is no reachable card** — the webhook transport, or the
+     *    channel moved since. Post a fresh card, which is what this did before any of this
+     *    existed.
+     */
+    protected function dispatchAmendment(Lead $lead): void
+    {
+        $announced = is_array($lead->slack_announced) ? $lead->slack_announced : [];
+        $current = $this->announcedSnapshot($lead);
+        $changes = $this->changesBetween($announced, $current);
+
+        if ($changes === []) {
+            $this->activityLogger->logConsumption(
+                leadId: $lead->id,
+                eventType: 'LeadCreated',
+                actorDomain: 'Slack',
+                outcome: 'skipped',
+                description: 'Suppressed a repeat partial capture: nothing was amended',
+                payload: ['type' => 'amendment'],
+            );
+
+            return;
+        }
+
+        $threadTs = $this->threadTsFor($lead);
+
+        if ($threadTs === null) {
+            $this->dispatchSlackNotification($lead, 'partial');
+
+            return;
+        }
+
+        try {
+            $values = $this->valuesFor($lead);
+            $renderer = app(SlackMessageRenderer::class);
+
+            // The card first: if the edit fails, the reply that follows is still true, whereas
+            // a reply that landed under a card the edit then failed to correct would be the
+            // pair the wrong way round.
+            $card = $renderer->render('new_lead', $values);
+            $this->edit($lead, $threadTs, $card['text'], $card['blocks'], $card['color'] ?? null);
+
+            $reply = $renderer->render('lead_amended', array_merge($values, [
+                'changes' => implode("\n", $changes),
+            ]));
+
+            $result = $this->send($reply['text'], $reply['blocks'], $reply['color'] ?? null, $threadTs);
+
+            // The snapshot moves on whether or not the reply landed. It records what the card
+            // says, and the card was already edited; leaving the old snapshot in place would
+            // make the next amendment report a change that has been on screen for minutes.
+            $this->rememberAnnouncement($lead, null, $current);
+
+            $this->activityLogger->logConsumption(
+                leadId: $lead->id,
+                eventType: 'LeadCreated',
+                actorDomain: 'Slack',
+                outcome: $result !== null ? 'succeeded' : 'failed',
+                description: $result !== null
+                    ? 'Amended the lead alert in place: '.implode('; ', $changes)
+                    : 'Failed to post the amendment to Slack',
+                payload: ['type' => 'amendment', 'changes' => $changes],
+            );
+        } catch (\Throwable $e) {
+            Log::error("HandleLeadEventsForSlack: Exception amending Slack alert for lead #{$lead->id}: ".$e->getMessage());
+        }
+    }
+
+    /**
+     * The card's own values, kept so a later capture can say what moved.
+     *
+     * Only what step one collects and the card renders. `submission_type`, the UTMs and the
+     * click ids are excluded on purpose: they are first-write-wins in CaptureLeadAction, so
+     * they cannot differ between two captures of the same lead, and listing them here would
+     * only invite a diff that can never fire.
+     *
+     * @return array<string, string>
+     */
+    protected function announcedSnapshot(Lead $lead): array
+    {
+        return [
+            'name' => trim((string) (($lead->first_name ?: $lead->name).' '.(string) $lead->last_name)),
+            'email' => trim((string) $lead->email),
+            'phone' => trim((string) $lead->phone),
+            'revenue' => trim((string) $lead->monthly_revenue),
+            'company' => trim((string) $lead->company),
+            'role' => trim((string) $lead->role_needed),
+            'weekly hours' => trim((string) $lead->weekly_hours),
+        ];
+    }
+
+    /**
+     * One line per field that moved, phrased for someone who has the first card in front of
+     * them and wants to know what is different about it.
+     *
+     * Only keys present in both snapshots are compared, so adding a field to
+     * {@see announcedSnapshot()} does not report an amendment on every lead captured before the
+     * deploy — those rows carry the old shape, and a missing key is an unknown, not a change.
+     *
+     * @param  array<string, mixed>  $before
+     * @param  array<string, mixed>  $after
+     * @return list<string>
+     */
+    protected function changesBetween(array $before, array $after): array
+    {
+        $changes = [];
+
+        foreach ($after as $label => $new) {
+            if (! array_key_exists($label, $before)) {
+                continue;
+            }
+
+            $old = trim((string) $before[$label]);
+            $new = trim((string) $new);
+
+            if ($old === $new) {
+                continue;
+            }
+
+            $changes[] = match (true) {
+                $old === '' => "{$label}: ".$this->clip($new),
+                $new === '' => "{$label}: cleared (was ".$this->clip($old).')',
+                default => "{$label}: ".$this->clip($old).' → '.$this->clip($new),
+            };
+        }
+
+        return $changes;
+    }
+
+    /**
+     * Keep one value from wrapping the line it shares with the value it replaced.
+     */
+    protected function clip(string $value, int $max = 40): string
+    {
+        return mb_strlen($value) > $max ? mb_substr($value, 0, $max - 1).'…' : $value;
     }
 
     /**
@@ -523,5 +695,28 @@ class HandleLeadEventsForSlack
         bool $broadcast = false,
     ): ?array {
         return $this->transport->post($text, $blocks, $color, $threadTs, $broadcast);
+    }
+
+    /**
+     * Rewrite a message posted earlier, so a card the visitor has since corrected stops saying
+     * the old thing.
+     *
+     * The same seam as {@see send()}, and false rather than an exception for the same reasons
+     * the transport returns it: without a bot token there is nothing to edit with, and an alert
+     * that could not be corrected is not a reason to lose the reply that explains it.
+     *
+     * @param  array<int, array<string, mixed>>  $blocks
+     */
+    protected function edit(Lead $lead, string $ts, string $text, array $blocks = [], ?string $color = null): bool
+    {
+        // The channel the card was posted to, not the one configured now — threadTsFor() has
+        // already established they do not disagree, and an older row records no channel at all.
+        $channel = trim((string) $lead->slack_channel_id) ?: SlackCredentials::channel();
+
+        if ($channel === '') {
+            return false;
+        }
+
+        return $this->transport->update($channel, $ts, $text, $blocks, $color);
     }
 }

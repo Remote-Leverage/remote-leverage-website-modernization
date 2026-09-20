@@ -6,6 +6,7 @@ namespace App\Application\Livewire\Booking;
 
 use App\Domains\Lead\Actions\CaptureLeadAction;
 use App\Domains\Lead\Data\LeadCaptureData;
+use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\AttributionCollector;
 use App\Domains\Lead\Services\EmailValidationService;
 use App\Domains\Lead\Services\LeadQualification;
@@ -34,6 +35,15 @@ class MultistepBookingWizard extends Component
 
     /** How long an empty one is. Deliberately an order of magnitude shorter. */
     public const EMPTY_AVAILABILITY_TTL_SECONDS = 60;
+
+    /**
+     * How long a step-one submission keeps resuming the lead the same visit already created.
+     *
+     * Long enough to cover a reload, a phone call and a second look at the pricing; short
+     * enough that someone returning tomorrow is a new lead with a new alert rather than an
+     * amendment to a card the channel scrolled past yesterday. See resumableLeadId().
+     */
+    private const RESUME_WINDOW_MINUTES = 30;
 
     // Step progression (1: Details, 2: Date, 3: Time & Confirm)
     public int $currentStep = 1;
@@ -611,6 +621,19 @@ class MultistepBookingWizard extends Component
                     'source_form' => 'MultistepBookingWizard',
                     'submission_type' => 'Partial',
                     'event_uri' => $this->getActiveEventTypeUri(),
+
+                    /*
+                     * Update the lead this visit already created rather than making another.
+                     *
+                     * Step 1 runs more than once whenever the revenue-band warning sends
+                     * someone back to change their answer. Without this, each pass wrote a new
+                     * row: two Slack cards, two Meta `Lead` conversions for one person (the
+                     * event id is derived from the lead uuid, so Meta cannot collapse them),
+                     * two admin emails — and the first row left behind forever as a partial
+                     * drop-off that nobody dropped off from. submitBooking() has always passed
+                     * this; the partial capture simply never did.
+                     */
+                    'lead_id' => $this->leadId ?? $this->resumableLeadId(),
                 ],
                 'attribution_named' => $this->attributionNamedFor('Partial'),
                 'attribution' => $this->attribution,
@@ -626,6 +649,52 @@ class MultistepBookingWizard extends Component
         } catch (\Throwable $e) {
             Log::warning('Could not capture partial lead on Step 1: '.$e->getMessage());
             $this->reportException($e);
+        }
+    }
+
+    /**
+     * The lead row this visit already created, when the component itself has forgotten it.
+     *
+     * `$leadId` lives in the Livewire snapshot, so a page reload loses it while the visit
+     * carries on — same person, same browser, same answers, a minute later. Without this,
+     * filling step 1 again after a refresh forks the lead exactly as the revenue-band warning
+     * used to.
+     *
+     * Keyed on the address plus PostHog's session id, **not** on `$sessionId`: that one is
+     * minted in `mount()`, so it is a per-component-instance value and a reload produces a new
+     * one — precisely the case this exists to cover. PostHog's survives the reload and expires
+     * with the visit, which is the notion of "session" wanted here. Where PostHog is blocked
+     * there is no session id to match on and the address alone carries it, inside the window.
+     *
+     * A completed form is never resumed. Someone who books and then opens the form again is
+     * starting something new, and threading that onto the booked lead's alert would bury it.
+     *
+     * Never throws — a capture that cannot look up its predecessor still captures.
+     */
+    protected function resumableLeadId(): ?int
+    {
+        $email = strtolower(trim((string) $this->email));
+
+        if ($email === '') {
+            return null;
+        }
+
+        $posthog = trim((string) $this->posthogSessionId);
+
+        try {
+            $id = Lead::query()
+                ->where('email', $email)
+                ->where('created_at', '>=', Carbon::now()->subMinutes(self::RESUME_WINDOW_MINUTES))
+                ->whereRaw("LOWER(TRIM(COALESCE(submission_type, ''))) <> 'final'")
+                ->when($posthog !== '', fn ($query) => $query->where('posthog_session_id', $posthog))
+                ->latest('id')
+                ->value('id');
+
+            return $id ? (int) $id : null;
+        } catch (\Throwable $e) {
+            Log::warning('Could not look up a resumable lead for this visit: '.$e->getMessage());
+
+            return null;
         }
     }
 

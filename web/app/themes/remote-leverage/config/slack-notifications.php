@@ -273,6 +273,33 @@ return [
     ],
     /*
     |--------------------------------------------------------------------------
+    | Amended — the visitor changed an answer and submitted step 1 again
+    |--------------------------------------------------------------------------
+    |
+    | Most often the revenue-band warning: someone picks a band, reads what it says, goes back
+    | and picks another. The card above has already been edited to the new answers, so this is
+    | the record of what moved — a margin note, in context grey, not a second lead.
+    |
+    | A repeat submission that changed nothing renders no message at all; the listener never
+    | reaches this template. See HandleLeadEventsForSlack::dispatchAmendment().
+    |
+    |   changes   one "field: old → new" per line, already joined
+    */
+    'lead_amended' => [
+        'color' => null,
+        'fallback' => '{{ name }} amended their answers: {{ changes }}',
+        'blocks' => [
+            [
+                'type' => 'context',
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => "Amended before booking\n{{ changes }}"],
+                ],
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Action confirmations
     |--------------------------------------------------------------------------
     |

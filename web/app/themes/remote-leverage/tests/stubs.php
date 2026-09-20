@@ -280,6 +280,7 @@ if (! Capsule::schema()->hasTable('rl_leads')) {
         $table->timestamp('hubspot_lifecycle_synced_at')->nullable();
         $table->string('slack_message_ts', 32)->nullable();
         $table->string('slack_channel_id', 32)->nullable();
+        $table->text('slack_announced')->nullable();
         $table->unsignedInteger('profile_id')->nullable()->index();
         $table->boolean('is_blocked')->default(false)->index();
 

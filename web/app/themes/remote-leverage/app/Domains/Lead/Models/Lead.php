@@ -87,6 +87,9 @@ class Lead extends Model
         // starting a new message. See the 2026_09_16_000007 migration.
         'slack_message_ts',
         'slack_channel_id',
+        // What that alert currently says, so a re-submitted step 1 can be reported as an
+        // amendment rather than as a second lead. See the 2026_09_20_000001 migration.
+        'slack_announced',
         // something for dynamic properties
     ];
 
@@ -98,6 +101,9 @@ class Lead extends Model
         // The HandL first-touch set plus any query parameter without a column of its own.
         // See App\Domains\Lead\Services\AttributionCollector.
         'attribution' => 'array',
+
+        // The values the lead's Slack card was last rendered with. See HandleLeadEventsForSlack.
+        'slack_announced' => 'array',
 
         // The database hands back 0/1; without this every `=== true` check against it is false
         // and a blocked lead reads as unblocked.

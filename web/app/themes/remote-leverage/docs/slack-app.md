@@ -39,6 +39,7 @@ values for `{{ placeholders }}`.
 | Template | Fired by | Notes |
 | :--- | :--- | :--- |
 | `new_lead` | `LeadCreated`, partial only | Opens the thread. Suppressed for blocked profiles and for `submission_type: Final`. |
+| `lead_amended` | `LeadCreated`, partial, for a lead already announced | The visitor changed an answer and submitted step 1 again. Replies in-thread and edits the card above it. Silent when nothing changed. |
 | `booked` | `LeadBookingCompleted` | On by default since 2026-09-17; `SLACK_NOTIFY_ON_BOOKING=false` silences it. Replies in-thread only. |
 | `lead_claimed`, `lead_contacted`, `lead_blocked` | A button press | Replies in-thread. Only the block broadcasts. |
 | `live_call_routed` | `LiveCallRequested`, routed | Always on — a live call starts within 15 minutes. |
@@ -104,6 +105,40 @@ Three things worth knowing:
   an independent message in the channel — so everything else, the booking included, stays in the
   thread. A block is the exception because it is a decision about a person the channel has
   already been alerted about.
+
+## A second step 1 is an amendment, not a second lead
+
+Someone picks "$0 to $5k", reads the revenue-band warning, goes back, picks "$5k to $10k" and
+continues. Step 1 runs twice.
+
+That used to produce two of everything — two lead rows, two cards in `#new-appts` with the more
+prominent one stating a band the visitor had already corrected, two Meta `Lead` conversions for
+one person, two admin emails — and left the first row in the dashboard forever as a partial
+drop-off that nobody had dropped off from. The cause was one missing key: `submitBooking()`
+passed `lead_id` into the capture and `capturePartialLead()` never did, so the second pass
+inserted rather than updated.
+
+It now resolves to one row per visit (`MultistepBookingWizard::resumableLeadId()`, keyed on the
+address plus PostHog's session id inside a 30-minute window — `$sessionId` is minted per
+component and a reload produces a new one, so it cannot carry this), and the listener decides
+what the channel hears:
+
+- **Nothing changed** — silence, logged as a skipped consumption on the lead's timeline. A
+  second identical card tells sales nothing they cannot already see.
+- **Something changed** — `chat.update` rewrites the card to the current answers, and a context
+  reply records the change: `revenue: $0 to $5k Per Month → $5k to $10k Per Month`. Both halves,
+  because Slack shows no edit marker on a bot message: without the reply the card would change
+  under the reader with nothing saying it had.
+- **Nothing to amend** — the webhook transport, or the channel moved since. A whole card is
+  posted, which is what happened before any of this existed.
+
+What the card says is stored on the lead as `slack_announced` beside the `ts`, because the row
+itself no longer knows — the second capture overwrote it. Only fields present in **both**
+snapshots are compared, so adding one does not report an amendment on every lead captured
+before the deploy.
+
+A completed form is never resumed: someone who books and then opens the form again is starting
+something new, and threading that onto the booked lead's card would bury it.
 
 ## Turning the buttons on
 
