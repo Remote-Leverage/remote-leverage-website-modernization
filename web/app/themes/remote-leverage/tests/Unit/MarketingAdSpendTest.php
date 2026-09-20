@@ -458,6 +458,23 @@ describe('signing in with Google', function () {
     });
 });
 
+/*
+ * The query file has to be in the repository, not merely on the machine that wrote it.
+ *
+ * `*.sql` in the theme's .gitignore swallowed it: the file sat on disk, `git status` stayed clean,
+ * every local run passed, and CI failed with the client returning null because the query had never
+ * been committed. The same pattern in .dockerignore would have done it again at deploy time.
+ *
+ * A test rather than a comment, because the next `.sql` file somebody adds under resources/ will
+ * hit exactly this and the failure gives no hint about ignore rules.
+ */
+test('the marketing query is a real file the application can read', function () {
+    $path = get_theme_file_path('resources/sql/marketing-home-daily.sql');
+
+    expect(is_readable($path))->toBeTrue('the marketing day query is missing from the theme')
+        ->and(file_get_contents($path))->toContain('vw_mkt_home_daily');
+});
+
 describe('the BigQuery client', function () {
     /*
      * The REST response separates the schema from the row: values come back as a positional list

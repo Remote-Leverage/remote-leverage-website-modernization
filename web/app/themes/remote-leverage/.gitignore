@@ -5,4 +5,11 @@
 .env
 npm-debug.log
 *.sql
+
+# ...except the marketing alert's query, which the application reads from disk at runtime.
+#
+# `*.sql` above keeps database dumps out of the repo, and it silently swallowed this too: the file
+# sat on disk, `git status` stayed clean, and CI failed with the client returning null because the
+# query was never committed. A file the running code needs is not a dump.
+!resources/sql/*.sql
 /.scrape-cache
