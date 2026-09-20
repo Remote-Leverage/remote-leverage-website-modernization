@@ -41,11 +41,15 @@ it('warns when WordPress has a Redis and Acorn does not', function () {
     config(['cache.default' => 'file']);
 
     expect(renderCacheNotice())
-        ->toContain('Admin caching is running per-container')
+        ->toContain('Admin caching is per-container')
         ->toContain('notice-warning')
         // esc_html turns the quotes into entities; asserting the raw string would pass only if
         // the driver name were being printed unescaped.
-        ->toContain('&quot;file&quot; driver');
+        ->toContain('&quot;file&quot; driver')
+        // It has to name the actual cause. "Acorn could not reach it" sent somebody looking for a
+        // credential that was never the problem; the package is.
+        ->toContain('illuminate/redis package is not installed')
+        ->and(renderCacheNotice())->not->toContain('could not reach');
 });
 
 it('says nothing once Acorn is on the same Redis', function () {
