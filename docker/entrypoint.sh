@@ -82,6 +82,38 @@ if [ "${SKIP_CHOWN:-0}" != "1" ]; then
   chown -R www-data:www-data /var/www/html/web/app/uploads || true
 fi
 
+# ---------------------------------------------------------------------------
+# Point Acorn's cache at the Redis WordPress is already using.
+#
+# Two different caches read two different variables, and only one of them was ever set here.
+# WP_REDIS_HOST configures the object cache drop-in, which is why the redis-cache plugin reports
+# itself connected in production. Acorn's Cache facade -- the marketing snapshot, the admin
+# dashboard KPI blocks, the domain overview -- reads CACHE_STORE and REDIS_HOST, neither of which
+# the task definition sets, so it silently fell back to the `file` driver.
+#
+# On ECS that means every task keeps a private copy on its own container filesystem. The symptom
+# is not a slow dashboard, it is a wrong one: the hourly job warms the snapshot on whichever task
+# runs cron, and a dashboard request served by any other task shows whatever that task last
+# computed. On 2026-09-20 the Slack card was correct at 07:00 while the widget beside it still
+# read "warehouse did not answer" from 06:56, on the same site, at the same moment.
+#
+# Derived rather than required, so no task definition or secret has to change: an environment
+# with a Redis for WordPress gets one for Acorn too. Both are still overridable, and an
+# environment with no Redis is untouched and keeps the file driver.
+#
+# Set *before* `wp acorn optimize` below, which caches the config. Exporting after that point
+# would write a config cache that still said `file` and the whole thing would be a no-op.
+if [ -n "${WP_REDIS_HOST:-}" ]; then
+  export REDIS_HOST="${REDIS_HOST:-$WP_REDIS_HOST}"
+  export REDIS_PORT="${REDIS_PORT:-${WP_REDIS_PORT:-6379}}"
+
+  # Laravel's cache lands on REDIS_CACHE_DB, which Acorn defaults to 1, while the object cache
+  # sits on WP_REDIS_DATABASE (0). One server, two databases, no collision.
+  export CACHE_STORE="${CACHE_STORE:-redis}"
+
+  echo "entrypoint: Acorn cache store is $CACHE_STORE via $REDIS_HOST:$REDIS_PORT"
+fi
+
 if wp core is-installed --allow-root >/dev/null 2>&1; then
   wp plugin activate redis-cache --allow-root || true
 
@@ -108,7 +140,8 @@ if wp core is-installed --allow-root >/dev/null 2>&1; then
   # reporting itself disabled on a site whose object cache was working.
   #
   # REDIS_HOST is Laravel's variable, read by Acorn's config/database.php for CACHE_STORE=redis.
-  # The two are deliberately distinct and an environment using Redis for both sets both.
+  # The two are deliberately distinct; the block above derives the second from the first so that
+  # an environment only has to configure one of them.
   if [ -n "${WP_REDIS_HOST:-}" ]; then
     wp redis enable --allow-root || true
   fi
