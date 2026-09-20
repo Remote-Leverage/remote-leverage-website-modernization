@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Scheduling\Gateways;
 
-use Illuminate\Support\Facades\Cache;
+use App\Infrastructure\Cache\SoftCache;
 
 class CalendlyTokenPool
 {
@@ -67,24 +67,24 @@ class CalendlyTokenPool
 
     public function markRateLimited(string $token, int $cooldownSeconds = 60): void
     {
-        Cache::put(self::rateLimitKey($token), true, now()->addSeconds($cooldownSeconds));
+        SoftCache::put(self::rateLimitKey($token), true, now()->addSeconds($cooldownSeconds));
     }
 
     public function isRateLimited(string $token): bool
     {
-        return Cache::has(self::rateLimitKey($token));
+        return SoftCache::has(self::rateLimitKey($token));
     }
 
     public function recordFailure(string $token, string $context = 'metadata'): void
     {
         $key = self::failureKey($token, $context);
-        $count = (int) Cache::get($key, 0);
-        Cache::put($key, $count + 1, now()->addSeconds(self::FAILURE_TTL_SECONDS));
+        $count = (int) SoftCache::get($key, 0);
+        SoftCache::put($key, $count + 1, now()->addSeconds(self::FAILURE_TTL_SECONDS));
     }
 
     public function failureCount(string $token, string $context = 'metadata'): int
     {
-        return (int) Cache::get(self::failureKey($token, $context), 0);
+        return (int) SoftCache::get(self::failureKey($token, $context), 0);
     }
 
     public function isCircuitOpen(string $token, string $context = 'metadata'): bool
@@ -96,7 +96,7 @@ class CalendlyTokenPool
     {
         $contexts = $context !== null ? [$context] : ['metadata', 'booking'];
         foreach ($contexts as $ctx) {
-            Cache::forget(self::failureKey($token, $ctx));
+            SoftCache::forget(self::failureKey($token, $ctx));
         }
     }
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Scheduling\Gateways;
 
+use App\Infrastructure\Cache\SoftCache;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -629,7 +629,7 @@ class CalendlyClient
         $key = self::userIdentityKey($token);
 
         if (! $forceRefresh) {
-            $cached = Cache::get($key);
+            $cached = SoftCache::get($key);
 
             if (is_array($cached) && (! empty($cached['organization']) || ! empty($cached['user']))) {
                 return $cached;
@@ -665,7 +665,7 @@ class CalendlyClient
             return null;
         }
 
-        Cache::put($key, $identity, now()->addSeconds(self::USER_IDENTITY_TTL_SECONDS));
+        SoftCache::put($key, $identity, now()->addSeconds(self::USER_IDENTITY_TTL_SECONDS));
 
         return $identity;
     }
@@ -700,7 +700,7 @@ class CalendlyClient
      */
     public function cachedAccountEmail(string $token): ?string
     {
-        $cached = Cache::get(self::userIdentityKey($token));
+        $cached = SoftCache::get(self::userIdentityKey($token));
 
         if (! is_array($cached)) {
             return null;
@@ -717,7 +717,7 @@ class CalendlyClient
      */
     public function forgetUserIdentity(string $token): void
     {
-        Cache::forget(self::userIdentityKey($token));
+        SoftCache::forget(self::userIdentityKey($token));
     }
 
     /**

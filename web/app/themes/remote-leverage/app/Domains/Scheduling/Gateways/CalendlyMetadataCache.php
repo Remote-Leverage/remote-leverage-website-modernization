@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Scheduling\Gateways;
 
-use Illuminate\Support\Facades\Cache;
+use App\Infrastructure\Cache\SoftCache;
 use Illuminate\Support\Facades\Log;
 
 class CalendlyMetadataCache
@@ -32,7 +32,7 @@ class CalendlyMetadataCache
     public function getEventType(string $eventUriOrUuid): ?array
     {
         $key = self::EVENT_DETAILS_PREFIX.md5($eventUriOrUuid);
-        $cached = Cache::get($key);
+        $cached = SoftCache::get($key);
 
         if ($cached !== null) {
             return $cached;
@@ -41,7 +41,7 @@ class CalendlyMetadataCache
         $resource = $this->client->getEventType($eventUriOrUuid, 'metadata');
 
         if ($resource !== null) {
-            Cache::put($key, $resource, now()->addSeconds(self::EVENT_DETAILS_TTL_SECONDS));
+            SoftCache::put($key, $resource, now()->addSeconds(self::EVENT_DETAILS_TTL_SECONDS));
         }
 
         return $resource;
@@ -60,10 +60,10 @@ class CalendlyMetadataCache
         $backupKey = self::QUESTIONS_BACKUP_PREFIX.md5($eventUriOrUuid);
         $freshKey = self::QUESTIONS_FRESH_PREFIX.md5($eventUriOrUuid);
 
-        $backup = Cache::get($backupKey);
+        $backup = SoftCache::get($backupKey);
 
         if ($backup !== null) {
-            if (! Cache::has($freshKey)) {
+            if (! SoftCache::has($freshKey)) {
                 $this->scheduleBackgroundRefresh($eventUriOrUuid, $freshKey);
             }
 
@@ -88,19 +88,19 @@ class CalendlyMetadataCache
             return;
         }
 
-        Cache::put(self::EVENT_DETAILS_PREFIX.md5($eventUriOrUuid), $resource, now()->addSeconds(self::EVENT_DETAILS_TTL_SECONDS));
+        SoftCache::put(self::EVENT_DETAILS_PREFIX.md5($eventUriOrUuid), $resource, now()->addSeconds(self::EVENT_DETAILS_TTL_SECONDS));
 
         $backupKey = self::QUESTIONS_BACKUP_PREFIX.md5($eventUriOrUuid);
         $freshKey = self::QUESTIONS_FRESH_PREFIX.md5($eventUriOrUuid);
-        Cache::put($backupKey, $resource['custom_questions'] ?? [], now()->addDays(self::QUESTIONS_BACKUP_TTL_DAYS));
-        Cache::put($freshKey, 'fresh', now()->addHours(self::QUESTIONS_FRESH_TTL_HOURS));
+        SoftCache::put($backupKey, $resource['custom_questions'] ?? [], now()->addDays(self::QUESTIONS_BACKUP_TTL_DAYS));
+        SoftCache::put($freshKey, 'fresh', now()->addHours(self::QUESTIONS_FRESH_TTL_HOURS));
     }
 
     public function forget(string $eventUriOrUuid): void
     {
-        Cache::forget(self::EVENT_DETAILS_PREFIX.md5($eventUriOrUuid));
-        Cache::forget(self::QUESTIONS_BACKUP_PREFIX.md5($eventUriOrUuid));
-        Cache::forget(self::QUESTIONS_FRESH_PREFIX.md5($eventUriOrUuid));
+        SoftCache::forget(self::EVENT_DETAILS_PREFIX.md5($eventUriOrUuid));
+        SoftCache::forget(self::QUESTIONS_BACKUP_PREFIX.md5($eventUriOrUuid));
+        SoftCache::forget(self::QUESTIONS_FRESH_PREFIX.md5($eventUriOrUuid));
     }
 
     /**
@@ -120,8 +120,8 @@ class CalendlyMetadataCache
         if (! empty($questions)) {
             $backupKey = self::QUESTIONS_BACKUP_PREFIX.md5($eventUriOrUuid);
             $freshKey = self::QUESTIONS_FRESH_PREFIX.md5($eventUriOrUuid);
-            Cache::put($backupKey, $questions, now()->addDays(self::QUESTIONS_BACKUP_TTL_DAYS));
-            Cache::put($freshKey, 'fresh', now()->addHours(self::QUESTIONS_FRESH_TTL_HOURS));
+            SoftCache::put($backupKey, $questions, now()->addDays(self::QUESTIONS_BACKUP_TTL_DAYS));
+            SoftCache::put($freshKey, 'fresh', now()->addHours(self::QUESTIONS_FRESH_TTL_HOURS));
 
             return $questions;
         }
@@ -142,7 +142,7 @@ class CalendlyMetadataCache
         }
 
         wp_schedule_single_event(time(), 'rl_calendly_refresh_questions', [$eventUriOrUuid]);
-        Cache::put($freshKey, 'scheduled', now()->addHours(self::QUESTIONS_FRESH_TTL_HOURS));
+        SoftCache::put($freshKey, 'scheduled', now()->addHours(self::QUESTIONS_FRESH_TTL_HOURS));
     }
 
     protected function sendCriticalAlert(string $eventUri): void

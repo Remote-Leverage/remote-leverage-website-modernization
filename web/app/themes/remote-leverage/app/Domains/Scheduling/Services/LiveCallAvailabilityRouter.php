@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Scheduling\Services;
 
-use Illuminate\Support\Facades\Cache;
+use App\Infrastructure\Cache\SoftCache;
 
 class LiveCallAvailabilityRouter
 {
@@ -17,7 +17,7 @@ class LiveCallAvailabilityRouter
      */
     public function isAvailable(): bool
     {
-        return (bool) Cache::get(self::CACHE_KEY, true);
+        return (bool) SoftCache::get(self::CACHE_KEY, true);
     }
 
     /**
@@ -25,7 +25,7 @@ class LiveCallAvailabilityRouter
      */
     public function setAvailability(bool $available, int $ttlMinutes = 30): void
     {
-        Cache::put(self::CACHE_KEY, $available, now()->addMinutes($ttlMinutes));
+        SoftCache::put(self::CACHE_KEY, $available, now()->addMinutes($ttlMinutes));
     }
 
     /**
