@@ -113,11 +113,18 @@ class MarketingCostAlertWidget
 
         if ($snapshot === null) {
             /*
-             * Not an error. The hourly job warms this; until its first run of the environment's
-             * life there is genuinely nothing to show, and saying so beats both a blank card and
-             * a spurious "see the error log".
+             * Not an error. The hourly job warms this cache; until its first run of the
+             * environment's life there is genuinely nothing to show.
+             *
+             * The actions still render. They used to sit behind an early return, which put the
+             * one button that would populate this card behind the card being populated — on a
+             * freshly deployed environment, the state where somebody most wants to press it.
              */
-            echo '<p class="rl-dash-kpi-meta">No figures yet &mdash; the hourly marketing job has not run since this environment last started. This card fills in on its next run.</p>';
+            echo '<p class="rl-dash-kpi-meta">No figures yet &mdash; the hourly marketing job has not run '
+                .'since this environment last started. Send one now to fill this in, or wait for the next run.</p>';
+
+            $this->renderWarehouseStatus();
+            $this->renderActions();
 
             return;
         }
@@ -299,6 +306,29 @@ class MarketingCostAlertWidget
                 .($snapshot->lastBookingName !== null ? $snapshot->lastBookingName.', ' : '')
                 .$this->duration($snapshot->lastBookingMinutes).' ago';
 
+        $this->renderActions();
+        ?>
+        <p class="rl-dash-kpi-meta" style="margin-top:12px;border-top:1px solid #f4f4f5;padding-top:10px;">
+            <?php echo esc_html(ucfirst($lastLead)); ?> &middot; <?php echo esc_html($lastBooking); ?><br>
+            <?php if ($snapshot->excludedVaLeads > 0 || $snapshot->excludedVaBookings > 0) { ?>
+                Excluded as likely VA applicants: <?php echo esc_html((string) $snapshot->excludedVaLeads); ?> leads,
+                <?php echo esc_html((string) $snapshot->excludedVaBookings); ?> bookings. The test is a phone
+                number outside the US and Canada, so it will occasionally catch a real client.<br>
+            <?php } ?>
+            Figures as at <?php echo esc_html($snapshot->generatedAt->format('H:i T')); ?>,
+            refreshed hourly by the marketing job rather than on this page load.
+        </p>
+        <?php
+    }
+
+    /**
+     * The send button, and the outcome of the last press.
+     *
+     * Rendered on both paths — with figures and without. It is the only way to make the card fill
+     * in without waiting an hour, so hiding it until the card has filled in is exactly backwards.
+     */
+    private function renderActions(): void
+    {
         $result = sanitize_text_field((string) ($_GET['rl_cost_alert'] ?? ''));
         ?>
         <?php if ($result !== '') { ?>
@@ -314,21 +344,28 @@ class MarketingCostAlertWidget
             <input type="hidden" name="rl_action" value="<?php echo esc_attr(self::SEND_ACTION); ?>" />
             <button type="submit" class="button button-secondary">Send to Slack now</button>
             <span class="rl-dash-kpi-meta" style="margin-left:8px;">
-                Posts these figures immediately, ignoring the reporting window and the environment gate.
+                Posts immediately, ignoring the reporting window and the environment gate.
             </span>
         </form>
-
-        <p class="rl-dash-kpi-meta" style="margin-top:12px;border-top:1px solid #f4f4f5;padding-top:10px;">
-            <?php echo esc_html(ucfirst($lastLead)); ?> &middot; <?php echo esc_html($lastBooking); ?><br>
-            <?php if ($snapshot->excludedVaLeads > 0 || $snapshot->excludedVaBookings > 0) { ?>
-                Excluded as likely VA applicants: <?php echo esc_html((string) $snapshot->excludedVaLeads); ?> leads,
-                <?php echo esc_html((string) $snapshot->excludedVaBookings); ?> bookings. The test is a phone
-                number outside the US and Canada, so it will occasionally catch a real client.<br>
-            <?php } ?>
-            Figures as at <?php echo esc_html($snapshot->generatedAt->format('H:i T')); ?>,
-            refreshed hourly by the marketing job rather than on this page load.
-        </p>
         <?php
+    }
+
+    /**
+     * Whether the warehouse is wired up, on the empty card.
+     *
+     * Shown here rather than only alongside figures, because the empty card is where somebody is
+     * standing when they have just finished connecting and are wondering whether it took.
+     */
+    private function renderWarehouseStatus(): void
+    {
+        $problem = app(BigQueryClient::class)->misconfiguration();
+
+        printf(
+            '<p class="rl-dash-kpi-meta">%s</p>',
+            $problem === null
+                ? esc_html('Marketing warehouse: configured.')
+                : esc_html('Marketing warehouse is not set up: '.$problem.'.'),
+        );
     }
 
     /**
