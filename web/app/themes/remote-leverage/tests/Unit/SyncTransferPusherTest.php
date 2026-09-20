@@ -376,3 +376,143 @@ describe('reporting a push that never opened a session', function () {
         }
     });
 });
+
+/**
+ * Leads are pushed as whole rows of their own tables. The runner walks a cursor
+ * per table and a tableIndex across them, and every table gets an opening chunk
+ * — including an empty one, which is what tells the target to empty its copy.
+ */
+describe('pushing the leads dataset', function () {
+    beforeEach(function () {
+        DB::table('rl_leads')->delete();
+        DB::table('rl_lead_activity_logs')->delete();
+    });
+
+    it('sends each table in load order, rows verbatim', function () {
+        seedPushLead(1);
+        DB::table('rl_lead_activity_logs')->insert(pushActivityRow(7, 1));
+
+        $this->pusher->push(pushManifest(['leads']), 'staging');
+
+        $chunks = $this->client->chunks();
+
+        expect(array_column($chunks, 'table'))->toBe([
+            // Every table gets an opening chunk, empty or not: that chunk is what tells the
+            // target to empty its copy, so skipping one would turn the replace into a merge.
+            'rl_lead_profiles',
+            'rl_lead_identifiers',
+            'rl_leads',
+            'rl_lead_activity_logs',
+        ])
+            ->and(array_column($chunks, 'dataset'))->toBe(['leads', 'leads', 'leads', 'leads'])
+            // The profile tables are empty here, so the rows land in the third and fourth chunks.
+            ->and($chunks[2]['rows'][0]['id'])->toBe(1)
+            ->and($chunks[2]['rows'][0]['email'])->toBe('pushed@example.test')
+            ->and($chunks[3]['rows'][0]['lead_id'])->toBe(1);
+    });
+
+    it('sends no post rows at all', function () {
+        seedPost(1);
+        seedPushLead(1);
+
+        $this->pusher->push(pushManifest(['leads']), 'staging');
+
+        foreach ($this->client->chunks() as $chunk) {
+            expect($chunk)->not->toHaveKey('posts');
+        }
+    });
+
+    it('still opens each table when the source has no rows for it', function () {
+        $this->pusher->push(pushManifest(['leads']), 'staging');
+
+        // Without this the target would keep rows the source does not have, and
+        // a "replace" would quietly be a merge.
+        expect(array_column($this->client->chunks(), 'table'))
+            ->toBe([
+                // Every table gets an opening chunk, empty or not: that chunk is what tells the
+                // target to empty its copy, so skipping one would turn the replace into a merge.
+                'rl_lead_profiles',
+                'rl_lead_identifiers',
+                'rl_leads',
+                'rl_lead_activity_logs',
+            ]);
+    });
+
+    it('walks a wide table across several batches', function () {
+        foreach (range(1, PushJobRunner::BATCH_SIZE + 3) as $id) {
+            seedPushLead($id);
+        }
+
+        $this->pusher->push(pushManifest(['leads']), 'staging');
+
+        $chunks = $this->client->chunks();
+        $ids = [];
+
+        foreach ($chunks as $chunk) {
+            $ids = array_merge($ids, array_column($chunk['rows'], 'id'));
+        }
+
+        /*
+         * Two chunks for the leads themselves, plus one opening chunk for each of the other three
+         * tables — empty, and sent anyway, because that is what empties the target's copy.
+         */
+        expect($chunks)->toHaveCount(5)
+            ->and($ids)->toBe(array_unique($ids))
+            ->and($ids)->toHaveCount(PushJobRunner::BATCH_SIZE + 3);
+    });
+
+    it('counts lead rows toward the progress total, not the content set', function () {
+        seedPost(1);
+        seedPost(2);
+        seedPushLead(1);
+
+        $seen = [];
+        $this->pusher->push(pushManifest(['leads']), 'staging', function (string $phase, array $status) use (&$seen) {
+            $seen[] = $status['totals']['posts'];
+        });
+
+        expect($seen[0])->toBe(1);
+    });
+
+    it('stops when the target rejects a table batch', function () {
+        seedPushLead(1);
+        $this->client->chunkResponse = ['ok' => false, 'error' => 'unknown column'];
+
+        $this->pusher->push(pushManifest(['leads']), 'staging');
+    })->throws(RuntimeException::class, 'The target rejected a rl_lead_profiles batch');
+});
+
+function seedPushLead(int $id): void
+{
+    DB::table('rl_leads')->insert([
+        'id' => $id,
+        'uuid' => 'push-uuid-'.$id,
+        'name' => 'Pushed lead '.$id,
+        'email' => 'pushed@example.test',
+        'notes' => 'A wide note column.',
+        'attribution' => json_encode(['first_touch' => 'google']),
+        'source_type' => 'organic',
+        'status' => 'captured',
+        'is_blocked' => 0,
+        'created_at' => '2026-09-03 08:00:00',
+        'updated_at' => '2026-09-03 08:00:00',
+    ]);
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function pushActivityRow(int $id, int $leadId): array
+{
+    return [
+        'id' => $id,
+        'lead_id' => $leadId,
+        'event_type' => 'lead.captured',
+        'actor_domain' => 'leads',
+        'stage' => 'capture',
+        'outcome' => 'succeeded',
+        'description' => 'Captured locally.',
+        'payload' => json_encode(['lead_id' => $leadId]),
+        'created_at' => '2026-09-03 08:00:01',
+    ];
+}

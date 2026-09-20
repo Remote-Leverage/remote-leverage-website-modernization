@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Domains\Sync\Transfer\Import;
 
+use App\Domains\Sync\Datasets\Dataset;
 use App\Domains\Sync\Datasets\DatasetRegistry;
 use App\Domains\Sync\Transfer\TransferSession;
 use App\Domains\Sync\Transfer\UndoLog;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * Writes an incoming batch of posts and their meta onto the target.
@@ -25,6 +28,11 @@ use Illuminate\Support\Facades\DB;
  *
  * Because content is rewritten against the map as it is written, media must be
  * imported first — see DatasetRegistry::importOrder().
+ *
+ * A third policy sits alongside those two, for table-backed datasets: leads
+ * arrive as whole rows of their own tables, the target's copies are emptied
+ * first, and the source's primary keys are preserved exactly. No remapping and
+ * no merge — see importTableBatch().
  */
 class ContentImporter
 {
@@ -73,6 +81,205 @@ class ContentImporter
         $session->recordRows($dataset, 'meta', $written['meta']);
 
         return $written;
+    }
+
+    /**
+     * Rows read, recorded and deleted per round trip while emptying a table.
+     *
+     * Same reasoning as DatasetCleaner::BATCH: the receiving side has no
+     * long-running process, so the empty walks in bounded steps rather than
+     * relying on one large DELETE.
+     */
+    private const EMPTY_BATCH = 200;
+
+    /**
+     * Apply one batch of whole table rows to the target.
+     *
+     * This is the table-backed path — leads today — and it is a replace, not a
+     * merge: the dataset's tables are emptied once, on the first batch to
+     * arrive for that dataset, and rows are then inserted under the primary keys
+     * they carried on the source. Preserving the keys is what keeps
+     * rl_lead_activity_logs.lead_id pointing at the right lead.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return int Rows written.
+     */
+    public function importTableBatch(
+        TransferSession $session,
+        string $dataset,
+        string $table,
+        array $rows,
+        ?UndoLog $undo = null,
+    ): int {
+        $definition = $this->transferDataset($session, $dataset);
+
+        if (! in_array($table, $definition->transferTables, true)) {
+            throw new InvalidArgumentException(
+                "Table \"{$table}\" is not part of the \"{$definition->label}\" dataset."
+            );
+        }
+
+        // A no-op if the ability or the runner already did it and saved the
+        // session; the marker is what makes a redelivered chunk safe.
+        $this->emptyTablesFor($session, $dataset, $undo);
+
+        $key = Dataset::TRANSFER_KEY;
+        $entries = [];
+        $written = 0;
+
+        foreach ($rows as $row) {
+            if (! array_key_exists($key, $row) || $row[$key] === null || $row[$key] === '') {
+                // Dropping it silently is how a transfer reports success having
+                // shipped fewer rows than it read.
+                throw new RuntimeException("A {$table} row arrived without a {$key}.");
+            }
+
+            $id = $row[$key];
+
+            // Always an insert entry, never an update: the table was emptied at
+            // the top of this dataset, so nothing here existed before the
+            // transfer — including on a redelivered chunk, where the row present
+            // is one this same transfer wrote.
+            $entries[] = UndoLog::insertEntry($table, [$key => $id]);
+
+            // Keyed upsert rather than insert, so a chunk redelivered after a
+            // dropped connection lands on the same row instead of colliding
+            // with itself on the primary key.
+            DB::table($table)->updateOrInsert([$key => $id], $row);
+
+            $written++;
+        }
+
+        if ($undo instanceof UndoLog) {
+            $undo->recordMany($entries);
+        }
+
+        $session->recordRows($dataset, $table, $written);
+
+        return $written;
+    }
+
+    /**
+     * Empty this dataset's tables on the target, once per session.
+     *
+     * Public and separate from importTableBatch so the caller can persist the
+     * session between the empty and the first insert — the same ordering the
+     * post path uses, and for the same reason: if the import dies and the chunk
+     * is redelivered, the retry must not empty a second time and take the rows
+     * this transfer already wrote with it.
+     *
+     * Children before parents, so rl_lead_activity_logs goes before rl_leads
+     * and the foreign key never dangles.
+     *
+     * @return int Rows removed; zero once it has already run.
+     */
+    public function emptyTablesFor(TransferSession $session, string $dataset, ?UndoLog $undo = null): int
+    {
+        $definition = $this->transferDataset($session, $dataset);
+        $marker = self::EMPTIED_MARKER_PREFIX.$dataset;
+
+        if ($this->hasEmptied($session, $dataset)) {
+            return 0;
+        }
+
+        $removed = 0;
+
+        foreach ($definition->emptyOrder() as $table) {
+            $removed += $this->emptyTable($table, $undo);
+        }
+
+        $session->markCleaned($marker);
+        $session->recordRows($dataset, 'removed', $removed);
+
+        return $removed;
+    }
+
+    /**
+     * Marker namespace for "this dataset's tables have been emptied".
+     *
+     * Prefixed rather than the bare dataset key so it cannot be confused with
+     * the post cleaner's marker, which answers a different question about a
+     * different set of rows.
+     */
+    private const EMPTIED_MARKER_PREFIX = 'tables:';
+
+    /**
+     * Whether this session has already emptied the dataset's tables.
+     *
+     * A zero return from emptyTablesFor() is ambiguous on its own — it means
+     * either "already done" or "the target's tables were empty anyway" — and
+     * the caller has to persist the marker in the second case too.
+     */
+    public function hasEmptied(TransferSession $session, string $dataset): bool
+    {
+        return $session->hasCleaned(self::EMPTIED_MARKER_PREFIX.$dataset);
+    }
+
+    /**
+     * Record and delete every row of one table.
+     */
+    private function emptyTable(string $table, ?UndoLog $undo): int
+    {
+        $key = Dataset::TRANSFER_KEY;
+        $removed = 0;
+        $after = null;
+
+        while (true) {
+            $query = DB::table($table)->orderBy($key)->limit(self::EMPTY_BATCH);
+
+            if ($after !== null) {
+                $query->where($key, '>', $after);
+            }
+
+            $rows = array_map(fn ($row) => (array) $row, $query->get()->all());
+
+            if ($rows === []) {
+                return $removed;
+            }
+
+            $ids = array_column($rows, $key);
+            $after = end($ids);
+
+            if ($undo instanceof UndoLog) {
+                // One write for the batch rather than one per row — a whole
+                // table is recorded inside a single request, and on staging the
+                // log is on EFS.
+                $undo->recordMany(array_map(
+                    fn (array $row) => UndoLog::updateEntry($table, [$key => $row[$key]], $row),
+                    $rows,
+                ));
+            }
+
+            DB::table($table)->whereIn($key, $ids)->delete();
+
+            $removed += count($ids);
+        }
+    }
+
+    /**
+     * The dataset definition, having checked it may actually travel this way.
+     *
+     * Three separate questions, all of which have to hold: the session's own
+     * manifest covers the dataset, the dataset is transferable at all, and it is
+     * declared table-backed. Emptying a target table is the most destructive
+     * thing in this pipeline, so the reason it is allowed is re-derived here
+     * rather than inherited from whoever called.
+     */
+    private function transferDataset(TransferSession $session, string $dataset): Dataset
+    {
+        if (! $session->manifest->includes($dataset)) {
+            throw new InvalidArgumentException("Dataset \"{$dataset}\" is not part of this transfer.");
+        }
+
+        $definition = $this->registry->get($dataset);
+
+        if (! $definition->transferable || ! $definition->isTableBacked()) {
+            throw new InvalidArgumentException(
+                "The \"{$definition->label}\" dataset does not travel as table rows."
+            );
+        }
+
+        return $definition;
     }
 
     /**

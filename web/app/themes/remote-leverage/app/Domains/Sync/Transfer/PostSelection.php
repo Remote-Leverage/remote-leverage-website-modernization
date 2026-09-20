@@ -42,22 +42,23 @@ final class PostSelection
     {
         $query = DB::table('posts')->whereNotIn('post_type', self::ALWAYS_EXCLUDED_TYPES);
 
-        // Settings are wp_options rows and own no posts at all. Without this the
-        // "everything that is not an attachment" branch below claims them, and a
-        // settings-only push silently ships the entire content set instead of
-        // seven option keys — the opposite of what the dataset promises.
-        if ($dataset === DatasetRegistry::SETTINGS) {
-            return $query->whereRaw('1 = 0');
-        }
-
         if ($dataset === DatasetRegistry::MEDIA) {
             $query->where('post_type', '=', 'attachment');
-        } else {
+        } elseif ($dataset === DatasetRegistry::CONTENT) {
             $query->where('post_type', '!=', 'attachment');
 
             if ($manifest->excludedPostTypes !== []) {
                 $query->whereNotIn('post_type', $manifest->excludedPostTypes);
             }
+        } else {
+            // Nothing else owns posts. Settings are wp_options rows; leads are
+            // whole rows of their own tables. This used to be an "everything
+            // that is not an attachment" fallback, and any dataset that reached
+            // it silently claimed the entire content set — which for the
+            // cleaning side means deleting every page on the target while
+            // importing lead rows. Named datasets only, and the default is the
+            // empty set.
+            $query->whereRaw('1 = 0');
         }
 
         // Exclusions bind the clean as much as the export. A post type or ID the

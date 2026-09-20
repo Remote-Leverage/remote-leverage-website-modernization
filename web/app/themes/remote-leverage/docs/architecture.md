@@ -226,10 +226,23 @@ The entrypoint disables WP-Cron's request spawning *only* after cron actually st
 fails, the container keeps the old request-triggered behaviour rather than having neither.
 Every task runs the job, and WordPress's own `doing_cron` lock means one of them does the work.
 
-There is still no queue worker: `QUEUE_CONNECTION` is unset, so Acorn's default `sync` runs any
-dispatched job inline. Nothing in the theme implements `ShouldQueue`; the deferred integrations
-use `dispatch(...)->afterResponse()`, which is a terminating callback in the same PHP process,
-not a queued job — see `ThemeServiceProvider::ensureApplicationTerminates()`.
+### The queue
+
+A worker exists but is **inert by default**. `QUEUE_CONNECTION` is unset in every deployed
+environment, so Acorn's default `sync` applies, the entrypoint starts no worker, and the deferred
+integrations still run as terminating callbacks in the web request's own process — see
+`ThemeServiceProvider::ensureApplicationTerminates()`, without which they are discarded entirely.
+
+Setting `QUEUE_CONNECTION=database` changes three things at once: `App\Infrastructure\Queue\Deferred`
+starts queueing instead of deferring in-process, the entrypoint starts `queue:work`, and failures
+land in `wp_failed_jobs` instead of vanishing. The tables come from the `2026_09_19_000002`
+migration and exist whether or not the switch is on, so turning it on and back off is an
+environment change, not a deploy.
+
+Conversion is per call site and partly done: `Deferred::call()` is what a converted site uses,
+and it picks the right path for whichever connection the environment has. Everything still on
+`dispatch(...)->afterResponse()` keeps working untouched. `docker-compose.yml` runs `database`
+so the worker can be exercised locally; nothing else does yet.
 
 | Hook | Schedule | Does |
 | :--- | :--- | :--- |

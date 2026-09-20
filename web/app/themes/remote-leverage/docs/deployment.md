@@ -115,6 +115,7 @@ if wp core is-installed; then
   [ -n "$WP_REDIS_HOST" ] && wp redis enable
 fi
 cron && export DISABLE_WP_CRON=true   # real cron; falls back to request spawning if it fails
+[ "$QUEUE_CONNECTION" != sync ] && wp acorn queue:work ... &   # only when a queue is configured
 php-fpm -D
 exec nginx -g "daemon off;"
 ```

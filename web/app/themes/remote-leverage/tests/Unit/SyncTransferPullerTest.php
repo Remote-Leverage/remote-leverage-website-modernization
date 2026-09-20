@@ -51,11 +51,21 @@ class FakeSourceClient extends SyncClient
     {
         $dataset = (string) ($input['dataset'] ?? '');
         $after = (int) ($input['after'] ?? 0);
+        $tableIndex = (int) ($input['table_index'] ?? 0);
 
         foreach ($this->batches as $batch) {
-            if (($batch['dataset'] ?? '') === $dataset && (int) ($batch['after'] ?? 0) === $after) {
-                return $batch['response'];
+            if (($batch['dataset'] ?? '') !== $dataset || (int) ($batch['after'] ?? 0) !== $after) {
+                continue;
             }
+
+            // Table-backed datasets ask per table, so a stub that does not say
+            // which one is taken to mean the first — which is what every
+            // posts-shaped stub in this file means.
+            if ((int) ($batch['table_index'] ?? 0) !== $tableIndex) {
+                continue;
+            }
+
+            return $batch['response'];
         }
 
         return ['ok' => true, 'done' => true];
@@ -207,3 +217,150 @@ describe('pulling rows', function () {
         $this->undoLogs->forget($result['session_id']);
     });
 });
+
+/**
+ * Leads travel as whole rows of their own tables rather than as posts, so the
+ * pull walks a cursor per table and the local tables are replaced rather than
+ * merged. See ContentImporter::importTableBatch().
+ */
+describe('pulling the leads dataset', function () {
+    beforeEach(function () {
+        DB::table('rl_leads')->delete();
+        DB::table('rl_lead_activity_logs')->delete();
+    });
+
+    it('writes the source rows under their original ids', function () {
+        $this->client->batches = [
+            ['dataset' => 'leads', 'table_index' => 2, 'after' => 0, 'response' => [
+                'ok' => true, 'table' => 'rl_leads', 'done' => false, 'last_id' => 4100, 'total' => 1,
+                'rows' => [remoteLead(4100)],
+            ]],
+            ['dataset' => 'leads', 'table_index' => 3, 'after' => 0, 'response' => [
+                'ok' => true, 'table' => 'rl_lead_activity_logs', 'done' => false, 'last_id' => 9,
+                'total' => 1, 'rows' => [remoteActivity(9, 4100)],
+            ]],
+        ];
+
+        $this->puller->pull(pullManifest(['leads']), 'staging');
+
+        expect(DB::table('rl_leads')->pluck('id')->map('intval')->all())->toBe([4100])
+            ->and(DB::table('rl_leads')->where('id', 4100)->value('email'))->toBe('remote@example.test')
+            ->and(DB::table('rl_lead_activity_logs')->where('id', 9)->value('lead_id'))->toBe(4100);
+    });
+
+    it('asks for each table in turn, with its own cursor', function () {
+        $this->client->batches = [
+            ['dataset' => 'leads', 'table_index' => 2, 'after' => 0, 'response' => [
+                'ok' => true, 'table' => 'rl_leads', 'done' => false, 'last_id' => 1, 'total' => 2,
+                'rows' => [remoteLead(1)],
+            ]],
+            ['dataset' => 'leads', 'table_index' => 2, 'after' => 1, 'response' => [
+                'ok' => true, 'table' => 'rl_leads', 'done' => false, 'last_id' => 2,
+                'rows' => [remoteLead(2)],
+            ]],
+            ['dataset' => 'leads', 'table_index' => 3, 'after' => 0, 'response' => [
+                'ok' => true, 'table' => 'rl_lead_activity_logs', 'done' => false, 'last_id' => 3,
+                'total' => 1, 'rows' => [remoteActivity(3, 2)],
+            ]],
+        ];
+
+        $this->puller->pull(pullManifest(['leads']), 'staging');
+
+        expect(DB::table('rl_leads')->pluck('id')->map('intval')->all())->toBe([1, 2])
+            ->and(DB::table('rl_lead_activity_logs')->count())->toBe(1);
+    });
+
+    it('empties the local tables even when the source has nothing', function () {
+        DB::table('rl_leads')->insert(remoteLead(900));
+        DB::table('rl_lead_activity_logs')->insert(remoteActivity(1, 900));
+
+        // Every stub misses, so the source answers "done" with no rows.
+        $this->puller->pull(pullManifest(['leads']), 'staging');
+
+        expect(DB::table('rl_leads')->count())->toBe(0)
+            ->and(DB::table('rl_lead_activity_logs')->count())->toBe(0);
+    });
+
+    it('replaces rather than merges what the target already held', function () {
+        DB::table('rl_leads')->insert(remoteLead(900, 'stale@target.test'));
+
+        $this->client->batches = [
+            ['dataset' => 'leads', 'table_index' => 2, 'after' => 0, 'response' => [
+                'ok' => true, 'table' => 'rl_leads', 'done' => false, 'last_id' => 1, 'total' => 1,
+                'rows' => [remoteLead(1)],
+            ]],
+        ];
+
+        $this->puller->pull(pullManifest(['leads']), 'staging');
+
+        expect(DB::table('rl_leads')->pluck('id')->map('intval')->all())->toBe([1]);
+    });
+
+    it('stops rather than importing rows the source labelled another table', function () {
+        $this->client->batches = [
+            ['dataset' => 'leads', 'table_index' => 2, 'after' => 0, 'response' => [
+                'ok' => true, 'table' => 'rl_lead_activity_logs', 'done' => false, 'last_id' => 1,
+                'rows' => [remoteLead(1)],
+            ]],
+        ];
+
+        $this->puller->pull(pullManifest(['leads']), 'staging');
+    })->throws(RuntimeException::class, 'disagree on the shape');
+
+    it('rolls back to what the target held before', function () {
+        DB::table('rl_leads')->insert(remoteLead(900, 'original@target.test'));
+
+        $this->client->batches = [
+            ['dataset' => 'leads', 'table_index' => 2, 'after' => 0, 'response' => [
+                'ok' => true, 'table' => 'rl_leads', 'done' => false, 'last_id' => 1, 'total' => 1,
+                'rows' => [remoteLead(1)],
+            ]],
+        ];
+
+        $result = $this->puller->pull(pullManifest(['leads']), 'staging');
+        $this->undoLogs->for($result['session_id'])->rollback();
+
+        expect(DB::table('rl_leads')->pluck('id')->map('intval')->all())->toBe([900])
+            ->and(DB::table('rl_leads')->where('id', 900)->value('email'))->toBe('original@target.test');
+
+        $this->undoLogs->forget($result['session_id']);
+    });
+});
+
+/**
+ * @return array<string, mixed>
+ */
+function remoteLead(int $id, string $email = 'remote@example.test'): array
+{
+    return [
+        'id' => $id,
+        'uuid' => 'remote-uuid-'.$id,
+        'name' => 'Remote lead '.$id,
+        'email' => $email,
+        'notes' => 'Wide column, sent verbatim.',
+        'attribution' => json_encode(['first_touch' => 'linkedin']),
+        'source_type' => 'organic',
+        'status' => 'captured',
+        'is_blocked' => 0,
+        'created_at' => '2026-09-02 09:00:00',
+        'updated_at' => '2026-09-02 09:00:00',
+    ];
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function remoteActivity(int $id, int $leadId): array
+{
+    return [
+        'id' => $id,
+        'lead_id' => $leadId,
+        'event_type' => 'lead.captured',
+        'actor_domain' => 'leads',
+        'stage' => 'capture',
+        'outcome' => 'succeeded',
+        'description' => 'Captured remotely.',
+        'payload' => json_encode(['lead_id' => $leadId]),
+        'created_at' => '2026-09-02 09:00:01',
+    ];
+}

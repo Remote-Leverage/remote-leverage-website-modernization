@@ -56,6 +56,13 @@ class PushTransferCommand extends Command
             return $this->reportDryRun($registry, $manifest, $target);
         }
 
+        foreach ($manifest->datasets as $dataset) {
+            if ($registry->get($dataset)->isTableBacked()) {
+                $this->warn("{$dataset}: whole rows, real contact details included — "
+                    ."those tables are emptied on {$target} and replaced, never merged.");
+            }
+        }
+
         $this->info('Pushing '.implode(', ', $manifest->datasets)." to {$target}...");
 
         try {
@@ -112,16 +119,37 @@ class PushTransferCommand extends Command
 
         $this->info("Dry run — nothing sent to {$target}.");
 
+        $replaced = [];
+
         foreach ($registry->importOrder($manifest->datasets) as $dataset) {
-            // Settings own no posts, so counting them in posts would report the
-            // content total under the settings label and read as though a
-            // settings push were about to ship the whole site.
+            $definition = $registry->get($dataset);
+
+            // A table-backed dataset owns no posts, and a dataset that owns no
+            // posts must not be counted in them: settings reported under a post
+            // count read as though a settings push were about to ship the whole
+            // site, and leads would report a flat zero.
+            if ($definition->isTableBacked()) {
+                $replaced[] = $dataset;
+
+                foreach ($definition->transferTables as $table) {
+                    $this->line(sprintf('  %-10s %d rows in %s  (replaced on the target)',
+                        $dataset, $exporter->tableCount($table), $table));
+                }
+
+                continue;
+            }
+
             [$count, $unit] = $dataset === DatasetRegistry::SETTINGS
                 ? [count($exporter->settingsValues()), 'settings']
                 : [$exporter->count($manifest, $dataset), 'posts'];
 
             $this->line(sprintf('  %-10s %d %s%s', $dataset, $count, $unit,
                 $manifest->shouldClean($dataset) ? '  (target emptied first)' : ''));
+        }
+
+        if ($replaced !== []) {
+            $this->warn(implode(', ', $replaced).' travel as whole rows, real contact details '
+                ."included: those tables are emptied on {$target} and replaced, never merged.");
         }
 
         // The row count on the far side is not knowable without calling it, so

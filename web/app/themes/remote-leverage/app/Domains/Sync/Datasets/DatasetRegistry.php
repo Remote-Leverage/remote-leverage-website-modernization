@@ -11,12 +11,20 @@ use InvalidArgumentException;
  *
  * Three tiers, and the distinction is the safety model:
  *
- *  - transferable      may move between environments (content, media, settings)
+ *  - transferable      may move between environments (content, media, settings,
+ *                      leads)
  *  - purge-only        real customer data or credentials; may be emptied on
- *                      either side but never copied (leads, referrals,
- *                      scheduling, users)
+ *                      either side but never copied (referrals, scheduling,
+ *                      users)
  *  - never synced      per-environment state that must not move or be purged
  *                      by this tool (migrations, comments)
+ *
+ * Leads is transferable *and* purgeable, and it is the only dataset that
+ * travels as whole table rows rather than through the posts pipeline — see
+ * Dataset::$transferTables. It carries real PII verbatim, deliberately: the
+ * marketing cost alert compares BigQuery spend against this site's own lead
+ * counts, and a non-production environment with warehouse data but no leads
+ * makes every cross-check and every cost-per-lead figure meaningless.
  *
  * A dataset being listed here is not permission to transfer it: transferable()
  * is the only source the manifest accepts, and TransferManifest re-checks.
@@ -87,12 +95,45 @@ final class DatasetRegistry
             self::LEADS => new Dataset(
                 key: self::LEADS,
                 label: 'Leads',
-                description: 'Real enquiry data. Never copied between environments; '
-                    .'can be emptied on either side.',
-                tables: ['rl_leads', 'rl_lead_activity_logs'],
-                transferable: false,
+                description: 'Real enquiry data with its identity profiles, copied verbatim — '
+                    .'PII included — so a non-production environment can be cross-checked against '
+                    .'the marketing warehouse. The target\'s lead tables are replaced, not merged.',
+                /*
+                 * Purge order, children before parents. `rl_lead_activity_logs.lead_id` is a real
+                 * cascading foreign key, so deleting leads would take the logs anyway; the others
+                 * are indexes rather than constraints, which means nothing stops a wrong order
+                 * leaving orphans instead of erroring.
+                 */
+                tables: [
+                    'rl_lead_activity_logs',
+                    'rl_leads',
+                    'rl_lead_identifiers',
+                    'rl_lead_profiles',
+                ],
+                transferable: true,
                 defaultSelected: false,
                 purgeable: true,
+
+                /*
+                 * Load order, parents before children, and the identity tables travel with the
+                 * leads rather than being left behind.
+                 *
+                 * `rl_leads.profile_id` points at `rl_lead_profiles.id`. Copying leads without
+                 * their profiles gives the target ids pointing at rows it does not have — the
+                 * same shape as the existing "content without media" hazard, and silent, because
+                 * that column carries an index and not a constraint. `rl_lead_identifiers` is the
+                 * email, phone and device fingerprints those profiles are matched on, so a
+                 * profile without them cannot recognise a returning visitor.
+                 *
+                 * `emptyOrder()` reverses this, which is why the two lists differ in order rather
+                 * than one being derived from the other.
+                 */
+                transferTables: [
+                    'rl_lead_profiles',
+                    'rl_lead_identifiers',
+                    'rl_leads',
+                    'rl_lead_activity_logs',
+                ],
             ),
             self::REFERRALS => new Dataset(
                 key: self::REFERRALS,
@@ -137,12 +178,15 @@ final class DatasetRegistry
      * imported. Importing content first would rewrite against a map that is
      * still empty and leave the references pointing at the source's IDs.
      *
+     * Leads is last and independent: it shares no keys with wp_posts, so its
+     * position only has to be stable, not early.
+     *
      * @param  array<int, string>  $datasets
      * @return array<int, string>
      */
     public function importOrder(array $datasets): array
     {
-        $order = [self::MEDIA, self::CONTENT, self::SETTINGS];
+        $order = [self::MEDIA, self::CONTENT, self::SETTINGS, self::LEADS];
 
         $ordered = array_values(array_filter($order, fn (string $k) => in_array($k, $datasets, true)));
 

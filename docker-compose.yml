@@ -58,6 +58,10 @@ services:
       CACHE_STORE: redis
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      # The queue is on here and nowhere else yet. This stack is where the worker, the jobs
+      # table and a converted call site can be exercised together before staging opts in;
+      # Herd and the other local setups stay on `sync` and keep today's in-process behaviour.
+      QUEUE_CONNECTION: database
     depends_on:
       db:
         condition: service_healthy

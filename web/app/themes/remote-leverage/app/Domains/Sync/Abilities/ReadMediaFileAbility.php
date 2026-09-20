@@ -18,7 +18,7 @@ use Throwable;
  *
  * Read-only.
  */
-class ReadMediaFileAbility extends TransferAbility
+class ReadMediaFileAbility extends ReadOnlyTransferAbility
 {
     public function __construct(private readonly MediaFileExporter $files) {}
 

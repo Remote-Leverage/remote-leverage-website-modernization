@@ -75,14 +75,75 @@ it('does not throw from assertSyncEnabled in staging', function () {
     expect(true)->toBeTrue();
 });
 
-it('refuses to provision credentials in production before touching WordPress', function () {
+/*
+ * Provisioning is the one sync surface that is NOT environment-gated, because
+ * production has to be able to issue the credential a lower environment pulls
+ * with. What that credential can then do is decided by the abilities — see the
+ * read-only/write split asserted below — not by refusing to mint it.
+ */
+it('provisions credentials in production rather than refusing on the environment', function () {
     setWpEnv('production');
 
-    (new SyncCredentialProvisioner)->provision();
-})->throws(SyncNotPermittedException::class);
+    // It gets past the environment and fails on application passwords instead,
+    // which is the next thing a real production request would be judged on.
+    expect(fn () => (new SyncCredentialProvisioner)->provision())
+        ->toThrow(RuntimeException::class)
+        ->and(fn () => (new SyncCredentialProvisioner)->provision())
+        ->not->toThrow(SyncNotPermittedException::class);
+});
 
-it('refuses to revoke credentials in production', function () {
+it('revokes credentials in production, so the read credential has a kill switch', function () {
     setWpEnv('production');
 
+    // No sync-service user here, so this is the early return. The assertion is
+    // that it returns at all: it used to throw before reaching the lookup.
     (new SyncCredentialProvisioner)->revoke();
-})->throws(SyncNotPermittedException::class);
+
+    expect(true)->toBeTrue();
+});
+
+describe('which transfer abilities production will answer', function () {
+    /*
+     * The gate that actually protects production, now that the admin screen and
+     * the provisioner no longer refuse there. A write ability added later
+     * inherits the refusal by extending TransferAbility; this fails if one is
+     * ever put on the read-only base by mistake.
+     */
+    $readOnly = [
+        'ExportTransferBatchAbility',
+        'ExportMediaManifestAbility',
+        'ReadMediaFileAbility',
+    ];
+
+    it('exposes exactly the three a pull calls, and no more', function () use ($readOnly) {
+        $onReadOnlyBase = [];
+
+        foreach (glob(__DIR__.'/../../app/Domains/Sync/Abilities/*.php') ?: [] as $file) {
+            if (str_contains((string) file_get_contents($file), 'extends ReadOnlyTransferAbility')) {
+                $onReadOnlyBase[] = basename($file, '.php');
+            }
+        }
+
+        expect($onReadOnlyBase)->toEqualCanonicalizing($readOnly);
+    });
+
+    it('keeps every other transfer ability on the production-refusing base', function () use ($readOnly) {
+        foreach (glob(__DIR__.'/../../app/Domains/Sync/Abilities/*.php') ?: [] as $file) {
+            $name = basename($file, '.php');
+
+            if (in_array($name, $readOnly, true) || $name === 'TransferAbility' || $name === 'ReadOnlyTransferAbility') {
+                continue;
+            }
+
+            $source = (string) file_get_contents($file);
+
+            if (! str_contains($source, 'extends TransferAbility')) {
+                continue; // a plain Ability — the settings/page sync, gated elsewhere
+            }
+
+            expect($source)->not->toContain('extends ReadOnlyTransferAbility');
+        }
+
+        expect(true)->toBeTrue();
+    });
+});

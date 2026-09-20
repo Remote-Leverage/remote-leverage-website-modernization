@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Domains\Sync\Transfer\Export;
 
+use App\Domains\Sync\Datasets\Dataset;
 use App\Domains\Sync\Datasets\DatasetRegistry;
 use App\Domains\Sync\Transfer\PostSelection;
 use App\Domains\Sync\Transfer\TransferManifest;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 /**
  * Reads the post rows a transfer covers, in resumable batches.
@@ -19,6 +21,11 @@ use Illuminate\Support\Facades\DB;
  *
  * Table names are passed unprefixed — the Acorn database connection already
  * carries the install's prefix, so DB::table('posts') resolves to wp_posts.
+ *
+ * Two shapes of export live here. Posts and their meta travel through
+ * postIdBatch()/postRows()/postMetaRows(); a table-backed dataset (leads)
+ * travels as whole rows through tableCount()/tableRowBatch(). The second is not
+ * reachable for a dataset that has not declared transferTables.
  */
 class ContentExporter
 {
@@ -87,6 +94,60 @@ class ContentExporter
             fn ($row) => (array) $row,
             DB::table('postmeta')->whereIn('post_id', $postIds)->orderBy('meta_id')->get()->all(),
         );
+    }
+
+    /**
+     * How many rows one transfer table holds.
+     *
+     * Separate from count() above, which asks the posts question. A table-backed
+     * dataset has no posts at all, and answering it through PostSelection would
+     * return the entire content set.
+     */
+    public function tableCount(string $table): int
+    {
+        return DB::table($this->assertTransferTable($table))->count();
+    }
+
+    /**
+     * The next batch of whole rows from one transfer table, ascending by id.
+     *
+     * Verbatim columns, no projection and no filtering: a table-backed dataset
+     * is mirrored, so anything dropped here is data the target silently never
+     * receives. Cursor-based on the primary key for the same reason the post
+     * walk is — the export spans many requests.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function tableRowBatch(string $table, int $after, int $limit): array
+    {
+        return array_map(
+            fn ($row) => (array) $row,
+            DB::table($this->assertTransferTable($table))
+                ->where(Dataset::TRANSFER_KEY, '>', $after)
+                ->orderBy(Dataset::TRANSFER_KEY)
+                ->limit(max(1, $limit))
+                ->get()
+                ->all(),
+        );
+    }
+
+    /**
+     * Refuse any table that is not declared as a transfer table by some dataset.
+     *
+     * The abilities resolve a table by index rather than by name, so a caller
+     * cannot name one — but this is the only method in the export path that
+     * takes a table name at all, and it is worth it being unable to read an
+     * arbitrary one even if a future caller passes input straight through.
+     */
+    private function assertTransferTable(string $table): string
+    {
+        foreach ($this->registry->all() as $dataset) {
+            if (in_array($table, $dataset->transferTables, true)) {
+                return $table;
+            }
+        }
+
+        throw new InvalidArgumentException("\"{$table}\" is not a transferable table.");
     }
 
     /**

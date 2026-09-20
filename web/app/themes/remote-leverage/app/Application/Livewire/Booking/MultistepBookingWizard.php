@@ -17,6 +17,7 @@ use App\Domains\Scheduling\Services\TierUtilizationProbe;
 use App\Domains\Tracking\Data\AnalyticsEventData;
 use App\Domains\Tracking\Gateways\CustomerIOClient;
 use App\Domains\Tracking\Support\GoogleEnhancedConversion;
+use App\Infrastructure\Queue\Deferred;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
@@ -945,10 +946,17 @@ class MultistepBookingWizard extends Component
                  * so it goes after the response, like the live-call Slack alerts do. The probe
                  * throttles itself, so a busy hour measures once rather than once per visitor.
                  *
-                 * Static closure, no `$this`: serializing a Livewire component into a deferred
-                 * job would drag the whole form state along with it.
+                 * `Deferred::call` rather than a closure: it queues where a queue is configured
+                 * and falls back to the same after-response dispatch everywhere else, so this
+                 * behaves identically until an environment sets QUEUE_CONNECTION. Only the role
+                 * string crosses the boundary — no `$this`, because serialising a Livewire
+                 * component would drag the whole form state along with it.
+                 *
+                 * First site converted, and chosen for being the cheapest to be wrong about:
+                 * internal telemetry, self-throttling, and nothing a visitor or a customer ever
+                 * sees.
                  */
-                dispatch(static fn () => app(TierUtilizationProbe::class)->probe($role))->afterResponse();
+                Deferred::call(TierUtilizationProbe::class, 'probe', [$role]);
             }
         } catch (\Throwable $e) {
             Log::warning('Failed to load month availability: '.$e->getMessage());

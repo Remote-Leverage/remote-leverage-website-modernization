@@ -1,7 +1,7 @@
 # Environment sync — design
 
 Bi-directional, dataset-selectable sync between local and staging, driven entirely
-from wp-admin. **Never available in production.**
+from wp-admin. **Production is a read-only source and never a target** — see §6.
 
 This extends `app/Domains/Sync` rather than adding a second mechanism. See
 [docs/ai-mcp-and-sync.md](ai-mcp-and-sync.md) for the existing settings/page sync
@@ -49,8 +49,8 @@ unchanged. What's new is provisioning, the dataset model, and the transfer engin
 
 ## 1. Provisioning without WP-CLI
 
-A **Generate sync credentials** action on the Settings screen, available on local and
-staging, requiring `manage_options`:
+A **Generate sync credentials** action on the Settings screen, available in every
+environment including production, requiring `manage_options`:
 
 1. Creates the `sync-service` user if absent (role `subscriber`).
 2. Grants `rl_manage_ai_sync` — the same grant `rl:sync:grant` performs, in PHP.
@@ -59,6 +59,13 @@ staging, requiring `manage_options`:
 
 This is the only piece that must exist before anything else works. It replaces the
 CLI bootstrap entirely — no redeploy, no container shell, no secrets-manager round trip.
+
+On production the screen is *only* this card: no push, no pull, no purge, no history,
+and `EnvironmentSyncAdmin::handleActions()` refuses any action outside `provision` and
+`revoke`. The card has to exist there because production is a pull source, and the
+credential a lower environment authenticates with has to be mintable somewhere.
+Provisioning is therefore the one sync surface that is not environment-gated; what the
+credential can *reach* is decided by the abilities instead (§6).
 
 > **Prerequisite: Application Passwords must be available on the target.** WordFence disables them
 > by default, which makes every sync call fail as `rest_not_logged_in` — the same response as a
@@ -84,17 +91,40 @@ behaviour. Selection is per-run, not global config.
 |---|---|---|
 | `content` | `wp_posts`, `wp_postmeta`, `wp_terms`, `wp_termmeta`, `wp_term_taxonomy`, `wp_term_relationships` | selected |
 | `media` | `attachment` rows + the referenced files under `uploads/` | selected |
-| `leads` | `wp_rl_leads`, `wp_rl_lead_activity_logs` | **never transferred** |
+| `leads` | `wp_rl_lead_profiles`, `wp_rl_lead_identifiers`, `wp_rl_leads`, `wp_rl_lead_activity_logs` | opt-in, **replaces the target** |
 | `referrals` | `wp_rl_referrers`, `wp_rl_referrals`, `wp_rl_referral_clicks`, `wp_rl_referral_rewards`, `wp_rl_payouts` | **never transferred** |
 | `scheduling` | `wp_rl_live_call_sessions` | **never transferred** |
 | `settings` | the `config/rl-sync.php` option whitelist | opt-in |
 | `users` | `wp_users`, `wp_usermeta` | **never transferred** |
 | — | `wp_migrations`, `wp_comments`, `wp_commentmeta` | never synced, not selectable |
 
-`leads`, `referrals`, `scheduling` and `users` are transfer-excluded by design: they
-are either real customer data or the credentials this tool runs on. They still appear
-on the screen, but only under **Maintenance** (section 5) — you can purge them, on
-either side, without ever copying them between environments.
+`referrals`, `scheduling` and `users` are transfer-excluded by design: they are either
+real customer data or the credentials this tool runs on. They still appear on the
+screen, but only under **Maintenance** (section 5) — you can purge them, on either
+side, without ever copying them between environments.
+
+`leads` is the exception, and a deliberate one. The marketing cost alert reads spend
+from the BigQuery warehouse and compares it against this site's own lead counts, so an
+environment with warehouse data and no leads makes every cross-check and every
+cost-per-lead figure meaningless. Leads therefore transfer in both directions, as whole
+rows — PII included, unredacted — and all four of the target's lead tables are **emptied
+and replaced**, never merged. Nothing is emptied on the source, ever.
+
+Leads are the only dataset that travels as table rows rather than through the
+posts/meta pipeline. The marker is `Dataset::$transferTables`, which is set for leads
+alone; `$tables` is the purger's list and every dataset populates it, so it says
+nothing about how a dataset moves. The order inside `$transferTables` is load order:
+
+```
+load:  rl_lead_profiles -> rl_lead_identifiers -> rl_leads -> rl_lead_activity_logs
+empty: rl_lead_activity_logs -> rl_leads -> rl_lead_identifiers -> rl_lead_profiles
+```
+
+Parents before children on the way in, the reverse on the way out. Only
+`rl_lead_activity_logs.lead_id -> rl_leads.id` is a declared foreign key; the two
+`profile_id` columns are not, which is exactly why the order is pinned by a test. A wrong
+order on an enforced constraint raises an error, but a wrong order on an unenforced one
+just leaves orphan rows that look fine until something reads them.
 
 Comments are treated as disposable and never sync in either direction. The site is not
 meant to support comments at all, so the sync has no reason to carry them; disabling
@@ -237,8 +267,8 @@ requested.
 
 ## 5. Maintenance
 
-Separate from transfer, and the only thing you can do to `leads`, `referrals` and
-`scheduling`:
+Separate from transfer, and the only thing you can do to `referrals` and `scheduling`
+(`leads` can also be transferred — see section 2):
 
 - **Purge on this environment** — truncate the group's tables locally.
 - **Purge on the remote** — same, over the sync channel.
@@ -248,18 +278,44 @@ side is production.
 
 ## 6. Production safety
 
-Four independent gates, so no single mistake is sufficient:
+Production is a **source**, never a target. The gates are shaped around that asymmetry
+rather than around a blanket refusal:
 
-1. The admin screen is **not registered** when `WP_ENV === 'production'`.
-2. Every transfer/maintenance ability **refuses to run** when `WP_ENV === 'production'`,
-   regardless of caller or capability.
-3. The client **refuses to target** an environment whose configured URL matches
-   `PRODUCTION_SYNC_URL`.
-4. `sync-service` on production is never granted `rl_manage_ai_sync`, so even a
-   leaked credential can't reach the abilities.
+1. The admin screen registers on production but renders only the credentials card, and
+   `handleActions()` allows exactly `provision` and `revoke`. The push/pull AJAX
+   endpoints are not registered there at all, so they answer `-1` rather than reaching
+   a handler.
+2. Every ability that **writes** — import, purge, rollback, receive-chunk,
+   receive-media, begin, finish — extends `TransferAbility`, which refuses when
+   `WP_ENV === 'production'` regardless of caller or capability.
+3. The three abilities a pull calls on the far side — `export-transfer-batch`,
+   `export-media-manifest`, `read-media-file` — extend `ReadOnlyTransferAbility`
+   instead. They check the capability and not the environment. None of them touches
+   the database or the filesystem.
+4. `TransferPusher` refuses a target that is production by name, and refuses any
+   target sharing a host with `PRODUCTION_SYNC_URL`. The admin dropdowns offer
+   production as a source only.
+5. `sync-service` on production holds `rl_manage_ai_sync` only if an admin pressed
+   Generate. Nothing in the deploy grants it, and Revoke drops the capability along
+   with the password.
 
-Gate 2 is the important one: it means production is safe even if someone copies the
-staging code, the credentials, and the config wholesale.
+Gate 2 is still the important one: it means production cannot be written to even by
+someone holding a valid credential, and copying the staging code, the credentials and
+the config wholesale still buys no write.
+
+### Why this was widened
+
+It used to be four gates and a flat "never in production". That also made production
+unusable as a source, which is a different thing from protecting it as a target. The
+marketing cost alert reads spend from the BigQuery warehouse and divides it by this
+site's own lead counts, so an environment with real warehouse data and no leads
+produces a cost-per-lead figure that is confidently wrong. Testing it needs production's
+lead rows in local and staging, and there is no shell on either remote to get them out
+another way.
+
+The cost is real and worth stating plainly: a credential minted on production reads
+production data, lead PII included and unredacted. It is created by hand, revoked from
+the same screen, and should not be left live between pulls.
 
 ## 7. What this does not do
 
@@ -267,7 +323,8 @@ staging code, the credentials, and the config wholesale.
   run migrations on the target first — a transfer into a stale schema is refused
   rather than half-applied.
 - **Plugin/theme files.** Code ships through the deploy pipeline, not this.
-- **Production, in either direction.**
+- **Writes to production, in any form.** Production can be pulled *from*; nothing
+  can be pushed, imported, purged or rolled back there.
 
 ## Decisions
 

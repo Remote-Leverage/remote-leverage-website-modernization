@@ -1258,3 +1258,16 @@ if (! function_exists('delete_transient')) {
         return true;
     }
 }
+
+/*
+ * There is no users table in the unit suite, so "no such user" is the only
+ * honest answer. It is enough to exercise the paths that branch on absence —
+ * SyncCredentialProvisioner::revoke() returning early, for one. A test that
+ * needs a real user should stub WP_User and override this, not lean on it.
+ */
+if (! function_exists('get_user_by')) {
+    function get_user_by($field, $value)
+    {
+        return false;
+    }
+}

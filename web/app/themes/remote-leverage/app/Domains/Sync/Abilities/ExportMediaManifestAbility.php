@@ -18,7 +18,7 @@ use App\Domains\Sync\Transfer\TransferManifest;
  *
  * Read-only.
  */
-class ExportMediaManifestAbility extends TransferAbility
+class ExportMediaManifestAbility extends ReadOnlyTransferAbility
 {
     public function __construct(
         private readonly DatasetRegistry $registry,

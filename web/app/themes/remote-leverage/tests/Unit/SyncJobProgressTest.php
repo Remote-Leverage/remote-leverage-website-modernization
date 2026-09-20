@@ -88,6 +88,39 @@ describe('progress reporting', function () {
 
         expect($this->pushJobs->find($job->id)->totals)->toBe(['posts' => 42, 'files' => 7]);
     });
+
+    it('resumes a push inside the table it had reached', function () {
+        $job = $this->pushJobs->create($this->manifest, 'staging');
+        $job->datasetIndex = 1;
+        $job->tableIndex = 1;
+        $job->cursor = 3200;
+        $this->pushJobs->save($job);
+
+        // Losing tableIndex would restart the dataset at its first table and
+        // re-send every row of it.
+        $resumed = $this->pushJobs->find($job->id);
+
+        expect($resumed->tableIndex)->toBe(1)
+            ->and($resumed->cursor)->toBe(3200)
+            ->and($resumed->datasetIndex)->toBe(1);
+    });
+
+    it('resumes a pull inside the table it had reached', function () {
+        $job = $this->pullJobs->create($this->pullManifest, 'staging');
+        $job->tableIndex = 1;
+        $job->cursor = 17;
+        $this->pullJobs->save($job);
+
+        $resumed = $this->pullJobs->find($job->id);
+
+        expect($resumed->tableIndex)->toBe(1)
+            ->and($resumed->cursor)->toBe(17);
+    });
+
+    it('starts both job kinds on the first table', function () {
+        expect($this->pushJobs->create($this->manifest, 'staging')->tableIndex)->toBe(0)
+            ->and($this->pullJobs->create($this->pullManifest, 'staging')->tableIndex)->toBe(0);
+    });
 });
 
 describe('one transfer at a time', function () {

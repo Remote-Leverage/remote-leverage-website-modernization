@@ -26,10 +26,17 @@ use Throwable;
  * received. The credential has to exist before any transfer can run, which is
  * why provisioning sits above the transfer form rather than beside it.
  *
- * The screen is never registered in production — see register(). That is the
- * outermost of the four gates in the design doc; the abilities enforce their
- * own independently, so removing this one would still not make production
- * reachable.
+ * In production the screen is registered but reduced to the credentials card:
+ * no push, no pull, no purge, no history, and handleActions() refuses every
+ * action outside PRODUCTION_ACTIONS. Production needs the card because it is a
+ * pull *source* — the credential a lower environment authenticates with has to
+ * be mintable somewhere, and there is no shell.
+ *
+ * That narrows gate 1 of the four in the design doc, deliberately. The gate that
+ * actually protects production is gate 2, in TransferAbility: it refuses on
+ * WP_ENV alone, so the credential minted here reaches the three read-only
+ * abilities and nothing else. Copying this code, the credential and the config
+ * to production still buys no write.
  */
 class EnvironmentSyncAdmin
 {
@@ -55,17 +62,29 @@ class EnvironmentSyncAdmin
         private readonly EnvironmentSyncScreen $screen,
     ) {}
 
+    /**
+     * Actions the screen offers in production, where it is a provisioning
+     * console and nothing else.
+     *
+     * An allow-list rather than a set of guards inside each handler: a handler
+     * added later is refused here by default, which is the direction a mistake
+     * should fail in.
+     */
+    private const PRODUCTION_ACTIONS = ['provision', 'revoke'];
+
     public function register(): void
     {
-        if (! SyncEnvironment::syncEnabled()) {
-            return;
-        }
-
         add_action('admin_menu', [$this, 'addMenuPage']);
         add_action('admin_init', [$this, 'handleActions']);
-        add_action('wp_ajax_rl_sync_push_step', [$this, 'handlePushStep']);
-        add_action('wp_ajax_rl_sync_pull_step', [$this, 'handlePullStep']);
         add_action('admin_enqueue_scripts', [$this, 'enqueueStyles']);
+
+        // Push and pull are driven a step at a time over AJAX, and neither can
+        // run here. Not registering the endpoints at all means production
+        // answers -1 rather than reaching a handler that would have to refuse.
+        if (SyncEnvironment::syncEnabled()) {
+            add_action('wp_ajax_rl_sync_push_step', [$this, 'handlePushStep']);
+            add_action('wp_ajax_rl_sync_pull_step', [$this, 'handlePullStep']);
+        }
     }
 
     /**
@@ -107,6 +126,20 @@ class EnvironmentSyncAdmin
         }
 
         check_admin_referer(self::SLUG);
+
+        // In production the screen renders nothing but the credentials card, so
+        // there is no form to submit anything else from. This is here for the
+        // case that matters: a request forged against the URL directly.
+        if (! SyncEnvironment::syncEnabled() && ! in_array($action, self::PRODUCTION_ACTIONS, true)) {
+            set_transient(
+                $this->noticeKey('error'),
+                'Only credential provisioning is available in the "'.SyncEnvironment::current().'" environment.',
+                60,
+            );
+
+            wp_safe_redirect(admin_url('options-general.php?page='.self::SLUG));
+            exit;
+        }
 
         try {
             match ($action) {

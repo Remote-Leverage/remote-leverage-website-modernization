@@ -90,6 +90,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       procps \
       default-mysql-client \
       awscli \
+      cron \
     && rm -rf /var/lib/apt/lists/* \
     && curl -fsSL -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
     && chmod +x /usr/local/bin/wp \
@@ -101,7 +102,13 @@ COPY docker/php.ini /usr/local/etc/php/conf.d/wordpress.ini
 COPY docker/www.conf /usr/local/etc/php-fpm.d/www.conf
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh \
+COPY docker/wp-cron.sh /usr/local/bin/wp-cron.sh
+# Lands as /etc/cron.d/wp-cron: no dot in the name and not group-writable, both of which Debian
+# cron requires before it will read a file there.
+COPY docker/wp-cron.crontab /etc/cron.d/wp-cron
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/wp-cron.sh \
+    && chown root:root /etc/cron.d/wp-cron \
+    && chmod 0644 /etc/cron.d/wp-cron \
     && rm -f /usr/local/etc/php-fpm.d/zz-docker.conf \
     && nginx -t
 

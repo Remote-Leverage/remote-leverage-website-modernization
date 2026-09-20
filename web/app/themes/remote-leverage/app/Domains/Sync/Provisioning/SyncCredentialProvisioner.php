@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Domains\Sync\Provisioning;
 
 use App\Domains\Sync\SyncCapability;
-use App\Domains\Sync\SyncEnvironment;
 use RuntimeException;
 use WP_Application_Passwords;
 use WP_User;
@@ -22,6 +21,18 @@ use WP_User;
  * Everything here is what those two commands do, callable from wp-admin instead.
  * `rl:sync:grant` still exists and still works — this is an alternative entry
  * point to the same end state, not a replacement.
+ *
+ * ## Why this runs in production too
+ *
+ * It used to call SyncEnvironment::assertSyncEnabled(), which refused here. That
+ * made production unprovisionable, and therefore unusable as a *source* — you
+ * could not pull leads or media down from it to test against real volumes.
+ *
+ * What the credential can reach is decided by the abilities, not by this class.
+ * On production the only ones that answer are the three in
+ * ReadOnlyTransferAbility; every write still refuses on WP_ENV alone. So the
+ * credential this mints on production is a read credential, and it exists only
+ * because an admin pressed the button — nothing in the deploy grants it.
  */
 class SyncCredentialProvisioner
 {
@@ -67,8 +78,6 @@ class SyncCredentialProvisioner
      */
     public function provision(): array
     {
-        SyncEnvironment::assertSyncEnabled();
-
         if (! $this->applicationPasswordsAvailable()) {
             throw new RuntimeException($this->unavailableReason() ?? 'Application passwords are unavailable.');
         }
@@ -106,8 +115,6 @@ class SyncCredentialProvisioner
      */
     public function revoke(): void
     {
-        SyncEnvironment::assertSyncEnabled();
-
         $user = $this->findUser();
 
         if (! $user instanceof WP_User) {

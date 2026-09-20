@@ -1,0 +1,14 @@
+# WordPress scheduled jobs, every minute.
+#
+# Installed to /etc/cron.d/wp-cron, which is why each line carries a user field. Debian's cron
+# ignores a file in that directory if it is group- or world-writable, or if its name contains a
+# dot — see the Dockerfile COPY, which lands it as `wp-cron` with mode 0644.
+#
+# Every task in the service runs this. That is intentional and safe rather than something to
+# engineer around: wp-cron.php takes WordPress's `doing_cron` lock, so of N tasks firing in the
+# same minute exactly one runs the due jobs and the rest return immediately. The cost is N-1
+# loopback requests a minute, which is nothing; the benefit is that no single task is special,
+# so a rolling deploy or a failed task never takes scheduled work down with it.
+#
+# A trailing newline is required — cron silently skips a final line without one.
+* * * * * root /usr/local/bin/wp-cron.sh

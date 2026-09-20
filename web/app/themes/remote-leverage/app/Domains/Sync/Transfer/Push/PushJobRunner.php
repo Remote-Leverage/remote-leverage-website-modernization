@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Sync\Transfer\Push;
 
+use App\Domains\Sync\Datasets\Dataset;
 use App\Domains\Sync\Datasets\DatasetRegistry;
 use App\Domains\Sync\SyncClient;
 use App\Domains\Sync\Transfer\Export\ContentExporter;
@@ -86,13 +87,37 @@ class PushJobRunner
         $posts = 0;
 
         foreach ($job->datasets as $dataset) {
-            $posts += $this->exporter->count($job->manifest, $dataset);
+            $posts += $this->rowTotal($job, $dataset);
         }
 
         $job->totals = ['posts' => $posts, 'files' => 0];
         $job->datasetIndex = 0;
+        $job->tableIndex = 0;
         $job->cursor = 0;
         $job->phase = $job->datasets === [] ? PushJob::PHASE_FINISH : PushJob::PHASE_ROWS;
+    }
+
+    /**
+     * How many rows this dataset will send, for the progress denominator.
+     *
+     * A table-backed dataset owns no posts, so asking the post exporter would
+     * count the whole content set instead.
+     */
+    private function rowTotal(PushJob $job, string $dataset): int
+    {
+        $definition = $this->registry->get($dataset);
+
+        if (! $definition->isTableBacked()) {
+            return $this->exporter->count($job->manifest, $dataset);
+        }
+
+        $total = 0;
+
+        foreach ($definition->transferTables as $table) {
+            $total += $this->exporter->tableCount($table);
+        }
+
+        return $total;
     }
 
     private function rows(SyncClient $client, PushJob $job): void
@@ -105,15 +130,16 @@ class PushJobRunner
             return;
         }
 
+        if ($this->registry->get($dataset)->isTableBacked()) {
+            $this->tableRows($client, $job, $dataset);
+
+            return;
+        }
+
         $ids = $this->exporter->postIdBatch($job->manifest, $dataset, $job->cursor, self::BATCH_SIZE);
 
         if ($ids === []) {
-            $job->datasetIndex++;
-            $job->cursor = 0;
-
-            if ($job->currentDataset() === null) {
-                $job->phase = $this->afterRows($job);
-            }
+            $this->nextDataset($job);
 
             return;
         }
@@ -137,6 +163,87 @@ class PushJobRunner
         $job->count('meta', count($meta));
         $job->counters['removed'] = $this->removedOnTarget($response);
         $job->cursor = (int) end($ids);
+    }
+
+    /**
+     * Send one batch of whole rows from the current transfer table.
+     *
+     * A dataset with several tables needs a cursor per table, which is what
+     * tableIndex is: cursor walks ids inside one table, tableIndex walks the
+     * tables, datasetIndex walks the datasets. All three are persisted, so a
+     * resumed job picks up inside the table it was in rather than starting the
+     * dataset again.
+     *
+     * The opening batch of each table is sent even when the table is empty. It
+     * is what tells the target to empty its own copy, and skipping it is how a
+     * source with no activity logs would leave the target's in place and call
+     * the dataset mirrored.
+     */
+    private function tableRows(SyncClient $client, PushJob $job, string $dataset): void
+    {
+        $tables = $this->registry->get($dataset)->transferTables;
+        $table = $tables[$job->tableIndex] ?? null;
+
+        if ($table === null) {
+            $this->nextDataset($job);
+
+            return;
+        }
+
+        $rows = $this->exporter->tableRowBatch($table, $job->cursor, self::BATCH_SIZE);
+
+        if ($rows === [] && $job->cursor > 0) {
+            $this->nextTable($job, $tables);
+
+            return;
+        }
+
+        $response = $client->run('app/receive-transfer-chunk', [
+            'session_id' => $job->sessionId,
+            'dataset' => $dataset,
+            'table' => $table,
+            'rows' => $rows,
+        ]);
+
+        if (($response['ok'] ?? false) !== true) {
+            throw new RuntimeException("The target rejected a {$table} batch: "
+                .($response['error'] ?? 'unknown reason'));
+        }
+
+        $job->count('posts', count($rows));
+        $job->counters['removed'] = $this->removedOnTarget($response);
+
+        if ($rows === []) {
+            $this->nextTable($job, $tables);
+
+            return;
+        }
+
+        $job->cursor = (int) $rows[count($rows) - 1][Dataset::TRANSFER_KEY];
+    }
+
+    /**
+     * @param  array<int, string>  $tables
+     */
+    private function nextTable(PushJob $job, array $tables): void
+    {
+        $job->tableIndex++;
+        $job->cursor = 0;
+
+        if ($job->tableIndex >= count($tables)) {
+            $this->nextDataset($job);
+        }
+    }
+
+    private function nextDataset(PushJob $job): void
+    {
+        $job->datasetIndex++;
+        $job->tableIndex = 0;
+        $job->cursor = 0;
+
+        if ($job->currentDataset() === null) {
+            $job->phase = $this->afterRows($job);
+        }
     }
 
     /**

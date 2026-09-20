@@ -75,6 +75,7 @@ class PullJobRunner
         $job->sessionId = $session->id;
         $job->datasets = $this->registry->importOrder($job->manifest->datasets);
         $job->datasetIndex = 0;
+        $job->tableIndex = 0;
         $job->cursor = 0;
         $job->phase = $job->datasets === [] ? PullJob::PHASE_FINISH : PullJob::PHASE_ROWS;
     }
@@ -85,6 +86,12 @@ class PullJobRunner
 
         if ($dataset === null) {
             $job->phase = $this->afterRows($job);
+
+            return;
+        }
+
+        if ($this->registry->get($dataset)->isTableBacked()) {
+            $this->tableRows($client, $job, $dataset);
 
             return;
         }
@@ -108,12 +115,7 @@ class PullJobRunner
         }
 
         if (($batch['done'] ?? false) === true) {
-            $job->datasetIndex++;
-            $job->cursor = 0;
-
-            if ($job->currentDataset() === null) {
-                $job->phase = $this->afterRows($job);
-            }
+            $this->nextDataset($job);
 
             return;
         }
@@ -137,11 +139,113 @@ class PullJobRunner
         $job->cursor = (int) ($batch['last_id'] ?? 0);
 
         if ($job->cursor === 0) {
-            $job->datasetIndex++;
+            $this->nextDataset($job);
+        }
+    }
 
-            if ($job->currentDataset() === null) {
-                $job->phase = $this->afterRows($job);
+    /**
+     * Fetch and import one batch of whole rows from the current transfer table.
+     *
+     * The mirror of PushJobRunner::tableRows(). The table is asked for by index
+     * and resolved against this side's own registry as well as the source's, so
+     * two environments running different code cannot quietly write one table's
+     * rows into another's.
+     *
+     * The opening batch is imported even when it is empty: that is what empties
+     * the local tables, and skipping it would leave rows here that the source
+     * does not have — a merge, when the whole point is a replace.
+     */
+    private function tableRows(SyncClient $client, PullJob $job, string $dataset): void
+    {
+        $tables = $this->registry->get($dataset)->transferTables;
+        $table = $tables[$job->tableIndex] ?? null;
+
+        if ($table === null) {
+            $this->nextDataset($job);
+
+            return;
+        }
+
+        $batch = $client->run('app/export-transfer-batch', [
+            'manifest' => $job->manifest->toArray(),
+            'dataset' => $dataset,
+            'table_index' => $job->tableIndex,
+            'after' => $job->cursor,
+            'limit' => self::BATCH_SIZE,
+        ]);
+
+        if (($batch['ok'] ?? false) !== true) {
+            throw new RuntimeException("The source refused a {$table} batch: "
+                .($batch['error'] ?? 'unknown reason'));
+        }
+
+        $sent = (string) ($batch['table'] ?? $table);
+
+        if ($sent !== $table) {
+            throw new RuntimeException(
+                "The source answered for \"{$sent}\" when asked for \"{$table}\". "
+                .'The two environments disagree on the shape of the '.$dataset.' dataset.'
+            );
+        }
+
+        if ($job->cursor === 0 && isset($batch['total'])) {
+            $job->totals['posts'] = ($job->totals['posts'] ?? 0) + (int) $batch['total'];
+        }
+
+        $rows = array_values(array_filter((array) ($batch['rows'] ?? []), 'is_array'));
+
+        if ($rows !== [] || $job->cursor === 0) {
+            $session = $this->session($job);
+            $undo = $this->undoLogs->for($job->sessionId);
+
+            // Emptied and persisted before the first row lands, so a step that
+            // dies mid-import cannot empty a second time on resume and take
+            // what earlier batches wrote with it.
+            if (! $this->importer->hasEmptied($session, $dataset)) {
+                $this->importer->emptyTablesFor($session, $dataset, $undo);
+                $this->sessions->save($session);
             }
+
+            $this->importer->importTableBatch($session, $dataset, $table, $rows, $undo);
+            $this->sessions->save($session);
+
+            $job->count('posts', count($rows));
+        }
+
+        $last = (int) ($batch['last_id'] ?? 0);
+
+        // A cursor that did not move would fetch the same batch forever, so a
+        // source that reports neither progress nor completion ends the table.
+        if (($batch['done'] ?? false) === true || $last <= $job->cursor) {
+            $this->nextTable($job, $tables);
+
+            return;
+        }
+
+        $job->cursor = $last;
+    }
+
+    /**
+     * @param  array<int, string>  $tables
+     */
+    private function nextTable(PullJob $job, array $tables): void
+    {
+        $job->tableIndex++;
+        $job->cursor = 0;
+
+        if ($job->tableIndex >= count($tables)) {
+            $this->nextDataset($job);
+        }
+    }
+
+    private function nextDataset(PullJob $job): void
+    {
+        $job->datasetIndex++;
+        $job->tableIndex = 0;
+        $job->cursor = 0;
+
+        if ($job->currentDataset() === null) {
+            $job->phase = $this->afterRows($job);
         }
     }
 

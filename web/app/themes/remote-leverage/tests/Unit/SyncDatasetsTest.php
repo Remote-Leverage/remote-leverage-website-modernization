@@ -30,13 +30,65 @@ describe('dataset catalogue', function () {
             ->and($this->registry->isNeverSynced('posts'))->toBeFalse();
     });
 
-    it('allows only content, media and settings to transfer', function () {
+    it('allows only content, media, settings and leads to transfer', function () {
         expect(array_keys($this->registry->transferable()))
             ->toEqualCanonicalizing([
                 DatasetRegistry::CONTENT,
                 DatasetRegistry::MEDIA,
                 DatasetRegistry::SETTINGS,
+                DatasetRegistry::LEADS,
             ]);
+    });
+
+    it('marks leads, and only leads, as travelling by table', function () {
+        $byTable = array_keys(array_filter($this->registry->all(), fn ($d) => $d->isTableBacked()));
+
+        expect($byTable)->toBe([DatasetRegistry::LEADS])
+            ->and($this->registry->get(DatasetRegistry::LEADS)->transferTables)
+            ->toBe([
+                'rl_lead_profiles',
+                'rl_lead_identifiers',
+                'rl_leads',
+                'rl_lead_activity_logs',
+            ]);
+    });
+
+    it('empties lead tables children-first and loads them parents-first', function () {
+        $leads = $this->registry->get(DatasetRegistry::LEADS);
+
+        /*
+         * Parents before children on the way in, the reverse on the way out.
+         *
+         * `rl_leads.profile_id` and `rl_lead_identifiers.profile_id` point at `rl_lead_profiles`,
+         * and `rl_lead_activity_logs.lead_id` at `rl_leads`. Only the last of those is a real
+         * constraint, which is exactly why the order is asserted: a wrong order on the others
+         * leaves orphans rather than raising an error.
+         */
+        expect($leads->transferTables)->toBe([
+            'rl_lead_profiles',
+            'rl_lead_identifiers',
+            'rl_leads',
+            'rl_lead_activity_logs',
+        ])->and($leads->emptyOrder())->toBe([
+            'rl_lead_activity_logs',
+            'rl_leads',
+            'rl_lead_identifiers',
+            'rl_lead_profiles',
+        ]);
+    });
+
+    it('does not mark the posts-backed datasets as table-backed', function () {
+        expect($this->registry->get(DatasetRegistry::CONTENT)->isTableBacked())->toBeFalse()
+            ->and($this->registry->get(DatasetRegistry::MEDIA)->isTableBacked())->toBeFalse()
+            ->and($this->registry->get(DatasetRegistry::SETTINGS)->isTableBacked())->toBeFalse();
+    });
+
+    it('keeps purge-only datasets off the table-transfer path', function () {
+        // They populate $tables for the purger; that must never be mistaken
+        // for permission to transfer them.
+        expect($this->registry->get(DatasetRegistry::REFERRALS)->tables)->not->toBe([])
+            ->and($this->registry->get(DatasetRegistry::REFERRALS)->isTableBacked())->toBeFalse()
+            ->and($this->registry->get(DatasetRegistry::USERS)->isTableBacked())->toBeFalse();
     });
 
     it('allows only real-data groups to be purged', function () {
@@ -62,7 +114,12 @@ describe('dataset catalogue', function () {
 
     it('applies the install prefix to table names', function () {
         expect($this->registry->get(DatasetRegistry::LEADS)->prefixedTables('wp_'))
-            ->toBe(['wp_rl_leads', 'wp_rl_lead_activity_logs']);
+            ->toBe([
+                'wp_rl_lead_activity_logs',
+                'wp_rl_leads',
+                'wp_rl_lead_identifiers',
+                'wp_rl_lead_profiles',
+            ]);
     });
 
     it('rejects an unknown dataset key', function () {
@@ -90,9 +147,18 @@ describe('transfer manifest', function () {
     it('refuses a dataset that is purge-only', function () {
         TransferManifest::fromArray([
             'direction' => 'push',
-            'datasets' => ['content', 'leads'],
+            'datasets' => ['content', 'referrals'],
         ], $this->registry);
     })->throws(InvalidManifestException::class, 'never transferred');
+
+    it('accepts leads, which is now transferable', function () {
+        $manifest = TransferManifest::fromArray([
+            'direction' => 'pull',
+            'datasets' => ['leads'],
+        ], $this->registry);
+
+        expect($manifest->includes(DatasetRegistry::LEADS))->toBeTrue();
+    });
 
     it('refuses to transfer users even though they are a known dataset', function () {
         TransferManifest::fromArray([

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domains\Sync\Abilities;
 
+use App\Domains\Sync\Datasets\DatasetRegistry;
 use App\Domains\Sync\Transfer\Import\ContentImporter;
 use App\Domains\Sync\Transfer\Import\DatasetCleaner;
 use App\Domains\Sync\Transfer\SessionStore;
 use App\Domains\Sync\Transfer\TransferSession;
+use App\Domains\Sync\Transfer\UndoLog;
 use App\Domains\Sync\Transfer\UndoLogFactory;
 use Throwable;
 
@@ -21,6 +23,12 @@ use Throwable;
  *
  * Writes are upserts keyed on the primary key, so a chunk redelivered after a
  * dropped connection lands on the same rows rather than duplicating them.
+ *
+ * Two chunk shapes, and which one applies is decided by the dataset here rather
+ * than by what the sender happened to put in the payload: posts-and-meta, or —
+ * for a table-backed dataset such as leads — a table name and whole rows. The
+ * table path replaces the target's tables, and the emptying only ever happens
+ * here, inside an open session, for a dataset that session's manifest covers.
  */
 class ReceiveTransferChunkAbility extends TransferAbility
 {
@@ -29,6 +37,7 @@ class ReceiveTransferChunkAbility extends TransferAbility
         private readonly ContentImporter $importer,
         private readonly DatasetCleaner $cleaner,
         private readonly UndoLogFactory $undoLogs,
+        private readonly DatasetRegistry $registry = new DatasetRegistry,
     ) {}
 
     public function label(): string
@@ -61,6 +70,10 @@ class ReceiveTransferChunkAbility extends TransferAbility
 
         $session->state = TransferSession::STATE_IMPORTING;
         $undo = $this->undoLogs->for($session->id);
+
+        if ($this->registry->get($dataset)->isTableBacked()) {
+            return $this->receiveTableChunk($session, $dataset, $input, $undo);
+        }
 
         // Clean lazily, on the first chunk of each dataset, rather than when the
         // session opens. Deleting only once rows are actually arriving means a
@@ -107,6 +120,61 @@ class ReceiveTransferChunkAbility extends TransferAbility
     }
 
     /**
+     * Apply one batch of whole table rows — the leads path.
+     *
+     * The table is named by the sender, but it is only ever accepted after
+     * ContentImporter has checked it against the dataset definition and the
+     * session's own manifest, so a chunk cannot reach a table this transfer was
+     * not opened for. The empty runs first and is persisted before a single row
+     * is written, exactly as the post clean is.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function receiveTableChunk(
+        TransferSession $session,
+        string $dataset,
+        array $input,
+        UndoLog $undo,
+    ): array {
+        $table = (string) ($input['table'] ?? '');
+        $emptiedAlready = $this->importer->hasEmptied($session, $dataset);
+
+        try {
+            $this->importer->emptyTablesFor($session, $dataset, $undo);
+        } catch (Throwable $e) {
+            $session->fail($e->getMessage());
+            $this->sessions->save($session);
+
+            return ['ok' => false, 'error' => $e->getMessage(), 'session' => $session->toStatusArray()];
+        }
+
+        if (! $emptiedAlready) {
+            // Persisted before the first insert. A chunk redelivered after this
+            // request dies must not empty again — by then the target may hold
+            // rows this transfer wrote.
+            $this->sessions->save($session);
+        }
+
+        try {
+            $written = $this->importer->importTableBatch($session, $dataset, $table, $this->rows($input, 'rows'), $undo);
+        } catch (Throwable $e) {
+            $session->fail($e->getMessage());
+            $this->sessions->save($session);
+
+            return ['ok' => false, 'error' => $e->getMessage(), 'session' => $session->toStatusArray()];
+        }
+
+        $this->sessions->save($session);
+
+        return [
+            'ok' => true,
+            'written' => ['table' => $table, 'rows' => $written],
+            'session' => $session->toStatusArray(),
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $input
      * @return array<int, array<string, mixed>>
      */
@@ -130,6 +198,10 @@ class ReceiveTransferChunkAbility extends TransferAbility
                 'dataset' => ['type' => 'string', 'description' => 'Which selected dataset this batch belongs to.'],
                 'posts' => ['type' => 'array', 'description' => 'Post rows in this batch.'],
                 'meta' => ['type' => 'array', 'description' => 'Postmeta rows for those posts.'],
+                'table' => ['type' => 'string', 'description' => 'Table-backed datasets only: which of the '
+                    .'dataset\'s transfer tables these rows belong to.'],
+                'rows' => ['type' => 'array', 'description' => 'Table-backed datasets only: whole rows, '
+                    .'keys included.'],
             ],
             'required' => ['session_id', 'dataset'],
         ];

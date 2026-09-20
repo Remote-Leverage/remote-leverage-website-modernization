@@ -140,11 +140,22 @@ class UndoLog
      */
     public function recordInsert(string $table, array $primaryKey): void
     {
-        $this->append([
+        $this->append(self::insertEntry($table, $primaryKey));
+    }
+
+    /**
+     * Build an insert entry without writing it, for batching via recordMany().
+     *
+     * @param  array<string, mixed>  $primaryKey
+     * @return array<string, mixed>
+     */
+    public static function insertEntry(string $table, array $primaryKey): array
+    {
+        return [
             'op' => self::OP_INSERT,
             'table' => $table,
             'pk' => $primaryKey,
-        ]);
+        ];
     }
 
     /**

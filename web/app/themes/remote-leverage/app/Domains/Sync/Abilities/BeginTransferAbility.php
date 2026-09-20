@@ -14,8 +14,12 @@ use App\Domains\Sync\Transfer\TransferManifest;
  *
  * The manifest arrives from the other environment and is validated here rather
  * than trusted — TransferManifest refuses a purge-only dataset outright, so a
- * caller asking to import leads or users is rejected at the door even though it
- * authenticated successfully.
+ * caller asking to import referrals or users is rejected at the door even
+ * though it authenticated successfully.
+ *
+ * The session this opens is also what bounds the destructive half of a
+ * table-backed transfer: ReceiveTransferChunkAbility will only empty a table of
+ * a dataset named in this manifest.
  */
 class BeginTransferAbility extends TransferAbility
 {

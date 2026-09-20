@@ -114,5 +114,88 @@ if wp core is-installed --allow-root >/dev/null 2>&1; then
   fi
 fi
 
+# ---------------------------------------------------------------------------
+# Real cron, so scheduled work stops depending on visitor traffic.
+#
+# WP-Cron fires on a request. That is workable on a busy marketing site during the day and not
+# workable at all overnight: an hour with no visitors is an hour with no scheduled run, and
+# nothing anywhere says a tick was skipped. Every hourly job in this application inherits that —
+# abandoned-lead processing, the Calendly cache warm, integration-call pruning, the marketing
+# cost alert and the dashboard snapshot it warms.
+#
+# DISABLE_WP_CRON is exported only once cron is actually up, and that ordering is the point.
+# Setting it unconditionally would mean a container whose cron failed to start has neither a
+# real cron nor the request-triggered fallback, and scheduled work would stop completely and
+# silently. This way the failure degrades to exactly the behaviour that shipped before this
+# block existed, and says so in CloudWatch.
+#
+# php-fpm reads the exported value because docker/www.conf sets `clear_env = no`; the task
+# definition can still override it, since config/application.php reads the environment and the
+# entrypoint never overwrites a variable that is already set.
+# ---------------------------------------------------------------------------
+if [ "${DISABLE_WP_CRON:-}" = "true" ]; then
+  # Already switched off by the task definition. Starting cron anyway would mean no scheduled
+  # work at all, so this honours the setting and warns rather than quietly contradicting it.
+  echo "entrypoint: DISABLE_WP_CRON is already true in the environment; not starting cron." >&2
+elif command -v cron >/dev/null 2>&1 && cron; then
+  export DISABLE_WP_CRON=true
+  echo "entrypoint: cron started; WP-Cron no longer piggybacks on visitor requests."
+else
+  echo "entrypoint: WARNING - cron failed to start; leaving WP-Cron on request spawning." >&2
+fi
+
+# ---------------------------------------------------------------------------
+# Queue worker.
+#
+# Inert unless QUEUE_CONNECTION names a real connection. Unset or `sync` is what every
+# environment runs today: the deferred integrations execute as terminating callbacks inside the
+# web request's own process, and a worker would have nothing to take. That default is what makes
+# this safe to ship before any environment has opted in — and why switching the queue on is an
+# environment change rather than a deploy.
+#
+# WP-CLI here, unlike the cron tick above, and it can be: this inherits the entrypoint's
+# environment, so the database credentials the ECS task definition supplies are present. Cron
+# jobs get no environment, which is the whole reason wp-cron.sh goes over the loopback instead.
+#
+# Every task runs its own worker. The database driver reserves a row before working it, so N
+# workers share the queue rather than racing for the same job.
+# ---------------------------------------------------------------------------
+case "${QUEUE_CONNECTION:-sync}" in
+  sync)
+    echo "entrypoint: QUEUE_CONNECTION is '${QUEUE_CONNECTION:-unset}'; no queue worker needed."
+    ;;
+  *)
+    (
+      while true; do
+        # The worker runs as root, like every other wp call here, so anything it creates would
+        # otherwise be unwritable for php-fpm, which serves as www-data. Repeating this is cheap
+        # and it only comes round once an hour.
+        chown -R www-data:www-data /var/www/html/web/app/cache 2>/dev/null || true
+
+        # --max-time recycles the process hourly. That bounds memory and means a deploy's new
+        # code is picked up without anything having to signal the worker.
+        #
+        # --timeout must stay below the connection's retry_after (90s in Acorn's config): a job
+        # killed for running long while the queue still considers it reserved would be handed to
+        # a second worker while the first was on it. --tries=1 matches CallHandlerJob's own
+        # setting — no retry, because the handlers it wraps are not all idempotent and a retried
+        # Slack post or lead webhook is a duplicate someone else has to deal with.
+        wp acorn queue:work \
+          --queue=default \
+          --tries=1 \
+          --timeout=60 \
+          --sleep=3 \
+          --max-time=3600 \
+          --allow-root || true
+
+        # A crash loop should not become a busy loop against the database.
+        sleep 2
+      done
+    ) &
+
+    echo "entrypoint: queue worker started on the '${QUEUE_CONNECTION}' connection."
+    ;;
+esac
+
 php-fpm -D
 exec nginx -g "daemon off;"

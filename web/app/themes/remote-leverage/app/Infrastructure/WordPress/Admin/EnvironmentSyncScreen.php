@@ -46,6 +46,12 @@ class EnvironmentSyncScreen
      */
     public function render(?array $issuedCredentials, bool $autostartPush, bool $autostartPull): void
     {
+        if (! SyncEnvironment::syncEnabled()) {
+            $this->renderSourceOnly($issuedCredentials);
+
+            return;
+        }
+
         $push = $this->pushJobs->active();
         $pull = $this->pullJobs->active();
         $running = $push !== null || $pull !== null;
@@ -90,7 +96,7 @@ class EnvironmentSyncScreen
      */
     private function header(): void
     {
-        $targets = $this->configuredEnvironments();
+        $targets = $this->configuredEnvironments(includeReadOnly: true);
 
         echo '<div class="rl-admin-header">';
         echo '<h1 class="rl-admin-title">Environment Sync</h1>';
@@ -105,7 +111,7 @@ class EnvironmentSyncScreen
                 .'environment&rsquo;s <code>.env</code> to connect one.'
             : 'Connected to '.esc_html(implode(', ', $targets)).'.';
 
-        echo ' Never available in production.</p>';
+        echo ' Production can be pulled from, never pushed to.</p>';
         echo '</div>';
     }
 
@@ -166,7 +172,10 @@ class EnvironmentSyncScreen
 
     private function tabs(bool $running): void
     {
-        if ($this->configuredEnvironments() === []) {
+        // Production alone is enough to justify the tabs: you cannot push to it,
+        // but you can pull from it, so hiding them would hide the only thing
+        // this screen could do.
+        if ($this->configuredEnvironments(includeReadOnly: true) === []) {
             return;
         }
 
@@ -283,15 +292,24 @@ class EnvironmentSyncScreen
         echo '</form>';
     }
 
+    /**
+     * Production is offered as a source and withheld everywhere else.
+     *
+     * It is read-only by ability, and TransferPusher refuses it by host as well,
+     * so listing it as a target would only ever produce an error. Leaving it out
+     * of the dropdown is the honest version of the same rule.
+     */
     private function environmentSelect(string $name): void
     {
+        $isSource = $name === 'source';
+
         printf('<div class="rl-field"><label class="rl-label">%s</label>'
             .'<select name="%s" class="rl-select">',
-            esc_html($name === 'source' ? 'Source' : 'Target'),
+            esc_html($isSource ? 'Source' : 'Target'),
             esc_attr($name),
         );
 
-        foreach ($this->configuredEnvironments() as $env) {
+        foreach ($this->configuredEnvironments($isSource) as $env) {
             printf('<option value="%1$s">%1$s</option>', esc_attr((string) $env));
         }
 
@@ -307,7 +325,9 @@ class EnvironmentSyncScreen
         }
 
         echo '</ul>';
-        echo '<span class="rl-hint">Leads, referrals, scheduling and users are never transferred. '
+        echo '<span class="rl-hint">Referrals, scheduling and users are never transferred. '
+            .'Leads are, and they carry real contact details: the target\'s lead tables are '
+            .'emptied and replaced, never merged. '
             .'Content without media leaves posts pointing at files the other side does not have.</span></div>';
     }
 
@@ -429,6 +449,48 @@ class EnvironmentSyncScreen
      * Setup, folded away once it is done — it is a one-time step, not something
      * you come to this screen for.
      */
+    /**
+     * The whole screen in an environment that cannot run a transfer — today,
+     * production.
+     *
+     * Deliberately not the normal screen with the controls disabled. There is
+     * nothing to push, nothing to pull and no history to show here, and a row of
+     * greyed-out buttons invites someone to work out how to un-grey them. What
+     * is left is a credentials card and a paragraph saying why it is the only
+     * thing here.
+     *
+     * @param  array{user_login: string, password: string}|null  $issuedCredentials
+     */
+    private function renderSourceOnly(?array $issuedCredentials): void
+    {
+        echo '<div class="wrap rl-admin-wrap rl-sync">';
+        $this->styles();
+
+        echo '<div class="rl-admin-header">';
+        echo '<h1 class="rl-admin-title">Environment Sync</h1>';
+        printf(
+            '<p class="rl-admin-subtitle">This environment is <code>%s</code>, so it can be '
+                .'<strong>read from and never written to</strong>. Transfers are started on the '
+                .'environment receiving them; this page exists only to issue the credential they '
+                .'authenticate with.</p>',
+            esc_html(SyncEnvironment::current()),
+        );
+        echo '</div>';
+
+        if ($issuedCredentials !== null) {
+            $this->issuedCredentials($issuedCredentials);
+        }
+
+        $this->credentials();
+
+        echo '<p class="rl-hint">A credential issued here can export content, list media and read '
+            .'an uploaded file. It cannot import, purge or roll anything back &mdash; those refuse '
+            .'on this environment whoever is calling. Lead rows are exported with their personal '
+            .'data intact, so revoke this when you are done pulling.</p>';
+
+        echo '</div>';
+    }
+
     private function credentials(): void
     {
         $status = $this->provisioner->status();
@@ -531,11 +593,26 @@ class EnvironmentSyncScreen
     /**
      * @return array<int, string>
      */
-    private function configuredEnvironments(): array
+    /**
+     * Remotes this environment has credentials for.
+     *
+     * @param  bool  $includeReadOnly  true when the caller is choosing something
+     *                                 to read from. Production is configured
+     *                                 like any other remote but can only ever be
+     *                                 a source, so it is excluded by default and
+     *                                 opted into here.
+     * @return array<int, string>
+     */
+    private function configuredEnvironments(bool $includeReadOnly = false): array
     {
-        return array_keys(array_filter(
+        $configured = array_keys(array_filter(
             (array) config('rl-sync.environments', []),
             fn ($env) => ! empty($env['url']),
+        ));
+
+        return array_values(array_filter(
+            $configured,
+            fn ($env) => $includeReadOnly || $env !== SyncEnvironment::PRODUCTION,
         ));
     }
 
