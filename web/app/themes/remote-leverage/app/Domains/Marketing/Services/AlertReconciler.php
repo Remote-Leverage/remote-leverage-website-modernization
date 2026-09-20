@@ -45,6 +45,11 @@ class AlertReconciler
      *     booked_by_status?: int,
      *     warehouse_bookings?: int|null,
      *     warehouse_unavailable?: bool,
+     *     warehouse_age_minutes?: int|null,
+     *     stale_platforms?: array<int, string>,
+     *     spend_pending?: bool,
+     *     report_date?: string|null,
+     *     report_is_closing?: bool,
      * }  $facts
      * @return array<int, string> One sentence per finding, empty when everything ties up.
      */
@@ -196,6 +201,73 @@ class AlertReconciler
             }
         }
 
+        /*
+         * How old the warehouse's own copy is.
+         *
+         * Distinct from the "as of" on the card, which is when this application *asked* — that
+         * keeps ticking forward whether or not the pipeline behind it is still running. A stalled
+         * ETL therefore presents as a card full of frozen figures wearing a current timestamp,
+         * which is the one failure mode nothing else here can see.
+         *
+         * Ninety minutes because the alert runs hourly and the extract runs more often than that;
+         * a gap wider than one cycle means something has stopped rather than merely lagged.
+         */
+        $age = $facts['warehouse_age_minutes'] ?? null;
+        $maxAge = (int) config('marketing.cost_alert.max_warehouse_age_minutes', 90);
+
+        if (is_int($age) && $age > $maxAge) {
+            $findings[] = sprintf(
+                'The warehouse last refreshed %s ago. Every cost figure above is from that moment, '.
+                'not from now, however recent the timestamp on this card looks.',
+                self::humanMinutes($age),
+            );
+        }
+
+        /*
+         * An ad platform that has not finished reporting.
+         *
+         * Spend arrives short, so cost per booking comes out *better* than it is — the most
+         * dangerous direction for a cost alert to be wrong in, because nobody questions good news.
+         * The warehouse flags Meta, Google and Bing separately; the card used to read only Meta.
+         */
+        $stalePlatforms = (array) ($facts['stale_platforms'] ?? []);
+
+        if ($stalePlatforms !== []) {
+            $findings[] = sprintf(
+                '%s still reporting, so spend is understated and every cost per booking above is '.
+                'lower than the real one. Treat them as a floor.',
+                self::andList($stalePlatforms),
+            );
+        } elseif (($facts['spend_pending'] ?? false) === true) {
+            $findings[] = 'Spend for this day is still settling, so the cost figures above may move.';
+        }
+
         return $findings;
+    }
+
+    /** "95 minutes" / "3h 10m", whichever reads faster at a glance. */
+    private static function humanMinutes(int $minutes): string
+    {
+        if ($minutes < 120) {
+            return $minutes.' minutes';
+        }
+
+        return intdiv($minutes, 60).'h '.($minutes % 60).'m';
+    }
+
+    /**
+     * "Meta", "Meta and Google", "Meta, Google and Microsoft".
+     *
+     * @param  array<int, string>  $items
+     */
+    private static function andList(array $items): string
+    {
+        if (count($items) === 1) {
+            return $items[0].' is';
+        }
+
+        $last = array_pop($items);
+
+        return implode(', ', $items).' and '.$last.' are';
     }
 }

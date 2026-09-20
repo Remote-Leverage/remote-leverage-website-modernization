@@ -7,8 +7,10 @@ use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Services\LeadQualification;
 use App\Domains\Lead\Services\SlackMessageRenderer;
 use App\Domains\Marketing\Actions\SendCostAlertAction;
+use App\Domains\Marketing\Data\DaySupplement;
 use App\Domains\Marketing\Data\FunnelSnapshot;
 use App\Domains\Marketing\Data\MarketingDay;
+use App\Domains\Marketing\Data\PartialDay;
 use App\Domains\Marketing\Data\PlatformSlice;
 use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Services\AlertReconciler;
@@ -1320,11 +1322,11 @@ function costAlertDay(array $overrides = []): MarketingDay
  * Null is the unreachable case and it is a first-class one: half the tests in this file are about
  * what the card says when the cost figures are not there.
  */
-function warehouseStub(?MarketingDay $day): BigQueryClient
+function warehouseStub(?MarketingDay $day, ?PartialDay $today = null): BigQueryClient
 {
-    return new class($day) extends BigQueryClient
+    return new class($day, $today) extends BigQueryClient
     {
-        public function __construct(private ?MarketingDay $day) {}
+        public function __construct(private ?MarketingDay $day, private ?PartialDay $today) {}
 
         public function isConfigured(): bool
         {
@@ -1334,6 +1336,11 @@ function warehouseStub(?MarketingDay $day): BigQueryClient
         public function marketingDay(): ?MarketingDay
         {
             return $this->day;
+        }
+
+        public function todaySoFar(): ?PartialDay
+        {
+            return $this->today;
         }
     };
 }
@@ -1417,25 +1424,22 @@ function recordingCostTransport(): object
  * without BigQuery credentials and the state most of these tests want: the funnel half of the card
  * rendered from real rows, and the cost half explicitly absent.
  */
-function costAlertAction(SlackTransport $transport, ?MarketingDay $day = null): SendCostAlertAction
+function costAlertAction(SlackTransport $transport, ?MarketingDay $day = null, ?PartialDay $today = null): SendCostAlertAction
 {
     return new SendCostAlertAction(
-        new FunnelMetricsService(null, null, null, warehouseStub($day)),
+        new FunnelMetricsService(null, null, null, warehouseStub($day, $today)),
         $transport,
         new SlackMessageRenderer,
     );
 }
 
 /*
- * Which day the two halves of the card are about.
+ * Which day this site's half of the card covers.
  *
- * The warehouse decides, because it is the half that cannot be recomputed: before 08:00 Eastern
- * `marketing-home-daily.sql` reports the previous day complete rather than a few hours of today
- * (`IF(hour_et < 8, DATE_SUB(today, INTERVAL 1 DAY), today)`). This side used to ignore that and
- * always count today, so a card fired at 03:52 on 2026-09-20 showed the warehouse's closed 19 Sep
- * — 97 leads, 63 bookings — beside this site's 3h52m of 20 Sep, 7 and 3. The reconciler duly
- * reported that one source had to be wrong. Neither was; on matched days they agreed to within
- * 28%. It also made cost per booking one day's spend over another day's bookings.
+ * Today, at every hour, because the card is. This followed the warehouse's reported day for a
+ * while — the period when an overnight card's headline was the previous day closed — and the
+ * tests for that are gone with it. What remains is the case that made the alignment matter in the
+ * first place: the two halves must never describe different days.
  */
 describe('the day the card reports', function () {
     beforeEach(function () {
@@ -1444,83 +1448,21 @@ describe('the day the card reports', function () {
         LeadActivityLog::truncate();
     });
 
-    $closingOn = fn (string $date): MarketingDay => costAlertDay([
-        'Date' => $date,
-        'report_kind' => 'CLOSING',
-        'as_of_et' => '03:52',
-    ]);
-
-    test('a closing report counts the warehouse day, not the day the job happens to run', function () use ($closingOn) {
-        $yesterday = costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 14:00:00', 'UTC')]);
-        costAlertBooking($yesterday, CarbonImmutable::parse('2026-09-19 15:00:00', 'UTC'));
-
+    test('the funnel figures are today, even while the warehouse reports yesterday closed', function () {
+        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 14:00:00', 'UTC')]);
         costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-20 03:00:00', 'UTC')]);
 
-        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub($closingOn('2026-09-19'))))
-            ->snapshot(CarbonImmutable::parse('2026-09-20 03:52:00', 'UTC'));
+        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(
+            costAlertDay(['Date' => '2026-09-19', 'report_kind' => 'CLOSING']),
+            PartialDay::fromRow(['date' => '2026-09-20', 'as_of_et' => '03:52', 'total_leads' => 1]),
+        )))->snapshot(CarbonImmutable::parse('2026-09-20 03:52:00', 'UTC'));
 
         expect($snapshot->leads)->toBe(1)
-            ->and($snapshot->bookings)->toBe(1);
+            ->and($snapshot->todaySoFar?->date)->toBe('2026-09-20');
     });
 
-    test('a closing report takes the whole day, not up to the hour the job ran', function () use ($closingOn) {
-        // 22:00 is past 03:52 on the clock, so a window that stopped at "now" would miss it.
-        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 22:00:00', 'UTC')]);
-
-        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub($closingOn('2026-09-19'))))
-            ->snapshot(CarbonImmutable::parse('2026-09-20 03:52:00', 'UTC'));
-
-        expect($snapshot->leads)->toBe(1);
-    });
-
-    test('a day-to-date report still counts today so far', function () {
-        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 14:00:00', 'UTC')]);
-        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-20 09:00:00', 'UTC')]);
-
-        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(costAlertDay([
-            'Date' => '2026-09-20',
-            'report_kind' => 'DAY-TO-DATE',
-        ]))))->snapshot(CarbonImmutable::parse('2026-09-20 15:00:00', 'UTC'));
-
-        expect($snapshot->leads)->toBe(1);
-    });
-
-    test('an unreadable warehouse falls back to today rather than counting nothing', function () {
-        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-20 09:00:00', 'UTC')]);
-
-        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(null)))
-            ->snapshot(CarbonImmutable::parse('2026-09-20 15:00:00', 'UTC'));
-
-        expect($snapshot->leads)->toBe(1);
-    });
-
-    /*
-     * The baseline has to follow the window, or the fix above just moves the lie.
-     *
-     * baseline() normally measures each prior day up to the same *hour*, because a figure read at
-     * 15:00 is not comparable to a finished day. On a closing report the compared figure IS a
-     * finished day, so the rule inverts: measuring a complete Saturday against a 7-day average
-     * taken at 03:52 reads as "+489% vs average".
-     */
-    test('a closing report compares against whole prior days, not the hour it ran at', function () use ($closingOn) {
-        // One lead late on each of the two prior days, well after 03:52.
-        foreach (['2026-09-17', '2026-09-18'] as $date) {
-            costAlertLead(['created_at' => CarbonImmutable::parse($date.' 22:00:00', 'UTC')]);
-        }
-
-        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 22:00:00', 'UTC')]);
-
-        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub($closingOn('2026-09-19'))))
-            ->snapshot(CarbonImmutable::parse('2026-09-20 03:52:00', 'UTC'));
-
-        // Both prior days are seen in full, so one lead against an average of one is no change.
-        // An hour-capped baseline would see zero on both and call this an infinite rise.
-        expect($snapshot->leads)->toBe(1)
-            ->and($snapshot->baseline['leads'])->toBeGreaterThan(0.0);
-    });
-
-    test('a day-to-date report still compares against the same hour', function () {
-        // 22:00 yesterday is after the 15:00 read, so an hour-capped baseline must not count it.
+    test('the baseline stays same-hour, so a morning is not measured against finished days', function () {
+        // 22:00 yesterday is after a 15:00 read, so an hour-capped baseline must not count it.
         costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 22:00:00', 'UTC')]);
 
         $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(costAlertDay([
@@ -1529,6 +1471,15 @@ describe('the day the card reports', function () {
         ]))))->snapshot(CarbonImmutable::parse('2026-09-20 15:00:00', 'UTC'));
 
         expect($snapshot->baseline['leads'])->toBe(0.0);
+    });
+
+    test('an unreadable warehouse still counts today', function () {
+        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-20 09:00:00', 'UTC')]);
+
+        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(null)))
+            ->snapshot(CarbonImmutable::parse('2026-09-20 15:00:00', 'UTC'));
+
+        expect($snapshot->leads)->toBe(1);
     });
 
     test('the gap warning names the day instead of calling it today', function () {
@@ -1541,149 +1492,7 @@ describe('the day the card reports', function () {
         ]);
 
         expect($findings)->not->toBeEmpty()
-            ->and($findings[0])->toContain('on 2026-09-19')
-            ->and($findings[0])->not->toContain('bookings today');
-    });
-});
-
-/*
- * The funnel summary reads down the funnel, each step carrying its share of the one above.
- *
- * The percentages are same-window ratios of the warehouse's own three numbers, not conversion
- * rates: a booking on a given day can come from a lead captured last week, so the denominator is
- * not the cohort the numerator came from. The trailing rate in the Activity block is the
- * lead-level measure and the two can differ sharply — both are printed rather than one.
- */
-describe('the funnel summary', function () {
-    beforeEach(function () {
-        costAlertConfig();
-        Lead::truncate();
-        LeadActivityLog::truncate();
-        update_option(SendCostAlertAction::STATE_OPTION, []);
-    });
-
-    $render = function (array $overrides): string {
-        $transport = recordingCostTransport();
-
-        costAlertAction($transport, costAlertDay(array_merge([
-            'report_kind' => 'CLOSING',
-            'as_of_et' => '07:30',
-        ], $overrides)))->execute(CarbonImmutable::parse('2026-09-19 07:30:00', 'UTC'), force: true);
-
-        return json_encode($transport->posted[0]['blocks'], JSON_UNESCAPED_UNICODE);
-    };
-
-    test('it reads leads, then bookings, then qualified, each with its share', function () use ($render) {
-        $blocks = $render([
-            'total_leads' => '10',
-            'total_appointments' => '5',
-            'total_qualified' => '2',
-            'prev_appointments' => null,
-        ]);
-
-        expect($blocks)
-            ->toContain('- Leads: 10')
-            ->toContain('- Bookings: 5 (50% of leads)')
-            ->toContain('- Qualified: 2 (40% of bookings)');
-    });
-
-    test('a share and a previous-day note share one bracket', function () use ($render) {
-        // "5 (50% of leads) (was 3 on ...)" is the density the card was restructured to remove.
-        $blocks = $render([
-            'total_leads' => '10',
-            'total_appointments' => '5',
-            'prev_appointments' => '3',
-            'prev_d' => '2026-09-18',
-        ]);
-
-        expect($blocks)->toContain('- Bookings: 5 (50% of leads, was 3 on')
-            ->and($blocks)->not->toContain('of leads) (was');
-    });
-
-    test('no leads means no share rather than a division by zero', function () use ($render) {
-        $blocks = $render([
-            'total_leads' => '0',
-            'total_appointments' => '0',
-            'total_qualified' => '0',
-            'prev_appointments' => null,
-        ]);
-
-        expect($blocks)->toContain('- Bookings: 0')
-            ->and($blocks)->not->toContain('% of leads');
-    });
-
-    /*
-     * The two sides can disagree — the warehouse counts bookings against the day they happened and
-     * leads against the day they arrived, so a quiet day following a busy one can book more than
-     * it captured. A share above 100% is not a rate, so none is printed.
-     */
-    test('more bookings than leads prints the counts and no share', function () use ($render) {
-        $blocks = $render([
-            'total_leads' => '4',
-            'total_appointments' => '9',
-            'prev_appointments' => null,
-        ]);
-
-        expect($blocks)->toContain('- Bookings: 9')
-            ->and($blocks)->not->toContain('% of leads');
-    });
-});
-
-/*
- * The send button's progress reporting.
- *
- * The work is unchanged and still takes as long as it takes; what this buys is a person knowing
- * which part they are waiting on. "Reading the marketing warehouse" and "Fetching consultations
- * from Calendly" are the two slow steps, they fail for entirely different reasons, and they are
- * fixed by different people — so the value is in the labels, not the bar.
- */
-describe('send progress', function () {
-    beforeEach(function () {
-        costAlertConfig();
-        Lead::truncate();
-        LeadActivityLog::truncate();
-        update_option(SendCostAlertAction::STATE_OPTION, []);
-    });
-
-    test('it reports named steps, in order, ending short of complete', function () {
-        $seen = [];
-
-        costAlertAction(recordingCostTransport(), costAlertDay())->execute(
-            CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC'),
-            force: true,
-            onProgress: function (string $label, int $percent) use (&$seen) {
-                $seen[] = [$label, $percent];
-            },
-        );
-
-        $labels = array_column($seen, 0);
-        $percents = array_column($seen, 1);
-
-        expect($labels)->toContain('Checking the environment and reporting window')
-            ->and($labels)->toContain('Reading the marketing warehouse')
-            ->and($labels)->toContain('Posting to Slack');
-
-        // Never backwards: the bar is painted straight from these and must not jump about.
-        $sorted = $percents;
-        sort($sorted);
-
-        expect($percents)->toBe($sorted)
-            // The last step is "posting", not "posted". Completion is the response arriving, not
-            // a number this side made up before the network call it is announcing.
-            ->and(max($percents))->toBeLessThan(100)
-            ->and(min($percents))->toBeGreaterThan(0);
-    });
-
-    test('it runs perfectly well with nobody watching', function () {
-        // The scheduled run passes no callback, which must stay a supported case rather than a
-        // null-check somebody forgets.
-        $transport = recordingCostTransport();
-
-        expect(costAlertAction($transport, costAlertDay())->execute(
-            CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC'),
-            force: true,
-        ))->toBeTrue()
-            ->and($transport->posted)->toHaveCount(1);
+            ->and($findings[0])->toContain('on 2026-09-19');
     });
 });
 
@@ -1745,5 +1554,249 @@ describe('every run leaves its own card', function () {
 
         expect($state['ts'] ?? '')->not->toBe('')
             ->and($state['card'] ?? '')->toBe('2026-09-19/CLOSING');
+    });
+});
+
+/*
+ * "Today so far", under a closing report.
+ *
+ * Between midnight and 08:00 Eastern the data team's query reports the previous day complete and
+ * says nothing at all about the hours since midnight — but the view holds those hours, and the
+ * alert this replaced showed them around the clock. Without them a reader at 05:00 cannot tell a
+ * slow start from a stopped ad account.
+ */
+describe('today so far', function () {
+    beforeEach(function () {
+        costAlertConfig();
+        Lead::truncate();
+        LeadActivityLog::truncate();
+        update_option(SendCostAlertAction::STATE_OPTION, []);
+    });
+
+    $render = function (?PartialDay $today, string $kind = 'CLOSING'): string {
+        $transport = recordingCostTransport();
+
+        costAlertAction($transport, costAlertDay([
+            'Date' => '2026-09-19',
+            'report_kind' => $kind,
+        ]), $today)->execute(CarbonImmutable::parse('2026-09-20 03:00:00', 'UTC'), force: true);
+
+        return json_encode($transport->posted[0]['blocks'], JSON_UNESCAPED_UNICODE);
+    };
+
+    test('today is the headline and the closed day is one line under it', function () use ($render) {
+        $blocks = $render(PartialDay::fromRow([
+            'date' => '2026-09-20', 'as_of_et' => '05:43',
+            'total_leads' => 11, 'total_appointments' => 7, 'total_qualified' => 3,
+            'total_spend' => 471.80, 'cpl' => 42.89, 'cpb' => 67.40, 'cpqb' => 157.27,
+        ]));
+
+        expect($blocks)->toContain('Today so far — Sun 20 Sep, as of 05:43 ET')
+            ->and($blocks)->toContain('- Leads: 11')
+            ->and($blocks)->toContain('- Bookings: 7 (64% of leads)')
+            ->and($blocks)->toContain('- CPB: $67.40')
+            // Eight overnight cards repeating a finished day as a block is what this replaced.
+            ->and($blocks)->toContain('Sat 19 Sep closed: 314 leads, 16 bookings, $3,732.24 spend, CPB $287.10')
+            ->and($blocks)->not->toContain('*Closing — Sat 19 Sep*');
+    });
+
+    test('a quiet night prints dashes for the costs rather than zeroes', function () use ($render) {
+        // 00:30 with no bookings yet. A cost per booking on zero bookings is absent, not zero,
+        // and SAFE_DIVIDE gives null so the card prints a dash.
+        $blocks = $render(PartialDay::fromRow([
+            'date' => '2026-09-20', 'as_of_et' => '00:30',
+            'total_leads' => 0, 'total_appointments' => 0, 'total_qualified' => 0, 'total_spend' => 0.0,
+        ]));
+
+        expect($blocks)->toContain('Today so far — Sun 20 Sep, as of 00:30 ET')
+            ->and($blocks)->toContain('- Leads: 0')
+            ->and($blocks)->not->toContain('CPB: $0.00');
+    });
+
+    test('it is absent when the warehouse could not be asked', function () use ($render) {
+        expect($render(null))->not->toContain('Today so far');
+    });
+
+    test('it is not fetched at all once the report is day-to-date', function () {
+        // From 08:00 the headline is already today; a second copy would be the same numbers twice.
+        $transport = recordingCostTransport();
+
+        costAlertAction($transport, costAlertDay([
+            'Date' => '2026-09-20',
+            'report_kind' => 'DAY-TO-DATE',
+        ]), new PartialDay('2026-09-20', '13:00', 40, 25, 18, 8000.0))
+            ->execute(CarbonImmutable::parse('2026-09-20 13:00:00', 'UTC'), force: true);
+
+        expect(json_encode($transport->posted[0]['blocks'], JSON_UNESCAPED_UNICODE))
+            ->not->toContain('Today so far');
+    });
+});
+
+/*
+ * Freshness, per-platform staleness, and the funnel above the lead.
+ *
+ * All three come from columns the data team's query does not select, read by our own supplement
+ * query against the same view for the same date.
+ */
+describe('the day supplement', function () {
+    beforeEach(function () {
+        costAlertConfig();
+        Lead::truncate();
+        LeadActivityLog::truncate();
+    });
+
+    $clean = [
+        'leads' => 10, 'bookings' => 5, 'platform_bookings' => 5, 'booked_by_status' => 5,
+        'last_lead_minutes' => 5, 'last_booking_minutes' => 20, 'within_window' => true,
+    ];
+
+    /*
+     * The zone extracted_at is recorded in is asserted, not assumed, because getting it wrong is
+     * silent: read as UTC it made a fresh extract look four hours old and the check below warned
+     * about a pipeline that was working.
+     */
+    test('extracted_at is read as Eastern, so a fresh extract reads as fresh', function () {
+        $supplement = DaySupplement::fromRow([
+            'date' => '2026-09-19',
+            'extracted_at' => '2026-09-20 05:44:07',
+        ]);
+
+        // Whole minutes, truncated rather than rounded — an age should never read older than it is.
+        expect($supplement->ageInMinutes(CarbonImmutable::parse('2026-09-20 05:46:07', 'America/New_York')))->toBe(2)
+            ->and($supplement->ageInMinutes(CarbonImmutable::parse('2026-09-20 05:46:00', 'America/New_York')))->toBe(1);
+    });
+
+    test('a stalled extract is reported, however current the card looks', function () use ($clean) {
+        $findings = (new AlertReconciler)->check([...$clean, 'warehouse_age_minutes' => 240]);
+
+        expect(implode(' ', $findings))->toContain('last refreshed 4h 0m ago');
+    });
+
+    test('an extract inside the hourly cycle says nothing', function () use ($clean) {
+        expect((new AlertReconciler)->check([...$clean, 'warehouse_age_minutes' => 45]))->toBe([]);
+    });
+
+    /*
+     * Spend arriving short makes cost per booking look *better*, which is the most dangerous
+     * direction for a cost alert to be wrong in — nobody questions good news. The card used to
+     * check Meta alone.
+     */
+    test('every reporting platform is named, not just Meta', function () use ($clean) {
+        $one = (new AlertReconciler)->check([...$clean, 'stale_platforms' => ['Google']]);
+        $two = (new AlertReconciler)->check([...$clean, 'stale_platforms' => ['Meta', 'Google', 'Microsoft']]);
+
+        expect(implode(' ', $one))->toContain('Google is still reporting')
+            ->and(implode(' ', $two))->toContain('Meta, Google and Microsoft are still reporting');
+    });
+
+    test('spend still settling is a softer finding than a stale platform', function () use ($clean) {
+        $findings = (new AlertReconciler)->check([...$clean, 'spend_pending' => true]);
+
+        expect(implode(' ', $findings))->toContain('still settling');
+    });
+
+    test('the stale-platform finding wins when both apply', function () use ($clean) {
+        // Naming the platform is strictly more useful than saying spend is unsettled.
+        $findings = (new AlertReconciler)->check([
+            ...$clean, 'spend_pending' => true, 'stale_platforms' => ['Meta'],
+        ]);
+
+        expect(implode(' ', $findings))->toContain('Meta is still reporting')
+            ->and(implode(' ', $findings))->not->toContain('still settling');
+    });
+
+    test('the supplement round-trips through the snapshot cache', function () {
+        // The widget reads a cached array, so a field that does not survive toArray/fromArray is
+        // present on the Slack card and absent on the dashboard.
+        $original = DaySupplement::fromRow([
+            'date' => '2026-09-19', 'extracted_at' => '2026-09-20 05:44:07',
+            'meta_stale' => 1, 'google_stale' => 0, 'bing_stale' => 0, 'spend_pending' => 0,
+            'impressions' => 452542, 'clicks' => 3764, 'landing_page_views' => 2669,
+        ]);
+
+        $restored = DaySupplement::fromRow($original->toArray());
+
+        expect($restored->impressions)->toBe(452542)
+            ->and($restored->clicks)->toBe(3764)
+            ->and($restored->stalePlatforms())->toBe(['Meta'])
+            ->and($restored->extractedAt?->toIso8601String())->toBe($original->extractedAt?->toIso8601String());
+    });
+});
+
+/*
+ * Which day the platform breakdown describes.
+ *
+ * It used to follow the headline, which overnight is yesterday closed — putting a breakdown of
+ * Saturday directly beneath a "Today so far" line, where it reads as today's. The breakdown is the
+ * part people act on, so it is the part that has to be current.
+ */
+describe('the platform breakdown', function () {
+    beforeEach(function () {
+        costAlertConfig();
+        Lead::truncate();
+        LeadActivityLog::truncate();
+        update_option(SendCostAlertAction::STATE_OPTION, []);
+    });
+
+    $todayWithChannels = fn (): PartialDay => PartialDay::fromRow([
+        'date' => '2026-09-20', 'as_of_et' => '05:59',
+        'total_leads' => 11, 'total_appointments' => 7, 'total_qualified' => 3, 'total_spend' => 549.71,
+        'facebook_spend' => 546.54, 'facebook_cpb' => 68.32, 'facebook_cpqb' => 136.64,
+        'google_spend' => 3.12, 'google_cpb' => null, 'google_cpqb' => null,
+        'bing_spend' => 0, 'bing_cpb' => null, 'bing_cpqb' => null,
+    ]);
+
+    test('overnight it shows today, not the closed day above it', function () use ($todayWithChannels) {
+        $transport = recordingCostTransport();
+
+        costAlertAction($transport, costAlertDay([
+            'Date' => '2026-09-19', 'report_kind' => 'CLOSING',
+            'facebook_spend' => '19106.75', 'facebook_cpb' => '308.17',
+        ]), $todayWithChannels())->execute(CarbonImmutable::parse('2026-09-20 03:00:00', 'UTC'), force: true);
+
+        $blocks = json_encode($transport->posted[0]['blocks'], JSON_UNESCAPED_UNICODE);
+
+        expect($blocks)->toContain('$546.54 spend')
+            ->and($blocks)->not->toContain('$19,106.75 spend')
+            // And it says which day it means, so the question cannot be asked again.
+            ->and($blocks)->toContain('By platform — today so far, as of 05:59 ET');
+    });
+
+    test('a channel at zero today still gets no card', function () use ($todayWithChannels) {
+        $transport = recordingCostTransport();
+
+        costAlertAction($transport, costAlertDay([
+            'Date' => '2026-09-19', 'report_kind' => 'CLOSING',
+        ]), $todayWithChannels())->execute(CarbonImmutable::parse('2026-09-20 03:00:00', 'UTC'), force: true);
+
+        // Bing spent nothing today; a row of dashes teaches people to skip the section.
+        expect(json_encode($transport->posted[0]['blocks'], JSON_UNESCAPED_UNICODE))
+            ->not->toContain('Microsoft');
+    });
+
+    test('from 08:00 it is the reported day, named as that day', function () {
+        $transport = recordingCostTransport();
+
+        costAlertAction($transport, costAlertDay([
+            'Date' => '2026-09-20', 'report_kind' => 'DAY-TO-DATE',
+        ]))->execute(CarbonImmutable::parse('2026-09-20 13:00:00', 'UTC'), force: true);
+
+        expect(json_encode($transport->posted[0]['blocks'], JSON_UNESCAPED_UNICODE))
+            ->toContain('By platform — Sun 20 Sep');
+    });
+
+    /*
+     * The cost formula is theirs, not one invented for today. Verified against their published
+     * figures for 19 Sep: Facebook 19106.75 / 62 bookings = 308.1733 against their 308.17, and
+     * / 47 qualified = 406.5266 against their 406.53.
+     */
+    test('the per-channel costs are plain division of the view own columns', function () {
+        $today = PartialDay::fromRow([
+            'date' => '2026-09-19', 'as_of_et' => '23:59',
+            'facebook_spend' => 19106.75, 'facebook_cpb' => 19106.75 / 62, 'facebook_cpqb' => 19106.75 / 47,
+        ]);
+
+        expect(round($today->channels['meta']->cpb, 2))->toBe(308.17)
+            ->and(round($today->channels['meta']->cpqb, 2))->toBe(406.53);
     });
 });

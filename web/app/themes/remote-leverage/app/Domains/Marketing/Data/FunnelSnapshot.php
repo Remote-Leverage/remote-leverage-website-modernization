@@ -82,6 +82,16 @@ readonly class FunnelSnapshot
          * cost half of the card unavailable rather than wrong.
          */
         public ?MarketingDay $marketingDay = null,
+
+        /**
+         * Today's running totals, set only on an overnight closing report — see
+         * FunnelMetricsService::snapshot(). Null the rest of the day, when the headline figures
+         * are already today's and a second set of them would be the same numbers twice.
+         */
+        public ?PartialDay $todaySoFar = null,
+
+        /** Freshness, per-platform staleness and the funnel above the lead. Null when unreadable. */
+        public ?DaySupplement $supplement = null,
     ) {}
 
     /**
@@ -149,6 +159,8 @@ readonly class FunnelSnapshot
             'consultations_today' => $this->consultationsToday,
             'upcoming_consultations' => $this->upcomingConsultations,
             'marketing_day' => $this->marketingDay?->toRow(),
+            'today_so_far' => $this->todaySoFar?->toArray(),
+            'supplement' => $this->supplement?->toArray(),
             'baseline' => $this->baseline,
             'warnings' => $this->warnings,
             'unattributed_by_channel' => $this->unattributedByChannel,
@@ -198,6 +210,12 @@ readonly class FunnelSnapshot
             upcomingConsultations: (array) ($data['upcoming_consultations'] ?? []),
             marketingDay: is_array($data['marketing_day'] ?? null)
                 ? MarketingDay::fromRow($data['marketing_day'])
+                : null,
+            todaySoFar: is_array($data['today_so_far'] ?? null)
+                ? PartialDay::fromRow($data['today_so_far'])
+                : null,
+            supplement: is_array($data['supplement'] ?? null)
+                ? DaySupplement::fromRow($data['supplement'])
                 : null,
             baseline: (array) ($data['baseline'] ?? []),
             warnings: (array) ($data['warnings'] ?? []),

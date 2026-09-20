@@ -112,6 +112,16 @@ return [
          * same setting as `window` until the card went round the clock, at which point one value
          * could not answer both questions without getting one of them wrong.
          */
+        /*
+         * How stale the warehouse's own extract may be before the card says so.
+         *
+         * Not the same as the "as of" time on the card, which is when this application asked. That
+         * advances whether or not the pipeline behind it is running, so a stalled ETL shows as
+         * frozen figures wearing a current timestamp. Ninety minutes because the alert runs hourly
+         * and the extract more often than that: a wider gap means stopped, not merely lagging.
+         */
+        'max_warehouse_age_minutes' => (int) env('MARKETING_MAX_WAREHOUSE_AGE_MINUTES', 90),
+
         'staffed' => [
             'from' => (int) env('MARKETING_COST_ALERT_STAFFED_FROM_HOUR', 9),
             'to' => (int) env('MARKETING_COST_ALERT_STAFFED_TO_HOUR', 18),

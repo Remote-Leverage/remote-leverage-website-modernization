@@ -11,7 +11,6 @@ use App\Domains\Lead\Services\LeadChannel;
 use App\Domains\Lead\Services\LeadPlatform;
 use App\Domains\Lead\Services\LeadQualification;
 use App\Domains\Marketing\Data\FunnelSnapshot;
-use App\Domains\Marketing\Data\MarketingDay;
 use App\Domains\Marketing\Data\PlatformSlice;
 use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Support\AlertWindow;
@@ -214,12 +213,51 @@ class FunnelMetricsService
          * The cost half, from the data team's warehouse rather than from this application.
          * Null when it cannot be read, which makes the card say so instead of rendering zeros.
          *
-         * Read *before* the window is chosen, because it is what chooses the window. See
-         * reportingWindow().
+         * Read first, because everything below depends on which day it says it is reporting: before
+         * 08:00 Eastern it reports the previous day closed, and the card then goes and fetches
+         * today separately.
          */
         $marketingDay = ($this->warehouse ?? new BigQueryClient)->marketingDay();
 
-        [$fromUtc, $toUtc] = $this->reportingWindow($now, $marketingDay);
+        /*
+         * On an overnight closing report the headline is yesterday, finished — which says nothing
+         * about the hours since midnight. The alert this replaced showed those hours around the
+         * clock, and people read the overnight cards to see whether the morning had started, so
+         * the figures are fetched and printed beneath the closing block.
+         *
+         * Only then. From 08:00 the headline is already today and a second copy of it would be
+         * the same numbers twice.
+         */
+        /*
+         * Freshness and the funnel above the lead, for the day just reported. Asked for by date so
+         * it can never describe a different day from the headline.
+         */
+        $todaySoFar = $marketingDay?->isClosing() === true
+            ? ($this->warehouse ?? new BigQueryClient)->todaySoFar()
+            : null;
+
+        /*
+         * Freshness, staleness and reach for the day the card is *about* — today whenever there is
+         * a today-so-far row, the reported day otherwise. Asking for the reported day overnight
+         * would put yesterday's impressions under a headline describing this morning.
+         */
+        $subjectDate = $todaySoFar?->date ?? $marketingDay?->date ?? '';
+
+        $supplement = $subjectDate !== ''
+            ? ($this->warehouse ?? new BigQueryClient)->supplement($subjectDate)
+            : null;
+
+        /*
+                 * Today, at every hour.
+                 *
+                 * This followed the warehouse's reported day for a while, so that an overnight card whose
+                 * headline was yesterday-closed had matching funnel figures. The card is now about today
+                 * at every hour — the closed day survives as a single reference line — so the two are
+                 * aligned again by both being today, which is also what they were before any of this.
+                 */
+        $dayStart = $now->startOfDay();
+        $fromUtc = $dayStart->utc();
+        $toUtc = $now->utc();
 
         $step('Counting leads and bookings', 30);
 
@@ -266,10 +304,7 @@ class FunnelMetricsService
 
         $step('Averaging the previous days', 85);
 
-        $baseline = $this->baseline(
-            $toUtc->setTimezone($now->timezone),
-            $marketingDay?->isClosing() ?? false,
-        );
+        $baseline = $this->baseline($now);
 
         $platformBookings = array_sum(array_map(
             static fn (PlatformSlice $slice): int => $slice->bookings,
@@ -302,14 +337,23 @@ class FunnelMetricsService
              * differ a little — different definitions of a booking, different load times — but a
              * wide gap means one of the two is wrong and the card is reporting the warehouse's.
              */
-            'warehouse_bookings' => $marketingDay?->appointments,
+            'warehouse_bookings' => $todaySoFar?->appointments ?? $marketingDay?->appointments,
+
+            /*
+             * How old the warehouse's own copy is, and which ad platforms were still catching up
+             * when it was taken. Both are about whether the figures above can be trusted, which is
+             * the reconciler's entire job.
+             */
+            'warehouse_age_minutes' => $supplement?->ageInMinutes($now),
+            'stale_platforms' => $supplement?->stalePlatforms() ?? [],
+            'spend_pending' => $supplement?->spendPending ?? false,
 
             /*
              * Which day both halves now cover, so the reconciler can name it instead of saying
              * "today" about a card that, before 08:00 Eastern, is about yesterday.
              */
-            'report_date' => $marketingDay?->date,
-            'report_is_closing' => $marketingDay?->isClosing() ?? false,
+            'report_date' => $subjectDate,
+            'report_is_closing' => false,
             'warehouse_unavailable' => $marketingDay === null,
         ]);
 
@@ -339,6 +383,8 @@ class FunnelMetricsService
             warnings: $warnings,
 
             marketingDay: $marketingDay,
+            todaySoFar: $todaySoFar,
+            supplement: $supplement,
 
             unattributedByChannel: $this->unattributedByChannel($bookedLeads),
         );
@@ -349,56 +395,6 @@ class FunnelMetricsService
      *
      * @return Collection<int, Lead>
      */
-    /**
-     * The window this site's half of the card covers, in UTC.
-     *
-     * Normally today so far. But the warehouse decides which day the card is about, and before
-     * 08:00 Eastern it deliberately reports *yesterday, closed* rather than a handful of hours of
-     * today — `IF(hour_et < 8, DATE_SUB(today, INTERVAL 1 DAY), today)` in
-     * resources/sql/marketing-home-daily.sql. When it does, this side has to follow it or the two
-     * halves of one card describe two different days.
-     *
-     * That is not hypothetical and it is not subtle. A card fired at 03:52 on 2026-09-20 put the
-     * warehouse's closed 19 Sep (97 leads, 63 bookings) beside this site's 3h52m of 20 Sep (7 and
-     * 3), and the reconciler correctly shouted that one of them had to be wrong. Neither was. On
-     * matched days the two agreed to within 28%. Every figure was real and they were not about
-     * the same day.
-     *
-     * It also made the headline arithmetic meaningless: spend for one day over bookings for
-     * another is not a cost per booking.
-     *
-     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
-     */
-    private function reportingWindow(CarbonImmutable $now, ?MarketingDay $day): array
-    {
-        if ($day === null || ! $day->isClosing() || $day->date === '') {
-            return [$now->startOfDay()->utc(), $now->utc()];
-        }
-
-        try {
-            $start = CarbonImmutable::parse($day->date, $now->timezone)->startOfDay();
-        } catch (\Throwable $e) {
-            /*
-             * An unparseable date is the view changing shape under us. Falling back to today is
-             * wrong by a day at worst; guessing at the string is wrong in ways nobody can see.
-             */
-            Log::warning('FunnelMetricsService: the warehouse reported an unreadable date', [
-                'date' => $day->date,
-                'error' => $e->getMessage(),
-            ]);
-
-            return [$now->startOfDay()->utc(), $now->utc()];
-        }
-
-        /*
-         * Capped at now, so a warehouse that somehow reports today as CLOSING cannot ask for a
-         * window running into the future — that would read as a quiet day rather than an error.
-         */
-        $end = $start->endOfDay();
-
-        return [$start->utc(), $end->greaterThan($now) ? $now->utc() : $end->utc()];
-    }
-
     private function clientLeadsBetween(CarbonImmutable $fromUtc, CarbonImmutable $toUtc): Collection
     {
         return $this->clientLeads()
@@ -621,16 +617,14 @@ class FunnelMetricsService
      * read at midnight. Comparing a mid-afternoon figure against a full-day average compares two
      * different things and reliably makes the afternoon look bad.
      *
-     * On a closing report the reverse holds and the rule has to invert. The figure being compared
-     * is then a complete day, so the baseline has to be complete days too — measuring 111 leads
-     * for a finished Saturday against a 7-day average taken at 03:52 gives "+489% vs average",
-     * which is the same mistake as the one this method exists to avoid, pointing the other way.
+     * The card reports today at every hour, so the comparison is always same-hour. It briefly
+     * took whole days as well, for the period when an overnight card's headline was a finished
+     * day; that is now a single reference line with no average beside it.
      *
      * @param  CarbonImmutable  $anchor  End of the window being compared, in the report timezone.
-     * @param  bool  $wholeDays  Whether to measure each prior day in full.
      * @return array<string, float|null>
      */
-    private function baseline(CarbonImmutable $anchor, bool $wholeDays = false): array
+    private function baseline(CarbonImmutable $anchor): array
     {
         $days = max(1, (int) config('marketing.cost_alert.baseline_days', 7));
 
@@ -641,7 +635,7 @@ class FunnelMetricsService
         for ($back = 1; $back <= $days; $back++) {
             $then = $anchor->subDays($back);
             $fromUtc = $then->startOfDay()->utc();
-            $toUtc = ($wholeDays ? $then->endOfDay() : $then)->utc();
+            $toUtc = $then->utc();
 
             $leads[] = $this->clientLeads()
                 ->whereBetween('created_at', [$fromUtc, $toUtc])

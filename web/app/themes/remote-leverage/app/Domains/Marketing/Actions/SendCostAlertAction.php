@@ -8,6 +8,7 @@ use App\Domains\Lead\Services\SlackMessageRenderer;
 use App\Domains\Marketing\Data\ChannelDay;
 use App\Domains\Marketing\Data\FunnelSnapshot;
 use App\Domains\Marketing\Data\MarketingDay;
+use App\Domains\Marketing\Data\PartialDay;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use App\Domains\Marketing\Support\AlertWindow;
 use App\Infrastructure\Slack\SlackTransport;
@@ -265,6 +266,22 @@ class SendCostAlertAction
      */
     private function todayBlock(FunnelSnapshot $snapshot): string
     {
+        /*
+         * The card is about today at every hour.
+         *
+         * Overnight the data team's query reports the previous day closed, so today comes from our
+         * own supplementary read and the closed day shrinks to one reference line at the bottom.
+         * It was a full block for a while: eight overnight cards then carried a byte-identical
+         * summary of a day that had finished, and the part that actually moved — this morning —
+         * was a footnote under it.
+         *
+         * Falls back to the reported day when that read failed, which overnight means the closing
+         * report on its own. Worse than intended, better than a card with no figures.
+         */
+        if ($snapshot->todaySoFar !== null) {
+            return $this->partialDayBlock($snapshot, $snapshot->todaySoFar);
+        }
+
         $day = $snapshot->marketingDay;
 
         if ($day === null) {
@@ -299,7 +316,7 @@ class SendCostAlertAction
         if ($day->spend === null) {
             $lines[] = '- Spend: not reported for this day';
 
-            return implode("\n", $lines);
+            return implode("\n", array_merge($lines, $this->reachLines($snapshot)));
         }
 
         $lines[] = sprintf('- Spend: %s%s', $this->money($day->spend, $snapshot->currency), $this->spendCaveat($day));
@@ -328,7 +345,121 @@ class SendCostAlertAction
             );
         }
 
+        return implode("\n", array_merge($lines, $this->reachLines($snapshot)));
+    }
+
+    /**
+     * "Today so far" beneath a closing report, and nothing at any other hour.
+     *
+     * The block above it is yesterday, finished. Between midnight and 08:00 Eastern that is the
+     * whole card, which leaves the reader unable to tell a slow start from a stopped ad account —
+     * the legacy alert showed these hours and people used them for exactly that.
+     *
+     * Counts and spend only. Every rate on this card comes from the data team's query, and a cost
+     * per booking built from four hours of a day is a number nobody should act on.
+     *
+     * @return array<int, string>
+     */
+    /**
+     * The funnel above the lead: impressions, clicks, landing page views.
+     *
+     * The card's earliest warning is otherwise "no new lead for Xm", which is lagging by
+     * construction — by the time leads stop, whatever caused it happened hours ago. Clicks
+     * collapsing while spend continues is the same failure, visible sooner.
+     *
+     * One line, and only the three counts plus click-through. No cost-per-click or cost-per-view:
+     * those are rates, rates come from the data team's query, and it does not publish these.
+     *
+     * Always for the day the card is about — FunnelMetricsService asks for the supplement by date.
+     *
+     * @return array<int, string>
+     */
+    private function reachLines(FunnelSnapshot $snapshot): array
+    {
+        $reach = $snapshot->supplement;
+
+        if ($reach === null || $reach->impressions <= 0) {
+            return [];
+        }
+
+        return [
+            '',
+            sprintf(
+                '*Reach* — %s impressions, %s clicks, %.2f%% CTR, %s landing page views',
+                number_format($reach->impressions),
+                number_format($reach->clicks),
+                $reach->clicks / $reach->impressions * 100,
+                number_format($reach->landingPageViews),
+            ),
+        ];
+    }
+
+    /**
+     * Today, when the data team's query is reporting yesterday instead.
+     *
+     * Same shape as the reported-day block above so the card does not change layout at 08:00 —
+     * funnel order, each step carrying its share of the one above, then the costs. The costs are
+     * SAFE_DIVIDE of the view's own columns, which is exactly how theirs are computed; verified
+     * against their published 19 Sep figures before being used.
+     *
+     * No previous-day comparison and no target verdicts. Four hours of a day measured against a
+     * finished one is the "every morning looks like a collapse" comparison the card already avoids
+     * elsewhere, and a cost per booking on three bookings is not a number to hold to a target.
+     */
+    private function partialDayBlock(FunnelSnapshot $snapshot, PartialDay $today): string
+    {
+        $lines = [sprintf(
+            '*Today so far — %s, as of %s ET*',
+            $this->prettyDate($today->date),
+            $today->asOfEt,
+        )];
+
+        $lines[] = sprintf('- Leads: %d', $today->leads);
+        $lines[] = sprintf('- Bookings: %d%s', $today->appointments, $this->notes(
+            $this->shareOf($today->appointments, $today->leads, 'leads'),
+        ));
+        $lines[] = sprintf('- Qualified: %d%s', $today->qualified, $this->notes(
+            $this->shareOf($today->qualified, $today->appointments, 'bookings'),
+        ));
+        $lines[] = sprintf('- Spend: %s', $this->money($today->spend, $snapshot->currency));
+        $lines[] = sprintf('- CPL: %s', $this->money($today->cpl, $snapshot->currency));
+        $lines[] = sprintf('- CPB: %s', $this->money($today->cpb, $snapshot->currency));
+        $lines[] = sprintf('- CPQB: %s', $this->money($today->cpqb, $snapshot->currency));
+
+        $lines = array_merge($lines, $this->reachLines($snapshot), $this->closedDayLine($snapshot));
+
         return implode("\n", $lines);
+    }
+
+    /**
+     * Yesterday, in one line, under today.
+     *
+     * The whole of a finished day compressed to the four figures somebody would ask for. It is
+     * identical on every card between midnight and 08:00, which is the point of it being one line
+     * rather than a block: a reader who arrives at 06:00 gets the closed total without eight cards
+     * having repeated it at them.
+     *
+     * @return array<int, string>
+     */
+    private function closedDayLine(FunnelSnapshot $snapshot): array
+    {
+        $day = $snapshot->marketingDay;
+
+        if ($day === null || ! $day->isClosing()) {
+            return [];
+        }
+
+        return [
+            '',
+            sprintf(
+                '_%s closed: %d leads, %d bookings, %s spend, CPB %s_',
+                $this->prettyDate($day->date),
+                $day->leads,
+                $day->appointments,
+                $this->money($day->spend, $snapshot->currency),
+                $this->money($day->cpbPaid, $snapshot->currency),
+            ),
+        ];
     }
 
     /**
@@ -552,20 +683,40 @@ class SendCostAlertAction
     {
         $cards = [];
 
+        $cards['platform_period'] = '';
+
         foreach (range(1, 6) as $slot) {
             $cards["platform_{$slot}_title"] = '';
             $cards["platform_{$slot}_subtitle"] = '';
             $cards["platform_{$slot}_body"] = '';
         }
 
-        $day = $snapshot->marketingDay;
+        /*
+         * Today's channels when there are any, the reported day's otherwise.
+         *
+         * Overnight the headline is yesterday closed, and the platform cards used to follow it —
+         * which put a breakdown of Saturday directly beneath a "Today so far" line and read as
+         * today's. The breakdown is the part people act on, so it is the part that should be
+         * current; the closed day above it keeps the totals and the finished costs.
+         *
+         * From 08:00 `todaySoFar` is null and this is the reported day, which is already today.
+         */
+        $source = $snapshot->todaySoFar ?? $snapshot->marketingDay;
 
-        if ($day === null) {
+        if ($source === null) {
             return $cards;
         }
 
+        /*
+         * Name the day in the heading. The section sat unlabelled between a closed day and a
+         * running one, and there is no way to tell which it means from the numbers alone.
+         */
+        $cards['platform_period'] = $snapshot->todaySoFar !== null
+            ? 'today so far, as of '.$source->asOfEt.' ET'
+            : $this->prettyDate($source->date);
+
         $channels = array_filter(
-            $day->channels,
+            $source->channels,
             static fn (ChannelDay $channel): bool => $channel->isActive(),
         );
 
@@ -651,6 +802,22 @@ class SendCostAlertAction
             return sprintf(
                 '%s · %s',
                 $snapshot->generatedAt->format('D j M Y, H:i T'),
+                $snapshot->currency,
+            );
+        }
+
+        /*
+         * Named for the day the card is about, which is today at every hour. Overnight that comes
+         * from the supplementary read rather than from `$day`, which is still reporting the
+         * previous day closed — see todayBlock().
+         */
+        $today = $snapshot->todaySoFar;
+
+        if ($today !== null) {
+            return sprintf(
+                'Day to date, %s · as of %s ET · %s',
+                $this->prettyDate($today->date),
+                $today->asOfEt,
                 $snapshot->currency,
             );
         }

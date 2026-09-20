@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Domains\Marketing\Gateways;
 
 use App\Domains\Lead\Services\LeadSettingsService;
+use App\Domains\Marketing\Data\DaySupplement;
 use App\Domains\Marketing\Data\MarketingDay;
+use App\Domains\Marketing\Data\PartialDay;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -101,6 +103,66 @@ class BigQueryClient
     }
 
     /**
+     * Today's running totals, for the hours the marketing day does not cover.
+     *
+     * Only meaningful before 08:00 Eastern, when {@see self::marketingDay()} reports the previous
+     * day complete and says nothing about the hours since midnight. The caller decides when to ask
+     * — see FunnelMetricsService::snapshot().
+     *
+     * Null rather than zeroes when there is no row yet. A day with no channel row is a day nothing
+     * has happened on, and "no figures yet" and "zero spend" read very differently at 04:00.
+     */
+    public function todaySoFar(): ?PartialDay
+    {
+        $problem = $this->misconfiguration();
+
+        if ($problem !== null) {
+            return null;
+        }
+
+        try {
+            $row = $this->queryOneRow($this->sql('marketing-today-so-far'));
+        } catch (\Throwable $e) {
+            /*
+             * Warning, not an exception. This is a supplementary line on a card whose headline
+             * comes from elsewhere; losing it must not cost the whole alert.
+             */
+            Log::warning('BigQueryClient: could not read today so far', ['error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        return $row === null ? null : PartialDay::fromRow($row);
+    }
+
+    /**
+     * Freshness, per-platform staleness and the funnel above the lead, for a day already reported.
+     *
+     * Takes the date from the row {@see self::marketingDay()} returned rather than working it out
+     * again, so the two cannot end up describing different days. The date is validated rather than
+     * bound: `queryOneRow()` posts raw SQL with no parameter support, so the only safe thing to
+     * interpolate is a string that has been proven to be exactly a date.
+     *
+     * Supplementary by definition — null on any failure, because losing it must not cost the card.
+     */
+    public function supplement(string $date): ?DaySupplement
+    {
+        if ($this->misconfiguration() !== null || preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+            return null;
+        }
+
+        try {
+            $row = $this->queryOneRow(str_replace('@@DATE@@', $date, $this->sql('marketing-day-supplement')));
+        } catch (\Throwable $e) {
+            Log::warning('BigQueryClient: could not read the day supplement', ['error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        return $row === null ? null : DaySupplement::fromRow($row);
+    }
+
+    /**
      * The marketing day, or null when it cannot be read.
      *
      * The query decides for itself which day that is — before 08:00 Eastern it reports yesterday
@@ -147,6 +209,27 @@ class BigQueryClient
                     'query' => $sql,
                     'useLegacySql' => false,
                     'timeoutMs' => self::QUERY_TIMEOUT_MS,
+
+                    /*
+                     * No cached results, ever.
+                     *
+                     * BigQuery defaults this to true and will serve a byte-identical earlier
+                     * answer for up to 24 hours when the SQL text has not changed — which, for a
+                     * query whose only moving part is CURRENT_TIMESTAMP inside it, is every run.
+                     * The row comes back whole: the figures *and* the `as_of_et` that says when
+                     * they were read.
+                     *
+                     * A card posted at 03:48 carried "as of 04:50 ET", 62 minutes in the future,
+                     * which is only possible if the row predated the request. Three other cards
+                     * that night were accurate, so this is intermittent rather than constant —
+                     * but freshness is the entire point of an hourly alert, and since every run
+                     * now leaves a permanent card rather than editing one, a stale figure is
+                     * published rather than overwritten a minute later.
+                     *
+                     * The query scans one day of an aggregated view and runs in about a second,
+                     * so there is nothing here worth caching.
+                     */
+                    'useQueryCache' => false,
                 ],
             );
 
@@ -385,12 +468,12 @@ class BigQueryClient
     }
 
     /** The data team's query, kept verbatim in a file of its own. */
-    private function sql(): string
+    private function sql(string $file = 'marketing-home-daily'): string
     {
-        $path = get_theme_file_path('resources/sql/marketing-home-daily.sql');
+        $path = get_theme_file_path('resources/sql/'.$file.'.sql');
 
         if (! is_readable($path)) {
-            throw new \RuntimeException('the marketing day query is missing from the theme');
+            throw new \RuntimeException('the '.$file.' query is missing from the theme');
         }
 
         return (string) file_get_contents($path);

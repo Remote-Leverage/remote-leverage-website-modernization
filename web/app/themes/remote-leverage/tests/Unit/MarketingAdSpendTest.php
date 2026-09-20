@@ -508,6 +508,28 @@ describe('the BigQuery client', function () {
     });
 
     /*
+     * BigQuery caches a byte-identical query for 24 hours by default, and the only moving part in
+     * this one is a CURRENT_TIMESTAMP inside the SQL text — so every hourly run is a cache
+     * candidate. A hit returns the earlier row whole: the figures and the `as_of_et` saying when
+     * they were read. That is how a card posted at 03:48 came to be headed "as of 04:50 ET".
+     *
+     * Since every run now leaves a permanent card instead of editing one, a stale figure is
+     * published rather than quietly corrected on the next tick.
+     */
+    test('it never accepts a cached result', function () {
+        configureWarehouse();
+        fakeBigQuery(bigQueryResponse(warehouseRow()));
+
+        (new BigQueryClient)->marketingDay();
+
+        Http::assertSent(function (Request $request) {
+            // Explicitly false, not merely absent: absent is the default, and the default is true.
+            return array_key_exists('useQueryCache', (array) $request->data())
+                && ((array) $request->data())['useQueryCache'] === false;
+        });
+    });
+
+    /*
      * A schema and a row of different lengths cannot be zipped, and doing it anyway would shift
      * every column left of the gap onto the wrong field — spend reading as a cost, a date reading
      * as a count — with nothing failing. That is strictly worse than no card, so it is an error.

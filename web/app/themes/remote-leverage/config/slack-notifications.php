@@ -760,7 +760,7 @@ return [
             [
                 'type' => 'section',
                 '_when' => ['platform_1_title'],
-                'text' => ['type' => 'mrkdwn', 'text' => '*By platform*'],
+                'text' => ['type' => 'mrkdwn', 'text' => '*By platform — {{ platform_period }}*'],
             ],
             [
                 'type' => 'card',
