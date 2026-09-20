@@ -7,6 +7,7 @@ namespace App\Infrastructure\WordPress\Admin;
 use App\Domains\Marketing\Actions\SendCostAlertAction;
 use App\Domains\Marketing\Data\ChannelDay;
 use App\Domains\Marketing\Data\FunnelSnapshot;
+use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 
 /**
@@ -223,8 +224,19 @@ class MarketingCostAlertWidget
         $day = $snapshot->marketingDay;
 
         if ($day === null) {
-            echo '<p class="rl-dash-kpi-meta">The marketing warehouse did not answer, so spend and the '
-                .'channel breakdown are unavailable. The figures above come from this site.</p>';
+            /*
+             * Name the specific reason when there is one. "Did not answer" covers a missing
+             * credential, a missing project id and a query that failed, and only the last of
+             * those is something to go and read a log about.
+             */
+            $problem = app(BigQueryClient::class)->misconfiguration();
+
+            printf(
+                '<p class="rl-dash-kpi-meta">%s The figures above come from this site.</p>',
+                $problem === null
+                    ? esc_html('The marketing warehouse did not answer, so spend and the channel breakdown are unavailable.')
+                    : esc_html('The marketing warehouse is not set up: '.$problem.'.'),
+            );
 
             return;
         }

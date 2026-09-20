@@ -72,7 +72,32 @@ class BigQueryClient
 
     public function isConfigured(): bool
     {
-        return $this->credentials() !== null && $this->projectId() !== '';
+        return $this->misconfiguration() === null;
+    }
+
+    /**
+     * Why this cannot run, in words, or null when it can.
+     *
+     * "Not configured" covers three different situations that need three different fixes, and the
+     * one that catches people is the third: a user credential does not name a project, so signing
+     * in successfully and then seeing nothing happen is the expected outcome of forgetting the
+     * billing project. Saying which is missing turns that from a puzzle into a field to fill in.
+     */
+    public function misconfiguration(): ?string
+    {
+        $credentials = $this->credentials();
+
+        if ($credentials === null) {
+            return 'no Google credential is configured — sign in, or paste a service account key';
+        }
+
+        if ($this->projectId() === '') {
+            return $this->isServiceAccount($credentials)
+                ? 'the service account key names no project; set the billing project ID'
+                : 'a signed-in Google account does not name a project; set the billing project ID';
+        }
+
+        return null;
     }
 
     /**
@@ -83,7 +108,11 @@ class BigQueryClient
      */
     public function marketingDay(): ?MarketingDay
     {
-        if (! $this->isConfigured()) {
+        $problem = $this->misconfiguration();
+
+        if ($problem !== null) {
+            Log::info('BigQueryClient: not reading the warehouse — '.$problem);
+
             return null;
         }
 

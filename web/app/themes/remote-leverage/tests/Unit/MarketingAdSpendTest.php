@@ -623,6 +623,36 @@ describe('the BigQuery client', function () {
     });
 
     /* A half-filled OAuth credential is not a credential. */
+    /*
+     * "Not configured" covers three situations needing three different fixes, and the one that
+     * catches people is a signed-in account with no billing project: the sign-in visibly worked,
+     * and then nothing happens.
+     */
+    test('the reason it cannot run is specific', function () {
+        config([
+            'marketing.warehouse.credentials' => '',
+            'marketing.warehouse.client_id' => '',
+            'marketing.warehouse.client_secret' => '',
+            'marketing.warehouse.refresh_token' => '',
+            'marketing.warehouse.project_id' => '',
+        ]);
+
+        expect((new BigQueryClient)->misconfiguration())->toContain('no Google credential');
+
+        config([
+            'marketing.warehouse.client_id' => 'cid',
+            'marketing.warehouse.client_secret' => 'secret',
+            'marketing.warehouse.refresh_token' => 'refresh',
+        ]);
+
+        expect((new BigQueryClient)->misconfiguration())->toContain('billing project');
+
+        config(['marketing.warehouse.project_id' => 'rl-data-platform-dev']);
+
+        expect((new BigQueryClient)->misconfiguration())->toBeNull()
+            ->and((new BigQueryClient)->isConfigured())->toBeTrue();
+    });
+
     test('an incomplete OAuth trio is unconfigured', function () {
         config([
             'marketing.warehouse.credentials' => '',
