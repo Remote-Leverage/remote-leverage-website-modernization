@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Infrastructure\Providers\DomainServiceProvider;
+use Illuminate\Redis\RedisServiceProvider;
 use Roots\Acorn\Sage\SageServiceProvider;
 
 class ThemeServiceProvider extends SageServiceProvider
@@ -15,6 +16,25 @@ class ThemeServiceProvider extends SageServiceProvider
     public function register()
     {
         parent::register();
+
+        /*
+         * Bind `redis` to Laravel's Redis factory.
+         *
+         * Acorn registers no Redis provider and illuminate/redis was not installed, so nothing
+         * held that key. Laravel then resolved the literal string as a class name -- PHP class
+         * names are case-insensitive -- instantiated phpredis' own `Redis`, and handed it to
+         * RedisStore, which demands an Illuminate\Contracts\Redis\Factory:
+         *
+         *   RedisStore::__construct(): Argument #1 ($redis) must be of type
+         *   Illuminate\Contracts\Redis\Factory, Redis given
+         *
+         * That is a TypeError on every admin screen touching the Cache facade, while the public
+         * site stays up and the deploy goes green. It took both environments down on 2026-09-20.
+         *
+         * Deferred, so registering it costs nothing until something asks for `redis` -- which
+         * nothing does unless CACHE_STORE says so.
+         */
+        $this->app->register(RedisServiceProvider::class);
 
         $this->app->register(DomainServiceProvider::class);
     }

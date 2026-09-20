@@ -23,16 +23,14 @@ namespace App\Infrastructure\WordPress\Admin;
  * WordPress having a Redis while Acorn does not. `WP_REDIS_HOST` is what the object cache drop-in
  * reads; `cache.default` is what Acorn resolved.
  *
- * Today the two always disagree where Redis exists, and not for a configuration reason:
- * `illuminate/redis` is not installed and Acorn registers no Redis provider, so nothing is bound
- * to `redis` in the container. Setting CACHE_STORE=redis does not switch the store, it throws —
- * Laravel resolves the literal string as a class name, PHP class names are case-insensitive, and
- * phpredis' own `Redis` reaches a store demanding a Factory. That took both environments' admin
- * down on 2026-09-20. See .env.example.
+ * Redis being present and Acorn not using it is now a *choice* rather than a defect. It was a
+ * defect until 2026-09-20: illuminate/redis was missing and nothing was bound to `redis`, so
+ * setting CACHE_STORE=redis threw a TypeError on every admin screen instead of switching the
+ * store. The package is required now and ThemeServiceProvider registers the provider.
  *
- * So this is not "misconfigured, go and fix the credentials". It is "this theme cannot share a
- * cache between tasks yet", which is a package away and worth saying out loud rather than leaving
- * as a quiet wrongness in the numbers.
+ * What is left is a trade the notice states rather than decides. Acorn's cache has no graceful
+ * mode and the booking path caches through it, so Redis buys a consistent dashboard at the cost
+ * of an outage taking bookings with it. See .env.example.
  *
  * An environment with no Redis at all is not degraded, it is simply small, and says nothing.
  */
@@ -57,17 +55,16 @@ class CacheHealthNotice
             '<div class="notice notice-warning"><p><strong>%s</strong> %s</p><p>%s</p></div>',
             esc_html('Admin caching is per-container.'),
             esc_html(sprintf(
-                'This site has Redis, but Acorn cannot use it: the illuminate/redis package is not '.
-                'installed, so the Cache facade runs on the "%s" driver and each container caches on '.
+                'This site has Redis, but Acorn is on the "%s" driver, so each container caches on '.
                 'its own filesystem.',
                 (string) config('cache.default', 'file'),
             )),
             esc_html(
                 'Dashboard figures may differ between page loads and disagree with the Slack card, '.
                 'because whichever container answers shows what it last computed, and a deploy '.
-                'clears them all. Nothing is lost and no figure is invented. This is a known '.
-                'limitation rather than a misconfiguration: it needs a package, not an environment '.
-                'variable, and setting CACHE_STORE=redis without one takes the admin down.'
+                'clears them all. Nothing is lost and no figure is invented. Setting '.
+                'CACHE_STORE=redis fixes it and now works, but read the note in .env.example first: '.
+                'the booking path caches too, and unlike the file driver a Redis outage throws.'
             ),
         );
     }
