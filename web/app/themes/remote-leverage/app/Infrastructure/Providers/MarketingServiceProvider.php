@@ -137,6 +137,22 @@ class MarketingServiceProvider extends ServiceProvider
             $this->app->make(MarketingCostAlertWidget::class)->handleSendNow();
         });
 
+        /*
+         * The same send, over AJAX, plus a poll for how far it has got.
+         *
+         * Same lazy-resolution rule as above, and it matters more here: the progress endpoint is
+         * hit every few hundred milliseconds while a send runs, and it only reads a transient. It
+         * resolves the widget for one static method's worth of work either way, so both are bound
+         * to closures that do the cheap thing first.
+         */
+        \add_action('wp_ajax_'.MarketingCostAlertWidget::SEND_AJAX, function () {
+            $this->app->make(MarketingCostAlertWidget::class)->handleSendAjax();
+        });
+
+        \add_action('wp_ajax_'.MarketingCostAlertWidget::PROGRESS_AJAX, static function () {
+            MarketingCostAlertWidget::handleProgressAjax();
+        });
+
         \add_action('wp_dashboard_setup', function () {
             try {
                 $this->app->make(MarketingCostAlertWidget::class)->addWidget();
@@ -146,6 +162,21 @@ class MarketingServiceProvider extends ServiceProvider
                 ]);
             }
         }, 1000);
+    }
+
+    /**
+     * The next exact top of the hour, as a UTC timestamp.
+     *
+     * Cron timestamps are UTC and every whole hour is a multiple of 3600 there, so this is the
+     * same instant as :00 in any timezone whose offset is a whole number of hours — which covers
+     * every timezone this runs in.
+     *
+     * The tick that fires it runs once a minute (docker/wp-cron.crontab), so an event due at
+     * 04:00:00 is picked up within about a minute of it. "On the hour", not "to the second".
+     */
+    private static function nextHour(): int
+    {
+        return (intdiv(time(), HOUR_IN_SECONDS) + 1) * HOUR_IN_SECONDS;
     }
 
     private function scheduleCostAlert(): void
@@ -167,7 +198,27 @@ class MarketingServiceProvider extends ServiceProvider
             $scheduled = \wp_next_scheduled(self::CRON_HOOK);
 
             if ($enabled && ! $scheduled) {
-                \wp_schedule_event(time(), 'hourly', self::CRON_HOOK);
+                \wp_schedule_event(self::nextHour(), 'hourly', self::CRON_HOOK);
+
+                return;
+            }
+
+            /*
+             * Drag an existing event back onto the hour.
+             *
+             * WP-Cron's 'hourly' is "every 3600 seconds from the first run", not "at :00". So the
+             * card posts at whatever second this hook was first registered on that install and
+             * keeps that offset forever — :51:42 on the machine this was written on. Changing the
+             * schedule call alone fixes nothing on an environment that already has the event,
+             * because wp_next_scheduled() is truthy and the branch above never runs.
+             *
+             * People read an hourly report as being about the hour. One that lands at 09:51
+             * carrying figures "as of 09:51" invites the reasonable assumption that 10:00 is
+             * missing.
+             */
+            if ($enabled && $scheduled && $scheduled % HOUR_IN_SECONDS !== 0) {
+                \wp_unschedule_event($scheduled, self::CRON_HOOK);
+                \wp_schedule_event(self::nextHour(), 'hourly', self::CRON_HOOK);
 
                 return;
             }

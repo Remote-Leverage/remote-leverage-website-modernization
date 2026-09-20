@@ -17,24 +17,21 @@ use Illuminate\Support\Facades\Log;
 /**
  * Builds the marketing cost alert and puts it in Slack.
  *
- * ## One card a day, edited in place
+ * ## One card per run, and the channel is the history
  *
- * The alert this replaces posted a fresh message on every run. Nine near-identical cards a day
- * in a channel is how a channel becomes something people mute, and the history is worse than
- * useless: scrolling back a week means paging through sixty cards to find the six that mattered.
+ * Every run posts a new message. Twenty-four cards a day is the point rather than the cost: the
+ * channel becomes a scrollable record of how the day developed, and a stakeholder who opens it at
+ * lunchtime can see what the morning looked like without asking anyone.
  *
- * So the first run of the day posts, and every run after it edits that same message. The channel
- * holds one live card showing where the day currently stands, and the history holds one row per
- * day. `SlackTransport::post()` already returned the `ts` needed to do this — the lead alerts
- * have threaded on it since 2026-09-16 — so the only new part is remembering it across runs.
+ * This was built the other way first — post once, then `chat.update` the same message hourly — on
+ * the reasoning that near-identical cards are how a channel gets muted. That trades away the
+ * thing the channel is for. An edited card answers "where do we stand now", which the dashboard
+ * widget already answers on demand; only the channel can answer "what did this look like at
+ * 06:00", and editing destroys that answer every hour.
  *
- * {@see self::STATE_OPTION} is that memory. It holds the date it belongs to, so the first run
- * after midnight sees a stale date and posts fresh rather than editing yesterday's card into
- * today's numbers, which would quietly destroy the record of yesterday.
- *
- * If the edit fails — somebody deleted the message, the channel changed underneath — it posts a
- * new card rather than dropping the run. A duplicate card is a visible, harmless annoyance; a
- * silent gap in a cost alert is neither.
+ * The consequence to keep in mind: a figure in the channel is a reading from the moment it was
+ * posted and is never corrected afterwards. That is what a log is. Every card carries the hour it
+ * was read at, so an old one is identifiable as old rather than merely wrong.
  *
  * ## Why the formatting is here and the layout is not
  *
@@ -47,7 +44,14 @@ use Illuminate\Support\Facades\Log;
  */
 class SendCostAlertAction
 {
-    /** Where the day's card is remembered, so later runs edit it instead of reposting. */
+    /**
+     * The last card posted: its date, timestamp and channel.
+     *
+     * Nothing reads it to decide what to send — every run posts. It is kept because the Slack
+     * timestamp is otherwise unrecoverable: the bot has `chat:write` and no `channels:history`,
+     * so a card it posted cannot be found again, and deleting one means knowing its `ts`. One
+     * entry is a thin handle on that, and it costs a single option row.
+     */
     public const STATE_OPTION = 'rl_marketing_cost_alert_card';
 
     public function __construct(
@@ -61,8 +65,21 @@ class SendCostAlertAction
      *                       human can check the output without waiting for 09:00.
      * @return bool Whether anything reached Slack.
      */
-    public function execute(?CarbonImmutable $now = null, bool $force = false): bool
+    public function execute(?CarbonImmutable $now = null, bool $force = false, ?callable $onProgress = null): bool
     {
+        /*
+         * Optional, and null everywhere except the dashboard's send button. The scheduled run has
+         * nobody watching it; a person who pressed a button and is now looking at ten seconds of
+         * nothing does. See FunnelMetricsService::snapshot() for why the steps are named.
+         */
+        $step = static function (string $label, int $percent) use ($onProgress): void {
+            if ($onProgress !== null) {
+                $onProgress($label, $percent);
+            }
+        };
+
+        $step('Checking the environment and reporting window', 3);
+
         /*
          * `$force` bypasses the environment gate as well as the clock.
          *
@@ -92,7 +109,7 @@ class SendCostAlertAction
             return false;
         }
 
-        $snapshot = $this->metrics->snapshot($now);
+        $snapshot = $this->metrics->snapshot($now, $onProgress);
 
         /*
          * Hand the dashboard widget the snapshot we just paid for — but only when it is current.
@@ -105,6 +122,8 @@ class SendCostAlertAction
         if (! $isBackfill) {
             $this->metrics->store($snapshot);
         }
+
+        $step('Laying out the card', 92);
 
         $rendered = $this->renderer->render('marketing_cost_alert', $this->values($snapshot));
 
@@ -122,7 +141,9 @@ class SendCostAlertAction
          */
         $color = $snapshot->warnings !== [] ? '#b91c1c' : $rendered['color'];
 
-        return $this->deliver($rendered['text'], $rendered['blocks'], $color, $now);
+        $step('Posting to Slack', 96);
+
+        return $this->deliver($rendered['text'], $rendered['blocks'], $color, $now, $snapshot->marketingDay);
     }
 
     /**
@@ -173,21 +194,20 @@ class SendCostAlertAction
      *
      * @param  array<int, array<string, mixed>>  $blocks
      */
-    private function deliver(string $text, array $blocks, ?string $color, CarbonImmutable $now): bool
-    {
+    /**
+     * Post the card. Always a new message, never an edit.
+     *
+     * See the class docblock: the channel is the history, so each hourly run leaves its own
+     * record. The posted message is remembered only so its timestamp exists somewhere.
+     */
+    private function deliver(
+        string $text,
+        array $blocks,
+        ?string $color,
+        CarbonImmutable $now,
+        ?MarketingDay $day = null,
+    ): bool {
         $channel = trim((string) config('marketing.cost_alert.channel', ''));
-        $state = $this->state();
-        $today = $now->toDateString();
-
-        if (($state['date'] ?? null) === $today && ($state['ts'] ?? '') !== '' && ($state['channel'] ?? '') !== '') {
-            if ($this->slack->update((string) $state['channel'], (string) $state['ts'], $text, $blocks, $color)) {
-                return true;
-            }
-
-            Log::info("SendCostAlertAction: could not edit today's card, posting a new one.", [
-                'ts' => $state['ts'],
-            ]);
-        }
 
         $result = $this->slack->post($text, $blocks, $color, null, false, $channel !== '' ? $channel : null);
 
@@ -196,16 +216,14 @@ class SendCostAlertAction
         }
 
         /*
-         * Only remember a card that can actually be edited later.
-         *
-         * The webhook fallback returns a null `ts`, and storing that would make every subsequent
-         * run take the update path, fail, and post anyway — the duplicate-card behaviour, once
-         * an hour, in an environment that has no bot token precisely because nobody has finished
-         * setting it up.
+         * The webhook fallback returns a null `ts`. Nothing depends on having one any more, so a
+         * missing timestamp is no longer a problem to defend against — it just means this card
+         * cannot be found again later.
          */
         if (($result['ts'] ?? null) !== null && ($result['channel'] ?? null) !== null) {
             $this->remember([
-                'date' => $today,
+                'card' => $this->cardKey($now, $day),
+                'date' => $now->toDateString(),
                 'ts' => (string) $result['ts'],
                 'channel' => (string) $result['channel'],
             ]);
@@ -769,6 +787,22 @@ class SendCostAlertAction
     }
 
     /** @return array<string, mixed> */
+    /**
+     * A label for what the last stored card was about: reported day and report kind.
+     *
+     * Recorded rather than acted on. Between midnight and 08:00 Eastern the warehouse reports the
+     * previous day closed and from 08:00 the current day so far, so the calendar date alone does
+     * not say which of the two a stored timestamp belongs to.
+     */
+    private function cardKey(CarbonImmutable $now, ?MarketingDay $day): string
+    {
+        if ($day === null || $day->date === '') {
+            return $now->toDateString();
+        }
+
+        return $day->date.'/'.strtoupper($day->reportKind);
+    }
+
     private function state(): array
     {
         if (! function_exists('get_option')) {

@@ -10,6 +10,7 @@ use App\Domains\Marketing\Data\FunnelSnapshot;
 use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Log;
 
 /**
  * The marketing cost alert, on the wp-admin dashboard.
@@ -48,6 +49,27 @@ class MarketingCostAlertWidget
     /** The `rl_action` value that fires an immediate send. */
     public const SEND_ACTION = 'rl_send_cost_alert';
 
+    /** admin-ajax action that runs the send and streams its outcome back as JSON. */
+    public const SEND_AJAX = 'rl_cost_alert_send';
+
+    /** admin-ajax action the browser polls while that send is in flight. */
+    public const PROGRESS_AJAX = 'rl_cost_alert_progress';
+
+    /**
+     * Where a running send records which step it is on, keyed per user.
+     *
+     * A transient rather than anything cleverer because the two requests involved share nothing
+     * else: the send is one long POST, the poll is a series of short ones, and they are only
+     * related by being the same person. Keyed per user so two admins pressing the button do not
+     * read each other's progress.
+     *
+     * Short-lived on purpose. A send that dies mid-flight leaves its last step behind, and a
+     * stale "Posting to Slack" that never resolves is worse than no progress at all.
+     */
+    private const PROGRESS_TRANSIENT = 'rl_cost_alert_progress_';
+
+    private const PROGRESS_TTL = 300;
+
     /**
      * Post today's card to Slack immediately.
      *
@@ -85,6 +107,78 @@ class MarketingCostAlertWidget
          */
         wp_safe_redirect(add_query_arg('rl_cost_alert', $result, admin_url('index.php')));
         exit;
+    }
+
+    /**
+     * Run the send, recording each step where the poll below can read it.
+     *
+     * The whole request still takes as long as it always did — this does not make the work
+     * faster, it makes the waiting legible. The browser fires this and then polls
+     * {@see self::handleProgressAjax()} until it answers.
+     *
+     * `force: true` for the same reason the form handler uses it: a person clicking a button has
+     * asked, so neither the reporting window nor the environment gate applies.
+     */
+    public function handleSendAjax(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'You do not have permission to send the marketing cost alert.'], 403);
+        }
+
+        check_ajax_referer(self::SEND_AJAX);
+
+        $key = self::PROGRESS_TRANSIENT.get_current_user_id();
+
+        set_transient($key, ['label' => 'Starting', 'percent' => 1], self::PROGRESS_TTL);
+
+        try {
+            $sent = app(SendCostAlertAction::class)->execute(
+                force: true,
+                onProgress: static function (string $label, int $percent) use ($key): void {
+                    set_transient($key, ['label' => $label, 'percent' => $percent], self::PROGRESS_TTL);
+                },
+            );
+        } catch (\Throwable $e) {
+            Log::error('MarketingCostAlertWidget: AJAX send failed', ['error' => $e->getMessage()]);
+            delete_transient($key);
+
+            wp_send_json_error([
+                'message' => 'The send failed: '.$e->getMessage(),
+            ]);
+        }
+
+        delete_transient($key);
+
+        /*
+         * A false return is not an error — it is the alert declining to post, which it does for
+         * reasons the person should see rather than being told something broke.
+         */
+        wp_send_json_success([
+            'sent' => $sent,
+            'message' => $sent
+                ? 'Posted to Slack as a new card, so the channel keeps the history.'
+                : 'Nothing was sent. Slack rejected the message, or there was no card to render. See the error log.',
+        ]);
+    }
+
+    /**
+     * What the running send is doing right now.
+     *
+     * Static and deliberately tiny: it is hit several times a second across a ten-second send,
+     * and resolving the widget's dependency graph to read one transient would cost more than the
+     * work being measured.
+     */
+    public static function handleProgressAjax(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error([], 403);
+        }
+
+        check_ajax_referer(self::SEND_AJAX);
+
+        $progress = get_transient(self::PROGRESS_TRANSIENT.get_current_user_id());
+
+        wp_send_json_success(is_array($progress) ? $progress : null);
     }
 
     /**
@@ -344,12 +438,22 @@ class MarketingCostAlertWidget
         <?php if ($result !== '') { ?>
             <p class="rl-dash-kpi-meta" style="margin-top:12px;color:<?php echo $result === 'sent' ? '#15803d' : '#b91c1c'; ?> !important;">
                 <?php echo $result === 'sent'
-                    ? 'Posted to Slack. It replaces today&rsquo;s card rather than adding another.'
+                    ? 'Posted to Slack as a new card, so the channel keeps the history.'
                     : 'Slack rejected the message, or the alert is switched off. See the error log.'; ?>
             </p>
         <?php } ?>
 
-        <form method="post" action="<?php echo esc_url(admin_url('index.php')); ?>" style="margin-top:12px;">
+        <?php
+        /*
+         * A plain form, upgraded to AJAX by the script below.
+         *
+         * It stays a real form with a real action so that it still works with JavaScript off or
+         * broken — the handler on `admin_init` is untouched. The script cancels the submit and
+         * takes over; if it never runs, pressing the button does what it always did.
+         */
+        ?>
+        <form method="post" action="<?php echo esc_url(admin_url('index.php')); ?>"
+              style="margin-top:12px;" id="rl-cost-alert-send">
             <?php wp_nonce_field(self::SEND_ACTION); ?>
             <input type="hidden" name="rl_action" value="<?php echo esc_attr(self::SEND_ACTION); ?>" />
             <button type="submit" class="button button-secondary">Send to Slack now</button>
@@ -357,6 +461,127 @@ class MarketingCostAlertWidget
                 Posts immediately, ignoring the reporting window and the environment gate.
             </span>
         </form>
+
+        <div id="rl-cost-alert-progress" hidden style="margin-top:12px;">
+            <div style="height:6px;border-radius:3px;background:#e5e7eb;overflow:hidden;">
+                <div id="rl-cost-alert-bar"
+                     style="height:100%;width:0;border-radius:3px;background:#2271b1;transition:width .3s ease;"></div>
+            </div>
+            <p class="rl-dash-kpi-meta" id="rl-cost-alert-step" style="margin:6px 0 0;"></p>
+        </div>
+
+        <?php $this->sendScript(); ?>
+        <?php
+    }
+
+    /**
+     * Drives the send over AJAX and reports which step it is on.
+     *
+     * Polling a transient rather than streaming, because the send is one long PHP request and
+     * anything it echoed would be buffered behind nginx and php-fpm regardless. Two requests that
+     * share only a transient is the arrangement that actually survives this stack — the same one
+     * EnvironmentSyncScreen uses for a push.
+     *
+     * The bar never goes backwards and never reaches 100 until the send answers. A bar that sits
+     * at 100% while the work continues is the "stalled and hoping" experience this replaces,
+     * wearing a progress bar.
+     */
+    private function sendScript(): void
+    {
+        $config = wp_json_encode([
+            'ajax' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce(self::SEND_AJAX),
+            'send' => self::SEND_AJAX,
+            'progress' => self::PROGRESS_AJAX,
+        ]);
+
+        ?>
+        <script>
+        (function () {
+            var cfg = <?php echo $config; ?>;
+            var form = document.getElementById('rl-cost-alert-send');
+            var panel = document.getElementById('rl-cost-alert-progress');
+            var bar = document.getElementById('rl-cost-alert-bar');
+            var step = document.getElementById('rl-cost-alert-step');
+
+            if (!form || !panel || !bar || !step) {
+                return;
+            }
+
+            var button = form.querySelector('button');
+            var shown = 0;
+            var polling = null;
+
+            function paint(label, percent) {
+                // Monotonic: a poll that lands out of order must not drag the bar back.
+                if (percent > shown) {
+                    shown = percent;
+                    bar.style.width = shown + '%';
+                }
+                if (label) {
+                    step.textContent = label + '\u2026';
+                }
+            }
+
+            function post(action, extra) {
+                var body = new URLSearchParams(extra || {});
+                body.set('action', action);
+                body.set('_wpnonce', cfg.nonce);
+
+                return fetch(cfg.ajax, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body.toString()
+                }).then(function (r) { return r.json(); });
+            }
+
+            function poll() {
+                post(cfg.progress).then(function (res) {
+                    if (res && res.success && res.data) {
+                        paint(res.data.label, res.data.percent);
+                    }
+                }).catch(function () {
+                    // A dropped poll is not a failed send. Stay quiet and try again.
+                });
+            }
+
+            function finish(message, ok) {
+                clearInterval(polling);
+                bar.style.width = '100%';
+                bar.style.background = ok ? '#15803d' : '#b91c1c';
+                step.textContent = message;
+                step.style.color = (ok ? '#15803d' : '#b91c1c') + ' !important';
+                button.disabled = false;
+                button.textContent = 'Send to Slack now';
+            }
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                shown = 0;
+                bar.style.width = '0';
+                bar.style.background = '#2271b1';
+                step.style.removeProperty('color');
+                panel.hidden = false;
+                button.disabled = true;
+                button.textContent = 'Sending';
+                paint('Starting', 1);
+
+                polling = setInterval(poll, 500);
+
+                post(cfg.send).then(function (res) {
+                    if (res && res.success) {
+                        finish(res.data.message, !!res.data.sent);
+                        return;
+                    }
+                    finish((res && res.data && res.data.message) || 'The send failed. See the error log.', false);
+                }).catch(function (e) {
+                    finish('The send could not be reached: ' + e.message, false);
+                });
+            });
+        }());
+        </script>
         <?php
     }
 

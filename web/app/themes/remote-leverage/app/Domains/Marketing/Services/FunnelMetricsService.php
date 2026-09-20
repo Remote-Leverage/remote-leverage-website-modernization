@@ -187,10 +187,28 @@ class FunnelMetricsService
     /**
      * @param  CarbonImmutable|null  $now  Overridable so a test can pin the clock.
      */
-    public function snapshot(?CarbonImmutable $now = null): FunnelSnapshot
+    public function snapshot(?CarbonImmutable $now = null, ?callable $onProgress = null): FunnelSnapshot
     {
+        /*
+         * Named steps rather than a spinner.
+         *
+         * This method is 25-odd queries and, with Calendly configured, up to four network round
+         * trips measured between 1.1 and 10.0 seconds. A caller watching it needs to know which
+         * of those it is waiting on — "Reading the marketing warehouse" and "Fetching
+         * consultations from Calendly" fail for entirely different reasons and are fixed by
+         * different people. The percentages are rough and deliberately so; they order the steps,
+         * they do not predict them.
+         */
+        $step = static function (string $label, int $percent) use ($onProgress): void {
+            if ($onProgress !== null) {
+                $onProgress($label, $percent);
+            }
+        };
+
         $timezone = (string) config('marketing.cost_alert.timezone', 'UTC');
         $now = ($now ?? CarbonImmutable::now())->setTimezone($timezone);
+
+        $step('Reading the marketing warehouse', 10);
 
         /*
          * The cost half, from the data team's warehouse rather than from this application.
@@ -203,6 +221,8 @@ class FunnelMetricsService
 
         [$fromUtc, $toUtc] = $this->reportingWindow($now, $marketingDay);
 
+        $step('Counting leads and bookings', 30);
+
         $leads = $this->clientLeadsBetween($fromUtc, $toUtc);
         $bookedLeads = $this->clientLeadsBookedBetween($fromUtc, $toUtc);
 
@@ -214,19 +234,42 @@ class FunnelMetricsService
          */
         $leadCount = $this->clientLeads()->whereBetween('created_at', [$fromUtc, $toUtc])->count();
 
+        $step('Attributing leads to platforms', 45);
+
         $platforms = $this->slice($leads, $bookedLeads);
 
         $qualifiedT10 = $bookedLeads->filter(
             static fn (Lead $lead): bool => LeadQualification::isT10($lead)
         )->count();
 
+        $step('Reading HubSpot lifecycle stages', 55);
+
         [$qualifiedHubSpot, $hubSpotCoverage] = $this->hubSpotQualified($bookedLeads);
 
         $lastLeadMinutes = $this->minutesSince($now, $this->lastLeadAt());
         [$lastBookingMinutes, $lastBookingName] = $this->lastBooking($now);
 
+        $step('Measuring the trailing booking rate', 62);
+
         [$recentBooked, $recentSize] = $this->bookingRate(self::RECENT_SAMPLE);
         [$trailingBooked, $trailingSize] = $this->bookingRate(self::TRAILING_SAMPLE);
+
+        /*
+         * Hoisted out of the constructor call below so each can be announced before it runs.
+         * Calendly is the slowest thing here by an order of magnitude and the one most worth
+         * naming while somebody waits on it.
+         */
+        $step('Fetching consultations from Calendly', 70);
+
+        $consultationsToday = $this->consultationsOn($now);
+        $upcomingConsultations = $this->upcomingConsultations($now);
+
+        $step('Averaging the previous days', 85);
+
+        $baseline = $this->baseline(
+            $toUtc->setTimezone($now->timezone),
+            $marketingDay?->isClosing() ?? false,
+        );
 
         $platformBookings = array_sum(array_map(
             static fn (PlatformSlice $slice): int => $slice->bookings,
@@ -249,7 +292,11 @@ class FunnelMetricsService
                 ->whereBetween('created_at', [$fromUtc, $toUtc])
                 ->where('status', 'booked')
                 ->count(),
-            'within_window' => AlertWindow::contains($now),
+            /*
+             * Staffed hours, not posting hours. The card now posts round the clock; a six-hour
+             * lead gap is only an incident when there was somebody there to notice it.
+             */
+            'within_window' => AlertWindow::staffed($now),
             /*
              * The warehouse's booking count against this application's own. They are allowed to
              * differ a little — different definitions of a booking, different load times — but a
@@ -286,12 +333,9 @@ class FunnelMetricsService
             recentSampleSize: $recentSize,
             trailingBookingRate: $trailingSize > 0 ? $trailingBooked / $trailingSize : 0.0,
             trailingSampleSize: $trailingSize,
-            consultationsToday: $this->consultationsOn($now),
-            upcomingConsultations: $this->upcomingConsultations($now),
-            baseline: $this->baseline(
-                $toUtc->setTimezone($now->timezone),
-                $marketingDay?->isClosing() ?? false,
-            ),
+            consultationsToday: $consultationsToday,
+            upcomingConsultations: $upcomingConsultations,
+            baseline: $baseline,
             warnings: $warnings,
 
             marketingDay: $marketingDay,

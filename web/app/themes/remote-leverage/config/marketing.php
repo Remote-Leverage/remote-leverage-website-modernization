@@ -90,13 +90,31 @@ return [
         /*
          * Local hours at which the card is refreshed, inclusive of both ends.
          *
-         * The alert posts once per day at `from` and edits that same message on every later
-         * tick, so the channel holds one live card per day rather than nine stacked ones. See
-         * SendCostAlertAction for why editing beats reposting.
+         * Every tick posts its own card, so the channel is a scrollable record of how the day
+         * developed rather than one message that keeps changing. See SendCostAlertAction for why
+         * the history is the point.
+         *
+         * Round the clock by default. It used to be 9-18, which meant the first card of the day
+         * arrived at 09:00 already describing a night nobody could see. The overnight hours are
+         * cheap — the same one card, edited — and they are the ones where a stalled ad account
+         * goes unnoticed longest.
          */
         'window' => [
-            'from' => (int) env('MARKETING_COST_ALERT_FROM_HOUR', 9),
-            'to' => (int) env('MARKETING_COST_ALERT_TO_HOUR', 18),
+            'from' => (int) env('MARKETING_COST_ALERT_FROM_HOUR', 0),
+            'to' => (int) env('MARKETING_COST_ALERT_TO_HOUR', 23),
+        ],
+
+        /*
+         * The hours somebody is at a desk. Not when the card posts — when silence is a problem.
+         *
+         * `AlertReconciler` reports a long gap since the last lead as an incident, and that is
+         * only true during the working day: the identical gap at 4am is the night. This was the
+         * same setting as `window` until the card went round the clock, at which point one value
+         * could not answer both questions without getting one of them wrong.
+         */
+        'staffed' => [
+            'from' => (int) env('MARKETING_COST_ALERT_STAFFED_FROM_HOUR', 9),
+            'to' => (int) env('MARKETING_COST_ALERT_STAFFED_TO_HOUR', 18),
         ],
 
         /*

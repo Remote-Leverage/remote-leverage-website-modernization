@@ -14,6 +14,7 @@ use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Services\AlertReconciler;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use App\Domains\Marketing\Support\AdPlatformCredentials;
+use App\Domains\Marketing\Support\AlertWindow;
 use App\Domains\Marketing\Support\DemoSnapshot;
 use App\Infrastructure\Slack\SlackTransport;
 use App\Infrastructure\WordPress\Admin\MarketingDashboard;
@@ -674,7 +675,7 @@ describe('the message', function () {
 
         $metrics = new class extends FunnelMetricsService
         {
-            public function snapshot(?CarbonImmutable $now = null): FunnelSnapshot
+            public function snapshot(?CarbonImmutable $now = null, ?callable $onProgress = null): FunnelSnapshot
             {
                 return DemoSnapshot::build($now);
             }
@@ -834,7 +835,20 @@ describe('the message', function () {
             ->and($transport->posted)->toBeEmpty();
     });
 
-    test('stays quiet outside the reporting window unless forced', function () {
+    /*
+     * The card posts round the clock now. The overnight hours are the cheapest to cover — the
+     * same one card, edited — and the ones where a stalled ad account goes unnoticed longest.
+     */
+    test('posts in the middle of the night, because the window is the whole day', function () {
+        $action = costAlertAction($transport = recordingCostTransport());
+
+        expect($action->execute(CarbonImmutable::parse('2026-09-18 03:00:00', 'UTC')))->toBeTrue()
+            ->and($transport->posted)->toHaveCount(1);
+    });
+
+    test('still honours a narrowed window, and force still bypasses it', function () {
+        config(['marketing.cost_alert.window' => ['from' => 9, 'to' => 18]]);
+
         $action = costAlertAction($transport = recordingCostTransport());
         $middleOfTheNight = CarbonImmutable::parse('2026-09-18 03:00:00', 'UTC');
 
@@ -843,16 +857,44 @@ describe('the message', function () {
             ->and($action->execute($middleOfTheNight, force: true))->toBeTrue();
     });
 
-    test('posts the first card of the day and edits it afterwards', function () {
+    /*
+     * Posting hours and staffed hours are now separate settings, and the silence check reads the
+     * second. Sharing one value meant either no overnight card or a 4am card complaining that
+     * nobody had filled in a form since midnight.
+     */
+    test('a long silence is an incident during staffed hours and not overnight', function () {
+        $quiet = [
+            'leads' => 0, 'bookings' => 0, 'platform_bookings' => 0, 'booked_by_status' => 0,
+            'last_lead_minutes' => 400, 'last_booking_minutes' => 400,
+        ];
+
+        $night = AlertWindow::staffed(CarbonImmutable::parse('2026-09-18 04:00:00', 'UTC'));
+        $desk = AlertWindow::staffed(CarbonImmutable::parse('2026-09-18 14:00:00', 'UTC'));
+
+        expect($night)->toBeFalse()
+            ->and($desk)->toBeTrue()
+            ->and(AlertWindow::contains(CarbonImmutable::parse('2026-09-18 04:00:00', 'UTC')))->toBeTrue();
+
+        $overnight = (new AlertReconciler)->check([...$quiet, 'within_window' => $night]);
+        $working = (new AlertReconciler)->check([...$quiet, 'within_window' => $desk]);
+
+        expect(implode(' ', $overnight))->not->toContain('No new lead')
+            ->and(implode(' ', $working))->toContain('No new lead');
+    });
+
+    /*
+     * Every run leaves its own card. The channel is the record of how the day developed, which is
+     * the one question the dashboard widget cannot answer — it only ever shows now.
+     */
+    test('posts a new card on every run and never edits one', function () {
         $transport = recordingCostTransport();
         $action = costAlertAction($transport);
 
         $action->execute(CarbonImmutable::parse('2026-09-18 09:00:00', 'UTC'), force: true);
         $action->execute(CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC'), force: true);
 
-        expect($transport->posted)->toHaveCount(1)
-            ->and($transport->updated)->toHaveCount(1)
-            ->and($transport->updated[0]['ts'])->toBe('1700000000.0001');
+        expect($transport->posted)->toHaveCount(2)
+            ->and($transport->updated)->toBeEmpty();
     });
 
     /*
@@ -1584,5 +1626,124 @@ describe('the funnel summary', function () {
 
         expect($blocks)->toContain('- Bookings: 9')
             ->and($blocks)->not->toContain('% of leads');
+    });
+});
+
+/*
+ * The send button's progress reporting.
+ *
+ * The work is unchanged and still takes as long as it takes; what this buys is a person knowing
+ * which part they are waiting on. "Reading the marketing warehouse" and "Fetching consultations
+ * from Calendly" are the two slow steps, they fail for entirely different reasons, and they are
+ * fixed by different people — so the value is in the labels, not the bar.
+ */
+describe('send progress', function () {
+    beforeEach(function () {
+        costAlertConfig();
+        Lead::truncate();
+        LeadActivityLog::truncate();
+        update_option(SendCostAlertAction::STATE_OPTION, []);
+    });
+
+    test('it reports named steps, in order, ending short of complete', function () {
+        $seen = [];
+
+        costAlertAction(recordingCostTransport(), costAlertDay())->execute(
+            CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC'),
+            force: true,
+            onProgress: function (string $label, int $percent) use (&$seen) {
+                $seen[] = [$label, $percent];
+            },
+        );
+
+        $labels = array_column($seen, 0);
+        $percents = array_column($seen, 1);
+
+        expect($labels)->toContain('Checking the environment and reporting window')
+            ->and($labels)->toContain('Reading the marketing warehouse')
+            ->and($labels)->toContain('Posting to Slack');
+
+        // Never backwards: the bar is painted straight from these and must not jump about.
+        $sorted = $percents;
+        sort($sorted);
+
+        expect($percents)->toBe($sorted)
+            // The last step is "posting", not "posted". Completion is the response arriving, not
+            // a number this side made up before the network call it is announcing.
+            ->and(max($percents))->toBeLessThan(100)
+            ->and(min($percents))->toBeGreaterThan(0);
+    });
+
+    test('it runs perfectly well with nobody watching', function () {
+        // The scheduled run passes no callback, which must stay a supported case rather than a
+        // null-check somebody forgets.
+        $transport = recordingCostTransport();
+
+        expect(costAlertAction($transport, costAlertDay())->execute(
+            CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC'),
+            force: true,
+        ))->toBeTrue()
+            ->and($transport->posted)->toHaveCount(1);
+    });
+});
+
+/*
+ * Nothing is ever edited, whatever the report is about.
+ *
+ * This was built the other way first — one card a day, updated hourly — and the boundary cases
+ * are kept as tests because they are where an edit would do the most damage if one were ever
+ * reintroduced. Between midnight and 08:00 Eastern the warehouse reports the previous day closed
+ * and from 08:00 the current day so far, both on the same calendar date, so a card keyed on the
+ * date would have had the 08:00 run overwrite the night's closing figures with the new day's
+ * running ones.
+ */
+describe('every run leaves its own card', function () {
+    beforeEach(function () {
+        costAlertConfig();
+        Lead::truncate();
+        LeadActivityLog::truncate();
+        update_option(SendCostAlertAction::STATE_OPTION, []);
+    });
+
+    test('hourly runs through one night stack up rather than collapsing', function () {
+        $transport = recordingCostTransport();
+        $closing = costAlertDay(['Date' => '2026-09-19', 'report_kind' => 'CLOSING']);
+
+        costAlertAction($transport, $closing)->execute(CarbonImmutable::parse('2026-09-20 02:00:00', 'UTC'), force: true);
+        costAlertAction($transport, $closing)->execute(CarbonImmutable::parse('2026-09-20 03:00:00', 'UTC'), force: true);
+
+        expect($transport->posted)->toHaveCount(2)
+            ->and($transport->updated)->toBeEmpty();
+    });
+
+    test('the switch from closing to day-to-date does not touch the night', function () {
+        $transport = recordingCostTransport();
+
+        costAlertAction($transport, costAlertDay([
+            'Date' => '2026-09-19',
+            'report_kind' => 'CLOSING',
+        ]))->execute(CarbonImmutable::parse('2026-09-20 03:00:00', 'UTC'), force: true);
+
+        costAlertAction($transport, costAlertDay([
+            'Date' => '2026-09-20',
+            'report_kind' => 'DAY-TO-DATE',
+        ]))->execute(CarbonImmutable::parse('2026-09-20 13:00:00', 'UTC'), force: true);
+
+        expect($transport->posted)->toHaveCount(2)
+            ->and($transport->updated)->toBeEmpty();
+    });
+
+    test('it remembers the last card posted, so its timestamp is recoverable', function () {
+        // The bot has chat:write and no channels:history, so a card it posted cannot be found
+        // again by searching. This option row is the only handle on one.
+        costAlertAction(recordingCostTransport(), costAlertDay([
+            'Date' => '2026-09-19',
+            'report_kind' => 'CLOSING',
+        ]))->execute(CarbonImmutable::parse('2026-09-20 03:00:00', 'UTC'), force: true);
+
+        $state = get_option(SendCostAlertAction::STATE_OPTION, []);
+
+        expect($state['ts'] ?? '')->not->toBe('')
+            ->and($state['card'] ?? '')->toBe('2026-09-19/CLOSING');
     });
 });
