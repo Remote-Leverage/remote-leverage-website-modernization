@@ -112,8 +112,9 @@ if wp core is-installed; then
   wp plugin activate redis-cache
   wp acorn rl:deploy        # fatal on failure — refuses to start
   wp acorn optimize
-  [ -n "$REDIS_HOST" ] && wp redis enable
+  [ -n "$WP_REDIS_HOST" ] && wp redis enable
 fi
+cron && export DISABLE_WP_CRON=true   # real cron; falls back to request spawning if it fails
 php-fpm -D
 exec nginx -g "daemon off;"
 ```

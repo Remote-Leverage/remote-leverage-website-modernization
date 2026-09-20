@@ -707,6 +707,51 @@ describe('the message', function () {
     });
 
     /*
+     * The alert is never scheduled outside production, but it can still be fired by hand — the
+     * dashboard button and `--force` both exist so somebody can test against real data, and both
+     * land in the channel production posts to. Without a banner a staging card is
+     * indistinguishable from the real thing.
+     */
+    test('a card sent from outside production says so', function () {
+        $now = CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC');
+        $GLOBALS['wp_environment_type'] = 'staging';
+
+        $action = costAlertAction($transport = recordingCostTransport());
+        $action->execute($now, force: true);
+
+        $json = (string) json_encode($transport->posted[0]['blocks']);
+
+        expect($json)->toContain('TEST MESSAGE')
+            ->and($json)->toContain('STAGING');
+    });
+
+    test('a production card carries no test banner', function () {
+        $now = CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC');
+        $GLOBALS['wp_environment_type'] = 'production';
+
+        $action = costAlertAction($transport = recordingCostTransport());
+        $action->execute($now, force: true);
+
+        expect(json_encode($transport->posted[0]['blocks']))->not->toContain('TEST MESSAGE');
+    });
+
+    /*
+     * A fabricated card sent from staging is two different things the reader needs to know.
+     * Dropping one because the other applies is how somebody mistakes a demo for a staging run.
+     */
+    test('a demo sent from staging carries both notices', function () {
+        $GLOBALS['wp_environment_type'] = 'staging';
+
+        $action = costAlertAction($transport = recordingCostTransport());
+        $action->preview(DemoSnapshot::build(CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC')), 'EXAMPLE CARD');
+
+        $json = (string) json_encode($transport->posted[0]['blocks']);
+
+        expect($json)->toContain('EXAMPLE CARD')
+            ->and($json)->toContain('TEST MESSAGE');
+    });
+
+    /*
      * House rule: no native emoji. A `:shortcode:` for a brand logo is a different thing and is
      * not what this guards — the pattern is unicode ranges, which a shortcode does not match.
      */

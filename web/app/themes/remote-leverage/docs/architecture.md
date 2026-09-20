@@ -215,7 +215,21 @@ The list in `config/rl-sync.php` is exactly the set the sync feature is allowed 
 
 ## 6. Scheduled work
 
-WP-Cron, registered in the providers. There is no queue worker and no system cron beyond WordPress's own.
+WP-Cron hooks, registered in the providers, driven by a **real cron inside the container**.
+
+`docker/wp-cron.crontab` installs a minute-by-minute job that curls `/wp/wp-cron.php` over the
+loopback, and `docker/entrypoint.sh` exports `DISABLE_WP_CRON=true` once that daemon is up — so
+scheduled work no longer depends on a visitor arriving. Before 2026-09-19 it did, which meant a
+quiet night was a night with no hourly runs and nothing recording that a tick was skipped.
+
+The entrypoint disables WP-Cron's request spawning *only* after cron actually starts; if it
+fails, the container keeps the old request-triggered behaviour rather than having neither.
+Every task runs the job, and WordPress's own `doing_cron` lock means one of them does the work.
+
+There is still no queue worker: `QUEUE_CONNECTION` is unset, so Acorn's default `sync` runs any
+dispatched job inline. Nothing in the theme implements `ShouldQueue`; the deferred integrations
+use `dispatch(...)->afterResponse()`, which is a terminating callback in the same PHP process,
+not a queued job — see `ThemeServiceProvider::ensureApplicationTerminates()`.
 
 | Hook | Schedule | Does |
 | :--- | :--- | :--- |

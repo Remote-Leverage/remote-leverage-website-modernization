@@ -453,10 +453,11 @@ a look at the wp-admin widget, which renders the same snapshot without posting a
 
 ### Needs a decision or an action
 
-1. **Confirm WP-Cron actually runs.** `DISABLE_WP_CRON` defaults to false and nothing in the
-   workflows or the entrypoint sets it, so WP-Cron fires on visitor requests — fine for a site
-   with traffic. If it is ever disabled, this job stops silently, because a skipped tick is
-   indistinguishable from a quiet hour by design.
+1. ~~**Confirm WP-Cron actually runs.**~~ **Resolved 2026-09-19.** The container now runs a real
+   cron (`docker/wp-cron.crontab`) that hits `/wp/wp-cron.php` every minute, and the entrypoint
+   exports `DISABLE_WP_CRON=true` once that daemon is up. Ticks no longer depend on a visitor
+   arriving, which matters most overnight — the window where this job's hourly cadence was
+   previously least reliable and a skipped tick was indistinguishable from a quiet hour.
 2. **Check the bot can post.** `chat:write.public` covers a public channel it has not joined. A
    private `#marketing-cost-alerts` needs the bot invited first, or Slack answers
    `not_in_channel` and the run logs a warning nobody is watching for.

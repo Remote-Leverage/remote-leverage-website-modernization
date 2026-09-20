@@ -705,14 +705,17 @@ return [
          */
         'blocks' => [
             /*
-             * Only ever filled by `--demo`. Above the header rather than below it: a card of
-             * plausible marketing figures in a channel where people read real ones needs to
-             * announce itself before anyone has read a number, not after.
+             * Anything the reader has to know before they read a number: that the figures are
+             * fabricated, or that the card came from an environment that is not production.
+             *
+             * Above the header rather than below it. A card of plausible marketing figures in a
+             * channel where people read real ones has to announce itself first, not after
+             * somebody has already reacted to the numbers.
              */
             [
                 'type' => 'section',
-                '_when' => ['demo_notice'],
-                'text' => ['type' => 'mrkdwn', 'text' => '{{ demo_notice }}'],
+                '_when' => ['notice'],
+                'text' => ['type' => 'mrkdwn', 'text' => '{{ notice }}'],
             ],
             [
                 'type' => 'header',

@@ -37,7 +37,19 @@ use Illuminate\Support\ServiceProvider;
  */
 class MarketingServiceProvider extends ServiceProvider
 {
+    /** Posts the card. Production only. */
     public const CRON_HOOK = 'rl_marketing_cost_alert';
+
+    /**
+     * Refreshes the dashboard widget's figures. Every environment.
+     *
+     * Separate from the send, because they are gated differently and used to be the same hook.
+     * The consequence of sharing one was that staging and local — where the alert is correctly
+     * never scheduled — also never warmed the cache, so the wp-admin widget read "no figures yet"
+     * forever. Reading the numbers is not the thing anybody wanted to prevent outside production;
+     * posting them to a channel is.
+     */
+    public const WARM_HOOK = 'rl_marketing_warm_snapshot';
 
     public function register(): void
     {
@@ -143,6 +155,14 @@ class MarketingServiceProvider extends ServiceProvider
         }
 
         \add_action('init', function () {
+            /*
+             * The warm runs everywhere. It reads the database and the warehouse and writes a
+             * cache entry; it posts nothing, so there is nothing to gate.
+             */
+            if (! \wp_next_scheduled(self::WARM_HOOK)) {
+                \wp_schedule_event(time(), 'hourly', self::WARM_HOOK);
+            }
+
             $enabled = AlertWindow::enabledHere();
             $scheduled = \wp_next_scheduled(self::CRON_HOOK);
 
@@ -165,6 +185,16 @@ class MarketingServiceProvider extends ServiceProvider
             }
         });
 
+        \add_action(self::WARM_HOOK, function () {
+            try {
+                $this->app->make(FunnelMetricsService::class)->warmCache();
+            } catch (\Throwable $e) {
+                Log::error('MarketingServiceProvider: could not warm the cost alert snapshot', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+
         \add_action(self::CRON_HOOK, function () {
             try {
                 $this->app->make(SendCostAlertAction::class)->execute();
@@ -180,16 +210,12 @@ class MarketingServiceProvider extends ServiceProvider
             }
 
             /*
-             * Warm the dashboard widget's snapshot on the same tick.
+             * Warm on the same tick as well as on the warm hook's own schedule.
              *
-             * Separate from the block above, and deliberately not inside it: `execute()` returns
-             * early outside the reporting window and when the Slack side is switched off, but the
-             * widget is registered either way and still needs figures. Overnight, and in any
-             * environment with no bot token, this is the only thing that fills it.
-             *
-             * `warmCache()` no-ops when the stored copy is recent, so on the ticks where the
-             * alert has just run this costs a cache read rather than a second round of Calendly
-             * and Meta calls.
+             * `execute()` returns early outside the reporting window, so the send cannot be
+             * relied on to leave fresh figures behind — but when it has just run, this is nearly
+             * free: `warmCache()` no-ops when the stored copy is recent, so it costs a cache read
+             * rather than a second round of Calendly and warehouse calls.
              */
             try {
                 $this->app->make(FunnelMetricsService::class)->warmCache();

@@ -140,9 +140,14 @@ class SendCostAlertAction
      */
     public function preview(FunnelSnapshot $snapshot, string $notice): bool
     {
+        /*
+         * Both notices, when both apply. A fabricated card sent from staging is two different
+         * things a reader needs to know, and dropping one because the other is present is how
+         * somebody takes a demo card for a staging card or the reverse.
+         */
         $rendered = $this->renderer->render(
             'marketing_cost_alert',
-            ['demo_notice' => $notice] + $this->values($snapshot),
+            ['notice' => trim($notice."\n".$this->environmentNotice())] + $this->values($snapshot),
         );
 
         if ($rendered['blocks'] === []) {
@@ -221,8 +226,7 @@ class SendCostAlertAction
     private function values(FunnelSnapshot $snapshot): array
     {
         return [
-            // Empty on every real card, so the renderer's `_when` prunes the notice block.
-            'demo_notice' => '',
+            'notice' => $this->environmentNotice(),
             'subheading' => $this->subheading($snapshot),
             'headline_metrics' => $this->headlineMetrics($snapshot),
             'warnings' => $this->warnings($snapshot),
@@ -534,6 +538,34 @@ class SendCostAlertAction
         $emoji = trim((string) config('marketing.cost_alert.platform_emoji.'.$slug, ''));
 
         return $emoji === '' ? $name : $emoji.' '.$name;
+    }
+
+    /**
+     * A banner on anything sent from an environment that is not production.
+     *
+     * The alert is not scheduled outside production, but it can still be fired by hand — the
+     * dashboard button and `--force` both exist so somebody can test against real data. Those
+     * land in the same channel production posts to, so without this a staging card is
+     * indistinguishable from the real thing and somebody acts on figures from a test database.
+     *
+     * Empty on production, which prunes the block entirely.
+     */
+    private function environmentNotice(): string
+    {
+        $environment = function_exists('wp_get_environment_type')
+            ? (string) \wp_get_environment_type()
+            : (string) (env('WP_ENV') ?: 'production');
+
+        if ($environment === 'production') {
+            return '';
+        }
+
+        return sprintf(
+            '*TEST MESSAGE — sent by hand from %s, not production.* The figures come from that '.
+            "environment's database and may be stale, partial or invented. Nothing here is a real "
+            .'trading number.',
+            strtoupper($environment),
+        );
     }
 
     /**
