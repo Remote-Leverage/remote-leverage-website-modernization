@@ -173,10 +173,24 @@ class AlertReconciler
             $tolerance = max(3, (int) ceil(max((int) $warehouseBookings, $siteBookings) * 0.25));
 
             if ($gap > $tolerance) {
+                /*
+                 * Name the day rather than saying "today".
+                 *
+                 * Before 08:00 Eastern the warehouse reports yesterday closed and this card
+                 * follows it, so "today" would be false on exactly the cards most likely to
+                 * surprise someone. It was also what made this warning unreadable when the two
+                 * halves covered different days: it shouted that one source was wrong when the
+                 * real answer was that they were not being compared.
+                 */
+                $when = ($facts['report_is_closing'] ?? false) && ($facts['report_date'] ?? '') !== ''
+                    ? 'on '.$facts['report_date']
+                    : 'today';
+
                 $findings[] = sprintf(
-                    'The warehouse reports %d bookings today and this site recorded %d. The figures above are '.
+                    'The warehouse reports %d bookings %s and this site recorded %d. The figures above are '.
                     'the warehouse\'s; a gap this wide means one of the two is wrong.',
                     (int) $warehouseBookings,
+                    $when,
                     $siteBookings,
                 );
             }

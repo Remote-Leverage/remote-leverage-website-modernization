@@ -238,3 +238,30 @@ describe('Slack credentials as settings', function () {
         expect($service->get()['slack_signing_secret'])->toBe('');
     });
 });
+
+describe('the warehouse refresh token', function () {
+    /*
+     * The token is written by the OAuth callback and, until now, by nothing else — so it was
+     * unreachable: there was no way to read it out of the environment that consented, and no way
+     * to write it into one that had not. Google issues a refresh token only on first consent, so
+     * once the person who signed in moves on, an environment without the value can never obtain
+     * one. Making the field readable and writable on the settings screen is what makes it
+     * portable, and these two tests are the halves of that.
+     */
+    test('a save that omits it leaves the value the OAuth callback wrote', function () {
+        $service = new LeadSettingsService;
+
+        $service->save(['retention_days' => '30', 'notification_emails' => '', 'bigquery_refresh_token' => '1//consented']);
+        $service->save(['retention_days' => '45', 'notification_emails' => '']);
+
+        expect($service->get()['bigquery_refresh_token'])->toBe('1//consented');
+    });
+
+    test('a save that carries it adopts a token issued on another environment', function () {
+        $service = new LeadSettingsService;
+
+        $service->save(['retention_days' => '30', 'notification_emails' => '', 'bigquery_refresh_token' => '1//from-staging']);
+
+        expect($service->get()['bigquery_refresh_token'])->toBe('1//from-staging');
+    });
+});

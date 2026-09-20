@@ -9,6 +9,7 @@ use App\Domains\Marketing\Data\ChannelDay;
 use App\Domains\Marketing\Data\FunnelSnapshot;
 use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Services\FunnelMetricsService;
+use Carbon\CarbonImmutable;
 
 /**
  * The marketing cost alert, on the wp-admin dashboard.
@@ -172,16 +173,18 @@ class MarketingCostAlertWidget
             ? round($snapshot->trailingBookingRate * 100).'% of leads book, trailing '.$snapshot->trailingSampleSize
             : 'No booking rate yet';
 
+        [$closing, $period] = $this->period($snapshot);
+
         ?>
         <div class="rl-dash-kpi-grid">
             <div class="rl-dash-kpi-card">
-                <div class="rl-dash-kpi-header"><span class="rl-dash-kpi-label">Leads today</span></div>
+                <div class="rl-dash-kpi-header"><span class="rl-dash-kpi-label">Leads <?php echo $period; ?></span></div>
                 <div class="rl-dash-kpi-number"><?php echo esc_html((string) $snapshot->leads); ?></div>
-                <div class="rl-dash-kpi-meta"><?php echo esc_html($this->delta($snapshot->leads, $snapshot->baseline['leads'] ?? null)); ?></div>
+                <div class="rl-dash-kpi-meta"><?php echo esc_html($this->delta($snapshot->leads, $snapshot->baseline['leads'] ?? null, $closing)); ?></div>
             </div>
 
             <div class="rl-dash-kpi-card">
-                <div class="rl-dash-kpi-header"><span class="rl-dash-kpi-label">Bookings today</span></div>
+                <div class="rl-dash-kpi-header"><span class="rl-dash-kpi-label">Bookings <?php echo $period; ?></span></div>
                 <div class="rl-dash-kpi-number"><?php echo esc_html((string) $snapshot->bookings); ?></div>
                 <div class="rl-dash-kpi-meta"><?php echo wp_kses_post($bookingRate); ?></div>
             </div>
@@ -315,7 +318,14 @@ class MarketingCostAlertWidget
                 <?php echo esc_html((string) $snapshot->excludedVaBookings); ?> bookings. The test is a phone
                 number outside the US and Canada, so it will occasionally catch a real client.<br>
             <?php } ?>
-            Figures as at <?php echo esc_html($snapshot->generatedAt->format('H:i T')); ?>,
+            <?php [$closing, $period] = $this->period($snapshot); ?>
+            <?php if ($closing) { ?>
+                A <strong>closing report</strong> for <?php echo $period; ?>: before 08:00 Eastern the
+                warehouse reports the previous day complete, and both halves of this card follow it.
+                Read at <?php echo esc_html($snapshot->generatedAt->format('H:i T')); ?>.<br>
+            <?php } else { ?>
+                Figures as at <?php echo esc_html($snapshot->generatedAt->format('H:i T')); ?>,
+            <?php } ?>
             refreshed hourly by the marketing job rather than on this page load.
         </p>
         <?php
@@ -374,6 +384,41 @@ class MarketingCostAlertWidget
      * Shown on the T10 tile rather than as a tile of its own, because a tile reading "not
      * reported" is a tile people ask about once a week.
      */
+    /**
+     * Which day this card is about, as a flag and as a label.
+     *
+     * "Today" is a lie on a closing report. Before 08:00 Eastern the warehouse reports the
+     * previous day complete and FunnelMetricsService follows it, so every figure here is that
+     * day's — saying "today" over them is how a correct card gets read as a collapse. The Slack
+     * renderer already names the day; this one did not, and both the tiles and the footer need
+     * the answer.
+     *
+     * @return array{0: bool, 1: string} Whether this is a closing report, and the label for it.
+     */
+    private function period(FunnelSnapshot $snapshot): array
+    {
+        $day = $snapshot->marketingDay;
+        $closing = $day !== null && $day->isClosing() && $day->date !== '';
+
+        return [$closing, $closing ? esc_html($this->prettyDate($day->date)) : 'today'];
+    }
+
+    /**
+     * "Fri 19 Sep", or the raw string if it will not parse.
+     *
+     * Mirrors SendCostAlertAction::prettyDate so the widget and the Slack card name a day the
+     * same way — someone comparing the two should not have to work out whether two formats mean
+     * the same date.
+     */
+    private function prettyDate(string $date): string
+    {
+        try {
+            return CarbonImmutable::parse($date)->format('D j M');
+        } catch (\Throwable) {
+            return $date;
+        }
+    }
+
     private function hubSpotNote(FunnelSnapshot $snapshot): string
     {
         if ($snapshot->qualifiedHubSpot !== null) {
@@ -390,16 +435,25 @@ class MarketingCostAlertWidget
         );
     }
 
-    private function delta(int $actual, ?float $baseline): string
+    /**
+     * "+12% vs 7d avg at this hour", or "vs 7d avg" on a closing report.
+     *
+     * The qualifier has to match what FunnelMetricsService::baseline() actually measured. It
+     * compares like for like — same hour against same hour on a day-to-date card, whole day
+     * against whole days on a closing one — so saying "at this hour" over the second is a caption
+     * describing a comparison that was not made.
+     */
+    private function delta(int $actual, ?float $baseline, bool $closing = false): string
     {
         if ($baseline === null || $baseline <= 0.0) {
             return 'No baseline yet';
         }
 
         return sprintf(
-            '%+d%% vs %dd avg at this hour',
+            '%+d%% vs %dd avg%s',
             (int) round(($actual - $baseline) / $baseline * 100),
             max(1, (int) config('marketing.cost_alert.baseline_days', 7)),
+            $closing ? '' : ' at this hour',
         );
     }
 

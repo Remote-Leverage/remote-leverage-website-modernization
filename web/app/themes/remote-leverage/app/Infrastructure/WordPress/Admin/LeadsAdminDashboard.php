@@ -247,6 +247,7 @@ class LeadsAdminDashboard
                 'bigquery_credentials_json' => trim((string) wp_unslash($_POST['bigquery_credentials_json'] ?? '')),
                 'bigquery_client_id' => sanitize_text_field(wp_unslash((string) ($_POST['bigquery_client_id'] ?? ''))),
                 'bigquery_client_secret' => trim((string) wp_unslash($_POST['bigquery_client_secret'] ?? '')),
+                'bigquery_refresh_token' => trim((string) wp_unslash($_POST['bigquery_refresh_token'] ?? '')),
                 'bigquery_project_id' => sanitize_text_field(wp_unslash((string) ($_POST['bigquery_project_id'] ?? ''))),
             ]);
 
@@ -2686,6 +2687,22 @@ class LeadsAdminDashboard
                                     Save these first, then use the button above. The scope requested is
                                     <code>auth/bigquery</code>; the narrower <code>bigquery.readonly</code> looks
                                     right and cannot run a query.
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="bigquery_refresh_token">Refresh token</label></th>
+                            <td><input type="password" id="bigquery_refresh_token" name="bigquery_refresh_token" class="regular-text"
+                                       autocomplete="off"
+                                       value="<?php echo esc_attr((string) ($settings['bigquery_refresh_token'] ?? '')); ?>" />
+                                <p class="description">
+                                    Filled in for you by <strong>Connect with Google</strong> &mdash; you only touch this
+                                    to <em>copy it to another environment</em>. A refresh token is bound to the client ID
+                                    and secret, not to the site it was issued on, so the same value works in local,
+                                    staging and production as long as all three use the same OAuth client. That matters
+                                    because Google issues a refresh token only on first consent: if the person who
+                                    signed in is not around to do it again, copying this field is the only way to get
+                                    another environment reading the warehouse.
                                 </p>
                             </td>
                         </tr>

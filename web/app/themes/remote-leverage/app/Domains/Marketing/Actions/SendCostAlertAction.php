@@ -255,9 +255,28 @@ class SendCostAlertAction
 
         $lines = [sprintf('*%s*', $day->isClosing() ? 'Closing — '.$this->prettyDate($day->date) : 'Today, so far')];
 
-        $lines[] = sprintf('- Bookings: %d%s', $day->appointments, $this->versusPrevious($day->appointments, $day->previousAppointments, $day));
-        $lines[] = sprintf('- Qualified: %d', $day->qualified);
+        /*
+         * Funnel order, each step carrying its share of the one above.
+         *
+         * The two percentages are same-window ratios, computed from the warehouse's own three
+         * numbers so they cannot disagree with them. They are *not* conversion rates and must not
+         * be read as such: a booking on this day can come from a lead captured last week, so the
+         * denominator is not the cohort the numerator came from. The trailing booking rate in the
+         * Activity block is the lead-level measure, and the two can differ sharply — that is the
+         * factor-of-seventeen gap noted there, and it is why both appear rather than one.
+         *
+         * Sound enough on a closing report, which is a complete day. On a day-to-date card read at
+         * 09:00 the ratio is dominated by which of the two lags more, so treat it as a shape check
+         * rather than a rate.
+         */
         $lines[] = sprintf('- Leads: %d', $day->leads);
+        $lines[] = sprintf('- Bookings: %d%s', $day->appointments, $this->notes(
+            $this->shareOf($day->appointments, $day->leads, 'leads'),
+            $this->versusPrevious($day->appointments, $day->previousAppointments, $day),
+        ));
+        $lines[] = sprintf('- Qualified: %d%s', $day->qualified, $this->notes(
+            $this->shareOf($day->qualified, $day->appointments, 'bookings'),
+        ));
 
         if ($day->spend === null) {
             $lines[] = '- Spend: not reported for this day';
@@ -324,7 +343,7 @@ class SendCostAlertAction
             return '';
         }
 
-        return sprintf(' (was %d on %s)', $previous, $this->prettyDate((string) $day->previousDate));
+        return sprintf('was %d on %s', $previous, $this->prettyDate((string) $day->previousDate));
     }
 
     private function versusPreviousMoney(?float $current, ?float $previous, MarketingDay $day, FunnelSnapshot $snapshot): string
@@ -334,6 +353,38 @@ class SendCostAlertAction
         }
 
         return sprintf(' (was %s)', $this->money($previous, $snapshot->currency));
+    }
+
+    /**
+     * The parenthetical after a figure: " (65% of leads, was 35 on Fri 18 Sep)".
+     *
+     * One bracket however many notes there are. Two adjacent groups —
+     * "63 (65% of leads) (was 35 on Fri 18 Sep)" — is the kind of density the card was
+     * restructured to get rid of.
+     */
+    private function notes(string ...$parts): string
+    {
+        $parts = array_values(array_filter($parts, static fn (string $p): bool => $p !== ''));
+
+        return $parts === [] ? '' : ' ('.implode(', ', $parts).')';
+    }
+
+    /**
+     * "50% of leads", or nothing when the denominator cannot carry it.
+     *
+     * Silent on a zero denominator rather than printing "0%" or a dash: with nothing to divide by
+     * there is no share, and inventing one is how a quiet hour reads as a collapse. Silent above
+     * 100% too — a step cannot exceed the one above it, so a figure that does is the two sides
+     * measuring different things, and the honest response is to print the counts and say nothing
+     * about the ratio.
+     */
+    private function shareOf(int $part, ?int $whole, string $noun): string
+    {
+        if ($whole === null || $whole <= 0 || $part > $whole) {
+            return '';
+        }
+
+        return sprintf('%d%% of %s', (int) round($part / $whole * 100), $noun);
     }
 
     /** "Thu 18 Sep" from a warehouse date string, or the string itself if it will not parse. */

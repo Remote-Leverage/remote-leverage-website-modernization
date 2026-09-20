@@ -1383,3 +1383,206 @@ function costAlertAction(SlackTransport $transport, ?MarketingDay $day = null): 
         new SlackMessageRenderer,
     );
 }
+
+/*
+ * Which day the two halves of the card are about.
+ *
+ * The warehouse decides, because it is the half that cannot be recomputed: before 08:00 Eastern
+ * `marketing-home-daily.sql` reports the previous day complete rather than a few hours of today
+ * (`IF(hour_et < 8, DATE_SUB(today, INTERVAL 1 DAY), today)`). This side used to ignore that and
+ * always count today, so a card fired at 03:52 on 2026-09-20 showed the warehouse's closed 19 Sep
+ * — 97 leads, 63 bookings — beside this site's 3h52m of 20 Sep, 7 and 3. The reconciler duly
+ * reported that one source had to be wrong. Neither was; on matched days they agreed to within
+ * 28%. It also made cost per booking one day's spend over another day's bookings.
+ */
+describe('the day the card reports', function () {
+    beforeEach(function () {
+        costAlertConfig();
+        Lead::truncate();
+        LeadActivityLog::truncate();
+    });
+
+    $closingOn = fn (string $date): MarketingDay => costAlertDay([
+        'Date' => $date,
+        'report_kind' => 'CLOSING',
+        'as_of_et' => '03:52',
+    ]);
+
+    test('a closing report counts the warehouse day, not the day the job happens to run', function () use ($closingOn) {
+        $yesterday = costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 14:00:00', 'UTC')]);
+        costAlertBooking($yesterday, CarbonImmutable::parse('2026-09-19 15:00:00', 'UTC'));
+
+        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-20 03:00:00', 'UTC')]);
+
+        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub($closingOn('2026-09-19'))))
+            ->snapshot(CarbonImmutable::parse('2026-09-20 03:52:00', 'UTC'));
+
+        expect($snapshot->leads)->toBe(1)
+            ->and($snapshot->bookings)->toBe(1);
+    });
+
+    test('a closing report takes the whole day, not up to the hour the job ran', function () use ($closingOn) {
+        // 22:00 is past 03:52 on the clock, so a window that stopped at "now" would miss it.
+        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 22:00:00', 'UTC')]);
+
+        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub($closingOn('2026-09-19'))))
+            ->snapshot(CarbonImmutable::parse('2026-09-20 03:52:00', 'UTC'));
+
+        expect($snapshot->leads)->toBe(1);
+    });
+
+    test('a day-to-date report still counts today so far', function () {
+        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 14:00:00', 'UTC')]);
+        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-20 09:00:00', 'UTC')]);
+
+        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(costAlertDay([
+            'Date' => '2026-09-20',
+            'report_kind' => 'DAY-TO-DATE',
+        ]))))->snapshot(CarbonImmutable::parse('2026-09-20 15:00:00', 'UTC'));
+
+        expect($snapshot->leads)->toBe(1);
+    });
+
+    test('an unreadable warehouse falls back to today rather than counting nothing', function () {
+        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-20 09:00:00', 'UTC')]);
+
+        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(null)))
+            ->snapshot(CarbonImmutable::parse('2026-09-20 15:00:00', 'UTC'));
+
+        expect($snapshot->leads)->toBe(1);
+    });
+
+    /*
+     * The baseline has to follow the window, or the fix above just moves the lie.
+     *
+     * baseline() normally measures each prior day up to the same *hour*, because a figure read at
+     * 15:00 is not comparable to a finished day. On a closing report the compared figure IS a
+     * finished day, so the rule inverts: measuring a complete Saturday against a 7-day average
+     * taken at 03:52 reads as "+489% vs average".
+     */
+    test('a closing report compares against whole prior days, not the hour it ran at', function () use ($closingOn) {
+        // One lead late on each of the two prior days, well after 03:52.
+        foreach (['2026-09-17', '2026-09-18'] as $date) {
+            costAlertLead(['created_at' => CarbonImmutable::parse($date.' 22:00:00', 'UTC')]);
+        }
+
+        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 22:00:00', 'UTC')]);
+
+        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub($closingOn('2026-09-19'))))
+            ->snapshot(CarbonImmutable::parse('2026-09-20 03:52:00', 'UTC'));
+
+        // Both prior days are seen in full, so one lead against an average of one is no change.
+        // An hour-capped baseline would see zero on both and call this an infinite rise.
+        expect($snapshot->leads)->toBe(1)
+            ->and($snapshot->baseline['leads'])->toBeGreaterThan(0.0);
+    });
+
+    test('a day-to-date report still compares against the same hour', function () {
+        // 22:00 yesterday is after the 15:00 read, so an hour-capped baseline must not count it.
+        costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 22:00:00', 'UTC')]);
+
+        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(costAlertDay([
+            'Date' => '2026-09-20',
+            'report_kind' => 'DAY-TO-DATE',
+        ]))))->snapshot(CarbonImmutable::parse('2026-09-20 15:00:00', 'UTC'));
+
+        expect($snapshot->baseline['leads'])->toBe(0.0);
+    });
+
+    test('the gap warning names the day instead of calling it today', function () {
+        $findings = (new AlertReconciler)->check([
+            'leads' => 124, 'bookings' => 82, 'platform_bookings' => 82, 'booked_by_status' => 82,
+            'last_lead_minutes' => 5, 'last_booking_minutes' => 20, 'within_window' => true,
+            'warehouse_bookings' => 3,
+            'report_date' => '2026-09-19',
+            'report_is_closing' => true,
+        ]);
+
+        expect($findings)->not->toBeEmpty()
+            ->and($findings[0])->toContain('on 2026-09-19')
+            ->and($findings[0])->not->toContain('bookings today');
+    });
+});
+
+/*
+ * The funnel summary reads down the funnel, each step carrying its share of the one above.
+ *
+ * The percentages are same-window ratios of the warehouse's own three numbers, not conversion
+ * rates: a booking on a given day can come from a lead captured last week, so the denominator is
+ * not the cohort the numerator came from. The trailing rate in the Activity block is the
+ * lead-level measure and the two can differ sharply — both are printed rather than one.
+ */
+describe('the funnel summary', function () {
+    beforeEach(function () {
+        costAlertConfig();
+        Lead::truncate();
+        LeadActivityLog::truncate();
+        update_option(SendCostAlertAction::STATE_OPTION, []);
+    });
+
+    $render = function (array $overrides): string {
+        $transport = recordingCostTransport();
+
+        costAlertAction($transport, costAlertDay(array_merge([
+            'report_kind' => 'CLOSING',
+            'as_of_et' => '07:30',
+        ], $overrides)))->execute(CarbonImmutable::parse('2026-09-19 07:30:00', 'UTC'), force: true);
+
+        return json_encode($transport->posted[0]['blocks'], JSON_UNESCAPED_UNICODE);
+    };
+
+    test('it reads leads, then bookings, then qualified, each with its share', function () use ($render) {
+        $blocks = $render([
+            'total_leads' => '10',
+            'total_appointments' => '5',
+            'total_qualified' => '2',
+            'prev_appointments' => null,
+        ]);
+
+        expect($blocks)
+            ->toContain('- Leads: 10')
+            ->toContain('- Bookings: 5 (50% of leads)')
+            ->toContain('- Qualified: 2 (40% of bookings)');
+    });
+
+    test('a share and a previous-day note share one bracket', function () use ($render) {
+        // "5 (50% of leads) (was 3 on ...)" is the density the card was restructured to remove.
+        $blocks = $render([
+            'total_leads' => '10',
+            'total_appointments' => '5',
+            'prev_appointments' => '3',
+            'prev_d' => '2026-09-18',
+        ]);
+
+        expect($blocks)->toContain('- Bookings: 5 (50% of leads, was 3 on')
+            ->and($blocks)->not->toContain('of leads) (was');
+    });
+
+    test('no leads means no share rather than a division by zero', function () use ($render) {
+        $blocks = $render([
+            'total_leads' => '0',
+            'total_appointments' => '0',
+            'total_qualified' => '0',
+            'prev_appointments' => null,
+        ]);
+
+        expect($blocks)->toContain('- Bookings: 0')
+            ->and($blocks)->not->toContain('% of leads');
+    });
+
+    /*
+     * The two sides can disagree — the warehouse counts bookings against the day they happened and
+     * leads against the day they arrived, so a quiet day following a busy one can book more than
+     * it captured. A share above 100% is not a rate, so none is printed.
+     */
+    test('more bookings than leads prints the counts and no share', function () use ($render) {
+        $blocks = $render([
+            'total_leads' => '4',
+            'total_appointments' => '9',
+            'prev_appointments' => null,
+        ]);
+
+        expect($blocks)->toContain('- Bookings: 9')
+            ->and($blocks)->not->toContain('% of leads');
+    });
+});
