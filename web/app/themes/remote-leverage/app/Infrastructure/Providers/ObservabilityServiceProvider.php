@@ -7,6 +7,7 @@ namespace App\Infrastructure\Providers;
 use App\Infrastructure\Observability\CredentialRegistry;
 use App\Infrastructure\Observability\IntegrationCall;
 use App\Infrastructure\Observability\IntegrationCallRecorder;
+use App\Infrastructure\Observability\SentryReporting;
 use App\Infrastructure\WordPress\Admin\CacheHealthNotice;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\RequestSending;
@@ -43,6 +44,13 @@ class ObservabilityServiceProvider extends ServiceProvider
          * operator their dashboard is per-container.
          */
         (new CacheHealthNotice)->register();
+
+        /*
+         * Also above the integration-call gate. Error reporting is not integration recording, and
+         * switching that off must not silently switch off the thing that tells anyone the site is
+         * broken.
+         */
+        (new SentryReporting)->register();
 
         if (! config('observability.integration_calls.enabled', true)) {
             return;
