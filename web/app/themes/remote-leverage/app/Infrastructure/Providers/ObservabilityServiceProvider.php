@@ -7,6 +7,7 @@ namespace App\Infrastructure\Providers;
 use App\Infrastructure\Observability\CredentialRegistry;
 use App\Infrastructure\Observability\IntegrationCall;
 use App\Infrastructure\Observability\IntegrationCallRecorder;
+use App\Infrastructure\WordPress\Admin\CacheHealthNotice;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\RequestSending;
 use Illuminate\Http\Client\Events\ResponseReceived;
@@ -36,6 +37,13 @@ class ObservabilityServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        /*
+         * Above the integration-call gate on purpose. A degraded cache is not integration
+         * recording, and switching that off must not also switch off the one thing telling an
+         * operator their dashboard is per-container.
+         */
+        (new CacheHealthNotice)->register();
+
         if (! config('observability.integration_calls.enabled', true)) {
             return;
         }
