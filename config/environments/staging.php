@@ -33,6 +33,22 @@ Config::define('WP_DISABLE_FATAL_ERROR_HANDLER', true);
 ini_set('display_errors', '1');
 
 /*
+ * Buffer the response so the error page can actually be sent.
+ *
+ * Acorn renders a full exception page -- type, message, file, line, stack -- and its debug flag is
+ * `WP_DEBUG && WP_DEBUG_DISPLAY`, both true above. It still could not show one: by the time a
+ * fatal happens in an admin screen, _wp_admin_html_begin() has already echoed the doctype, so
+ * Symfony's Response::sendHeaders() hits "headers already sent" and *that* becomes the error.
+ * The result is a stack trace about the error page rather than about the fault, which is what
+ * 2026-09-20 spent the morning reading.
+ *
+ * With an output buffer open, headers_sent() is false when Acorn renders, so the real page comes
+ * through. Staging only, and it changes nothing about how the application behaves -- just whether
+ * it can tell you what happened.
+ */
+ob_start();
+
+/*
  * SCRIPT_DEBUG and SAVEQUERIES are deliberately *not* copied from development. They change what
  * is served and how queries run, which is exactly the drift from production that staging exists
  * to avoid. Only the reporting of errors changes here, not the behaviour that produces them.
