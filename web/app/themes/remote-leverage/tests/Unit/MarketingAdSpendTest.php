@@ -2,24 +2,32 @@
 
 declare(strict_types=1);
 
-use App\Domains\Marketing\Contracts\AdSpendSource;
-use App\Domains\Marketing\Data\AdSpendReading;
-use App\Domains\Marketing\Gateways\MetaInsightsClient;
-use App\Domains\Marketing\Services\AdSpendCollector;
-use App\Domains\Marketing\Services\AlertReconciler;
-use Carbon\CarbonImmutable;
+use App\Domains\Marketing\Data\MarketingDay;
+use App\Domains\Marketing\Gateways\BigQueryClient;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Facades\Http;
 
 /*
- * Reading spend back from an ad platform.
+ * Reading the marketing day out of the data team's warehouse.
  *
- * Every test here is about one distinction: *unreachable is not zero*. A platform that cannot be
- * asked and a platform that spent nothing are opposite facts, and collapsing them produces a cost
- * per booking that is too low — the direction on which somebody raises a budget. The arithmetic
- * is the easy part; keeping those two apart through four layers is not.
+ * This file used to test three ad platform clients — Meta REST, Google GAQL and a hand-built
+ * Microsoft SOAP report flow — and the collector that summed them. All four are deleted. Spend,
+ * channel attribution and the booking counts that divide into them now arrive as one BigQuery row,
+ * and every test here is about getting that row into typed fields without losing a distinction on
+ * the way.
+ *
+ * The distinction that matters most is unchanged from the file this replaces: *nothing is not
+ * zero*. It used to be "a platform that cannot be asked is not a platform that spent nothing".
+ * Now it is `SAFE_DIVIDE`, which returns null when the denominator is zero — a cost per booking of
+ * null means nothing booked, where 0.00 would mean every booking was free. Collapsing the two
+ * produces a cost figure that is too low, which is the direction somebody raises a budget on.
+ *
+ * resources/sql/marketing-home-daily.sql names this file's job explicitly: the query is owned by
+ * the data team and replaced wholesale when they change it, so the column names the mapper depends
+ * on have to fail loudly here rather than render a card of dashes.
  */
 
 beforeEach(function () {
@@ -30,302 +38,418 @@ beforeEach(function () {
 
     $GLOBALS['_app_config'] = [];
     config(['marketing' => require __DIR__.'/../../config/marketing.php']);
+    Cache::forget('rl_bigquery_access_token');
+
     config([
         'marketing.cost_alert.timezone' => 'America/New_York',
-        'marketing.ads.meta.access_token' => 'EAAT-test',
-        'marketing.ads.meta.ad_account_id' => '1234567890',
-        'marketing.ads.meta.api_version' => 'v21.0',
+        'marketing.warehouse.credentials' => '',
+        'marketing.warehouse.project_id' => '',
     ]);
 });
 
-/** Meta's two endpoints, steered per test. */
-function fakeMeta(array $account = [], array $insights = [], int $accountStatus = 200, int $insightsStatus = 200): void
-{
-    Http::fake(function (Request $request) use ($account, $insights, $accountStatus, $insightsStatus) {
-        if (str_contains($request->url(), '/insights')) {
-            return Http::response($insights, $insightsStatus);
-        }
+/*
+ * The client reads the query off disk through WordPress, which is not loaded here.
+ *
+ * Guarded and pointed at the real theme root, matching VideoSourceResolutionTest's stub exactly —
+ * whichever file Pest loads first defines it and both behave the same. It has to resolve to the
+ * actual theme, because the file it is asked for is the data team's real SQL: a stub returning a
+ * temp path would make every warehouse test pass against a query that does not exist.
+ */
+$GLOBALS['rl_theme_dir'] ??= dirname(__DIR__, 2);
 
-        return Http::response($account + [
-            'currency' => 'USD',
-            'timezone_name' => 'America/New_York',
-            'account_status' => 1,
-        ], $accountStatus);
-    });
+/**
+ * One row of the view, in the shape BigQuery actually hands back.
+ *
+ * Every value is a string, including the booleans and the integers, because that is what the REST
+ * API sends whatever the column's declared type. The column names and the arithmetic are lifted
+ * from resources/sql/marketing-home-daily.sql; the figures are the 2026-09-18 alert's.
+ *
+ * @param  array<string, string|null>  $overrides
+ * @return array<string, string|null>
+ */
+function warehouseRow(array $overrides = []): array
+{
+    return array_merge([
+        'Date' => '2026-09-18',
+        'report_kind' => 'DAY-TO-DATE',
+        'as_of_et' => '15:00',
+        'spend_is_complete' => 'false',
+        'total_new_appts' => '16',
+        'total_new_qualified' => '10',
+        'total_appointments' => '16',
+        'total_qualified' => '10',
+        'total_leads' => '314',
+        'total_spend' => '3732.24',
+        'google_spend' => '737.46',
+        'facebook_spend' => '2892.84',
+        'bing_spend' => '101.94',
+        'cpl' => '11.89',
+        'cpb' => '233.27',
+        'cpqb' => '373.22',
+        'cpb_all' => '233.27',
+        'cpqb_all' => '373.22',
+        'cpb_paid' => '287.1',
+        'cpqb_paid' => '414.69',
+        'google_cpb' => '184.37',
+        'facebook_cpb' => '321.43',
+        'bing_cpb' => '101.94',
+        'google_cpqb' => '245.82',
+        'facebook_cpqb' => '578.57',
+        'bing_cpqb' => '101.94',
+        'unclassified_leads' => '61',
+        'unclassified_appointments' => '3',
+        'unclassified_qualified' => '2',
+        'unclassified_appointments_share' => '0.1875',
+        'prev_date' => '2026-09-17',
+        'prev_spend' => '3410.0',
+        'prev_appointments' => '14',
+        'prev_cpb' => '243.57',
+        'prev_cpqb' => '379.0',
+    ], $overrides);
 }
 
-/** A source with a fixed answer, for testing the collector without HTTP. */
-function stubSource(string $platform, ?AdSpendReading $reading, bool $configured = true): AdSpendSource
+/**
+ * The REST envelope: a schema of names, and a row of anonymous positional values.
+ *
+ * Reproduced rather than simplified, because the separation *is* the thing the client has to get
+ * right — the values carry no names of their own.
+ *
+ * @param  array<string, string|null>  $row
+ * @return array<string, mixed>
+ */
+function bigQueryResponse(array $row, bool $jobComplete = true): array
 {
-    return new class($platform, $reading, $configured) implements AdSpendSource
-    {
-        public function __construct(
-            private string $slug,
-            private ?AdSpendReading $reading,
-            private bool $configured,
-        ) {}
-
-        public function platform(): string
-        {
-            return $this->slug;
-        }
-
-        public function isConfigured(): bool
-        {
-            return $this->configured;
-        }
-
-        public function read(CarbonImmutable $day): AdSpendReading
-        {
-            return $this->reading ?? AdSpendReading::unreachable($this->slug, 'no stub');
-        }
-    };
+    return [
+        'jobComplete' => $jobComplete,
+        'schema' => [
+            'fields' => array_map(
+                static fn (string $name): array => ['name' => $name, 'type' => 'STRING'],
+                array_keys($row),
+            ),
+        ],
+        'rows' => [
+            ['f' => array_map(static fn ($value): array => ['v' => $value], array_values($row))],
+        ],
+    ];
 }
 
-describe('the Meta insights client', function () {
-    $day = CarbonImmutable::parse('2026-09-18 15:00:00', 'America/New_York');
+/**
+ * A configured client whose token is already banked.
+ *
+ * The cached token is the ordinary state on every run but the first, and taking that path keeps
+ * these tests about reading the row rather than about `openssl_sign` — which has its own failure
+ * mode, its own error message, and nothing to do with whether a column is mapped correctly.
+ */
+function configureWarehouse(): void
+{
+    config([
+        'marketing.warehouse.credentials' => json_encode([
+            'client_email' => 'marketing-alert@rl-data-platform-dev.iam.gserviceaccount.com',
+            'private_key' => "-----BEGIN PRIVATE KEY-----\nstub\n-----END PRIVATE KEY-----\n",
+            'project_id' => 'rl-data-platform-dev',
+        ]),
+        'marketing.warehouse.project_id' => '',
+    ]);
 
-    test('reads the day and reports spend, currency and timezone', function () use ($day) {
-        fakeMeta(insights: ['data' => [['spend' => '2892.84']]]);
+    Cache::put('rl_bigquery_access_token', 'ya29-cached', 3000);
+}
 
-        $reading = (new MetaInsightsClient)->read($day);
+/** @param array<string, mixed> $body */
+function fakeBigQuery(array $body, int $status = 200): void
+{
+    Http::fake(['bigquery.googleapis.com/*' => Http::response($body, $status)]);
+}
 
-        expect($reading->reachable)->toBeTrue()
-            ->and($reading->spend)->toBe(2892.84)
-            ->and($reading->currency)->toBe('USD')
-            ->and($reading->timezone)->toBe('America/New_York')
-            ->and($reading->hasAccountIssue())->toBeFalse();
+describe('the warehouse row', function () {
+    test('every column the card prints lands on the field that prints it', function () {
+        $day = MarketingDay::fromRow(warehouseRow());
+
+        expect($day->date)->toBe('2026-09-18')
+            ->and($day->reportKind)->toBe('DAY-TO-DATE')
+            ->and($day->asOfEt)->toBe('15:00')
+            ->and($day->appointments)->toBe(16)
+            ->and($day->qualified)->toBe(10)
+            ->and($day->leads)->toBe(314)
+            ->and($day->spend)->toBe(3732.24)
+            ->and($day->cpl)->toBe(11.89)
+            ->and($day->cpbPaid)->toBe(287.1)
+            ->and($day->cpqbPaid)->toBe(414.69)
+            ->and($day->unclassifiedLeads)->toBe(61)
+            ->and($day->unclassifiedAppointments)->toBe(3)
+            ->and($day->unclassifiedQualified)->toBe(2)
+            ->and($day->unclassifiedShare)->toBe(0.1875)
+            ->and($day->previousDate)->toBe('2026-09-17')
+            ->and($day->previousSpend)->toBe(3410.0)
+            ->and($day->previousAppointments)->toBe(14)
+            ->and($day->previousCpb)->toBe(243.57);
     });
 
     /*
-     * Meta returns spend as a decimal string, and an account that ran nothing returns no rows at
-     * all rather than a row of zero. That empty array is a real answer and must read as 0.00 —
-     * it is the one case where zero is the truth.
+     * `cpb_all` and `cpb_paid` are computed independently by the view — total spend over every
+     * booking, against paid spend over paid bookings. They are the blended and paid figures this
+     * alert has always kept apart, and the gap between them is the attribution debt: on the
+     * 2026-09-18 numbers, $233.27 blended against $287.10 paid. Mapping either onto the other
+     * would print one number twice and lose the whole point of separating them.
      */
-    test('an empty data array is zero spend, not an unreachable platform', function () use ($day) {
-        fakeMeta(insights: ['data' => []]);
+    test('blended and paid cost per booking stay two different fields', function () {
+        $day = MarketingDay::fromRow(warehouseRow());
 
-        $reading = (new MetaInsightsClient)->read($day);
-
-        expect($reading->reachable)->toBeTrue()
-            ->and($reading->spend)->toBe(0.0);
-    });
-
-    test('a response with no recognisable data is unreachable rather than zero', function () use ($day) {
-        fakeMeta(insights: ['unexpected' => true]);
-
-        $reading = (new MetaInsightsClient)->read($day);
-
-        expect($reading->reachable)->toBeFalse()
-            ->and($reading->spend)->toBeNull();
+        expect($day->cpbAll)->toBe(233.27)
+            ->and($day->cpbPaid)->toBe(287.1)
+            ->and($day->cpqbAll)->toBe(373.22)
+            ->and($day->cpqbPaid)->toBe(414.69)
+            ->and($day->cpbAll)->not->toBe($day->cpbPaid);
     });
 
     /*
-     * Meta distinguishes an expired token, a token missing `ads_read` and an ad account the token
-     * cannot see. Those need three different fixes, so the message is carried through verbatim
-     * rather than collapsed into "request failed".
+     * The view says Facebook and Bing; the rest of this codebase says Meta and Microsoft, because
+     * that is `LeadPlatform`'s vocabulary and it is what the leads screen, the CSV export and the
+     * platform emoji config are all keyed on. The rename happens once, here. Get it wrong and the
+     * channel cards silently lose their logos and their labels.
      */
-    test("Meta's own error message survives to the reading", function () use ($day) {
-        fakeMeta(insights: ['error' => ['message' => '(#200) Requires ads_read permission']], insightsStatus: 403);
+    test('the view channel names are mapped onto this domain slugs', function () {
+        $channels = MarketingDay::fromRow(warehouseRow())->channels;
 
-        $reading = (new MetaInsightsClient)->read($day);
-
-        expect($reading->reachable)->toBeFalse()
-            ->and($reading->error)->toContain('ads_read');
+        expect(array_keys($channels))->toBe(['meta', 'google', 'microsoft'])
+            ->and($channels['meta']->spend)->toBe(2892.84)
+            ->and($channels['meta']->cpb)->toBe(321.43)
+            ->and($channels['meta']->cpqb)->toBe(578.57)
+            ->and($channels['google']->spend)->toBe(737.46)
+            ->and($channels['microsoft']->spend)->toBe(101.94)
+            ->and($channels['microsoft']->cpb)->toBe(101.94);
     });
 
     /*
-     * The failure this endpoint makes easy to miss: a disabled account answers 200 with spend
-     * 0.00. Without the status field that is indistinguishable from a quiet day.
+     * The single most important invariant in this file.
+     *
+     * `SAFE_DIVIDE` returns null, not zero, when nothing booked. A cost per booking of null means
+     * "no bookings to divide by"; 0.00 means "every booking was free", and the card renders it as
+     * a real figure beside a target it is comfortably under. A quiet morning would report the best
+     * cost per booking the business has ever seen.
      */
-    test('a disabled account is flagged even though the call succeeded', function () use ($day) {
-        fakeMeta(
-            account: ['account_status' => 2, 'disable_reason' => 1],
-            insights: ['data' => [['spend' => '0']]],
-        );
+    test('a null cost stays null and never becomes zero', function () {
+        $day = MarketingDay::fromRow(warehouseRow([
+            'total_appointments' => '0',
+            'total_qualified' => '0',
+            'cpb_all' => null,
+            'cpqb_all' => null,
+            'cpb_paid' => null,
+            'cpqb_paid' => null,
+            'facebook_cpb' => null,
+            'unclassified_appointments_share' => null,
+            'prev_cpb' => null,
+        ]));
 
-        $reading = (new MetaInsightsClient)->read($day);
-
-        expect($reading->reachable)->toBeTrue()
-            ->and($reading->spend)->toBe(0.0)
-            ->and($reading->hasAccountIssue())->toBeTrue()
-            ->and($reading->accountIssue)->toContain('disabled')
-            ->and($reading->accountIssue)->toContain('disable_reason 1');
+        expect($day->cpbAll)->toBeNull()
+            ->and($day->cpqbAll)->toBeNull()
+            ->and($day->cpbPaid)->toBeNull()
+            ->and($day->cpqbPaid)->toBeNull()
+            ->and($day->channels['meta']->cpb)->toBeNull()
+            ->and($day->unclassifiedShare)->toBeNull()
+            ->and($day->previousCpb)->toBeNull()
+            // Spend is still a real number on that day; it is only the quotients that vanish.
+            ->and($day->spend)->toBe(3732.24);
     });
 
-    test('the account timezone is reported so a mismatch can be caught', function () use ($day) {
-        fakeMeta(
-            account: ['timezone_name' => 'America/Los_Angeles'],
-            insights: ['data' => [['spend' => '10']]],
-        );
+    /*
+     * An empty string is what a blank cell arrives as, and `(float) ''` is 0.0 — the same wrong
+     * answer as above by a different route.
+     */
+    test('an empty cell is absent rather than zero', function () {
+        $day = MarketingDay::fromRow(warehouseRow(['cpb_paid' => '', 'total_spend' => '']));
 
-        expect((new MetaInsightsClient)->read($day)->timezone)->toBe('America/Los_Angeles');
+        expect($day->cpbPaid)->toBeNull()->and($day->spend)->toBeNull();
     });
 
-    test('the request asks for one explicit day rather than a preset', function () use ($day) {
-        fakeMeta(insights: ['data' => [['spend' => '1']]]);
+    /*
+     * A missing spend figure is not a day with no spend. The card prints "not reported for this
+     * day" rather than $0.00 for exactly this reason.
+     */
+    test('a day with no spend reported is distinguishable from a day that spent nothing', function () {
+        expect(MarketingDay::fromRow(warehouseRow(['total_spend' => null]))->spend)->toBeNull()
+            ->and(MarketingDay::fromRow(warehouseRow(['total_spend' => '0']))->spend)->toBe(0.0);
+    });
 
-        (new MetaInsightsClient)->read($day);
+    /*
+     * BigQuery sends booleans over REST as the strings "true" and "false". PHP casts both to true,
+     * so `(bool) $row['spend_is_complete']` marks every day-to-date figure final — the caveat that
+     * says the Meta feed has not closed yet would never print.
+     */
+    test('the string "false" is false', function () {
+        expect(MarketingDay::fromRow(warehouseRow(['spend_is_complete' => 'false']))->spendIsComplete)->toBeFalse()
+            ->and(MarketingDay::fromRow(warehouseRow(['spend_is_complete' => 'true']))->spendIsComplete)->toBeTrue()
+            ->and(MarketingDay::fromRow(warehouseRow(['spend_is_complete' => null]))->spendIsComplete)->toBeFalse();
+    });
 
+    /* Before 08:00 Eastern the query reports yesterday closed; after it, today so far. */
+    test('the report kind decides whether the day is closed', function () {
+        expect(MarketingDay::fromRow(warehouseRow(['report_kind' => 'CLOSING']))->isClosing())->toBeTrue()
+            ->and(MarketingDay::fromRow(warehouseRow())->isClosing())->toBeFalse();
+    });
+
+    /*
+     * The previous day is supplied on both report kinds and is only fair on one. Comparing two
+     * hours of today against a full previous day makes every morning look like a collapse, which
+     * is how a comparison stops being read at all.
+     */
+    test('the previous day is only a fair comparison against a closed one', function () {
+        expect(MarketingDay::fromRow(warehouseRow())->hasFairComparison())->toBeFalse()
+            ->and(MarketingDay::fromRow(warehouseRow(['report_kind' => 'CLOSING']))->hasFairComparison())->toBeTrue()
+            ->and(MarketingDay::fromRow(warehouseRow([
+                'report_kind' => 'CLOSING',
+                'prev_appointments' => null,
+            ]))->hasFairComparison())->toBeFalse();
+    });
+
+    /*
+     * The snapshot is cached as scalars rather than serialised objects — see
+     * FunnelSnapshot::toArray() — so the warehouse row has to survive a trip out and back. It
+     * round-trips through the same key names it was read with, one mapping rather than two, and
+     * this is what stops the two drifting: a field added to `fromRow` and forgotten in `toRow`
+     * reads correctly on the hourly run and comes back null on every dashboard load.
+     */
+    test('a cached row rebuilds into the same day', function () {
+        $day = MarketingDay::fromRow(warehouseRow());
+        $rebuilt = MarketingDay::fromRow($day->toRow());
+
+        expect($rebuilt->toRow())->toBe($day->toRow())
+            ->and($rebuilt->spend)->toBe($day->spend)
+            ->and($rebuilt->cpbPaid)->toBe($day->cpbPaid)
+            ->and($rebuilt->spendIsComplete)->toBe($day->spendIsComplete)
+            ->and($rebuilt->channels['meta']->spend)->toBe($day->channels['meta']->spend)
+            ->and($rebuilt->previousAppointments)->toBe($day->previousAppointments);
+    });
+
+    /* Null has to survive the round trip too, for the same reason it has to survive the read. */
+    test('nulls survive the round trip as nulls', function () {
+        $day = MarketingDay::fromRow(warehouseRow([
+            'cpb_paid' => null,
+            'total_spend' => null,
+            'prev_date' => null,
+            'prev_appointments' => null,
+        ]));
+
+        $rebuilt = MarketingDay::fromRow($day->toRow());
+
+        expect($rebuilt->cpbPaid)->toBeNull()
+            ->and($rebuilt->spend)->toBeNull()
+            ->and($rebuilt->previousDate)->toBeNull()
+            ->and($rebuilt->previousAppointments)->toBeNull()
+            ->and($rebuilt->hasFairComparison())->toBeFalse();
+    });
+
+    /* A channel that spent nothing gets no card; three channels exist and one is often quiet. */
+    test('a channel at zero spend is not active', function () {
+        $channels = MarketingDay::fromRow(warehouseRow(['bing_spend' => '0', 'google_spend' => null]))->channels;
+
+        expect($channels['meta']->isActive())->toBeTrue()
+            ->and($channels['microsoft']->isActive())->toBeFalse()
+            ->and($channels['google']->isActive())->toBeFalse();
+    });
+});
+
+describe('the BigQuery client', function () {
+    /*
+     * The REST response separates the schema from the row: values come back as a positional list
+     * of `{v: ...}` with no names on them. Zipping them by position against `schema.fields` is what
+     * lets the mapper read `$row['cpb_paid']` instead of `$row['f'][18]['v']`, which would start
+     * reading the wrong column the day the data team adds one to the SELECT.
+     *
+     * The fixture is deliberately in a different column order from the SQL file, so a mapper that
+     * had quietly learned the positions would fail here.
+     */
+    test('the schema names are zipped onto the row values by position', function () {
+        configureWarehouse();
+        fakeBigQuery(bigQueryResponse(array_reverse(warehouseRow(), preserve_keys: true)));
+
+        $day = (new BigQueryClient)->marketingDay();
+
+        expect($day)->not->toBeNull()
+            ->and($day->date)->toBe('2026-09-18')
+            ->and($day->spend)->toBe(3732.24)
+            ->and($day->cpbPaid)->toBe(287.1)
+            ->and($day->channels['meta']->spend)->toBe(2892.84);
+
+        // Billed to the configured project, and running the data team's file rather than a copy.
         Http::assertSent(function (Request $request) {
-            if (! str_contains($request->url(), '/insights')) {
-                return false;
-            }
+            $body = (array) $request->data();
 
-            // A preset is resolved against the account timezone with no way to see what it chose.
-            return str_contains(urldecode($request->url()), '"since":"2026-09-18"')
-                && str_contains(urldecode($request->url()), '"until":"2026-09-18"')
-                && ! str_contains($request->url(), 'date_preset');
+            return str_contains($request->url(), '/projects/rl-data-platform-dev/queries')
+                && ($body['useLegacySql'] ?? true) === false
+                && str_contains((string) ($body['query'] ?? ''), 'vw_mkt_home_daily');
         });
     });
 
-    test('the ad account id is prefixed once, however it was entered', function () use ($day) {
-        fakeMeta(insights: ['data' => [['spend' => '1']]]);
+    /*
+     * A schema and a row of different lengths cannot be zipped, and doing it anyway would shift
+     * every column left of the gap onto the wrong field — spend reading as a cost, a date reading
+     * as a count — with nothing failing. That is strictly worse than no card, so it is an error.
+     */
+    test('a schema and a row that do not line up is a failure, not a best effort', function () {
+        configureWarehouse();
 
-        config(['marketing.ads.meta.ad_account_id' => 'act_1234567890']);
-        (new MetaInsightsClient)->read($day);
+        $response = bigQueryResponse(warehouseRow());
+        $response['schema']['fields'][] = ['name' => 'a_column_the_row_does_not_have', 'type' => 'STRING'];
 
-        Http::assertSent(fn (Request $r) => str_contains($r->url(), '/act_1234567890/')
-            && ! str_contains($r->url(), 'act_act_'));
-    });
+        fakeBigQuery($response);
 
-    test('an unconfigured client does not make a request at all', function () use ($day) {
-        Http::fake();
-        config(['marketing.ads.meta.access_token' => '', 'marketing.ads.meta.ad_account_id' => '']);
-
-        $reading = (new MetaInsightsClient)->read($day);
-
-        expect($reading->reachable)->toBeFalse();
-        Http::assertNothingSent();
-    });
-});
-
-describe('the spend collector', function () {
-    $day = CarbonImmutable::parse('2026-09-18 15:00:00', 'America/New_York');
-
-    test('totals what every configured source reported', function () use ($day) {
-        $collector = new AdSpendCollector([
-            stubSource('meta', AdSpendReading::of('meta', 2892.84)),
-            stubSource('google', AdSpendReading::of('google', 737.46)),
-        ]);
-
-        $readings = $collector->collect($day);
-
-        expect(round((float) $collector->total($readings), 2))->toBe(3630.30)
-            ->and($collector->unreachable($readings))->toBe([]);
+        expect((new BigQueryClient)->marketingDay())->toBeNull();
     });
 
     /*
-     * The rule the whole feature turns on. Meta answers, Google does not, and the sum of what came
-     * back is not today's spend — it is today's spend minus an unknown amount. Dividing bookings
-     * by it reports a cost per booking that is too low, and too low is the reading somebody
-     * increases a budget on.
+     * A query that outran `timeoutMs` answers 200 with a job reference and no rows. Read as an
+     * empty result it would be a day with no spend and no bookings; it is a query that has not
+     * finished. The next hourly run gets it.
      */
-    test('one unreachable platform suppresses the total entirely', function () use ($day) {
-        $collector = new AdSpendCollector([
-            stubSource('meta', AdSpendReading::of('meta', 2892.84)),
-            stubSource('google', AdSpendReading::unreachable('google', 'token expired')),
-        ]);
+    test('an incomplete job is a failure rather than an empty day', function () {
+        configureWarehouse();
+        fakeBigQuery(bigQueryResponse(warehouseRow(), jobComplete: false));
 
-        $readings = $collector->collect($day);
-
-        expect($collector->total($readings))->toBeNull()
-            ->and($collector->unreachable($readings))->toBe(['google' => 'token expired'])
-            // The platform that did answer keeps its own figure; only the total is withheld.
-            ->and($readings['meta']->spend)->toBe(2892.84);
+        expect((new BigQueryClient)->marketingDay())->toBeNull();
     });
 
-    test('a source that is merely not configured is skipped, not failed', function () use ($day) {
-        $collector = new AdSpendCollector([
-            stubSource('meta', AdSpendReading::of('meta', 100.0)),
-            stubSource('google', null, configured: false),
-        ]);
+    /* No rows is no day. Null makes the card say the cost half is missing; zeros would lie. */
+    test('a result with no rows is null, not a day of zeroes', function () {
+        configureWarehouse();
+        fakeBigQuery(['jobComplete' => true, 'schema' => ['fields' => []], 'rows' => []]);
 
-        $readings = $collector->collect($day);
-
-        expect($readings)->toHaveCount(1)
-            ->and($collector->total($readings))->toBe(100.0);
+        expect((new BigQueryClient)->marketingDay())->toBeNull();
     });
 
-    test('nothing configured is no total rather than a total of zero', function () use ($day) {
-        $collector = new AdSpendCollector([stubSource('meta', null, configured: false)]);
+    /*
+     * Same contract as everything else feeding this alert: a failure returns null and is logged,
+     * never thrown. An hourly Slack card must not die because a warehouse answered 403.
+     */
+    test('an error response returns null rather than throwing', function () {
+        configureWarehouse();
+        fakeBigQuery(['error' => ['message' => 'Access Denied: Table vw_mkt_home_daily']], 403);
 
-        expect($collector->total($collector->collect($day)))->toBeNull();
+        expect((new BigQueryClient)->marketingDay())->toBeNull();
     });
 
-    test('account issues and timezone mismatches are surfaced separately', function () use ($day) {
-        $collector = new AdSpendCollector([
-            stubSource('meta', AdSpendReading::of(
-                'meta', 0.0, 'USD', 'America/Los_Angeles', 'account_status 2 (disabled)',
-            )),
-        ]);
+    /*
+     * An environment with no service account is not a broken one — it is every environment but
+     * production. It must cost nothing: no signing attempt, no token exchange, no query. The card
+     * simply reports the cost half as unavailable.
+     */
+    test('an unconfigured client makes no request at all', function () {
+        Http::fake();
 
-        $readings = $collector->collect($day);
+        $client = new BigQueryClient;
 
-        expect($collector->accountIssues($readings))->toBe(['meta' => 'account_status 2 (disabled)'])
-            ->and($collector->timezoneMismatches($readings, 'America/New_York'))
-            ->toBe(['meta' => 'America/Los_Angeles'])
-            /*
-             * The account answered, and what it answered was 0.00 because it is suspended. That
-             * is true and useless: totalling it produces a cost per booking of zero that reads as
-             * excellent performance. An unhealthy account withholds the total exactly as an
-             * unreachable one does.
-             */
-            ->and($collector->total($readings))->toBeNull();
+        expect($client->isConfigured())->toBeFalse()
+            ->and($client->marketingDay())->toBeNull();
+
+        Http::assertNothingSent();
     });
 
-    test('a matching timezone is not reported as a mismatch', function () use ($day) {
-        $collector = new AdSpendCollector([
-            stubSource('meta', AdSpendReading::of('meta', 5.0, 'USD', 'America/New_York')),
-        ]);
+    /* A credential that is not usable JSON is unconfigured, not a crash on the first query. */
+    test('a malformed credential is treated as unconfigured', function () {
+        Http::fake();
+        config(['marketing.warehouse.credentials' => 'not json at all']);
 
-        expect($collector->timezoneMismatches($collector->collect($day), 'America/New_York'))->toBe([]);
-    });
-});
+        expect((new BigQueryClient)->isConfigured())->toBeFalse();
 
-describe('what the alert says about a broken platform', function () {
-    $clean = [
-        'leads' => 40,
-        'bookings' => 10,
-        'last_lead_minutes' => 12,
-        'last_booking_minutes' => 30,
-        'platform_bookings' => 10,
-        'within_window' => true,
-    ];
-
-    test('an unreachable platform explains the missing cost figures', function () use ($clean) {
-        $findings = (new AlertReconciler)->check([
-            ...$clean,
-            'spend_unreachable' => ['google' => 'token expired'],
-        ]);
-
-        expect($findings)->toHaveCount(1)
-            ->and($findings[0])->toContain('Google')
-            ->and($findings[0])->toContain('token expired')
-            ->and($findings[0])->toContain('too cheap');
-    });
-
-    test('a disabled account is reported as a stop, not as a quiet day', function () use ($clean) {
-        $findings = (new AlertReconciler)->check([
-            ...$clean,
-            'account_issues' => ['meta' => 'account_status 2 (disabled)'],
-        ]);
-
-        expect($findings)->toHaveCount(1)
-            ->and($findings[0])->toContain('disabled')
-            ->and($findings[0])->toContain('not that the campaigns are quiet');
-    });
-
-    test('a timezone mismatch is reported rather than silently corrected', function () use ($clean) {
-        config(['marketing.cost_alert.timezone' => 'America/New_York']);
-
-        $findings = (new AlertReconciler)->check([
-            ...$clean,
-            'timezone_mismatches' => ['meta' => 'America/Los_Angeles'],
-        ]);
-
-        expect($findings)->toHaveCount(1)
-            ->and($findings[0])->toContain('America/Los_Angeles')
-            ->and($findings[0])->toContain('different windows');
+        Http::assertNothingSent();
     });
 });

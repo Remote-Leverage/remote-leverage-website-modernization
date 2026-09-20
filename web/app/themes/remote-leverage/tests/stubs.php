@@ -733,6 +733,24 @@ if (! function_exists('esc_js')) {
  * assert one side of that. Defaults to 'development' so anything production-gated stays off
  * unless a test asks for it.
  */
+if (! function_exists('get_theme_file_path')) {
+    /*
+     * Where the theme is on disk.
+     *
+     * Needed by anything that reads a file it ships with — BigQueryClient loads the data team's
+     * query from resources/sql this way. Without it that read throws, the client catches, and the
+     * happy-path tests pass against a null they never asked for: green, and testing nothing.
+     *
+     * Guarded and settable, because two test files defined their own copy before this existed.
+     */
+    function get_theme_file_path($file = '')
+    {
+        $root = $GLOBALS['rl_theme_dir'] ?? dirname(__DIR__);
+
+        return $file === '' ? $root : rtrim($root, '/').'/'.ltrim((string) $file, '/');
+    }
+}
+
 if (! function_exists('wp_get_environment_type')) {
     function wp_get_environment_type()
     {

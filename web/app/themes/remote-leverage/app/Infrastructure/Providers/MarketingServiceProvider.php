@@ -7,8 +7,7 @@ namespace App\Infrastructure\Providers;
 use App\Domains\Lead\Services\SlackMessageRenderer;
 use App\Domains\Marketing\Actions\SendCostAlertAction;
 use App\Domains\Marketing\Commands\SendCostAlertCommand;
-use App\Domains\Marketing\Gateways\MetaInsightsClient;
-use App\Domains\Marketing\Services\AdSpendCollector;
+use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Services\AlertReconciler;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use App\Domains\Marketing\Support\AlertWindow;
@@ -45,15 +44,14 @@ class MarketingServiceProvider extends ServiceProvider
         $this->app->singleton(AlertReconciler::class, fn () => new AlertReconciler);
 
         /*
-         * The ad spend sources, in the order the message lists them.
+         * The warehouse is the only source of spend and channel attribution.
          *
-         * Google and Microsoft are not here yet. An unconfigured source is skipped rather than
-         * failed, so adding one before its credentials exist would be harmless — but a class that
-         * does not exist cannot be listed, and phase 2 is Meta alone.
+         * Three ad platform clients used to live here. They were deleted when the data team's
+         * BigQuery view landed: they existed to obtain a number the warehouse already had
+         * reconciled, and two sources for one number is how a Slack card and a dashboard start
+         * disagreeing.
          */
-        $this->app->singleton(AdSpendCollector::class, fn () => new AdSpendCollector([
-            new MetaInsightsClient,
-        ]));
+        $this->app->singleton(BigQueryClient::class, fn () => new BigQueryClient);
 
         $this->app->singleton(FunnelMetricsService::class, fn ($app) => new FunnelMetricsService(
             /*
@@ -65,7 +63,7 @@ class MarketingServiceProvider extends ServiceProvider
             $app->bound(CalendlyClient::class) ? $app->make(CalendlyClient::class) : null,
             $app->bound(CalendlyEventTypeRoleResolver::class) ? $app->make(CalendlyEventTypeRoleResolver::class) : null,
             $app->make(AlertReconciler::class),
-            $app->make(AdSpendCollector::class),
+            $app->make(BigQueryClient::class),
         ));
 
         $this->app->singleton(SendCostAlertAction::class, fn ($app) => new SendCostAlertAction(
@@ -109,6 +107,23 @@ class MarketingServiceProvider extends ServiceProvider
         if (! function_exists('add_action')) {
             return;
         }
+
+        /*
+         * The "send now" button posts back to `admin.php`, so its handler binds on `admin_init` —
+         * by `wp_dashboard_setup` the request it needs to intercept is already past.
+         *
+         * The request parameter is checked *before* the widget is resolved. Resolving it pulls
+         * FunnelMetricsService, CalendlyClient, the token pool and every spend client into being,
+         * and doing that on every admin request to serve a button almost nobody presses is the
+         * eagerness this provider already had once.
+         */
+        \add_action('admin_init', function () {
+            if (($_REQUEST['rl_action'] ?? '') !== MarketingCostAlertWidget::SEND_ACTION) {
+                return;
+            }
+
+            $this->app->make(MarketingCostAlertWidget::class)->handleSendNow();
+        });
 
         \add_action('wp_dashboard_setup', function () {
             try {

@@ -58,19 +58,21 @@ ALLOWLIST = [
     "CUSTOMERIO_CDP_WRITE_KEY",
     "POSTHOG_API_KEY",
     "POSTHOG_HOST",
-    # Marketing cost alert — ad platform READ credentials.
+    # Marketing cost alert — the warehouse.
     #
-    # Distinct from META_CAPI_ACCESS_TOKEN above, which is the write grant for conversions. One
-    # Business Manager system user can hold both, but they are separate permissions: a CAPI-only
-    # token authenticates against the Insights endpoint and returns no spend, which reads on the
-    # card as an ad account that spent nothing rather than as a missing scope.
-    #
-    # META_ADS_ACCESS_TOKEN may be left unset, in which case the CAPI token is used — but
-    # META_ADS_ACCOUNT_ID has no default and Meta spend stays off until it is set.
+    # Spend, channel attribution and the booking counts that divide into them come from the data
+    # team's BigQuery view. The whole service account is one JSON blob rather than a private key
+    # split across variables: a PEM contains newlines, and a newline in an ECS task definition
+    # value works locally and produces an opaque OpenSSL error in production.
+    "BIGQUERY_CREDENTIALS_JSON",
+    "BIGQUERY_PROJECT_ID",
+    # Ad platform read credentials. Nothing consumes these any more — the Meta, Google and
+    # Microsoft clients were deleted when the warehouse landed, because two sources for one number
+    # is how a Slack card and a dashboard start disagreeing. Kept on the allowlist so that any
+    # already set in an environment are not stranded, and so a future diagnostic comparing the
+    # warehouse against a platform directly has somewhere to resolve them from.
     "META_ADS_ACCESS_TOKEN",
     "META_ADS_ACCOUNT_ID",
-    # Phases 3 and 4. Listed now so the tokens can be seeded the day they are issued; Google's
-    # developer token is approved by hand through an MCC and that wait is the long pole.
     "GOOGLE_ADS_DEVELOPER_TOKEN",
     "GOOGLE_ADS_CLIENT_ID",
     "GOOGLE_ADS_CLIENT_SECRET",
@@ -84,8 +86,8 @@ ALLOWLIST = [
     "MICROSOFT_ADS_CUSTOMER_ID",
     "MICROSOFT_ADS_ACCOUNT_ID",
     # Operational switches for the alert. Not secrets, but this script is the only path an
-    # environment variable has into a running task, and a kill switch that needs a code change
-    # is not a kill switch.
+    # environment variable has into a running task, and a kill switch that needs a code change is
+    # not a kill switch.
     "MARKETING_COST_ALERT_ENABLED",
     "MARKETING_COST_ALERT_CHANNEL",
     "MARKETING_TARGET_CPB",

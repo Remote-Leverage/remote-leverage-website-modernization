@@ -43,9 +43,8 @@ class AlertReconciler
      *     platform_bookings: int,
      *     within_window: bool,
      *     booked_by_status?: int,
-     *     spend_unreachable?: array<string, string>,
-     *     account_issues?: array<string, string>,
-     *     timezone_mismatches?: array<string, string>,
+     *     warehouse_bookings?: int|null,
+     *     warehouse_unavailable?: bool,
      * }  $facts
      * @return array<int, string> One sentence per finding, empty when everything ties up.
      */
@@ -143,55 +142,44 @@ class AlertReconciler
         }
 
         /*
-         * A platform that was asked and did not answer.
+         * The warehouse could not be read.
          *
-         * The cost figures are suppressed entirely when this happens — see
-         * AdSpendCollector::total() — so this finding is what explains the gap where they were.
-         * Without it the card simply goes quiet about cost on the day the token expires, which
-         * reads as "no spend today".
+         * Everything on the cost half comes from it, so this is not a degraded card, it is half a
+         * card — and the half that is missing is the reason the alert exists. Named explicitly so
+         * the gap where the money should be does not read as a day with no spend.
          */
-        foreach (($facts['spend_unreachable'] ?? []) as $platform => $reason) {
-            $findings[] = sprintf(
-                'Could not read %s spend (%s). Every cost figure is suppressed until it answers, '.
-                'because a total missing one platform divides by too little and reads too cheap.',
-                ucfirst((string) $platform),
-                $reason,
-            );
+        if (($facts['warehouse_unavailable'] ?? false) === true) {
+            $findings[] = 'The marketing warehouse did not answer, so spend, cost per booking and the '.
+                'channel breakdown are all missing. The funnel figures below come from this site and are unaffected.';
         }
 
         /*
-         * The platform answered, and what it said was that the account is in trouble.
+         * The warehouse's booking count against this site's own.
          *
-         * Distinct from unreachable and more urgent: a disabled or unsettled ad account returns a
-         * perfectly successful response reporting 0.00 spend, which is indistinguishable from a
-         * quiet day unless somebody reads the status field. This is that reading.
+         * They are allowed to differ — different definitions, different load times, and the site
+         * excludes likely VA applicants where the warehouse may not. A wide gap is different: the
+         * card reports the warehouse's number, so if the site recorded materially fewer or more,
+         * one of the two is wrong and nobody should be dividing spend by either until it is known
+         * which.
+         *
+         * A quarter, floored at three, so a quiet morning where one booking differs does not cry
+         * wolf and a busy day where forty do is caught.
          */
-        foreach (($facts['account_issues'] ?? []) as $platform => $issue) {
-            $findings[] = sprintf(
-                '%s reports a problem with the ad account: %s. Spend of zero from this platform '.
-                'means the account is stopped, not that the campaigns are quiet.',
-                ucfirst((string) $platform),
-                $issue,
-            );
-        }
+        $warehouseBookings = $facts['warehouse_bookings'] ?? null;
+        $siteBookings = (int) ($facts['bookings'] ?? 0);
 
-        /*
-         * Spend and bookings counted over different days.
-         *
-         * Ad platforms sum a date range in the ad account's own timezone. Nothing about the
-         * resulting cost per booking looks wrong — it is simply computed from two windows that do
-         * not line up, worst at the ends of the day. Reported rather than corrected, because
-         * which of the two settings is the mistake is not knowable from here.
-         */
-        foreach (($facts['timezone_mismatches'] ?? []) as $platform => $timezone) {
-            $findings[] = sprintf(
-                '%s reports in %s but this alert counts the day in %s. Spend and bookings are being '.
-                'summed over different windows; set marketing.cost_alert.timezone to match, or change '.
-                'the ad account.',
-                ucfirst((string) $platform),
-                $timezone,
-                (string) config('marketing.cost_alert.timezone', 'UTC'),
-            );
+        if ($warehouseBookings !== null) {
+            $gap = abs((int) $warehouseBookings - $siteBookings);
+            $tolerance = max(3, (int) ceil(max((int) $warehouseBookings, $siteBookings) * 0.25));
+
+            if ($gap > $tolerance) {
+                $findings[] = sprintf(
+                    'The warehouse reports %d bookings today and this site recorded %d. The figures above are '.
+                    'the warehouse\'s; a gap this wide means one of the two is wrong.',
+                    (int) $warehouseBookings,
+                    $siteBookings,
+                );
+            }
         }
 
         return $findings;

@@ -6,6 +6,7 @@ namespace App\Domains\Marketing\Support;
 
 use App\Domains\Lead\Services\LeadChannel;
 use App\Domains\Marketing\Data\FunnelSnapshot;
+use App\Domains\Marketing\Data\MarketingDay;
 use App\Domains\Marketing\Data\PlatformSlice;
 use Carbon\CarbonImmutable;
 
@@ -46,31 +47,66 @@ final class DemoSnapshot
         $at ??= CarbonImmutable::parse('2026-09-18 15:00:00', $timezone);
 
         /*
-         * Meta carries one booking attributed by `fbclid` alone, so the card shows the
-         * paid-versus-counted split that the whole LeadChannel gate exists for. Without a row
-         * like it the preview would look tidier than the real thing ever does.
+         * The warehouse half, with the legacy alert's own spend split: $2,892.84 Meta, $737.46
+         * Google, $101.94 Microsoft. Anybody holding the new card against the old one is looking
+         * at the same numbers, so the differences they see are differences in what the card says
+         * about them rather than in the data underneath.
+         */
+        $day = MarketingDay::fromRow([
+            'Date' => $at->toDateString(),
+            'report_kind' => 'DAY-TO-DATE',
+            'as_of_et' => $at->format('H:i'),
+            'spend_is_complete' => false,
+            'total_appointments' => 16,
+            'total_qualified' => 10,
+            'total_leads' => 314,
+            'total_spend' => 3732.24,
+            'facebook_spend' => 2892.84,
+            'google_spend' => 737.46,
+            'bing_spend' => 101.94,
+            'facebook_cpb' => 321.43,
+            'google_cpb' => 184.37,
+            'bing_cpb' => 101.94,
+            'facebook_cpqb' => 578.57,
+            'google_cpqb' => 245.82,
+            'bing_cpqb' => 101.94,
+            'cpl' => 11.89,
+            'cpb_all' => 233.27,
+            'cpqb_all' => 373.22,
+            'cpb_paid' => 287.10,
+            'cpqb_paid' => 414.69,
+            'unclassified_leads' => 61,
+            'unclassified_appointments' => 3,
+            'unclassified_qualified' => 2,
+            'unclassified_appointments_share' => 0.1875,
+            'prev_date' => $at->subDay()->toDateString(),
+            'prev_spend' => 3410.00,
+            'prev_appointments' => 14,
+            'prev_cpb' => 243.57,
+            'prev_cpqb' => 379.00,
+        ]);
+
+        /*
+         * The platform slices are this site's own counts, which the card no longer prints — they
+         * feed the admin widget and the reconciler. Kept on the demo so a preview exercises the
+         * same object the real path builds.
          */
         $platforms = [
             'meta' => new PlatformSlice(
                 slug: 'meta', label: 'Meta (Facebook / Instagram)',
                 leads: 212, bookings: 9, bookingsViaClickId: 2, qualified: 5,
-                spend: 2892.84, bookingsNotProvenPaid: 1, qualifiedNotProvenPaid: 0,
             ),
             'google' => new PlatformSlice(
-                slug: 'google', label: 'Google Ads',
-                leads: 48, bookings: 4, bookingsViaClickId: 0, qualified: 3, spend: 737.46,
+                slug: 'google', label: 'Google Ads', leads: 48, bookings: 4, bookingsViaClickId: 0, qualified: 3,
             ),
             'microsoft' => new PlatformSlice(
-                slug: 'microsoft', label: 'Microsoft / Bing',
-                leads: 12, bookings: 1, bookingsViaClickId: 0, qualified: 1, spend: 101.94,
+                slug: 'microsoft', label: 'Microsoft / Bing', leads: 12, bookings: 1, bookingsViaClickId: 0, qualified: 1,
             ),
             'direct' => new PlatformSlice(
-                slug: 'direct', label: 'Direct / no UTM',
-                leads: 38, bookings: 2, bookingsViaClickId: 0, qualified: 1,
+                slug: 'direct', label: 'Direct / no UTM', leads: 38, bookings: 2, bookingsViaClickId: 0, qualified: 1,
             ),
             'other' => new PlatformSlice(
-                slug: 'other', label: 'Other tagged source',
-                leads: 4, bookings: 0, bookingsViaClickId: 0, qualified: 0,
+                slug: 'other', label: 'Other tagged source', leads: 4, bookings: 0, bookingsViaClickId: 0, qualified: 0,
             ),
         ];
 
@@ -109,11 +145,11 @@ final class DemoSnapshot
             baseline: ['days' => 7.0, 'leads' => 280.0, 'bookings' => 14.0, 'qualified' => 9.0],
 
             warnings: [],
-            spend: 3732.24,
             unattributedByChannel: [
                 LeadChannel::ORGANIC => 1,
                 LeadChannel::SOCIAL => 1,
             ],
+            marketingDay: $day,
         );
     }
 }

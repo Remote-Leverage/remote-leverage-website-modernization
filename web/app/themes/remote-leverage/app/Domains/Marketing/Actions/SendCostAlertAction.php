@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Marketing\Actions;
 
-use App\Domains\Lead\Services\LeadChannel;
 use App\Domains\Lead\Services\SlackMessageRenderer;
+use App\Domains\Marketing\Data\ChannelDay;
 use App\Domains\Marketing\Data\FunnelSnapshot;
-use App\Domains\Marketing\Data\PlatformSlice;
+use App\Domains\Marketing\Data\MarketingDay;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use App\Domains\Marketing\Support\AlertWindow;
 use App\Infrastructure\Slack\SlackTransport;
@@ -228,7 +228,6 @@ class SendCostAlertAction
             'warnings' => $this->warnings($snapshot),
             'today_block' => $this->todayBlock($snapshot),
             ...$this->platformCards($snapshot),
-            'platform_notes' => $this->platformNotes($snapshot),
             'activity_block' => $this->activityBlock($snapshot),
             'footnotes' => $this->footnotes($snapshot),
             ...$this->actionUrls(),
@@ -236,70 +235,111 @@ class SendCostAlertAction
     }
 
     /**
-     * The day's numbers, one fact per line.
+     * The day's numbers, one fact per line, from the data team's warehouse.
      *
-     * Written to be read down a column, not across one. An earlier pass packed these onto two
-     * lines separated by middots, which was shorter and slower — the eye has to parse the
-     * separators and hold the labels. The legacy alert put one `Label: value` on each line and
-     * that is what "easy to read" meant when the person who reads this daily asked for it back.
-     *
-     * Volume before cost, matching the order the legacy message used: what happened, then what it
-     * cost. Without spend the last four lines simply are not there.
+     * Everything here is the view's own arithmetic rather than this application's. That is the
+     * point: the card has to agree with the dashboard the rest of the business reads, and the
+     * fastest way to guarantee that is to do no arithmetic of our own.
      */
     private function todayBlock(FunnelSnapshot $snapshot): string
     {
-        $lines = ['*Today*'];
+        $day = $snapshot->marketingDay;
 
-        $lines[] = sprintf(
-            '- Bookings: %d%s',
-            $snapshot->bookings,
-            $this->parenthetical($this->delta($snapshot->bookings, $snapshot->baseline['bookings'] ?? null)),
-        );
-        $lines[] = sprintf(
-            '- Qualified: %d%s',
-            $snapshot->qualifiedT10,
-            $this->parenthetical($this->delta($snapshot->qualifiedT10, $snapshot->baseline['qualified'] ?? null)),
-        );
-        $lines[] = sprintf(
-            '- Leads: %d%s',
-            $snapshot->leads,
-            $this->parenthetical($this->delta($snapshot->leads, $snapshot->baseline['leads'] ?? null)),
-        );
-        $lines[] = sprintf('- Booking rate: %d%%', (int) round($snapshot->trailingBookingRate * 100));
+        if ($day === null) {
+            return "*Today*\n".$this->spendUnavailable();
+        }
 
-        if (! $snapshot->hasSpend()) {
-            $lines[] = $this->spendUnavailable($snapshot);
+        $lines = [sprintf('*%s*', $day->isClosing() ? 'Closing — '.$this->prettyDate($day->date) : 'Today, so far')];
+
+        $lines[] = sprintf('- Bookings: %d%s', $day->appointments, $this->versusPrevious($day->appointments, $day->previousAppointments, $day));
+        $lines[] = sprintf('- Qualified: %d', $day->qualified);
+        $lines[] = sprintf('- Leads: %d', $day->leads);
+
+        if ($day->spend === null) {
+            $lines[] = '- Spend: not reported for this day';
 
             return implode("\n", $lines);
         }
 
-        $lines[] = sprintf('- Spend: %s', $this->money($snapshot->spend, $snapshot->currency));
+        $lines[] = sprintf('- Spend: %s%s', $this->money($day->spend, $snapshot->currency), $this->spendCaveat($day));
+        $lines[] = sprintf('- CPL: %s', $this->money($day->cpl, $snapshot->currency));
         $lines[] = sprintf(
-            '- CPB: %s%s',
-            $this->money($snapshot->paidCpb(), $snapshot->currency),
-            $this->targetSuffix('cpb', $snapshot->paidCpb(), $snapshot),
+            '- CPB: %s%s%s',
+            $this->money($day->cpbPaid, $snapshot->currency),
+            $this->targetSuffix('cpb', $day->cpbPaid, $snapshot),
+            $this->versusPreviousMoney($day->cpbPaid, $day->previousCpb, $day, $snapshot),
         );
         $lines[] = sprintf(
             '- CPQB: %s%s',
-            $this->money($snapshot->paidCpqb(), $snapshot->currency),
-            $this->targetSuffix('cpqb', $snapshot->paidCpqb(), $snapshot),
+            $this->money($day->cpqbPaid, $snapshot->currency),
+            $this->targetSuffix('cpqb', $day->cpqbPaid, $snapshot),
         );
 
-        $blended = $this->blendedLine($snapshot);
-
-        if ($blended !== '') {
-            $lines[] = $blended;
+        /*
+         * Blended last, with its denominator named. It is the number the legacy alert printed
+         * alone; above the paid figure it invites somebody to quote whichever is nicer.
+         */
+        if ($day->cpbAll !== null && $day->cpbAll !== $day->cpbPaid) {
+            $lines[] = sprintf(
+                '- Blended CPB: %s (all %d bookings, paid and not)',
+                $this->money($day->cpbAll, $snapshot->currency),
+                $day->appointments,
+            );
         }
 
         return implode("\n", $lines);
     }
 
-    /** " (+12% vs 7d)", or nothing. Keeps the sprintf call sites from sprouting conditionals. */
-    private function parenthetical(string $value): string
+    /**
+     * Whether the spend figure is final.
+     *
+     * `spend_is_complete` is only true on a closing report whose Meta feed covered the day. On a
+     * day still running it is always false, which is honest rather than useful — so the caveat is
+     * only printed when it says something the reader does not already know from the heading.
+     */
+    private function spendCaveat(MarketingDay $day): string
     {
-        $value = trim($value);
+        if ($day->spendIsComplete) {
+            return '';
+        }
 
-        return $value === '' ? '' : ' ('.$value.')';
+        return $day->isClosing() ? ' _(Meta feed incomplete)_' : '';
+    }
+
+    /**
+     * " (was 14)", but only when the comparison is fair.
+     *
+     * The view supplies the previous closed day on every report. Printing it against a
+     * day-to-date figure compares two hours of today with a full yesterday, which makes every
+     * morning look like a collapse and teaches people to ignore the comparison entirely. See
+     * MarketingDay::hasFairComparison().
+     */
+    private function versusPrevious(int $current, ?int $previous, MarketingDay $day): string
+    {
+        if (! $day->hasFairComparison() || $previous === null || $previous === 0) {
+            return '';
+        }
+
+        return sprintf(' (was %d on %s)', $previous, $this->prettyDate((string) $day->previousDate));
+    }
+
+    private function versusPreviousMoney(?float $current, ?float $previous, MarketingDay $day, FunnelSnapshot $snapshot): string
+    {
+        if (! $day->hasFairComparison() || $current === null || $previous === null || $previous <= 0.0) {
+            return '';
+        }
+
+        return sprintf(' (was %s)', $this->money($previous, $snapshot->currency));
+    }
+
+    /** "Thu 18 Sep" from a warehouse date string, or the string itself if it will not parse. */
+    private function prettyDate(string $date): string
+    {
+        try {
+            return CarbonImmutable::parse($date)->format('D j M');
+        } catch (\Throwable) {
+            return $date;
+        }
     }
 
     /** " (under $300.00)", or nothing when no target is configured. */
@@ -318,8 +358,18 @@ class SendCostAlertAction
         );
     }
 
+    /** Why there are no cost figures. The warehouse is the only source, so there is one reason. */
+    private function spendUnavailable(): string
+    {
+        return '_'.$this->spendPending().'_';
+    }
+
     /**
      * The pulse, one fact per line. Same shape as the legacy alert's "Lead Activity".
+     *
+     * Everything here comes from this site rather than the warehouse: the warehouse knows what
+     * was spent and booked, it does not know when the last lead arrived or how full the calendar
+     * is next Tuesday.
      */
     private function activityBlock(FunnelSnapshot $snapshot): string
     {
@@ -341,24 +391,27 @@ class SendCostAlertAction
                 ),
         );
 
+        $lines[] = sprintf('- Booking rate: %d%%', (int) round($snapshot->trailingBookingRate * 100));
+
         $consultations = $this->consultationsLine($snapshot);
 
         if ($consultations !== '') {
             $lines[] = $consultations;
         }
 
-        if ($snapshot->bookings > 0 && $snapshot->unattributedBookings() > 0) {
-            $channels = [];
+        /*
+         * The unclassified bucket, as the warehouse defines it: everything that is not a paid
+         * channel, so organic and direct are in it too. That is why this reads higher than the
+         * share of bookings the site simply failed to attribute.
+         */
+        $day = $snapshot->marketingDay;
 
-            foreach ($snapshot->unattributedByChannel as $channel => $count) {
-                $channels[] = $count.' '.LeadChannel::label($channel);
-            }
-
+        if ($day !== null && $day->unclassifiedAppointments > 0) {
             $lines[] = sprintf(
-                '- Attribution gap: %d of %d bookings%s',
-                $snapshot->unattributedBookings(),
-                $snapshot->bookings,
-                $channels === [] ? '' : ' — '.implode(', ', $channels),
+                '- Not from paid: %d of %d bookings%s',
+                $day->unclassifiedAppointments,
+                $day->appointments,
+                $day->unclassifiedShare === null ? '' : sprintf(' (%.1f%%)', $day->unclassifiedShare * 100),
             );
         }
 
@@ -370,10 +423,6 @@ class SendCostAlertAction
      *
      * "29 next business day" makes the reader work out which day that is against today's date and
      * the weekend, and on a Friday they will get it wrong. "29 Monday 21st" does not.
-     *
-     * A day Calendly would not answer for is printed as `unavailable` rather than skipped or
-     * zeroed — an empty calendar and an unreachable one mean opposite things, and one of them is
-     * a revenue stop.
      */
     private function consultationsLine(FunnelSnapshot $snapshot): string
     {
@@ -410,70 +459,24 @@ class SendCostAlertAction
         return [
             'dashboard_url' => admin_url('index.php'),
             'leads_url' => admin_url('admin.php?page=rl-leads&date_range=today'),
-
-            /*
-             * Straight to the bookings the card could not attribute. `direct` is the bucket they
-             * land in, and it is the one figure here somebody might want to read row by row.
-             */
             'unattributed_url' => admin_url('admin.php?page=rl-leads&date_range=today&platform=direct&status=booked'),
         ];
     }
 
-    /** Why there are no cost figures: not built, not answering, or the account is stopped. */
-    private function spendUnavailable(FunnelSnapshot $snapshot): string
-    {
-        return '_'.match (true) {
-            $snapshot->spendUnreachable !== [] => $this->spendSuppressed($snapshot, $snapshot->spendUnreachable, 'did not answer'),
-            $snapshot->hasAccountIssues() => $this->spendSuppressed($snapshot, $snapshot->accountIssues, 'reports a problem with the ad account'),
-            default => $this->spendPending(),
-        }.'_';
-    }
-
     /**
-     * Blended cost per booking, as the last line of the list.
+     * One stacked card per channel, from the warehouse, spend-descending.
      *
-     * Last on purpose. Blended is the number the legacy alert printed alone, and putting it above
-     * the paid figure invites somebody to quote whichever is nicer. Below it, with its denominator
-     * named, it reads as the caveat it is.
-     */
-    private function blendedLine(FunnelSnapshot $snapshot): string
-    {
-        if (! $snapshot->hasSpend()) {
-            return '';
-        }
-
-        $understatement = $snapshot->blendedUnderstatement();
-
-        return sprintf(
-            '- Blended CPB: %s (all %d bookings%s)',
-            $this->money($snapshot->blendedCpb(), $snapshot->currency),
-            $snapshot->bookings,
-            $understatement !== null && $understatement > 0.0
-                ? sprintf(', %d%% cheaper than paid', (int) round($understatement * 100))
-                : '',
-        );
-    }
-
-    /**
-     * One stacked card per platform, spend-descending so the money is read first.
+     * The counts on these cards are the warehouse's, not this application's. Mixing the two would
+     * produce a card whose spend came from one system and whose bookings came from another, and a
+     * cost per booking built from that is not a measurement of anything.
      *
-     * Title and body must resolve to something — a card missing either is dropped by
-     * `hasEmptyTextObject`, which is the right outcome but a silent one. The subtitle is the only
-     * genuinely optional part, and it is filled on every path anyway rather than relying on the
-     * renderer to prune it.
+     * A channel that spent nothing gets no card. Three channels exist in the view and on a quiet
+     * day one of them is zero all day; a row of dashes teaches people to skip the section.
      *
      * @return array<string, string>
      */
     private function platformCards(FunnelSnapshot $snapshot): array
     {
-        $slices = $snapshot->reportablePlatforms();
-
-        usort(
-            $slices,
-            static fn (PlatformSlice $a, PlatformSlice $b): int => ($b->spend ?? 0.0) <=> ($a->spend ?? 0.0)
-                ?: $b->bookings <=> $a->bookings,
-        );
-
         $cards = [];
 
         foreach (range(1, 6) as $slot) {
@@ -482,120 +485,99 @@ class SendCostAlertAction
             $cards["platform_{$slot}_body"] = '';
         }
 
-        foreach (array_slice($slices, 0, 6) as $index => $slice) {
+        $day = $snapshot->marketingDay;
+
+        if ($day === null) {
+            return $cards;
+        }
+
+        $channels = array_filter(
+            $day->channels,
+            static fn (ChannelDay $channel): bool => $channel->isActive(),
+        );
+
+        usort(
+            $channels,
+            static fn (ChannelDay $a, ChannelDay $b): int => ($b->spend ?? 0.0) <=> ($a->spend ?? 0.0),
+        );
+
+        foreach (array_slice($channels, 0, 6) as $index => $channel) {
             $slot = $index + 1;
 
-            $cards["platform_{$slot}_title"] = $this->shortLabel($slice);
-            $cards["platform_{$slot}_subtitle"] = $slice->spend !== null
-                ? sprintf('%s spend', $this->money($slice->spend, $snapshot->currency))
-                : 'No spend connected';
-            $cards["platform_{$slot}_body"] = $this->platformCardBody($slice, $snapshot);
+            $cards["platform_{$slot}_title"] = $this->channelLabel($channel->slug);
+            $cards["platform_{$slot}_subtitle"] = sprintf('%s spend', $this->money($channel->spend, $snapshot->currency));
+            $cards["platform_{$slot}_body"] = sprintf(
+                '*CPB* %s   *CPQB* %s',
+                $this->money($channel->cpb, $snapshot->currency),
+                $this->money($channel->cpqb, $snapshot->currency),
+            );
         }
 
         return $cards;
     }
 
-    private function platformCardBody(PlatformSlice $slice, FunnelSnapshot $snapshot): string
-    {
-        $lines = [];
-
-        if ($slice->spend !== null) {
-            $lines[] = sprintf(
-                '*CPB* %s   *CPQB* %s',
-                $this->money($slice->cpb(), $snapshot->currency),
-                $this->money($slice->cpqb(), $snapshot->currency),
-            );
-        }
-
-        /*
-         * The booked count names its paid subset only when the two differ, which on live data
-         * means Meta and only when `fbclid` rescued something. Printing "9 booked, 9 paid" on
-         * every other card would make the one that matters invisible.
-         */
-        $booked = $slice->bookingsNotProvenPaid > 0
-            ? sprintf('%d booked (%d paid)', $slice->bookings, $slice->paidBookings())
-            : sprintf('%d booked', $slice->bookings);
-
-        $lines[] = sprintf('%d leads · %s · %d qual', $slice->leads, $booked, $slice->qualified);
-
-        if ($slice->isSmallSample()) {
-            $lines[] = '_n too low for a rate_';
-        }
-
-        return implode("\n", $lines);
-    }
-
     /**
-     * "Meta (Facebook / Instagram)" trimmed to a card heading, with its logo when one is set up.
+     * A channel's display name, with its logo when the workspace has one.
      *
-     * The emoji is prefixed only when `marketing.cost_alert.platform_emoji` names one. Slack
-     * renders an emoji the workspace does not have as the literal text `:meta:`, and this bot
-     * cannot check which exist — so the default is no icon, and turning them on is a deliberate
-     * act by somebody who has just uploaded them.
+     * Slack renders an emoji it does not have as the literal text `:meta:`, and this bot cannot
+     * check which exist, so an unconfigured slug renders the plain name.
      */
-    private function shortLabel(PlatformSlice $slice): string
+    private function channelLabel(string $slug): string
     {
-        $name = match ($slice->slug) {
+        $name = match ($slug) {
             'meta' => 'Meta',
             'google' => 'Google',
             'microsoft' => 'Microsoft',
-            'linkedin' => 'LinkedIn',
-            'customerio' => 'Customer.io',
-            default => $slice->label,
+            default => ucfirst($slug),
         };
 
-        $emoji = trim((string) config('marketing.cost_alert.platform_emoji.'.$slice->slug, ''));
+        $emoji = trim((string) config('marketing.cost_alert.platform_emoji.'.$slug, ''));
 
         return $emoji === '' ? $name : $emoji.' '.$name;
     }
 
     /**
-     * The small print under the platform grid: what the numbers in it do not say.
+     * The line under the header: which day, as of when, in what currency.
+     *
+     * The warehouse's own `as_of_et` rather than this application's clock. They will normally
+     * agree; when they do not, the figures are the warehouse's and so should the timestamp be.
      */
-    private function platformNotes(FunnelSnapshot $snapshot): string
-    {
-        $notes = [];
-
-        $viaClickId = array_sum(array_map(
-            static fn (PlatformSlice $slice): int => $slice->bookingsViaClickId,
-            $snapshot->reportablePlatforms(),
-        ));
-
-        if ($viaClickId > 0) {
-            $notes[] = sprintf('%d attributed by click ID', $viaClickId);
-        }
-
-        /*
-         * `fbclid` is on organic Facebook and Instagram links too, so a booking rescued by one
-         * may be traffic the ad account never paid for. It stays in the platform count and out of
-         * the cost denominator; the card names the number so the two cannot differ silently, and
-         * docs/marketing-cost-alerts.md carries the reasoning.
-         */
-        if ($snapshot->notProvenPaidBookings() > 0) {
-            $notes[] = sprintf('%d kept out of CPB (fbclid, may be organic)', $snapshot->notProvenPaidBookings());
-        }
-
-        return implode(' · ', $notes);
-    }
-
     private function subheading(FunnelSnapshot $snapshot): string
     {
+        $day = $snapshot->marketingDay;
+
+        if ($day === null) {
+            return sprintf(
+                '%s · %s',
+                $snapshot->generatedAt->format('D j M Y, H:i T'),
+                $snapshot->currency,
+            );
+        }
+
         return sprintf(
-            '%s · day %d%% elapsed · %s',
-            $snapshot->generatedAt->format('D j M Y, H:i T'),
-            (int) round($snapshot->dayElapsed * 100),
+            '%s · as of %s ET · %s',
+            $day->isClosing()
+                ? 'Closing report for '.$this->prettyDate($day->date)
+                : 'Day to date, '.$this->prettyDate($day->date),
+            $day->asOfEt,
             $snapshot->currency,
         );
     }
 
-    /** The notification preview: what someone reads without opening Slack. */
+    /** The notification preview: what somebody reads without opening Slack. */
     private function headlineMetrics(FunnelSnapshot $snapshot): string
     {
+        $day = $snapshot->marketingDay;
+
+        if ($day === null) {
+            return 'Warehouse unavailable; funnel figures only';
+        }
+
         return sprintf(
-            '%d bookings, %d qualified, %d leads',
-            $snapshot->bookings,
-            $snapshot->qualifiedT10,
-            $snapshot->leads,
+            '%d bookings, %d qualified, %s spend',
+            $day->appointments,
+            $day->qualified,
+            $day->spend === null ? 'no' : $this->money($day->spend, $snapshot->currency),
         );
     }
 
@@ -607,47 +589,12 @@ class SendCostAlertAction
         ));
     }
 
-    /**
-     * What the alert says where the cost figures will go.
-     *
-     * Phrased as a missing integration rather than as missing data, and it names what *is*
-     * trustworthy below it. An alert with a hole in it and no explanation gets read as broken.
-     */
+    /** What the card says where the cost figures would be. */
     private function spendPending(): string
     {
-        return 'Spend, CPB and CPQB are not reported: no ad platform is configured. '.
-            'Everything below is live.';
+        return 'Spend, CPB and CPQB come from the marketing warehouse, which did not answer this run.';
     }
 
-    /**
-     * What goes where the cost figures would be when a connected platform is down.
-     *
-     * Deliberately not the same sentence as {@see self::spendPending()}. "Not built yet" and
-     * "built, and broken right now" need different reactions, and a card that says the same thing
-     * for both gets the wrong one.
-     */
-    /**
-     * @param  array<string, string>  $platforms
-     */
-    private function spendSuppressed(FunnelSnapshot $snapshot, array $platforms, string $because): string
-    {
-        return sprintf(
-            'Cost figures suppressed: %s %s. A total that is missing a platform, or one reporting zero '.
-            'because it is stopped, divides by too little spend and reads cheaper than the truth.',
-            implode(', ', array_map('ucfirst', array_keys($platforms))),
-            $because,
-        );
-    }
-
-    /** Trim "Meta (Facebook / Instagram)" to something a fixed-width column can hold. */
-
-    /**
-     * Both qualified definitions, and why one of them is missing.
-     *
-     * The HubSpot figure is suppressed rather than estimated when its coverage is thin, and the
-     * message says what the coverage is. See LeadQualification: the lifecycle sync only polls
-     * referral-attached leads, so a count over it today is a count of referrals.
-     */
     /**
      * The definitions and exclusions, as one line of small print.
      *
@@ -663,7 +610,20 @@ class SendCostAlertAction
      */
     private function footnotes(FunnelSnapshot $snapshot): string
     {
-        $parts = ['Qualified = self-reported $10k+ MRR'];
+        /*
+         * Where the figures come from, first, because it is the thing somebody comparing this
+         * card against the leads screen needs to know before anything else: the counts above are
+         * the warehouse's, and its definition of a qualified booking does not have to match this
+         * site's revenue band.
+         */
+        $parts = ['Spend and bookings from the marketing warehouse'];
+
+        /*
+         * This site's own qualified definitions, which the card no longer reports as figures but
+         * still names — the HubSpot coverage below is meaningless without saying what it is
+         * coverage of.
+         */
+        $parts[] = 'this site reads qualified as self-reported $10k+ MRR';
 
         if ($snapshot->qualifiedHubSpot !== null) {
             $parts[] = sprintf('HubSpot-qualified %d', $snapshot->qualifiedHubSpot);
@@ -685,54 +645,16 @@ class SendCostAlertAction
     }
 
     /**
-     * Ad account health, in as few words as the situation allows.
+     * Whether the warehouse answered, in as few words as the situation allows.
      *
      * The legacy alert spent three lines a day saying "No active issues", once per platform. A
      * clause that says nothing on the overwhelming majority of days is a clause people learn to
-     * skip, and then miss on the day it changes. Any real problem is already a red finding at the
-     * top of the card, so this only has to say whether to look.
+     * skip, and then miss on the day it changes. Account health now lives in the warehouse's own
+     * `spend_is_complete`, so all this has to report is whether the figures arrived.
      */
     private function healthClause(FunnelSnapshot $snapshot): string
     {
-        if (! $snapshot->hasSpendIntegration()) {
-            return 'ad health not monitored';
-        }
-
-        if ($snapshot->hasAccountIssues()) {
-            return sprintf('%s flagged, see above', implode(', ', array_map('ucfirst', array_keys($snapshot->accountIssues))));
-        }
-
-        if ($snapshot->spendUnreachable !== []) {
-            return sprintf('%s did not answer', implode(', ', array_map('ucfirst', array_keys($snapshot->spendUnreachable))));
-        }
-
-        return 'ad accounts clear';
-    }
-
-    /**
-     * "+12% vs 7d", or nothing when there is no usable baseline.
-     *
-     * The comparison is against the *same hour* on previous days — bookings lag the spend that
-     * produced them, so a mid-afternoon figure measured against a full-day average is
-     * structurally pessimistic. The label does not say "at this hour" because the card is read
-     * nine times a day and four words of methodology on four tiles is forty words of noise. That
-     * detail lives in docs/marketing-cost-alerts.md, which is where somebody checking a number
-     * goes anyway.
-     */
-    private function delta(int $actual, ?float $baseline): string
-    {
-        if ($baseline === null || $baseline <= 0.0) {
-            return '';
-        }
-
-        $change = ($actual - $baseline) / $baseline;
-
-        return sprintf(' %+d%% vs %dd', (int) round($change * 100), $this->baselineDays());
-    }
-
-    private function baselineDays(): int
-    {
-        return max(1, (int) config('marketing.cost_alert.baseline_days', 7));
+        return $snapshot->marketingDay === null ? 'warehouse unavailable' : 'warehouse current';
     }
 
     private function plural(int $count, string $noun): string

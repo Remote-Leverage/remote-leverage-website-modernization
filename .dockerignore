@@ -16,5 +16,16 @@ web/app/themes/remote-leverage/public
 doc
 .github
 *.sql
+
+# ...except the marketing alert's query, which the running application reads from disk at runtime.
+#
+# Belt and braces rather than a known bug. In Docker's matcher a bare `*` does not cross `/`, so
+# `*.sql` above should only match dumps at the context root — and the `**/` prefixes on the
+# entries near the top suggest whoever wrote them knew that. But this is the one `.sql` file in
+# the repo that has to be *inside* the image, and the failure mode if the assumption is wrong is
+# the one this repo has had before with videos: it works locally, where the file is on disk, and
+# every deployed environment reports the marketing warehouse as unavailable, with nothing failing
+# at build time to say why. An explicit exception costs nothing and removes the question.
+!web/app/themes/remote-leverage/resources/sql/*.sql
 docker-compose.yml
 auth.json

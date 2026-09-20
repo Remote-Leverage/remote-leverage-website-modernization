@@ -212,14 +212,50 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | The warehouse
+    |--------------------------------------------------------------------------
+    |
+    | Spend, channel attribution and the booking counts that divide into them all come from the
+    | data team's BigQuery view, not from this application. Not because the warehouse is more
+    | accurate — it may or may not be — but because it is what every other report in the business
+    | is built on, and a Slack card that disagrees with those is wrong whichever number is closer
+    | to the truth.
+    |
+    | The query lives verbatim in resources/sql/marketing-home-daily.sql and is owned by the data
+    | team. See App\Domains\Marketing\Gateways\BigQueryClient.
+    */
+    'warehouse' => [
+
+        /*
+         * The whole service account JSON, in one secret. Raw or base64, because a task definition
+         * that mangles quoting is a real thing and base64 is the usual escape hatch.
+         *
+         * One blob rather than a private key split across variables: a PEM contains newlines, and
+         * a newline in an ECS task definition value works locally and produces an opaque OpenSSL
+         * error in production.
+         */
+        'credentials' => (string) env('BIGQUERY_CREDENTIALS_JSON', ''),
+
+        /*
+         * The project the query is billed to. Defaults to the service account's own project,
+         * which is right unless the account is shared across projects.
+         */
+        'project_id' => (string) env('BIGQUERY_PROJECT_ID', ''),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Ad platform read credentials
     |--------------------------------------------------------------------------
     |
-    | Meta is live: set its token and ad account id and the cost alert reports Meta spend, CPB,
-    | CPQB and account status. Google and Microsoft have no client yet and are skipped while
-    | unset, so their keys exist here so the tokens can be pasted and synced between environments
-    | ahead of the clients — which is the slow part, since Google's developer token needs approval
-    | through an MCC and the wait is measured in days.
+    | **Nothing reads these any more.** Spend comes from the warehouse above; the Meta, Google and
+    | Microsoft clients that used to read it directly were deleted when that landed, because two
+    | sources for one number is how a card and a dashboard start disagreeing.
+    |
+    | The keys are kept so that a future integration needing write access, or a diagnostic that
+    | wants to compare the warehouse against a platform directly, has somewhere to resolve
+    | credentials from — and because deleting them from the sync allowlist would strand any that
+    | are already set in an environment.
     |
     | Environment first, admin setting second, exactly as Slack and HubSpot resolve. See
     | App\Domains\Marketing\Support\AdPlatformCredentials.

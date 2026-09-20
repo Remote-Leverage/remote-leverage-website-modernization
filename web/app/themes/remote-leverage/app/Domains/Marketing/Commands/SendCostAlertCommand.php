@@ -128,36 +128,34 @@ class SendCostAlertCommand extends Command
         $this->line($snapshot->generatedAt->format('D j M Y, H:i T'));
         $this->newLine();
 
+        $day = $snapshot->marketingDay;
+
         $this->table(['Metric', 'Value'], [
-            ['Leads today', $snapshot->leads],
-            ['Bookings today', $snapshot->bookings],
-            ['Qualified (T10)', $snapshot->qualifiedT10],
-            ['Qualified (HubSpot)', $snapshot->qualifiedHubSpot ?? 'suppressed, '.round($snapshot->hubSpotCoverage * 100).'% coverage'],
-            ['Attributed bookings', $snapshot->attributedBookings()],
-            ['Unattributed bookings', $snapshot->unattributedBookings()],
+            ['Report', $day === null ? 'warehouse unavailable' : $day->reportKind.' for '.$day->date],
+            ['Bookings (warehouse)', $day?->appointments ?? '-'],
+            ['Qualified (warehouse)', $day?->qualified ?? '-'],
+            ['Leads (warehouse)', $day?->leads ?? '-'],
+            ['Spend', $day?->spend ?? 'unavailable'],
+            ['CPB paid / all', ($day?->cpbPaid ?? '-').' / '.($day?->cpbAll ?? '-')],
+            ['CPQB paid / all', ($day?->cpqbPaid ?? '-').' / '.($day?->cpqbAll ?? '-')],
+            ['Not from paid', $day === null ? '-' : $day->unclassifiedAppointments.' bookings'],
+            ['Bookings (this site)', $snapshot->bookings],
             ['Excluded as VA', $snapshot->excludedVaLeads.' leads, '.$snapshot->excludedVaBookings.' bookings'],
-            ['Spend', $snapshot->hasSpend() ? $snapshot->spend : 'not connected'],
+            ['Booking rate', round($snapshot->trailingBookingRate * 100).'%'],
         ]);
 
-        foreach ($snapshot->reportablePlatforms() as $slice) {
-            $this->line(sprintf(
-                '  %-12s leads %-5d booked %-4d (paid %-4d) qualified %-4d (%d via click id)',
-                $slice->slug,
-                $slice->leads,
-                $slice->bookings,
-                $slice->paidBookings(),
-                $slice->qualified,
-                $slice->bookingsViaClickId,
-            ));
-        }
-
-        if ($snapshot->unattributedByChannel !== []) {
-            $this->newLine();
-            $this->line('Unattributed bookings, by first-touch channel:');
-
-            foreach ($snapshot->unattributedByChannel as $channel => $count) {
-                $this->line(sprintf('  %-16s %d', $channel, $count));
+        foreach (($day->channels ?? []) as $channel) {
+            if (! $channel->isActive()) {
+                continue;
             }
+
+            $this->line(sprintf(
+                '  %-12s spend %-10s CPB %-10s CPQB %s',
+                $channel->slug,
+                $channel->spend,
+                $channel->cpb ?? '-',
+                $channel->cpqb ?? '-',
+            ));
         }
 
         if ($snapshot->warnings !== []) {

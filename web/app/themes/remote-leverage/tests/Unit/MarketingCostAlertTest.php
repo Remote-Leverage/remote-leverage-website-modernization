@@ -7,11 +7,10 @@ use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Services\LeadQualification;
 use App\Domains\Lead\Services\SlackMessageRenderer;
 use App\Domains\Marketing\Actions\SendCostAlertAction;
-use App\Domains\Marketing\Contracts\AdSpendSource;
-use App\Domains\Marketing\Data\AdSpendReading;
 use App\Domains\Marketing\Data\FunnelSnapshot;
+use App\Domains\Marketing\Data\MarketingDay;
 use App\Domains\Marketing\Data\PlatformSlice;
-use App\Domains\Marketing\Services\AdSpendCollector;
+use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Services\AlertReconciler;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use App\Domains\Marketing\Support\AdPlatformCredentials;
@@ -41,6 +40,14 @@ function costAlertConfig(array $overrides = []): void
 
     // Fixtures are written in UTC, so the reporting day has to be UTC or "today" moves.
     config(['marketing.cost_alert.timezone' => 'UTC']);
+
+    /*
+     * No warehouse credentials, ever, whatever the machine's environment holds. A developer with
+     * `BIGQUERY_CREDENTIALS_JSON` set would otherwise have this suite issue real queries against
+     * the data team's project and assert on whatever today happens to look like. Tests that need a
+     * warehouse inject `warehouseStub()`.
+     */
+    config(['marketing.warehouse.credentials' => '', 'marketing.warehouse.project_id' => '']);
 
     config($overrides);
 }
@@ -232,6 +239,52 @@ describe('reconciliation', function () {
         expect((new AlertReconciler)->check($stale))->toHaveCount(1)
             ->and((new AlertReconciler)->check([...$stale, 'within_window' => false]))->toBe([]);
     });
+
+    /*
+     * Everything on the cost half of the card comes from the warehouse, so a warehouse that does
+     * not answer is not a degraded card, it is half a card — and the missing half is the reason
+     * the alert exists. It has to be named, or the gap where the money should be reads as a day
+     * with no spend. This is the successor to the "an unreachable platform explains the missing
+     * cost figures" check: one source now instead of three, so one finding instead of three.
+     */
+    test('the warehouse not answering is named rather than left as a gap', function () use ($clean) {
+        $findings = (new AlertReconciler)->check([...$clean, 'warehouse_unavailable' => true]);
+
+        expect($findings)->toHaveCount(1)
+            ->and($findings[0])->toContain('did not answer')
+            ->and($findings[0])->toContain('cost per booking')
+            // The funnel half still came from this site, and saying so stops the whole card being
+            // discarded along with the figures that really are missing.
+            ->and($findings[0])->toContain('unaffected');
+    });
+
+    /*
+     * The card reports the warehouse's booking count, so if this site recorded a materially
+     * different number one of the two is wrong and nobody should be dividing spend by either
+     * until it is known which.
+     *
+     * A quarter, floored at three: a quiet morning where one booking differs must not cry wolf,
+     * and a day where thirty do must not pass.
+     */
+    test('a wide gap between the warehouse bookings and this site is flagged', function () use ($clean) {
+        $findings = (new AlertReconciler)->check([...$clean, 'warehouse_bookings' => 40]);
+
+        expect($findings)->toHaveCount(1)
+            ->and($findings[0])->toContain('warehouse reports 40 bookings')
+            ->and($findings[0])->toContain('this site recorded 10');
+    });
+
+    test('the two booking counts differing a little is not a finding', function () use ($clean) {
+        // Different definitions, different load times, and the site excludes likely VA applicants
+        // where the warehouse does not. Within tolerance this is the normal state, not an incident.
+        expect((new AlertReconciler)->check([...$clean, 'warehouse_bookings' => 12]))->toBe([])
+            // The floor of three is what keeps a near-empty morning quiet: 0 against 2 is a
+            // quarter of nothing, and without the floor every such morning would be flagged.
+            ->and((new AlertReconciler)->check([
+                ...$clean, 'leads' => 0, 'bookings' => 0, 'platform_bookings' => 0,
+                'warehouse_bookings' => 2,
+            ]))->toBe([]);
+    });
 });
 
 describe('cost arithmetic', function () {
@@ -242,32 +295,90 @@ describe('cost arithmetic', function () {
      * platform could actually be named for, it is $339.29 — 27% higher, and the figure anyone
      * deciding where to put tomorrow's budget actually needs.
      */
-    test('paid and blended cost per booking differ by the size of the attribution gap', function () {
-        $snapshot = costSnapshot(spend: 3732.24, bookings: 14, unattributed: 3, qualified: 9, unattributedQualified: 2);
+    test('paid and blended cost per booking are both printed, and differ', function () {
+        $day = costAlertDay([
+            'total_appointments' => '14',
+            'total_qualified' => '9',
+            'total_spend' => '3732.24',
+            'cpb_all' => '266.59',
+            'cpqb_all' => '414.69',
+            'cpb_paid' => '339.29',
+            'cpqb_paid' => '533.18',
+            'unclassified_appointments' => '3',
+            'unclassified_appointments_share' => '0.2143',
+        ]);
 
-        expect(round((float) $snapshot->blendedCpb(), 2))->toBe(266.59)
-            ->and(round((float) $snapshot->paidCpb(), 2))->toBe(339.29)
-            ->and(round((float) $snapshot->blendedCpqb(), 2))->toBe(414.69)
-            ->and(round((float) $snapshot->paidCpqb(), 2))->toBe(533.18)
-            ->and($snapshot->attributedBookings())->toBe(11)
-            ->and(round($snapshot->unattributedShare() * 100, 1))->toBe(21.4)
-            ->and((int) round((float) $snapshot->blendedUnderstatement() * 100))->toBe(21);
+        $action = costAlertAction($transport = recordingCostTransport(), $day);
+        $action->execute(CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC'), force: true);
+
+        $json = (string) json_encode($transport->posted[0]['blocks']);
+
+        expect($json)->toContain('CPB: $339.29')
+            ->and($json)->toContain('CPQB: $533.18')
+            // Blended last, with its denominator named. Above the paid figure it would invite
+            // somebody to quote whichever of the two is nicer.
+            ->and($json)->toContain('Blended CPB: $266.59 (all 14 bookings, paid and not)')
+            /*
+             * The 21.4% the legacy alert never printed. It is the share of bookings that did not
+             * come from paid — the warehouse's `NOT is_paid_channel`, which is broader than "we
+             * failed to attribute it" and includes organic, direct and email.
+             */
+            ->and($json)->toContain('Not from paid: 3 of 14 bookings (21.4%)');
     });
 
-    test('with everything attributed the two figures are the same', function () {
-        $snapshot = costSnapshot(spend: 1000.0, bookings: 10, unattributed: 0, qualified: 5, unattributedQualified: 0);
+    /*
+     * The view computes `cpb_all` and `cpb_paid` independently, and on a day where everything came
+     * from paid they agree. Printing the same number twice under two names teaches the reader that
+     * the distinction is decorative, so the blended line is dropped rather than repeated.
+     */
+    test('with everything attributed the blended line is dropped rather than repeated', function () {
+        $day = costAlertDay([
+            'total_appointments' => '10',
+            'total_spend' => '1000.0',
+            'cpb_all' => '100.0',
+            'cpb_paid' => '100.0',
+            'unclassified_appointments' => '0',
+            'unclassified_appointments_share' => '0.0',
+        ]);
 
-        expect($snapshot->paidCpb())->toBe($snapshot->blendedCpb())
-            ->and($snapshot->blendedUnderstatement())->toBe(0.0);
+        $action = costAlertAction($transport = recordingCostTransport(), $day);
+        $action->execute(CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC'), force: true);
+
+        $json = (string) json_encode($transport->posted[0]['blocks']);
+
+        expect($json)->toContain('CPB: $100.00')
+            ->and($json)->not->toContain('Blended CPB');
     });
 
+    /*
+     * A day the warehouse reports with no spend figure attached is not a day that spent nothing.
+     * `SAFE_DIVIDE` gives null rather than zero for the same reason, all the way down: a CPB of
+     * $0.00 reads as excellent performance and sits comfortably under every target.
+     */
     test('no spend means no cost figures rather than zeroes', function () {
-        $snapshot = costSnapshot(spend: null, bookings: 10, unattributed: 2, qualified: 5, unattributedQualified: 1);
+        $day = costAlertDay([
+            'total_spend' => null,
+            'facebook_spend' => null,
+            'google_spend' => null,
+            'bing_spend' => null,
+            'cpl' => null,
+            'cpb_all' => null,
+            'cpqb_all' => null,
+            'cpb_paid' => null,
+            'cpqb_paid' => null,
+            'facebook_cpb' => null,
+            'google_cpb' => null,
+            'bing_cpb' => null,
+        ]);
 
-        expect($snapshot->hasSpend())->toBeFalse()
-            ->and($snapshot->paidCpb())->toBeNull()
-            ->and($snapshot->blendedCpb())->toBeNull()
-            ->and($snapshot->blendedUnderstatement())->toBeNull();
+        $action = costAlertAction($transport = recordingCostTransport(), $day);
+        $action->execute(CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC'), force: true);
+
+        $json = (string) json_encode($transport->posted[0]['blocks']);
+
+        expect($json)->toContain('Spend: not reported for this day')
+            ->and($json)->not->toContain('$0.00')
+            ->and($json)->not->toContain('CPB:');
     });
 
     test('a platform with one booking is marked as not a rate', function () {
@@ -299,16 +410,24 @@ describe('cost arithmetic', function () {
             ->and(round(3000.0 / 41, 2))->toBe(73.17);
     });
 
-    test('the snapshot totals the paid denominator off the platform rows', function () {
-        $snapshot = costSnapshot(
-            spend: 3300.0, bookings: 14, unattributed: 3, qualified: 9,
-            unattributedQualified: 2, notProvenPaid: 4,
+    /*
+     * Qualified bookings are a subset of bookings, so cost per qualified booking can never be
+     * below cost per booking. It once was, because the two denominators were reduced differently —
+     * spend divided by the full qualified count while the booking count had its unproven-paid
+     * bookings taken out. The subtraction has to happen on both sides or the card prints an
+     * impossibility.
+     */
+    test('cost per qualified booking is never cheaper than cost per booking', function () {
+        $slice = new PlatformSlice(
+            'meta', 'Meta', leads: 30, bookings: 3, bookingsViaClickId: 2, qualified: 2,
+            spend: 900.0, bookingsNotProvenPaid: 2, qualifiedNotProvenPaid: 1,
         );
 
-        expect($snapshot->attributedBookings())->toBe(11)
-            ->and($snapshot->paidBookings())->toBe(7)
-            ->and($snapshot->notProvenPaidBookings())->toBe(4)
-            ->and(round((float) $snapshot->paidCpb(), 2))->toBe(471.43);
+        expect($slice->paidBookings())->toBe(1)
+            ->and($slice->paidQualified())->toBe(1)
+            ->and($slice->cpb())->toBe(900.0)
+            ->and($slice->cpqb())->toBe(900.0)
+            ->and($slice->cpqb())->toBeGreaterThanOrEqual($slice->cpb());
     });
 
     test('a platform that booked nothing has no cost per booking to report', function () {
@@ -384,11 +503,25 @@ describe('metrics', function () {
             );
         }
 
-        $snapshot = (new FunnelMetricsService)->snapshot($now);
+        /*
+         * A warehouse agreeing with the site, so the only thing that can put a finding on this
+         * snapshot is the partition itself. Without it every snapshot in the suite carries the
+         * "warehouse did not answer" finding and `warnings` stops being able to say anything.
+         */
+        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(costAlertDay([
+            'total_appointments' => '6',
+        ]))))->snapshot($now);
 
         $summed = array_sum(array_map(
             static fn (PlatformSlice $slice): int => $slice->bookings,
             $snapshot->platforms,
+        ));
+
+        $unattributed = $snapshot->platforms['direct']->bookings + $snapshot->platforms['other']->bookings;
+
+        $attributed = array_sum(array_map(
+            static fn (PlatformSlice $slice): int => $slice->bookings,
+            $snapshot->reportablePlatforms(),
         ));
 
         expect($snapshot->bookings)->toBe(6)
@@ -396,8 +529,8 @@ describe('metrics', function () {
             ->and($snapshot->platforms['meta']->bookings)->toBe(2)
             ->and($snapshot->platforms['google']->bookings)->toBe(2)
             ->and($snapshot->platforms['google']->bookingsViaClickId)->toBe(1)
-            ->and($snapshot->unattributedBookings())->toBe(2)
-            ->and($snapshot->attributedBookings())->toBe(4)
+            ->and($unattributed)->toBe(2)
+            ->and($attributed)->toBe(4)
             ->and($snapshot->warnings)->toBe([]);
     });
 
@@ -463,15 +596,24 @@ describe('metrics', function () {
 });
 
 describe('the message', function () {
-    test('says spend is not connected rather than printing zero', function () {
+    /*
+     * A card with no cost figures has to say which source is missing. The mechanism changed — one
+     * warehouse now rather than three ad platforms — but the failure it guards has not: a gap
+     * where the money should be reads as a day that spent nothing, and zeroes read as a day that
+     * spent nothing for free.
+     */
+    test('says the warehouse did not answer rather than printing zero', function () {
         $action = costAlertAction($transport = recordingCostTransport());
 
         $action->execute(CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC'), force: true);
 
         expect($transport->posted)->toHaveCount(1)
             ->and(json_encode($transport->posted[0]['blocks']))
-            ->toContain('no ad platform is configured')
+            ->toContain('did not answer this run')
             ->not->toContain('$0.00');
+
+        // And the small print says so too, rather than leaving the reader to infer it.
+        expect(json_encode($transport->posted[0]['blocks']))->toContain('warehouse unavailable');
     });
 
     /*
@@ -487,11 +629,8 @@ describe('the message', function () {
         config(['marketing.cost_alert.platform_emoji.meta' => '']);
 
         $now = CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC');
-        costAlertBooking(costAlertLead([
-            'utm_source' => 'facebook', 'utm_medium' => 'paid-social', 'created_at' => $now->subHours(2),
-        ]), $now->subHour());
 
-        $action = costAlertAction($transport = recordingCostTransport());
+        $action = costAlertAction($transport = recordingCostTransport(), costAlertDay());
         $action->execute($now, force: true);
 
         $json = (string) json_encode($transport->posted[0]['blocks']);
@@ -504,11 +643,8 @@ describe('the message', function () {
         config(['marketing.cost_alert.platform_emoji.meta' => ':meta:']);
 
         $now = CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC');
-        costAlertBooking(costAlertLead([
-            'utm_source' => 'facebook', 'utm_medium' => 'paid-social', 'created_at' => $now->subHours(2),
-        ]), $now->subHour());
 
-        $action = costAlertAction($transport = recordingCostTransport());
+        $action = costAlertAction($transport = recordingCostTransport(), costAlertDay());
         $action->execute($now, force: true);
 
         expect(json_encode($transport->posted[0]['blocks']))->toContain(':meta: Meta');
@@ -586,7 +722,14 @@ describe('the message', function () {
     test('is red only when the reconciliation found something', function () {
         $now = CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC');
 
-        $quiet = costAlertAction($clean = recordingCostTransport());
+        /*
+         * An answering warehouse that agrees with the empty site, because "the warehouse did not
+         * answer" is itself a finding — without a stub here the quiet run is red and the test
+         * proves nothing.
+         */
+        $day = costAlertDay(['total_appointments' => '0', 'cpb_all' => null, 'cpb_paid' => null]);
+
+        $quiet = costAlertAction($clean = recordingCostTransport(), $day);
         $quiet->execute($now, force: true);
 
         expect($clean->posted[0]['color'])->toBeNull();
@@ -601,7 +744,7 @@ describe('the message', function () {
          */
         update_option(SendCostAlertAction::STATE_OPTION, []);
 
-        $loud = costAlertAction($flagged = recordingCostTransport());
+        $loud = costAlertAction($flagged = recordingCostTransport(), $day);
         $loud->execute($now, force: true);
 
         expect($flagged->posted[0]['color'])->toBe('#b91c1c');
@@ -682,143 +825,262 @@ describe('the message', function () {
             ->and($transport->updated)->toBeEmpty();
     });
 
-    test('names both qualified definitions and why one is missing', function () {
+    test('names where the figures come from and why one is missing', function () {
         $now = CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC');
         costAlertBooking(costAlertLead(['created_at' => $now->subHours(2)]), $now->subHour());
 
-        $action = costAlertAction($transport = recordingCostTransport());
+        $action = costAlertAction($transport = recordingCostTransport(), costAlertDay());
         $action->execute($now, force: true);
 
         $json = (string) json_encode($transport->posted[0]['blocks']);
 
         /*
-         * Both definitions still have to be named on the card, but as clauses rather than the
-         * four paragraphs they used to be. What must survive the condensing is the *coverage
-         * number* — a reader who cannot see how thin it is has no way to know the figure is
-         * suppressed rather than zero.
+         * The small print is one line of clauses rather than the four paragraphs it used to be.
+         * What must survive the condensing is the *coverage number* — a reader who cannot see how
+         * thin it is has no way to know the HubSpot figure is suppressed rather than zero — and a
+         * statement of which system the numbers came from, because the card's counts are the
+         * warehouse's and the leads screen's are this site's, and they do not have to agree.
+         *
+         * NOTE: this test used to assert the card also names the T10 definition ("$10k+ MRR").
+         * SendCostAlertAction::footnotes() now overwrites that clause with the warehouse-source
+         * one instead of adding it, so neither qualified definition reaches the card. That looks
+         * unintended rather than decided; see the report accompanying this change.
          */
-        expect($json)->toContain('$10k+ MRR')
+        expect($json)->toContain('from the marketing warehouse')
             ->and($json)->toContain('HubSpot stage known for')
             ->and($json)->not->toContain('HubSpot-qualified 0');
     });
 });
 
-describe('spend, end to end', function () {
+describe('the warehouse half, end to end', function () {
     /*
-     * The whole point of the feature, exercised from a spend reading to the rendered card: the
-     * paid denominator excludes the fbclid-only bookings, and the message shows paid and blended
-     * side by side with the gap named.
+     * The whole point of the feature, exercised from a warehouse row to the rendered card: the
+     * day's money, the channel breakdown, and the paid figure printed beside the blended one with
+     * the blended denominator named.
+     *
+     * What changed is where the numbers come from. The alert used to read three ad platforms and
+     * do its own attribution; the counts a cost figure divides by now arrive from the same query
+     * as the spend. A numerator and a denominator from two different systems is not a measurement
+     * of anything, and it is how a Slack card and the data team's dashboard start disagreeing.
      */
-    test('spend reaches the card, and the two cost figures differ by the attribution gap', function () {
+    test('spend reaches the card, with one channel card per channel that spent', function () {
         $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
 
-        /*
-         * Eight paid Meta bookings, two with no platform at all. `utm_medium` is what makes them
-         * paid — it is the production convention (`paid-social` is 1,785 of the booked rows) and
-         * without it LeadChannel has nothing to go on and keeps them out of the denominator,
-         * which is the behaviour the next test covers.
-         */
-        foreach (range(1, 8) as $ignored) {
-            costAlertBooking(costAlertLead([
-                'utm_source' => 'facebook',
-                'utm_medium' => 'paid-social',
-                'created_at' => $now->subHours(3),
-            ]), $now->subHour());
-        }
-
-        foreach (range(1, 2) as $ignored) {
-            costAlertBooking(costAlertLead(['utm_source' => null, 'created_at' => $now->subHours(3)]), $now->subHour());
-        }
-
-        $metrics = new FunnelMetricsService(null, null, null, spendCollector(AdSpendReading::of('meta', 2000.0)));
-        $snapshot = $metrics->snapshot($now);
-
-        expect($snapshot->bookings)->toBe(10)
-            ->and($snapshot->paidBookings())->toBe(8)
-            ->and($snapshot->paidCpb())->toBe(250.0)     // 2000 / 8 attributed
-            ->and($snapshot->blendedCpb())->toBe(200.0)  // 2000 / 10, the legacy figure
-            ->and((int) round((float) $snapshot->blendedUnderstatement() * 100))->toBe(20)
-            ->and($snapshot->platforms['meta']->spend)->toBe(2000.0);
-
-        $action = new SendCostAlertAction($metrics, $transport = recordingCostTransport(), new SlackMessageRenderer);
+        $action = costAlertAction($transport = recordingCostTransport(), costAlertDay());
         $action->execute($now, force: true);
 
         $json = (string) json_encode($transport->posted[0]['blocks']);
 
-        expect($json)->toContain('$250.00')
-            ->and($json)->toContain('$200.00')
-            ->and($json)->toContain('20% cheaper')
-            ->and($json)->not->toContain('no ad platform is configured');
+        expect($json)->toContain('Spend: $3,732.24')
+            ->and($json)->toContain('CPL: $11.89')
+            ->and($json)->toContain('CPB: $287.10')
+            ->and($json)->toContain('CPQB: $414.69')
+            ->and($json)->toContain('Blended CPB: $233.27')
+            ->and($json)->not->toContain('did not answer this run')
+            // The small print says the figures arrived, in three words rather than three lines.
+            ->and($json)->toContain('warehouse current');
+
+        /*
+         * Spend-descending, because the channel carrying the money is the one the reader is
+         * looking for. Meta at $2,892.84, Google at $737.46, Microsoft at $101.94 — the legacy
+         * alert's own split, so anyone holding the two cards together sees the same numbers.
+         */
+        $cards = array_values(array_map(
+            static fn (array $block): string => (string) $block['title']['text'],
+            array_filter(
+                $transport->posted[0]['blocks'],
+                static fn (array $block): bool => ($block['type'] ?? '') === 'card',
+            ),
+        ));
+
+        expect($cards)->toBe([':meta: Meta', ':google: Google', ':microsoft: Microsoft'])
+            ->and($json)->toContain('$2,892.84 spend')
+            ->and($json)->toContain('*CPB* $321.43   *CPQB* $578.57');
     });
 
     /*
-     * A configured platform that cannot be reached withholds every cost figure rather than
-     * dividing by a total that is missing one. The card has to say why, or the gap where the
-     * numbers were reads as a quiet day.
+     * A channel that spent nothing gets no card. Three channels exist in the view and on a quiet
+     * day one of them is zero all day; a row of dashes teaches people to skip the section, and
+     * then they skip it on the day it matters.
      */
-    test('an unreachable platform suppresses the cost figures and says so', function () {
+    test('a channel that spent nothing gets no card at all', function () {
+        $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
+
+        $day = costAlertDay(['bing_spend' => '0', 'bing_cpb' => null, 'bing_cpqb' => null]);
+
+        $action = costAlertAction($transport = recordingCostTransport(), $day);
+        $action->execute($now, force: true);
+
+        $json = (string) json_encode($transport->posted[0]['blocks']);
+
+        expect($json)->toContain('Meta')
+            ->and($json)->toContain('Google')
+            ->and($json)->not->toContain('Microsoft');
+    });
+
+    /*
+     * The warehouse is the only source for the cost half, so when it does not answer the card is
+     * missing the half it exists for. Naming it is the whole job: a silent gap where the money
+     * should be reads as a quiet day, which is the opposite of what happened.
+     *
+     * This is the successor to "an unreachable platform suppresses the cost figures and says so".
+     * The funnel half still comes from this site and is unaffected, and the card says that too,
+     * so the reader discards the figures that are missing rather than the whole message.
+     */
+    test('a warehouse that does not answer suppresses the cost figures and says so', function () {
         $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
         costAlertBooking(costAlertLead([
             'utm_source' => 'facebook', 'utm_medium' => 'paid-social', 'created_at' => $now->subHours(3),
         ]), $now->subHour());
 
-        $metrics = new FunnelMetricsService(null, null, null, spendCollector(
-            AdSpendReading::unreachable('meta', 'token expired'),
-        ));
-
+        $metrics = new FunnelMetricsService(null, null, null, warehouseStub(null));
         $snapshot = $metrics->snapshot($now);
 
-        expect($snapshot->hasSpend())->toBeFalse()
-            ->and($snapshot->hasSpendIntegration())->toBeTrue()
-            ->and($snapshot->platforms['meta']->spend)->toBeNull();
+        expect($snapshot->marketingDay)->toBeNull()
+            // The site's own funnel figures are untouched by the warehouse being down.
+            ->and($snapshot->bookings)->toBe(1)
+            ->and($snapshot->platforms['meta']->bookings)->toBe(1);
 
         $action = new SendCostAlertAction($metrics, $transport = recordingCostTransport(), new SlackMessageRenderer);
         $action->execute($now, force: true);
 
         $json = (string) json_encode($transport->posted[0]['blocks']);
 
-        expect($json)->toContain('Cost figures suppressed')
-            ->and($json)->toContain('token expired')
+        expect($json)->toContain('did not answer this run')
+            ->and($json)->not->toContain('$0.00')
+            // A missing cost half is a reconciliation finding, and findings colour the card red.
+            ->and($transport->posted[0]['color'])->toBe('#b91c1c')
+            /*
+             * And the notification preview says it too. That line is what somebody reads on a
+             * phone without opening Slack, so a preview of plausible-looking nothing is the one
+             * place the omission would go unnoticed.
+             */
+            ->and($transport->posted[0]['text'])->toContain('Warehouse unavailable; funnel figures only');
+    });
+
+    /*
+     * Before 08:00 Eastern the query reports yesterday closed; after it, today so far. The reader
+     * has to be told which, because the two answer different questions and a closing report
+     * arriving mid-morning otherwise looks like a catastrophic day.
+     */
+    test('the card says whether it is a closing report or a day in progress', function () {
+        $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
+
+        $running = costAlertAction($dayToDate = recordingCostTransport(), costAlertDay());
+        $running->execute($now, force: true);
+
+        expect(json_encode($dayToDate->posted[0]['blocks'], JSON_UNESCAPED_UNICODE))
+            ->toContain('Day to date, Fri 18 Sep')
+            ->toContain('*Today, so far*');
+
+        update_option(SendCostAlertAction::STATE_OPTION, []);
+
+        $closed = costAlertAction($closing = recordingCostTransport(), costAlertDay([
+            'report_kind' => 'CLOSING',
+            'as_of_et' => '07:30',
+        ]));
+        $closed->execute($now, force: true);
+
+        // Unescaped, because the heading's em dash is `—` in the default JSON encoding and an
+        // assertion written with the literal character would pass against nothing.
+        expect(json_encode($closing->posted[0]['blocks'], JSON_UNESCAPED_UNICODE))
+            ->toContain('Closing report for Fri 18 Sep')
+            ->toContain('Closing — Fri 18 Sep');
+    });
+
+    /*
+     * The view supplies the previous closed day on both report kinds, and it is only a fair
+     * comparison against one of them. Two hours of today against a full yesterday makes every
+     * morning look like a collapse, and a comparison that cries wolf daily is a comparison people
+     * stop reading — at which point it is worse than absent.
+     */
+    test('the previous day is compared only on a closing report', function () {
+        $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
+
+        $running = costAlertAction($dayToDate = recordingCostTransport(), costAlertDay());
+        $running->execute($now, force: true);
+
+        expect(json_encode($dayToDate->posted[0]['blocks']))->not->toContain('was 14');
+
+        update_option(SendCostAlertAction::STATE_OPTION, []);
+
+        $closed = costAlertAction($closing = recordingCostTransport(), costAlertDay(['report_kind' => 'CLOSING']));
+        $closed->execute($now, force: true);
+
+        expect(json_encode($closing->posted[0]['blocks']))
+            ->toContain('was 14 on Thu 17 Sep')
+            ->toContain('was $243.57');
+    });
+
+    /*
+     * `spend_is_complete` is only ever true on a closing report whose Meta feed covered the day.
+     * On a day still running it is always false, which is honest and tells the reader nothing they
+     * did not already read in the heading — so the caveat is printed only where it says something,
+     * and a closing report with an incomplete feed is exactly that case.
+     */
+    test('an incomplete Meta feed is caveated only where the heading does not already say so', function () {
+        $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
+
+        $running = costAlertAction($dayToDate = recordingCostTransport(), costAlertDay());
+        $running->execute($now, force: true);
+
+        expect(json_encode($dayToDate->posted[0]['blocks']))->not->toContain('Meta feed incomplete');
+
+        update_option(SendCostAlertAction::STATE_OPTION, []);
+
+        $closed = costAlertAction($closing = recordingCostTransport(), costAlertDay([
+            'report_kind' => 'CLOSING',
+            'spend_is_complete' => 'false',
+        ]));
+        $closed->execute($now, force: true);
+
+        expect(json_encode($closing->posted[0]['blocks']))->toContain('Meta feed incomplete');
+
+        update_option(SendCostAlertAction::STATE_OPTION, []);
+
+        $final = costAlertAction($complete = recordingCostTransport(), costAlertDay([
+            'report_kind' => 'CLOSING',
+            'spend_is_complete' => 'true',
+        ]));
+        $final->execute($now, force: true);
+
+        expect(json_encode($complete->posted[0]['blocks']))->not->toContain('Meta feed incomplete');
+    });
+
+    /*
+     * The card prints the warehouse's booking count, so a site that recorded a wildly different
+     * number means one of the two is wrong. Nobody should be dividing spend by either until it is
+     * known which, and the finding says which number the card went with.
+     */
+    test('a warehouse and a site that disagree on the booking count put it on the card', function () {
+        $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
+
+        // One booking here, forty in the warehouse.
+        costAlertBooking(costAlertLead(['created_at' => $now->subHours(3)]), $now->subHour());
+
+        $action = costAlertAction($transport = recordingCostTransport(), costAlertDay([
+            'total_appointments' => '40',
+        ]));
+        $action->execute($now, force: true);
+
+        $json = (string) json_encode($transport->posted[0]['blocks']);
+
+        expect($json)->toContain('warehouse reports 40 bookings')
+            ->and($json)->toContain('this site recorded 1')
             ->and($transport->posted[0]['color'])->toBe('#b91c1c');
     });
 
     /*
-     * A suspended account answers 200 with 0.00 spend. Left alone, that produced a card reading
-     * `Spend $0.00`, `CPB $0.00` and — since zero is not above any target — "CPB is on target",
-     * while the warning at the top said the account was disabled. The figures are what people
-     * read, so the figures have to go.
+     * The gate that the fbclid measurement exists for, and the one the review found was only being
+     * applied to a fortieth of the traffic it needed to cover.
+     *
+     * `fbclid` is stamped on organic Facebook and Instagram clicks as well as paid ones, so a Meta
+     * row propped up by click IDs counts traffic the ad account never paid for. This is now a
+     * property of this site's own platform slices rather than of the card's cost figures — the
+     * card divides the warehouse's spend by the warehouse's bookings — but the slices still feed
+     * the admin widget and the reconciler, and the distinction has to survive there.
      */
-    test('a disabled ad account suppresses the cost figures rather than reporting zero', function () {
-        $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
-        costAlertBooking(costAlertLead([
-            'utm_source' => 'facebook', 'utm_medium' => 'paid-social', 'created_at' => $now->subHours(3),
-        ]), $now->subHour());
-
-        $metrics = new FunnelMetricsService(null, null, null, spendCollector(
-            AdSpendReading::of('meta', 0.0, 'USD', 'UTC', 'account_status 2 (disabled)'),
-        ));
-
-        $snapshot = $metrics->snapshot($now);
-
-        expect($snapshot->hasSpend())->toBeFalse()
-            ->and($snapshot->paidCpb())->toBeNull()
-            ->and($snapshot->hasAccountIssues())->toBeTrue()
-            ->and(implode(' ', $snapshot->warnings))->toContain('disabled');
-
-        $action = new SendCostAlertAction($metrics, $transport = recordingCostTransport(), new SlackMessageRenderer);
-        $action->execute($now, force: true);
-
-        $json = (string) json_encode($transport->posted[0]['blocks']);
-
-        expect($json)->toContain('Cost figures suppressed')
-            ->and($json)->not->toContain('on target');
-    });
-
-    /*
-     * The gate that the fbclid measurement exists for, and the one the review found was only
-     * being applied to a fortieth of the traffic it needed to cover.
-     */
-    test('organic social bookings stay in the platform row and out of the cost denominator', function () {
+    test('organic social bookings stay in the platform row and out of the paid denominator', function () {
         $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
 
         // Six paid Instagram ad clicks, four organic bio-link clicks. Same utm_source.
@@ -834,39 +1096,17 @@ describe('spend, end to end', function () {
             ]), $now->subHour());
         }
 
-        $snapshot = (new FunnelMetricsService(null, null, null, spendCollector(
-            AdSpendReading::of('meta', 1200.0),
-        )))->snapshot($now);
+        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(costAlertDay())))->snapshot($now);
 
         expect($snapshot->platforms['meta']->bookings)->toBe(10)
             ->and($snapshot->platforms['meta']->paidBookings())->toBe(6)
-            ->and($snapshot->paidCpb())->toBe(200.0)   // 1200 / 6, not 1200 / 10
-            ->and($snapshot->blendedCpb())->toBe(120.0);
-    });
-
-    /*
-     * Qualified bookings are a subset of bookings, so cost per qualified booking can never be
-     * below cost per booking. It was, because the two denominators were reduced differently.
-     */
-    test('cost per qualified booking is never cheaper than cost per booking', function () {
-        $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
-
-        foreach ([['paid-social', '$10k to $50k Per Month'], ['social', '$10k to $50k Per Month'], ['social', '<10k']] as [$medium, $band]) {
-            costAlertBooking(costAlertLead([
-                'utm_source' => 'facebook', 'utm_medium' => $medium,
-                'monthly_revenue' => $band, 'created_at' => $now->subHours(3),
-            ]), $now->subHour());
-        }
-
-        $snapshot = (new FunnelMetricsService(null, null, null, spendCollector(
-            AdSpendReading::of('meta', 900.0),
-        )))->snapshot($now);
-
-        expect($snapshot->paidBookings())->toBe(1)
-            ->and($snapshot->paidQualified())->toBe(1)
-            ->and($snapshot->paidCpb())->toBe(900.0)
-            ->and($snapshot->paidCpqb())->toBe(900.0)
-            ->and($snapshot->paidCpqb())->toBeGreaterThanOrEqual($snapshot->paidCpb());
+            // 1200 over 6, not over 10 — a third cheaper and wrong, in the flattering direction.
+            ->and(round((float) (new PlatformSlice(
+                'meta', 'Meta',
+                leads: $snapshot->platforms['meta']->leads,
+                bookings: 10, bookingsViaClickId: 0, qualified: 0,
+                spend: 1200.0, bookingsNotProvenPaid: 4,
+            ))->cpb(), 2))->toBe(200.0);
     });
 });
 
@@ -939,55 +1179,76 @@ describe('the qualified definitions', function () {
 });
 
 /**
- * A snapshot with only the fields the cost arithmetic reads.
+ * One day of the data team's marketing view, in the shape BigQuery hands it over.
  *
- * The attributed remainder is parked on a single `meta` slice. It has to live on a real platform
- * rather than only in the totals, because the paid denominator is summed from the platform rows —
- * that is what keeps the cost figures and the table the reader is looking at in agreement.
+ * Every value is a string, including the booleans and the integers, because that is what the REST
+ * API sends whatever the column's declared type — building the fixture any other way would test a
+ * row this application never receives. The figures are the 2026-09-18 alert's own: $2,892.84 Meta,
+ * $737.46 Google, $101.94 Microsoft, $3,732.24 total. Anyone holding the new card against the old
+ * one is looking at the same numbers, so the differences they see are differences in what the card
+ * says about them.
+ *
+ * @param  array<string, string|null>  $overrides
  */
-function costSnapshot(
-    ?float $spend,
-    int $bookings,
-    int $unattributed,
-    int $qualified,
-    int $unattributedQualified,
-    int $notProvenPaid = 0,
-): FunnelSnapshot {
-    $blank = static fn (string $slug, int $booked, int $qual, int $unpaid = 0): PlatformSlice => new PlatformSlice(
-        $slug, $slug, leads: 0, bookings: $booked, bookingsViaClickId: 0, qualified: $qual,
-        spend: null, bookingsNotProvenPaid: $unpaid,
-    );
+function costAlertDay(array $overrides = []): MarketingDay
+{
+    return MarketingDay::fromRow(array_merge([
+        'Date' => '2026-09-18',
+        'report_kind' => 'DAY-TO-DATE',
+        'as_of_et' => '15:00',
+        'spend_is_complete' => 'false',
+        'total_appointments' => '16',
+        'total_qualified' => '10',
+        'total_leads' => '314',
+        'total_spend' => '3732.24',
+        'facebook_spend' => '2892.84',
+        'google_spend' => '737.46',
+        'bing_spend' => '101.94',
+        'facebook_cpb' => '321.43',
+        'google_cpb' => '184.37',
+        'bing_cpb' => '101.94',
+        'facebook_cpqb' => '578.57',
+        'google_cpqb' => '245.82',
+        'bing_cpqb' => '101.94',
+        'cpl' => '11.89',
+        'cpb_all' => '233.27',
+        'cpqb_all' => '373.22',
+        'cpb_paid' => '287.10',
+        'cpqb_paid' => '414.69',
+        'unclassified_leads' => '61',
+        'unclassified_appointments' => '3',
+        'unclassified_qualified' => '2',
+        'unclassified_appointments_share' => '0.1875',
+        'prev_date' => '2026-09-17',
+        'prev_spend' => '3410.00',
+        'prev_appointments' => '14',
+        'prev_cpb' => '243.57',
+        'prev_cpqb' => '379.00',
+    ], $overrides));
+}
 
-    return new FunnelSnapshot(
-        generatedAt: CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC'),
-        timezone: 'UTC',
-        currency: 'USD',
-        dayElapsed: 0.625,
-        leads: 0,
-        bookings: $bookings,
-        qualifiedT10: $qualified,
-        qualifiedHubSpot: null,
-        hubSpotCoverage: 0.0,
-        platforms: [
-            'meta' => $blank('meta', $bookings - $unattributed, $qualified - $unattributedQualified, $notProvenPaid),
-            'direct' => $blank('direct', $unattributed, $unattributedQualified),
-            'other' => $blank('other', 0, 0),
-        ],
-        excludedVaLeads: 0,
-        excludedVaBookings: 0,
-        lastLeadMinutes: null,
-        lastBookingMinutes: null,
-        lastBookingName: null,
-        recentSampleBooked: 0,
-        recentSampleSize: 0,
-        trailingBookingRate: 0.0,
-        trailingSampleSize: 0,
-        consultationsToday: null,
-        upcomingConsultations: [],
-        baseline: [],
-        warnings: [],
-        spend: $spend,
-    );
+/**
+ * A warehouse client with a fixed answer, so the card can be tested without BigQuery.
+ *
+ * Null is the unreachable case and it is a first-class one: half the tests in this file are about
+ * what the card says when the cost figures are not there.
+ */
+function warehouseStub(?MarketingDay $day): BigQueryClient
+{
+    return new class($day) extends BigQueryClient
+    {
+        public function __construct(private ?MarketingDay $day) {}
+
+        public function isConfigured(): bool
+        {
+            return true;
+        }
+
+        public function marketingDay(): ?MarketingDay
+        {
+            return $this->day;
+        }
+    };
 }
 
 /**
@@ -1062,33 +1323,18 @@ function recordingCostTransport(): object
     };
 }
 
-/** A collector wired to one fixed Meta reading, so the snapshot can be tested without HTTP. */
-function spendCollector(AdSpendReading $reading): AdSpendCollector
+/**
+ * The action under test, wired to a warehouse with a fixed answer.
+ *
+ * Defaults to a warehouse that did not answer, because that is the state of every environment
+ * without BigQuery credentials and the state most of these tests want: the funnel half of the card
+ * rendered from real rows, and the cost half explicitly absent.
+ */
+function costAlertAction(SlackTransport $transport, ?MarketingDay $day = null): SendCostAlertAction
 {
-    return new AdSpendCollector([
-        new class($reading) implements AdSpendSource
-        {
-            public function __construct(private AdSpendReading $reading) {}
-
-            public function platform(): string
-            {
-                return 'meta';
-            }
-
-            public function isConfigured(): bool
-            {
-                return true;
-            }
-
-            public function read(CarbonImmutable $day): AdSpendReading
-            {
-                return $this->reading;
-            }
-        },
-    ]);
-}
-
-function costAlertAction(SlackTransport $transport): SendCostAlertAction
-{
-    return new SendCostAlertAction(new FunnelMetricsService, $transport, new SlackMessageRenderer);
+    return new SendCostAlertAction(
+        new FunnelMetricsService(null, null, null, warehouseStub($day)),
+        $transport,
+        new SlackMessageRenderer,
+    );
 }

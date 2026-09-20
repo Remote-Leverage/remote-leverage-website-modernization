@@ -521,25 +521,98 @@ current data no Google booking is unattributed at all, so this is latent rather 
 
 ---
 
-## 7. The phases from here
+## 7. Where it stands
 
-**Phase 2 — Meta spend. Done, 2026-09-19.** Cheapest access of the three and the largest share of
-spend, 78% in the legacy sample. Real CPB and CPQB for most of the budget, and the paid-versus-blended
-comparison in section 3.1 is now a live figure rather than a historical one. Meta account health came
-with it, because `account_status` was one field away in a call already being made.
+**The cost half comes from the data team's warehouse.** Spend, channel attribution, and the
+booking, lead and qualified counts that divide into them are read from one BigQuery view. The
+activity half — last lead, last booking, booking rate, calendar load, the VA exclusion — still
+comes from this site, because the warehouse knows what was spent and booked and does not know when
+the last lead arrived or how full next Tuesday is.
 
-**Phase 3 — Google spend.** Start the developer token application now; the approval wait is the long
-pole, not the code. The work itself is a second `AdSpendSource` — the contract, the collector, the
-suppression rule and the reconciler findings all exist and are tested, so the new class is the only
-new thing. Google's client IDs are paid-certain, so no `LeadChannel` gate is needed for it.
+### Why, given three working clients were deleted to get here
 
-**Phase 4 — Microsoft.** 2.7% of spend against the heaviest integration of the three: developer
-token, Entra OAuth, and reporting over SOAP. Worth asking whether a scheduled platform report into
-one of the other sources is the better trade before writing a SOAP client for it.
+`MetaInsightsClient`, `GoogleAdsClient` and `MicrosoftAdsClient` were built, tested and then
+removed. They worked. The reason they went is not that the warehouse is more accurate — it may or
+may not be — but that it is what every other report in the business is built on. **A Slack card
+that disagrees with the data team's dashboard is wrong by definition, whichever number is closer
+to the truth.** Two sources for one figure is how that disagreement starts.
 
-**Unscheduled, and worth more than any of it: alert on exception, not only on schedule.** The daily
-card is for reading. A separate, immediate message when CPB breaches its band, a platform stops
-delivering or an account goes unhealthy is for acting.
+The clients also cost seventeen credentials across three platforms, one of which needed Google's
+manual approval, and the Microsoft one was an asynchronous SOAP flow whose figure was always a run
+stale. The warehouse needs one service account.
+
+Worth recording: the view independently separates paid cost from blended — `cpb_paid` against
+`cpb_all` — which is the central correction this rewrite made to the legacy alert. Two analyses
+reaching the same conclusion is the strongest evidence either was right.
+
+| Piece | Where |
+| :--- | :--- |
+| The query, verbatim and owned by the data team | [`resources/sql/marketing-home-daily.sql`](../resources/sql/marketing-home-daily.sql) |
+| Reading it | [`BigQueryClient`](../app/Domains/Marketing/Gateways/BigQueryClient.php) |
+| The row, typed | [`MarketingDay`](../app/Domains/Marketing/Data/MarketingDay.php), [`ChannelDay`](../app/Domains/Marketing/Data/ChannelDay.php) |
+
+### What the view changed about the card
+
+**It reports the right day.** Before 08:00 Eastern the query returns yesterday, closed; after it,
+today so far. The card says which. This alert used to always report today, so the 09:00 send was
+near-empty and told nobody anything.
+
+**The previous-day comparison only prints on a closing report.** The view supplies `prev_d` on both
+kinds, but comparing two hours of today against a full previous day makes every morning look like a
+collapse, and a comparison that cries wolf is one people stop reading.
+
+**The unclassified bucket is the warehouse's definition**, `NOT is_paid_channel` — so organic and
+direct are in it. That is broader than "we failed to attribute this", and it is why the figure
+reads higher than the attribution gap this site used to compute. The card words it as "did not come
+from a paid channel" rather than as a gap.
+
+**Two booking counts, one reported.** This site still counts its own bookings and leads; they are
+no longer printed. `AlertReconciler` compares them against the warehouse's and raises a finding when
+they diverge by more than 25% (floored at 3). Keeping a second opinion and never showing it is the
+point — it is a check, not a figure.
+
+### Getting it running
+
+1. **Create a service account** and put its whole JSON key in `BIGQUERY_CREDENTIALS_JSON` — one
+   secret, raw or base64. Not a private key split across variables: a PEM has newlines in it, and
+   a newline in an ECS task definition value works locally and fails opaquely in production.
+2. **Grant it two roles.** `roles/bigquery.jobUser` on the project the query is billed to, and
+   `roles/bigquery.dataViewer` on the dataset holding the view. Both are needed and neither is
+   enough alone: running a query creates a job, and reading the answer needs the data.
+3. **Set `BIGQUERY_PROJECT_ID`** if the billing project is not the service account's own.
+4. **Set the CPB and CPQB targets**, or the card prints the figures with no verdict.
+
+A note that costs an afternoon if missed: the OAuth scope is `auth/bigquery`, not
+`auth/bigquery.readonly`. The readonly scope is the intuitive choice and does not permit
+`jobs.query`, so a service account using it authenticates perfectly and is refused at the first
+query. Read-only is enforced by IAM, above, which is the right place for it.
+
+**Until the credential is set the alert still runs.** It posts a funnel-only card carrying a red
+finding that names the warehouse as unavailable. That is the designed degradation, not success —
+the half of the card the alert exists for is missing.
+
+### Known risks
+
+The view lives in `rl-data-platform-dev.sandbox_victorluz`. **A dev project and a personal sandbox
+schema can be redefined or dropped by one person, with no deploy and no test**, and the card goes
+blank when that happens. Promoting it to a stable dataset is the single most valuable thing anyone
+could do for this alert's reliability.
+
+The query is duplicated into this repo because the alert has to run it. When the data team changes
+theirs, replace the file wholesale — do not edit it to change a definition, because making the card
+disagree with everything else is worse than being wrong in the same way as everything else.
+
+### Sending one by hand
+
+The dashboard widget has a **Send to Slack now** button, which calls the same action the scheduler
+does with `force: true` — bypassing both the reporting window and the environment gate, because
+those exist to stop the *scheduler* posting when nobody asked. `wp acorn marketing:cost-alert
+--demo` previews the layout with fabricated figures, clearly labelled; `--dry` prints a real run's
+numbers without posting.
+
+### Still unscheduled: alert on exception
+
+The daily card is for reading. A separate, immediate message when CPB breaches its band or the
+warehouse goes quiet is for acting.
 [`AvailabilityHealthMonitor`](../app/Domains/Scheduling/Services/AvailabilityHealthMonitor.php) is
-already the pattern for this and is already tested: alert on entering a worse band, stay quiet
-inside one, keep a repeat for the worst band only.
+already the pattern and is already tested.

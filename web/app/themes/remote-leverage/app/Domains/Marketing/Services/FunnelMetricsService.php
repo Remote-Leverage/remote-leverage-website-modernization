@@ -10,9 +10,9 @@ use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Services\LeadChannel;
 use App\Domains\Lead\Services\LeadPlatform;
 use App\Domains\Lead\Services\LeadQualification;
-use App\Domains\Marketing\Data\AdSpendReading;
 use App\Domains\Marketing\Data\FunnelSnapshot;
 use App\Domains\Marketing\Data\PlatformSlice;
+use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Support\AlertWindow;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
@@ -81,7 +81,7 @@ class FunnelMetricsService
         private readonly ?CalendlyClient $calendly = null,
         private readonly ?CalendlyEventTypeRoleResolver $roles = null,
         private readonly ?AlertReconciler $reconciler = null,
-        private readonly ?AdSpendCollector $spend = null,
+        private readonly ?BigQueryClient $warehouse = null,
     ) {}
 
     /** Where the dashboard widget's copy of the snapshot lives. */
@@ -206,10 +206,13 @@ class FunnelMetricsService
          */
         $leadCount = $this->clientLeads()->whereBetween('created_at', [$fromUtc, $toUtc])->count();
 
-        $collector = $this->spend ?? new AdSpendCollector;
-        $readings = $collector->collect($now);
+        /*
+         * The cost half, from the data team's warehouse rather than from this application.
+         * Null when it cannot be read, which makes the card say so instead of rendering zeros.
+         */
+        $marketingDay = ($this->warehouse ?? new BigQueryClient)->marketingDay();
 
-        $platforms = $this->slice($leads, $bookedLeads, $readings);
+        $platforms = $this->slice($leads, $bookedLeads);
 
         $qualifiedT10 = $bookedLeads->filter(
             static fn (Lead $lead): bool => LeadQualification::isT10($lead)
@@ -245,9 +248,13 @@ class FunnelMetricsService
                 ->where('status', 'booked')
                 ->count(),
             'within_window' => AlertWindow::contains($now),
-            'spend_unreachable' => $collector->unreachable($readings),
-            'account_issues' => $collector->accountIssues($readings),
-            'timezone_mismatches' => $collector->timezoneMismatches($readings, $timezone),
+            /*
+             * The warehouse's booking count against this application's own. They are allowed to
+             * differ a little — different definitions of a booking, different load times — but a
+             * wide gap means one of the two is wrong and the card is reporting the warehouse's.
+             */
+            'warehouse_bookings' => $marketingDay?->appointments,
+            'warehouse_unavailable' => $marketingDay === null,
         ]);
 
         return new FunnelSnapshot(
@@ -275,17 +282,9 @@ class FunnelMetricsService
             baseline: $this->baseline($now),
             warnings: $warnings,
 
-            /*
-             * Null whenever any configured platform could not be reached, not just when none is
-             * configured. A total missing one platform divides bookings by too little spend and
-             * reports a cost per booking that is too low, which is the direction somebody
-             * increases a budget on. See AdSpendCollector::total().
-             */
-            spend: $collector->total($readings),
+            marketingDay: $marketingDay,
 
             unattributedByChannel: $this->unattributedByChannel($bookedLeads),
-            accountIssues: $collector->accountIssues($readings),
-            spendUnreachable: $collector->unreachable($readings),
         );
     }
 
@@ -353,10 +352,9 @@ class FunnelMetricsService
      *
      * @param  Collection<int, Lead>  $leads
      * @param  Collection<int, Lead>  $bookedLeads
-     * @param  array<string, AdSpendReading>  $readings
      * @return array<string, PlatformSlice>
      */
-    private function slice(Collection $leads, Collection $bookedLeads, array $readings = []): array
+    private function slice(Collection $leads, Collection $bookedLeads): array
     {
         $tally = [];
 
@@ -421,10 +419,11 @@ class FunnelMetricsService
                 qualified: $counts['qualified'],
 
                 /*
-                 * A reading that came back unreachable contributes null, not zero — a platform
-                 * we could not ask must not render as a platform that spent nothing.
+                 * No spend on a slice any more. These counts are this application's own view of
+                 * its leads, kept for the reconciler and the admin widget; the money and the
+                 * costs come from the warehouse and are reported from there.
                  */
-                spend: ($readings[$slug] ?? null)?->reachable === true ? $readings[$slug]->spend : null,
+                spend: null,
                 bookingsNotProvenPaid: $counts['not_proven_paid'],
                 qualifiedNotProvenPaid: $counts['qualified_not_proven_paid'],
             );

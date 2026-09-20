@@ -802,13 +802,6 @@ return [
                 'body' => ['type' => 'mrkdwn', 'text' => '{{ platform_6_body }}', 'verbatim' => false],
             ],
             [
-                'type' => 'context',
-                '_when' => ['platform_notes'],
-                'elements' => [
-                    ['type' => 'mrkdwn', 'text' => '{{ platform_notes }}'],
-                ],
-            ],
-            [
                 'type' => 'section',
                 '_when' => ['activity_block'],
                 'text' => ['type' => 'mrkdwn', 'text' => '{{ activity_block }}'],

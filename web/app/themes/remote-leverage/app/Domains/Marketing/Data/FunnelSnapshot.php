@@ -42,8 +42,6 @@ readonly class FunnelSnapshot
      * @param  array<string, float|null>  $baseline  Same-hour averages over the prior N days.
      * @param  array<int, string>  $warnings  Reconciliation findings, empty when everything ties up.
      * @param  array<string, int>  $unattributedByChannel  LeadChannel slug => bookings, highest first.
-     * @param  array<string, string>  $accountIssues  Platform slug => what the platform says is wrong.
-     * @param  array<string, string>  $spendUnreachable  Platform slug => why it could not be read.
      * @param  array<string, int|null>  $upcomingConsultations  "Monday 21st" => meetings, in date order.
      */
     public function __construct(
@@ -76,175 +74,15 @@ readonly class FunnelSnapshot
         public array $upcomingConsultations,
         public array $baseline,
         public array $warnings,
-        public ?float $spend = null,
         public array $unattributedByChannel = [],
-        public array $accountIssues = [],
-        public array $spendUnreachable = [],
+
+        /*
+         * The data team's marketing day: spend, channel attribution, and the booking and lead
+         * counts that divide into them. Null when the warehouse could not be read, which makes the
+         * cost half of the card unavailable rather than wrong.
+         */
+        public ?MarketingDay $marketingDay = null,
     ) {}
-
-    /** Bookings this alert can name a platform for. */
-    public function attributedBookings(): int
-    {
-        return $this->bookings - $this->unattributedBookings();
-    }
-
-    /**
-     * Bookings carrying neither a recognised `utm_source` nor a click ID.
-     *
-     * `direct` and `other` are the two buckets `LeadPlatform` puts those in, and because the
-     * buckets partition the table these two plus the platforms always sum to the total — which
-     * is what lets the message add them up in front of the reader without the rows disagreeing.
-     */
-    public function unattributedBookings(): int
-    {
-        return ($this->platforms['direct']->bookings ?? 0)
-            + ($this->platforms['other']->bookings ?? 0);
-    }
-
-    /** Unattributed bookings as a share of all of them, 0 when nothing booked. */
-    public function unattributedShare(): float
-    {
-        return $this->bookings > 0 ? $this->unattributedBookings() / $this->bookings : 0.0;
-    }
-
-    /**
-     * Bookings a platform can be named for *and* shown to have paid for.
-     *
-     * The denominator every cost figure divides by. Distinct from
-     * {@see self::attributedBookings()}, which answers the platform question and legitimately
-     * includes organic traffic from a platform that also sells ads.
-     */
-    public function paidBookings(): int
-    {
-        $paid = 0;
-
-        foreach ($this->platforms as $slice) {
-            if (in_array($slice->slug, ['direct', 'other'], true)) {
-                continue;
-            }
-
-            $paid += $slice->paidBookings();
-        }
-
-        return $paid;
-    }
-
-    /** Spend over the bookings we can show were paid for. The honest figure. */
-    public function paidCpb(): ?float
-    {
-        return $this->spend !== null && $this->paidBookings() > 0
-            ? $this->spend / $this->paidBookings()
-            : null;
-    }
-
-    /** Spend over every booking, attributed or not. What the legacy alert printed alone. */
-    public function blendedCpb(): ?float
-    {
-        return $this->spend !== null && $this->bookings > 0
-            ? $this->spend / $this->bookings
-            : null;
-    }
-
-    /**
-     * Qualified bookings a platform can be named for *and* shown to have paid for.
-     *
-     * The mirror of {@see self::paidBookings()}, and it has to be, because qualified bookings are
-     * a subset of bookings. Dividing spend by the full qualified count while dividing it by the
-     * reduced booking count printed a cost per qualified booking *below* the cost per booking —
-     * an impossibility, on a card whose entire value is being trustworthy.
-     */
-    public function paidQualified(): int
-    {
-        $paid = 0;
-
-        foreach ($this->platforms as $slice) {
-            if (in_array($slice->slug, ['direct', 'other'], true)) {
-                continue;
-            }
-
-            $paid += $slice->paidQualified();
-        }
-
-        return $paid;
-    }
-
-    /** The qualified equivalent of {@see self::paidCpb()}, on the T10 definition. */
-    public function paidCpqb(): ?float
-    {
-        return $this->spend !== null && $this->paidQualified() > 0
-            ? $this->spend / $this->paidQualified()
-            : null;
-    }
-
-    /** The qualified equivalent of {@see self::blendedCpb()}, on the T10 definition. */
-    public function blendedCpqb(): ?float
-    {
-        return $this->spend !== null && $this->qualifiedT10 > 0
-            ? $this->spend / $this->qualifiedT10
-            : null;
-    }
-
-    /** Qualified bookings this alert can name a platform for. */
-    public function attributedQualified(): int
-    {
-        return $this->qualifiedT10
-            - ($this->platforms['direct']->qualified ?? 0)
-            - ($this->platforms['other']->qualified ?? 0);
-    }
-
-    /**
-     * How much cheaper the blended figure reads than the paid one, as a share.
-     *
-     * The single number that says how much the unattributed bookings are flattering the
-     * headline. Null while there is no spend to divide.
-     */
-    public function blendedUnderstatement(): ?float
-    {
-        $paid = $this->paidCpb();
-        $blended = $this->blendedCpb();
-
-        if ($paid === null || $blended === null || $paid <= 0.0) {
-            return null;
-        }
-
-        return ($paid - $blended) / $paid;
-    }
-
-    /**
-     * Attributed bookings that cannot be shown to be paid.
-     *
-     * In practice: leads reached only through an `fbclid`, whose first-touch data says organic,
-     * social or direct. They stay in the platform rows — Meta really did send them — and stay out
-     * of the cost denominators, because Meta was not paid for them.
-     */
-    public function notProvenPaidBookings(): int
-    {
-        return $this->attributedBookings() - $this->paidBookings();
-    }
-
-    /** Is there a spend total that can be divided by anything? */
-    public function hasSpend(): bool
-    {
-        return $this->spend !== null;
-    }
-
-    /**
-     * Is any ad platform integration actually wired up, working or not?
-     *
-     * Distinct from {@see self::hasSpend()}, which is false both when nothing is connected and
-     * when something is connected but broken. The message says different things in those two
-     * cases: one is a phase not yet built, the other is an incident.
-     */
-    public function hasSpendIntegration(): bool
-    {
-        return $this->spend !== null || $this->spendUnreachable !== [] || $this->accountIssues !== [];
-    }
-
-    /** Does any connected platform report its own account as unhealthy? */
-    public function hasAccountIssues(): bool
-    {
-        return $this->accountIssues !== [];
-    }
 
     /**
      * Platform slices worth printing: the real platforms, in order, that saw anything today.
@@ -259,7 +97,7 @@ readonly class FunnelSnapshot
         return array_values(array_filter(
             $this->platforms,
             static fn (PlatformSlice $slice): bool => ! in_array($slice->slug, ['direct', 'other'], true)
-                && ($slice->leads > 0 || $slice->bookings > 0 || $slice->spend !== null),
+                && ($slice->leads > 0 || $slice->bookings > 0),
         ));
     }
 
@@ -310,12 +148,10 @@ readonly class FunnelSnapshot
             'trailing_sample_size' => $this->trailingSampleSize,
             'consultations_today' => $this->consultationsToday,
             'upcoming_consultations' => $this->upcomingConsultations,
+            'marketing_day' => $this->marketingDay?->toRow(),
             'baseline' => $this->baseline,
             'warnings' => $this->warnings,
-            'spend' => $this->spend,
             'unattributed_by_channel' => $this->unattributedByChannel,
-            'account_issues' => $this->accountIssues,
-            'spend_unreachable' => $this->spendUnreachable,
         ];
     }
 
@@ -360,12 +196,12 @@ readonly class FunnelSnapshot
             trailingSampleSize: (int) ($data['trailing_sample_size'] ?? 0),
             consultationsToday: isset($data['consultations_today']) ? (int) $data['consultations_today'] : null,
             upcomingConsultations: (array) ($data['upcoming_consultations'] ?? []),
+            marketingDay: is_array($data['marketing_day'] ?? null)
+                ? MarketingDay::fromRow($data['marketing_day'])
+                : null,
             baseline: (array) ($data['baseline'] ?? []),
             warnings: (array) ($data['warnings'] ?? []),
-            spend: isset($data['spend']) ? (float) $data['spend'] : null,
             unattributedByChannel: (array) ($data['unattributed_by_channel'] ?? []),
-            accountIssues: (array) ($data['account_issues'] ?? []),
-            spendUnreachable: (array) ($data['spend_unreachable'] ?? []),
         );
     }
 }

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\WordPress\Admin;
 
-use App\Domains\Lead\Services\LeadChannel;
+use App\Domains\Marketing\Actions\SendCostAlertAction;
+use App\Domains\Marketing\Data\ChannelDay;
 use App\Domains\Marketing\Data\FunnelSnapshot;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 
@@ -41,6 +42,48 @@ use App\Domains\Marketing\Services\FunnelMetricsService;
 class MarketingCostAlertWidget
 {
     public function __construct(private readonly FunnelMetricsService $metrics) {}
+
+    /** The `rl_action` value that fires an immediate send. */
+    public const SEND_ACTION = 'rl_send_cost_alert';
+
+    /**
+     * Post today's card to Slack immediately.
+     *
+     * Bound from `MarketingServiceProvider`, which checks the request parameter before resolving
+     * this class — see there for why.
+     *
+     * `force: true`, which bypasses both the reporting window and the environment gate. That is
+     * the point of the button: somebody on staging at 9pm wants to see the real thing, and the
+     * scheduled job will not oblige. The gates exist to stop the *scheduler* posting when nobody
+     * asked; a person clicking a button has asked.
+     *
+     * It deliberately sends to whatever channel is configured rather than anywhere safer. A test
+     * that posts somewhere else is not a test of the thing that will happen.
+     */
+    public function handleSendNow(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_die('You do not have permission to send the marketing cost alert.');
+        }
+
+        check_admin_referer(self::SEND_ACTION);
+
+        try {
+            $sent = app(SendCostAlertAction::class)->execute(force: true);
+            $result = $sent ? 'sent' : 'failed';
+        } catch (\Throwable $e) {
+            Log::error('MarketingCostAlertWidget: manual send failed', ['error' => $e->getMessage()]);
+            $result = 'failed';
+        }
+
+        /*
+         * Back to the dashboard rather than staying on a blank admin-post response. The result
+         * travels in the query string because the alternative is a transient keyed by user, and
+         * the only thing being communicated is one word.
+         */
+        wp_safe_redirect(add_query_arg('rl_cost_alert', $result, admin_url('index.php')));
+        exit;
+    }
 
     /**
      * Mount the card.
@@ -110,6 +153,8 @@ class MarketingCostAlertWidget
 
     private function renderHeadline(FunnelSnapshot $snapshot): void
     {
+        $day = $snapshot->marketingDay;
+
         /*
          * The trailing rate, not today's bookings over today's leads. See funnelLines() in
          * SendCostAlertAction: the same-day ratio looks like a conversion rate, is not one, and
@@ -145,21 +190,19 @@ class MarketingCostAlertWidget
             <div class="rl-dash-kpi-card">
                 <div class="rl-dash-kpi-header"><span class="rl-dash-kpi-label">Cost per booking</span></div>
                 <div class="rl-dash-kpi-number">
-                    <?php echo esc_html($snapshot->hasSpend() ? $this->money($snapshot->paidCpb(), $snapshot->currency) : '&mdash;'); ?>
+                    <?php echo esc_html($day?->cpbPaid === null ? '&mdash;' : $this->money($day->cpbPaid, $snapshot->currency)); ?>
                 </div>
                 <div class="rl-dash-kpi-meta">
                     <?php
                     /*
-                     * Phase 1 has no ad platform read integration, so this tile has no number to
-                     * show. It is still rendered, with the reason, rather than hidden: a missing
-                     * tile reads as a metric nobody tracks, and a dash with an explanation reads
-                     * as one that is coming.
+                     * Rendered with a dash and a reason rather than hidden when there is nothing
+                     * to show: a missing tile reads as a metric nobody tracks, where a dash with
+                     * an explanation reads as one that is temporarily unavailable.
                      */
                     echo esc_html(match (true) {
-                        $snapshot->hasSpend() => 'Paid, attributed bookings only',
-                        $snapshot->spendUnreachable !== [] => 'Suppressed: '
-                            .implode(', ', array_keys($snapshot->spendUnreachable)).' did not answer',
-                        default => 'No ad platform connected yet',
+                        $day === null => 'Warehouse did not answer',
+                        $day->cpbPaid === null => 'No paid bookings yet',
+                        default => 'Paid channels, from the warehouse',
                     });
         ?>
                 </div>
@@ -169,106 +212,66 @@ class MarketingCostAlertWidget
     }
 
     /**
-     * The attribution gap, then the per-platform table.
+     * What did not come from paid, then the channel table.
      *
-     * The gap gets its own line above the table because it is the number that decides whether
-     * the table is worth reading, and in the alert this replaces it was a footnote underneath.
+     * Both from the warehouse. This site's own attribution still exists — the reconciler uses it
+     * — but reporting one system's spend against another's bookings is not a measurement of
+     * anything, so the table is the warehouse's throughout.
      */
     private function renderPlatforms(FunnelSnapshot $snapshot): void
     {
-        $slices = $snapshot->reportablePlatforms();
+        $day = $snapshot->marketingDay;
 
-        if ($snapshot->bookings > 0 && $snapshot->unattributedBookings() > 0) {
-            $channels = [];
+        if ($day === null) {
+            echo '<p class="rl-dash-kpi-meta">The marketing warehouse did not answer, so spend and the '
+                .'channel breakdown are unavailable. The figures above come from this site.</p>';
 
-            foreach ($snapshot->unattributedByChannel as $channel => $count) {
-                $channels[] = $count.' '.LeadChannel::label($channel);
-            }
+            return;
+        }
+
+        if ($day->unclassifiedAppointments > 0) {
             ?>
             <p class="rl-dash-kpi-meta" style="margin:0 0 10px;">
-                <strong><?php echo esc_html((string) $snapshot->unattributedBookings()); ?></strong>
-                of <?php echo esc_html((string) $snapshot->bookings); ?> bookings
-                (<?php echo esc_html(number_format($snapshot->unattributedShare() * 100, 1)); ?>%)
-                carry no platform &mdash; no recognised UTM and no click ID. They are in the totals above
-                and in none of the rows below.
-                <?php if ($channels !== []) { ?>
-                    First-touch data says these were: <?php echo esc_html(implode(', ', $channels)); ?>.
+                <strong><?php echo esc_html((string) $day->unclassifiedAppointments); ?></strong>
+                of <?php echo esc_html((string) $day->appointments); ?> bookings
+                <?php if ($day->unclassifiedShare !== null) { ?>
+                    (<?php echo esc_html(number_format($day->unclassifiedShare * 100, 1)); ?>%)
                 <?php } ?>
+                did not come from a paid channel. Organic and direct are in that figure, so it is
+                broader than bookings this site failed to attribute.
             </p>
             <?php
         }
 
-        if ($slices === []) {
+        $channels = array_filter(
+            $day->channels,
+            static fn (ChannelDay $channel): bool => $channel->isActive(),
+        );
+
+        if ($channels === []) {
             return;
         }
 
-        $withSpend = $snapshot->hasSpend();
-        $viaClickId = 0;
-        $smallSample = false;
-
+        usort(
+            $channels,
+            static fn (ChannelDay $a, ChannelDay $b): int => ($b->spend ?? 0.0) <=> ($a->spend ?? 0.0),
+        );
         ?>
         <table class="rl-dash-table">
             <thead>
-                <tr>
-                    <th>Platform</th>
-                    <th>Leads</th>
-                    <th>Booked</th>
-                    <th>Qualified</th>
-                    <?php if ($withSpend) { ?>
-                        <th>Spend</th>
-                        <th>CPB</th>
-                        <th>CPQB</th>
-                    <?php } ?>
-                </tr>
+                <tr><th>Channel</th><th>Spend</th><th>CPB</th><th>CPQB</th></tr>
             </thead>
             <tbody>
-                <?php foreach ($slices as $slice) {
-                    $viaClickId += $slice->bookingsViaClickId;
-                    $smallSample = $smallSample || $slice->isSmallSample();
-                    ?>
+                <?php foreach ($channels as $channel) { ?>
                     <tr>
-                        <td><?php echo esc_html($slice->label); ?></td>
-                        <td><?php echo esc_html((string) $slice->leads); ?></td>
-                        <td>
-                            <?php echo esc_html((string) $slice->bookings); ?>
-                            <?php if ($slice->isSmallSample()) { ?>
-                                <span title="Too few bookings for the cost figures to be a rate">*</span>
-                            <?php } ?>
-                            <?php if ($slice->bookingsNotProvenPaid > 0) { ?>
-                                <span class="rl-dash-kpi-meta" title="Reached only through an fbclid, which Facebook stamps on organic links too. Counted here, kept out of the cost per booking.">
-                                    (<?php echo esc_html((string) $slice->paidBookings()); ?> paid)
-                                </span>
-                            <?php } ?>
-                        </td>
-                        <td><?php echo esc_html((string) $slice->qualified); ?></td>
-                        <?php if ($withSpend) { ?>
-                            <td><?php echo esc_html($this->money($slice->spend, $snapshot->currency)); ?></td>
-                            <td><?php echo esc_html($this->money($slice->cpb(), $snapshot->currency)); ?></td>
-                            <td><?php echo esc_html($this->money($slice->cpqb(), $snapshot->currency)); ?></td>
-                        <?php } ?>
+                        <td><?php echo esc_html(ucfirst($channel->slug)); ?></td>
+                        <td><?php echo esc_html($this->money($channel->spend, $snapshot->currency)); ?></td>
+                        <td><?php echo esc_html($this->money($channel->cpb, $snapshot->currency)); ?></td>
+                        <td><?php echo esc_html($this->money($channel->cpqb, $snapshot->currency)); ?></td>
                     </tr>
                 <?php } ?>
             </tbody>
         </table>
-
-        <?php if ($smallSample) { ?>
-            <p class="rl-dash-kpi-meta" style="margin-top:8px;">
-                * Fewer than <?php echo esc_html((string) config('marketing.cost_alert.small_sample', 3)); ?>
-                bookings. One booking either way moves this a long way, so read it as a count, not a rate.
-            </p>
-        <?php } ?>
-
-        <?php if ($viaClickId > 0) { ?>
-            <p class="rl-dash-kpi-meta" style="margin-top:6px;">
-                <?php echo esc_html((string) $viaClickId); ?> of these bookings were attributed by a click ID
-                rather than a UTM tag.
-                <?php if ($snapshot->notProvenPaidBookings() > 0) { ?>
-                    <?php echo esc_html((string) $snapshot->notProvenPaidBookings()); ?> of them are kept out
-                    of the cost per booking: they were reached only through an <code>fbclid</code>, which
-                    Facebook stamps on organic links too, and the first-touch data does not say they were paid.
-                <?php } ?>
-            </p>
-        <?php } ?>
         <?php
     }
 
@@ -284,7 +287,25 @@ class MarketingCostAlertWidget
                 .($snapshot->lastBookingName !== null ? $snapshot->lastBookingName.', ' : '')
                 .$this->duration($snapshot->lastBookingMinutes).' ago';
 
+        $result = sanitize_text_field((string) ($_GET['rl_cost_alert'] ?? ''));
         ?>
+        <?php if ($result !== '') { ?>
+            <p class="rl-dash-kpi-meta" style="margin-top:12px;color:<?php echo $result === 'sent' ? '#15803d' : '#b91c1c'; ?> !important;">
+                <?php echo $result === 'sent'
+                    ? 'Posted to Slack. It replaces today&rsquo;s card rather than adding another.'
+                    : 'Slack rejected the message, or the alert is switched off. See the error log.'; ?>
+            </p>
+        <?php } ?>
+
+        <form method="post" action="<?php echo esc_url(admin_url('index.php')); ?>" style="margin-top:12px;">
+            <?php wp_nonce_field(self::SEND_ACTION); ?>
+            <input type="hidden" name="rl_action" value="<?php echo esc_attr(self::SEND_ACTION); ?>" />
+            <button type="submit" class="button button-secondary">Send to Slack now</button>
+            <span class="rl-dash-kpi-meta" style="margin-left:8px;">
+                Posts these figures immediately, ignoring the reporting window and the environment gate.
+            </span>
+        </form>
+
         <p class="rl-dash-kpi-meta" style="margin-top:12px;border-top:1px solid #f4f4f5;padding-top:10px;">
             <?php echo esc_html(ucfirst($lastLead)); ?> &middot; <?php echo esc_html($lastBooking); ?><br>
             <?php if ($snapshot->excludedVaLeads > 0 || $snapshot->excludedVaBookings > 0) { ?>
