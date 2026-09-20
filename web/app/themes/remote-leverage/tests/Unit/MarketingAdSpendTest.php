@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Marketing\Data\MarketingDay;
 use App\Domains\Marketing\Gateways\BigQueryClient;
+use App\Domains\Marketing\Support\WarehouseOAuth;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
@@ -348,6 +350,114 @@ describe('the warehouse row', function () {
     });
 });
 
+describe('signing in with Google', function () {
+    beforeEach(function () {
+        update_option(LeadSettingsService::OPTION_KEY, []);
+        config([
+            'marketing.warehouse.client_id' => '',
+            'marketing.warehouse.client_secret' => '',
+            'marketing.warehouse.refresh_token' => '',
+        ]);
+    });
+
+    test('no sign-in button until an OAuth client exists', function () {
+        expect(WarehouseOAuth::isReady())->toBeFalse();
+
+        config(['marketing.warehouse.client_id' => 'cid', 'marketing.warehouse.client_secret' => 'secret']);
+
+        expect(WarehouseOAuth::isReady())->toBeTrue();
+    });
+
+    /*
+     * Google issues a refresh token only on the FIRST consent for a client and account. Without
+     * `access_type=offline` there is none at all, and without `prompt=consent` an admin who has
+     * authorised before gets an access token only — and the connection appears to work until the
+     * hour is up.
+     */
+    test('the consent URL asks for a refresh token every time', function () {
+        config(['marketing.warehouse.client_id' => 'cid', 'marketing.warehouse.client_secret' => 'secret']);
+
+        $url = WarehouseOAuth::authorizationUrl();
+
+        expect($url)->toContain('access_type=offline')
+            ->and($url)->toContain('prompt=consent')
+            ->and($url)->toContain(rawurlencode('https://www.googleapis.com/auth/bigquery'))
+            ->and($url)->not->toContain('bigquery.readonly')
+            ->and($url)->toContain('state=');
+    });
+
+    /*
+     * The callback arrives from Google, not from wp-admin, so there is no referer to check and
+     * `state` is the only CSRF guard. It has to be verified before the code is spent, because
+     * exchanging it is the irreversible half.
+     */
+    test('a callback with a bad state is refused without calling Google', function () {
+        Http::fake();
+        config(['marketing.warehouse.client_id' => 'cid', 'marketing.warehouse.client_secret' => 'secret']);
+
+        $_GET = ['state' => 'forged', 'code' => 'abc'];
+
+        expect(WarehouseOAuth::completeFromRequest())->toContain('could not be verified');
+        Http::assertNothingSent();
+
+        $_GET = [];
+    });
+
+    test('a successful exchange stores the refresh token and the account', function () {
+        config(['marketing.warehouse.client_id' => 'cid', 'marketing.warehouse.client_secret' => 'secret']);
+
+        Http::fake(function (Request $request) {
+            if (str_contains($request->url(), 'openidconnect')) {
+                return Http::response(['email' => 'lucas@remoteleverage.com'], 200);
+            }
+
+            return Http::response(['refresh_token' => 'refresh-1', 'access_token' => 'ya29'], 200);
+        });
+
+        $_GET = ['state' => wp_create_nonce(WarehouseOAuth::CALLBACK_ACTION), 'code' => 'abc'];
+
+        expect(WarehouseOAuth::completeFromRequest())->toBe('')
+            ->and(WarehouseOAuth::isConnected())->toBeTrue()
+            ->and(WarehouseOAuth::connectedAccount())->toBe('lucas@remoteleverage.com');
+
+        $_GET = [];
+    });
+
+    /*
+     * A consent that returns an access token and no refresh token leaves the alert working for an
+     * hour and then silently failing. It has to be reported as a failure now, not discovered later.
+     */
+    test('an exchange with no refresh token is a failure', function () {
+        config(['marketing.warehouse.client_id' => 'cid', 'marketing.warehouse.client_secret' => 'secret']);
+
+        Http::fake(fn () => Http::response(['access_token' => 'ya29'], 200));
+
+        $_GET = ['state' => wp_create_nonce(WarehouseOAuth::CALLBACK_ACTION), 'code' => 'abc'];
+
+        expect(WarehouseOAuth::completeFromRequest())->toContain('no refresh token')
+            ->and(WarehouseOAuth::isConnected())->toBeFalse();
+
+        $_GET = [];
+    });
+
+    /* The token is written by the flow and by nothing on the form, so a save must not clear it. */
+    test('saving the settings screen does not wipe a stored token', function () {
+        config(['marketing.warehouse.client_id' => 'cid', 'marketing.warehouse.client_secret' => 'secret']);
+
+        Http::fake(fn () => Http::response(['refresh_token' => 'refresh-1', 'access_token' => 'ya29'], 200));
+        $_GET = ['state' => wp_create_nonce(WarehouseOAuth::CALLBACK_ACTION), 'code' => 'abc'];
+        WarehouseOAuth::completeFromRequest();
+        $_GET = [];
+
+        (new LeadSettingsService)->save([
+            'retention_days' => 30,
+            'notification_emails' => '',
+        ]);
+
+        expect(WarehouseOAuth::isConnected())->toBeTrue();
+    });
+});
+
 describe('the BigQuery client', function () {
     /*
      * The REST response separates the schema from the row: values come back as a positional list
@@ -451,5 +561,65 @@ describe('the BigQuery client', function () {
         expect((new BigQueryClient)->isConfigured())->toBeFalse();
 
         Http::assertNothingSent();
+    });
+
+    /*
+     * Lucas's existing automation authenticates as a user, not a service account — so the client
+     * has to take either. `type` decides which grant is sent; nothing is configured to say so.
+     */
+    test('a user credential uses a refresh-token grant, not a signed assertion', function () {
+        Cache::forget('rl_bigquery_access_token');
+
+        config([
+            'marketing.warehouse.credentials' => '',
+            'marketing.warehouse.client_id' => 'cid.apps.googleusercontent.com',
+            'marketing.warehouse.client_secret' => 'secret',
+            'marketing.warehouse.refresh_token' => 'refresh',
+        ]);
+        config(['marketing.warehouse.project_id' => 'rl-data-platform-dev']);
+
+        Http::fake(function (Request $request) {
+            if (str_contains($request->url(), 'oauth2.googleapis.com')) {
+                return Http::response(['access_token' => 'ya29-user'], 200);
+            }
+
+            return Http::response([
+                'jobComplete' => true,
+                'schema' => ['fields' => [['name' => 'total_spend']]],
+                'rows' => [['f' => [['v' => '3732.24']]]],
+            ], 200);
+        });
+
+        expect((new BigQueryClient)->isConfigured())->toBeTrue()
+            ->and((new BigQueryClient)->marketingDay()?->spend)->toBe(3732.24);
+
+        Http::assertSent(function (Request $request) {
+            if (! str_contains($request->url(), 'oauth2.googleapis.com')) {
+                return true;
+            }
+
+            $body = (string) $request->body();
+
+            return str_contains($body, 'grant_type=refresh_token')
+                && ! str_contains($body, 'jwt-bearer');
+        });
+    });
+
+    /* A half-filled OAuth credential is not a credential. */
+    test('an incomplete OAuth trio is unconfigured', function () {
+        config([
+            'marketing.warehouse.credentials' => '',
+            'marketing.warehouse.client_id' => 'cid',
+            'marketing.warehouse.client_secret' => 'secret',
+            'marketing.warehouse.refresh_token' => '',
+        ]);
+
+        expect((new BigQueryClient)->isConfigured())->toBeFalse();
+    });
+
+    test('a service account key with no private key is unconfigured', function () {
+        config(['marketing.warehouse.credentials' => json_encode(['type' => 'service_account', 'client_email' => 'a@b'])]);
+
+        expect((new BigQueryClient)->isConfigured())->toBeFalse();
     });
 });

@@ -786,10 +786,25 @@ if (! function_exists('sanitize_key')) {
     }
 }
 
+if (! function_exists('wp_create_nonce')) {
+    function wp_create_nonce($action = -1)
+    {
+        return 'nonce-'.$action;
+    }
+}
+
 if (! function_exists('wp_verify_nonce')) {
+    /*
+     * Actually verifies, rather than always returning true.
+     *
+     * It used to return true unconditionally, which is fine for the call sites that only need the
+     * function to exist — but it makes a test of a CSRF guard assert nothing. The OAuth callback
+     * arrives from Google with no referer to check, so `state` is the only guard it has, and a
+     * test that cannot fail is worse than no test there.
+     */
     function wp_verify_nonce($nonce, $action = -1)
     {
-        return true;
+        return $nonce === wp_create_nonce($action);
     }
 }
 

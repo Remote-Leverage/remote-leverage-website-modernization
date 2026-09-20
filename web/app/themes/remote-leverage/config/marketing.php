@@ -234,7 +234,23 @@ return [
          * a newline in an ECS task definition value works locally and produces an opaque OpenSSL
          * error in production.
          */
+        /*
+         * A service account key, which genuinely is a JSON file you download from Google. Raw or
+         * base64, because a task definition that mangles quoting is a real thing.
+         */
         'credentials' => (string) env('BIGQUERY_CREDENTIALS_JSON', ''),
+
+        /*
+         * Or a user's OAuth credential, as three values.
+         *
+         * Not a JSON blob, because nobody has one: an OAuth flow hands back a client id, a secret
+         * and a refresh token, and the only way to get them as a file is
+         * `gcloud auth application-default login` on a machine. An existing automation holds them
+         * as three fields in whatever runs it, which is how they should be pasted here too.
+         */
+        'client_id' => (string) env('BIGQUERY_CLIENT_ID', ''),
+        'client_secret' => (string) env('BIGQUERY_CLIENT_SECRET', ''),
+        'refresh_token' => (string) env('BIGQUERY_REFRESH_TOKEN', ''),
 
         /*
          * The project the query is billed to. Defaults to the service account's own project,

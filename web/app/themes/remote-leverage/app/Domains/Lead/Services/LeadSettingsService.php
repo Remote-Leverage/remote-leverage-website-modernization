@@ -71,6 +71,26 @@ class LeadSettingsService
              * an MCC and approves it by hand and the wait is days. Merged in from
              * AdPlatformCredentials so a credential added there does not need a second edit here.
              */
+            /*
+             * The marketing warehouse. Either shape of Google credential JSON, whole.
+             *
+             * Settable here as well as by environment for the reason SlackCredentials explains:
+             * ECS maps Secrets Manager keys to environment variables one at a time, so a newly
+             * added credential cannot reach staging any other way until that changes. The env
+             * value still wins.
+             */
+            'bigquery_credentials_json' => '',
+            'bigquery_client_id' => '',
+            'bigquery_client_secret' => '',
+            'bigquery_refresh_token' => '',
+            'bigquery_connected_email' => '',
+            'bigquery_project_id' => '',
+
+            /*
+             * Ad platform read credentials. Nothing consumes these since the warehouse landed and
+             * the three clients were deleted; kept so any already stored are not silently dropped
+             * on the next save.
+             */
             ...self::adCredentialDefaults(),
 
             /*
@@ -212,6 +232,16 @@ class LeadSettingsService
             'slack_signing_secret' => $keep('slack_signing_secret'),
             'slack_webhook_url' => $this->sanitizeUrl($keep('slack_webhook_url')),
             'lead_webhook_url' => $this->sanitizeUrl($keep('lead_webhook_url')),
+            'bigquery_credentials_json' => $keep('bigquery_credentials_json'),
+            'bigquery_client_id' => $keep('bigquery_client_id'),
+            'bigquery_client_secret' => $keep('bigquery_client_secret'),
+            /*
+             * Written by the Google sign-in, never by the form — so `$keep` is exactly right:
+             * saving the settings screen must not blank a token nothing on it can set.
+             */
+            'bigquery_refresh_token' => $keep('bigquery_refresh_token'),
+            'bigquery_connected_email' => $keep('bigquery_connected_email'),
+            'bigquery_project_id' => $keep('bigquery_project_id'),
         ];
 
         /*

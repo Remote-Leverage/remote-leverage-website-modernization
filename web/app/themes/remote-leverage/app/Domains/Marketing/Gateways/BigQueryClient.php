@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Marketing\Gateways;
 
+use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Marketing\Data\MarketingDay;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -20,10 +21,15 @@ use Illuminate\Support\Facades\Log;
  *
  * ## Authentication
  *
- * A service account, signed locally. The flow is a self-signed JWT exchanged for an access token
- * — `openssl_sign` with the key from the service account JSON, posted to Google's token endpoint.
- * The official SDK would do this too, and would bring in `google/cloud-bigquery`, gRPC and a
- * transport layer to run one query an hour.
+ * Either a service account key or a user's OAuth credential, whichever `BIGQUERY_CREDENTIALS_JSON`
+ * holds — they are both Google credential JSON and both carry a `type`, so nothing has to be
+ * configured to say which. A service account is signed locally into a JWT and exchanged; a user
+ * credential is a plain refresh-token grant.
+ *
+ * Both are supported because the credential that exists is not always the one you would choose. A
+ * service account is the right thing for an unattended job and is what should end up here. A user
+ * credential ties the alert to a person: it dies when they leave, change their password or revoke
+ * the grant, and it carries whatever else that account can reach.
  *
  * The whole credential is one JSON blob in one secret rather than a private key split across
  * environment variables. A PEM has newlines in it, and a newline in an ECS task definition value
@@ -152,10 +158,16 @@ class BigQueryClient
     }
 
     /**
-     * An access token for the service account.
+     * An access token, from whichever credential shape was supplied.
      *
-     * Self-signed JWT, exchanged. Cached just under its hour, and a cached empty string is
-     * ignored rather than trusted — that would authenticate nothing for fifty minutes.
+     * Two are accepted because the credential that exists is not always the one you would choose.
+     * A `service_account` key is the right thing for an unattended job; an `authorized_user` is
+     * what `gcloud auth application-default login` writes and what an existing automation is
+     * likely to already have. Both are valid Google credential JSON and both carry a `type`, so
+     * nothing has to be configured to say which is which.
+     *
+     * Cached just under its hour, and a cached empty string is ignored rather than trusted —
+     * that would authenticate nothing for fifty minutes.
      */
     private function accessToken(): string
     {
@@ -168,21 +180,34 @@ class BigQueryClient
         $credentials = $this->credentials();
 
         if ($credentials === null) {
-            throw new \RuntimeException('no service account credentials configured');
+            throw new \RuntimeException('no BigQuery credentials configured');
         }
 
         $response = Http::asForm()
             ->timeout(self::TIMEOUT_SECONDS)
-            ->post(self::TOKEN_ENDPOINT, [
-                'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-                'assertion' => $this->assertion($credentials),
-            ]);
+            ->post(self::TOKEN_ENDPOINT, $this->isServiceAccount($credentials)
+                ? [
+                    'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                    'assertion' => $this->assertion($credentials),
+                ]
+                : [
+                    'grant_type' => 'refresh_token',
+                    'client_id' => $credentials['client_id'] ?? '',
+                    'client_secret' => $credentials['client_secret'] ?? '',
+                    'refresh_token' => $credentials['refresh_token'] ?? '',
+                ]);
 
         $token = (string) ($response->json('access_token') ?? '');
 
         if (! $response->successful() || $token === '') {
+            /*
+             * On a user credential `invalid_scope` here means the refresh token was minted
+             * without `auth/bigquery` — it will have been granted for whatever the original
+             * automation needed, and reading a view is not implied by that.
+             */
             throw new \RuntimeException(sprintf(
-                'token exchange failed: %s',
+                '%s token exchange failed: %s',
+                $this->isServiceAccount($credentials) ? 'service account' : 'user',
                 $response->json('error_description') ?? $response->json('error') ?? 'HTTP '.$response->status(),
             ));
         }
@@ -190,6 +215,24 @@ class BigQueryClient
         Cache::put(self::TOKEN_CACHE_KEY, $token, self::TOKEN_TTL_SECONDS);
 
         return $token;
+    }
+
+    /**
+     * Is this a service account key, or a user's OAuth credential?
+     *
+     * `type` decides it, falling back to the presence of a private key — a credential hand-built
+     * from three values may not carry the field Google would have written.
+     *
+     * @param  array<string, mixed>  $credentials
+     */
+    private function isServiceAccount(array $credentials): bool
+    {
+        if (($credentials['type'] ?? '') === 'service_account') {
+            return true;
+        }
+
+        return ($credentials['type'] ?? '') === ''
+            && trim((string) ($credentials['private_key'] ?? '')) !== '';
     }
 
     /**
@@ -230,21 +273,51 @@ class BigQueryClient
     }
 
     /**
-     * The service account, decoded.
+     * The credential, whichever way it was supplied.
      *
-     * Accepts the raw JSON or a base64 blob of it — a task definition that mangles quoting is a
-     * real thing, and base64 is the usual escape hatch.
+     * A service account arrives as the JSON file Google gives you. A user credential arrives as
+     * three separate values, because that is what an OAuth flow actually hands back — there is no
+     * JSON to download, and expecting somebody to hand-assemble one was the wrong ask.
+     *
+     * The three-value form is assembled into the same shape here so everything downstream sees
+     * one thing.
      *
      * @return array<string, mixed>|null
      */
     private function credentials(): ?array
     {
-        $raw = trim((string) config('marketing.warehouse.credentials', ''));
+        $json = $this->setting('marketing.warehouse.credentials', 'bigquery_credentials_json');
 
-        if ($raw === '') {
+        if ($json !== '') {
+            return $this->decodeServiceAccount($json);
+        }
+
+        $clientId = $this->setting('marketing.warehouse.client_id', 'bigquery_client_id');
+        $clientSecret = $this->setting('marketing.warehouse.client_secret', 'bigquery_client_secret');
+        $refreshToken = $this->setting('marketing.warehouse.refresh_token', 'bigquery_refresh_token');
+
+        if ($clientId === '' || $clientSecret === '' || $refreshToken === '') {
             return null;
         }
 
+        return [
+            'type' => 'authorized_user',
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'refresh_token' => $refreshToken,
+        ];
+    }
+
+    /**
+     * A service account key, decoded.
+     *
+     * Base64 is accepted as well as raw JSON: a private key is multi-line, and a task definition
+     * or a copy-paste that mangles it is common enough to be worth the escape hatch.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function decodeServiceAccount(string $raw): ?array
+    {
         if (! str_starts_with($raw, '{')) {
             $decoded = base64_decode($raw, true);
             $raw = $decoded === false ? $raw : $decoded;
@@ -252,8 +325,14 @@ class BigQueryClient
 
         $credentials = json_decode($raw, true);
 
-        if (! is_array($credentials) || ($credentials['private_key'] ?? '') === '') {
-            Log::warning('BigQueryClient: the service account credential is not usable JSON');
+        if (! is_array($credentials)) {
+            Log::warning('BigQueryClient: the service account key is not usable JSON');
+
+            return null;
+        }
+
+        if (trim((string) ($credentials['private_key'] ?? '')) === '') {
+            Log::warning('BigQueryClient: the service account key carries no private key');
 
             return null;
         }
@@ -263,14 +342,17 @@ class BigQueryClient
 
     private function projectId(): string
     {
-        $configured = trim((string) config('marketing.warehouse.project_id', ''));
+        $configured = $this->setting('marketing.warehouse.project_id', 'bigquery_project_id');
 
         if ($configured !== '') {
             return $configured;
         }
 
-        // The service account's own project is the right default for billing the query.
-        return (string) ($this->credentials()['project_id'] ?? '');
+        /*
+         * A service account key names its project; a user credential usually does not, which is
+         * why BIGQUERY_PROJECT_ID exists and is required in that case.
+         */
+        return (string) ($this->credentials()['project_id'] ?? $this->credentials()['quota_project_id'] ?? '');
     }
 
     /** The data team's query, kept verbatim in a file of its own. */
@@ -283,6 +365,29 @@ class BigQueryClient
         }
 
         return (string) file_get_contents($path);
+    }
+
+    /**
+     * Environment first, admin setting second.
+     *
+     * The same precedence `SlackCredentials` and `HubSpotGateway` use, and for the same reason:
+     * ECS maps Secrets Manager keys to environment variables one at a time, so a newly added
+     * credential cannot reach staging any other way until that changes. The Lead settings blob is
+     * in the environment sync whitelist, which is what lets one be set locally and pushed.
+     */
+    private function setting(string $configKey, string $settingKey): string
+    {
+        $fromEnvironment = trim((string) (config($configKey) ?? ''));
+
+        if ($fromEnvironment !== '') {
+            return $fromEnvironment;
+        }
+
+        if (! class_exists(LeadSettingsService::class)) {
+            return '';
+        }
+
+        return trim((string) ((new LeadSettingsService)->get()[$settingKey] ?? ''));
     }
 
     /** @param mixed $body */

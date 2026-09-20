@@ -573,16 +573,23 @@ point — it is a check, not a figure.
 
 ### Getting it running
 
-1. **Create a service account** and put its whole JSON key in `BIGQUERY_CREDENTIALS_JSON` — one
-   secret, raw or base64. Not a private key split across variables: a PEM has newlines in it, and
-   a newline in an ECS task definition value works locally and fails opaquely in production.
-2. **Grant it two roles.** `roles/bigquery.jobUser` on the project the query is billed to, and
-   `roles/bigquery.dataViewer` on the dataset holding the view. Both are needed and neither is
-   enough alone: running a query creates a job, and reading the answer needs the data.
-3. **Set `BIGQUERY_PROJECT_ID`** if the billing project is not the service account's own.
-4. **Set the CPB and CPQB targets**, or the card prints the figures with no verdict.
+`BIGQUERY_CREDENTIALS_JSON` takes **either** shape of Google credential JSON, raw or base64. One
+secret either way — not a private key split across variables, because a PEM has newlines in it and
+a newline in an ECS task definition value works locally and fails opaquely in production.
 
-A note that costs an afternoon if missed: the OAuth scope is `auth/bigquery`, not
+**A service account** (`"type": "service_account"`) is what should end up here. It needs
+`roles/bigquery.jobUser` on the billing project and `roles/bigquery.dataViewer` on the dataset —
+both, because running a query creates a job and reading the answer needs the data.
+
+**A user credential** (`"type": "authorized_user"` — client id, secret and refresh token, as
+`gcloud auth application-default login` writes) also works, and is usually what an existing
+automation already has. It is a stopgap: it ties the alert to a person, so it dies when they leave,
+change their password or revoke the grant, and it carries whatever else that account can reach. Set
+`BIGQUERY_PROJECT_ID` alongside it, since a user credential does not name a project.
+
+Also set the CPB and CPQB targets, or the card prints the figures with no verdict.
+
+A note that costs an afternoon if missed, on either credential: the scope is `auth/bigquery`, not
 `auth/bigquery.readonly`. The readonly scope is the intuitive choice and does not permit
 `jobs.query`, so a service account using it authenticates perfectly and is refused at the first
 query. Read-only is enforced by IAM, above, which is the right place for it.

@@ -17,7 +17,7 @@ use App\Domains\Lead\Services\LeadSearch;
 use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Lead\Services\LeadStatus;
 use App\Domains\Lead\Services\LeadSubmission;
-use App\Domains\Marketing\Support\AdPlatformCredentials;
+use App\Domains\Marketing\Support\WarehouseOAuth;
 use App\Domains\Scheduling\Actions\RetryFailedBookingAction;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
@@ -194,6 +194,36 @@ class LeadsAdminDashboard
             }
         }
 
+        if ($action === WarehouseOAuth::START_ACTION) {
+            check_admin_referer(WarehouseOAuth::START_ACTION);
+
+            wp_redirect(WarehouseOAuth::authorizationUrl());
+            exit;
+        }
+
+        /*
+         * Google's redirect back. No nonce check here — the browser is arriving from Google, not
+         * from wp-admin, so there is no referer to verify. The `state` parameter is the CSRF
+         * guard and WarehouseOAuth checks it before spending the code.
+         */
+        if ($action === WarehouseOAuth::CALLBACK_ACTION) {
+            $problem = WarehouseOAuth::completeFromRequest();
+
+            wp_safe_redirect(add_query_arg(
+                $problem === '' ? ['bigquery_connected' => '1'] : ['bigquery_error' => rawurlencode($problem)],
+                admin_url('admin.php?page=rl-leads-settings'),
+            ));
+            exit;
+        }
+
+        if ($action === 'bigquery_disconnect') {
+            check_admin_referer('bigquery_disconnect');
+            WarehouseOAuth::disconnect();
+
+            wp_safe_redirect(admin_url('admin.php?page=rl-leads-settings&bigquery_disconnected=1'));
+            exit;
+        }
+
         if ($action === 'save_lead_settings') {
             check_admin_referer('rl_save_lead_settings_nonce');
 
@@ -214,12 +244,10 @@ class LeadsAdminDashboard
                 'slack_webhook_url' => $_POST['slack_webhook_url'] ?? '',
                 'slack_signing_secret' => $_POST['slack_signing_secret'] ?? '',
                 'lead_webhook_url' => $_POST['lead_webhook_url'] ?? '',
-                /*
-                 * Spread rather than listed: the ad credentials are driven off
-                 * AdPlatformCredentials::KEYS, and typing seventeen of them here is seventeen
-                 * chances to omit the one that then gets wiped on every save.
-                 */
-                ...$this->submittedAdCredentials(),
+                'bigquery_credentials_json' => trim((string) wp_unslash($_POST['bigquery_credentials_json'] ?? '')),
+                'bigquery_client_id' => sanitize_text_field(wp_unslash((string) ($_POST['bigquery_client_id'] ?? ''))),
+                'bigquery_client_secret' => trim((string) wp_unslash($_POST['bigquery_client_secret'] ?? '')),
+                'bigquery_project_id' => sanitize_text_field(wp_unslash((string) ($_POST['bigquery_project_id'] ?? ''))),
             ]);
 
             if ($result['success']) {
@@ -2378,30 +2406,6 @@ class LeadsAdminDashboard
         <?php
     }
 
-    /**
-     * The ad platform credentials this form submitted, as `setting key => value`.
-     *
-     * Only keys actually present in the request are returned. LeadSettingsService treats an
-     * absent key as "leave it alone" and a submitted empty one as "clear it", and that
-     * distinction is load-bearing — see the `$keep` comment there.
-     *
-     * @return array<string, string>
-     */
-    private function submittedAdCredentials(): array
-    {
-        $submitted = [];
-
-        foreach (AdPlatformCredentials::settingKeys() as $keys) {
-            foreach ($keys as $key) {
-                if (array_key_exists($key, $_POST)) {
-                    $submitted[$key] = sanitize_text_field(wp_unslash((string) $_POST[$key]));
-                }
-            }
-        }
-
-        return $submitted;
-    }
-
     public function renderSettings(): void
     {
         $settings = app(LeadSettingsService::class)->get();
@@ -2604,76 +2608,125 @@ class LeadsAdminDashboard
                     </table>
                 </div>
 
-                <?php
-                /*
-                 * Ad platform read credentials.
-                 *
-                 * Rendered from AdPlatformCredentials::KEYS rather than hand-written, so the form
-                 * cannot fall behind the code that reads it — a credential with nowhere to be
-                 * pasted is indistinguishable from one that is simply not set.
-                 *
-                 * Nothing consumes these yet. The card says so, because a settings screen full of
-                 * fields that do nothing, with no note explaining it, gets filled in once and then
-                 * reported as broken.
-                 */
-                $adLabels = [
-                    'developer_token' => 'Developer token',
-                    'client_id' => 'OAuth client ID',
-                    'client_secret' => 'OAuth client secret',
-                    'refresh_token' => 'OAuth refresh token',
-                    'customer_id' => 'Customer ID',
-                    'login_customer_id' => 'Login customer ID (manager accounts only)',
-                    'access_token' => 'Access token',
-                    'ad_account_id' => 'Ad account ID',
-                    'api_version' => 'API version',
-                    'account_id' => 'Account ID',
-                ];
-        $adPlatformNames = [
-            'google' => 'Google Ads',
-            'meta' => 'Meta (Facebook / Instagram)',
-            'microsoft' => 'Microsoft Advertising (Bing)',
-        ];
-        $adSecretKeys = ['developer_token', 'client_secret', 'refresh_token', 'access_token'];
-        ?>
+                <?php if (isset($_GET['bigquery_connected'])) { ?>
+                    <div class="notice notice-success"><p>Connected to Google. The next alert will read the warehouse.</p></div>
+                <?php } elseif (isset($_GET['bigquery_disconnected'])) { ?>
+                    <div class="notice notice-warning"><p>Disconnected. Revoke the grant in the Google account too if it is no longer wanted.</p></div>
+                <?php } elseif (isset($_GET['bigquery_error'])) { ?>
+                    <div class="notice notice-error"><p><?php echo esc_html(rawurldecode(sanitize_text_field((string) $_GET['bigquery_error']))); ?></p></div>
+                <?php } ?>
+
                 <div class="rl-detail-card" style="margin-bottom: 20px;">
-                    <h3 class="rl-detail-title">Ad Platform Read Credentials</h3>
+                    <h3 class="rl-detail-title">Marketing Warehouse</h3>
                     <p class="description" style="margin: 0 0 16px;">
-                        For the marketing cost alert&rsquo;s spend, CPB, CPQB and account-health figures.
-                        <strong>Meta is live:</strong> fill in both its fields and the next hourly run starts
-                        calling the Graph API, so make sure the token carries <code>ads_read</code> before saving
-                        &mdash; without it every card reports Meta as unreachable and suppresses all cost figures.
-                        Google and Microsoft have no client yet and are ignored while empty; their fields are here
-                        so the tokens can be pasted ahead of the integrations, which matters most for Google,
-                        whose developer token is issued against a manager account and approved by hand.
-                        An environment variable of the same name always wins over anything set here.
+                        Where the cost alert gets spend, channel attribution and the booking counts that
+                        divide into them. Without it the alert still posts, but only the funnel half, with a
+                        warning saying the warehouse did not answer.
+                        Fill in <strong>either</strong> group below. An environment variable of the same name
+                        always wins over anything set here.
                     </p>
-                    <?php foreach (AdPlatformCredentials::KEYS as $adPlatform => $adKeys) { ?>
-                        <h4 style="margin: 16px 0 4px;"><?php echo esc_html($adPlatformNames[$adPlatform] ?? $adPlatform); ?></h4>
-                        <table class="form-table" role="presentation">
-                            <?php foreach ($adKeys as $adKey) {
-                                $adField = AdPlatformCredentials::settingKey($adPlatform, $adKey); ?>
-                                <tr>
-                                    <th scope="row"><label for="<?php echo esc_attr($adField); ?>"><?php echo esc_html($adLabels[$adKey] ?? $adKey); ?></label></th>
-                                    <td>
-                                        <input type="<?php echo in_array($adKey, $adSecretKeys, true) ? 'password' : 'text'; ?>"
-                                               id="<?php echo esc_attr($adField); ?>"
-                                               name="<?php echo esc_attr($adField); ?>"
-                                               class="regular-text"
-                                               autocomplete="off"
-                                               value="<?php echo esc_attr((string) ($settings[$adField] ?? '')); ?>" />
-                                        <?php if ($adPlatform === 'meta' && $adKey === 'access_token' && AdPlatformCredentials::metaTokenIsShared()) { ?>
-                                            <p class="description">
-                                                Currently the same token as the Conversions API uses. That is usually fine &mdash;
-                                                one Business Manager system user can hold both grants &mdash; but they are separate
-                                                permissions, and a Conversions-only token authenticates perfectly and returns no
-                                                insights. If the card reports Meta as unreachable, that is the first thing to check.
-                                            </p>
-                                        <?php } ?>
-                                    </td>
-                                </tr>
-                            <?php } ?>
-                        </table>
+
+                    <h4 style="margin: 16px 0 4px;">Option A &mdash; sign in with Google</h4>
+                    <?php if (! WarehouseOAuth::isReady()) { ?>
+                        <p class="description" style="margin: 0 0 8px;">
+                            Add an OAuth client ID and secret below, save, and a sign-in button appears here.
+                            Create the client in Google Cloud &rarr; APIs &amp; Services &rarr; Credentials, and
+                            register this exact callback on it as an authorised redirect URI:
+                        </p>
+                        <p><code style="user-select:all;"><?php echo esc_html(WarehouseOAuth::redirectUri()); ?></code></p>
+                    <?php } elseif (WarehouseOAuth::isConnected()) { ?>
+                        <p class="description" style="margin: 0 0 8px;">
+                            Connected<?php echo WarehouseOAuth::connectedAccount() !== ''
+                                ? ' as <strong>'.esc_html(WarehouseOAuth::connectedAccount()).'</strong>'
+                                : ''; ?>.
+                            This ties the alert to that person: it stops working when they leave, change their
+                            password or revoke the grant. Worth replacing with option B eventually.
+                        </p>
+                        <p>
+                            <a class="button button-secondary" href="<?php echo esc_url(wp_nonce_url(
+                                admin_url('admin.php?page=rl-leads-settings&rl_action='.WarehouseOAuth::START_ACTION),
+                                WarehouseOAuth::START_ACTION,
+                            )); ?>">Reconnect</a>
+                            <a class="button" href="<?php echo esc_url(wp_nonce_url(
+                                admin_url('admin.php?page=rl-leads-settings&rl_action=bigquery_disconnect'),
+                                'bigquery_disconnect',
+                            )); ?>">Disconnect</a>
+                        </p>
+                    <?php } else { ?>
+                        <p class="description" style="margin: 0 0 8px;">
+                            Sign in as the account that can read the marketing dataset. The refresh token is
+                            exchanged and stored for you &mdash; there is nothing to copy.
+                        </p>
+                        <p>
+                            <a class="button button-primary" href="<?php echo esc_url(wp_nonce_url(
+                                admin_url('admin.php?page=rl-leads-settings&rl_action='.WarehouseOAuth::START_ACTION),
+                                WarehouseOAuth::START_ACTION,
+                            )); ?>">Connect with Google</a>
+                        </p>
+                        <p class="description">
+                            If Google answers <code>redirect_uri_mismatch</code>, this callback is not registered
+                            on the OAuth client yet:<br>
+                            <code style="user-select:all;"><?php echo esc_html(WarehouseOAuth::redirectUri()); ?></code>
+                        </p>
                     <?php } ?>
+
+                    <table class="form-table" role="presentation">
+                        <tr>
+                            <th scope="row"><label for="bigquery_client_id">OAuth client ID</label></th>
+                            <td><input type="text" id="bigquery_client_id" name="bigquery_client_id" class="regular-text"
+                                       autocomplete="off"
+                                       value="<?php echo esc_attr((string) ($settings['bigquery_client_id'] ?? '')); ?>" /></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="bigquery_client_secret">OAuth client secret</label></th>
+                            <td><input type="password" id="bigquery_client_secret" name="bigquery_client_secret" class="regular-text"
+                                       autocomplete="off"
+                                       value="<?php echo esc_attr((string) ($settings['bigquery_client_secret'] ?? '')); ?>" />
+                                <p class="description">
+                                    Save these first, then use the button above. The scope requested is
+                                    <code>auth/bigquery</code>; the narrower <code>bigquery.readonly</code> looks
+                                    right and cannot run a query.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <h4 style="margin: 20px 0 4px;">Option B &mdash; service account key</h4>
+                    <p class="description" style="margin: 0 0 8px;">
+                        A JSON file you download from Google Cloud when you create the key. Paste it whole.
+                        The account needs <code>roles/bigquery.jobUser</code> on the billing project and
+                        <code>roles/bigquery.dataViewer</code> on the dataset &mdash; both, because running a
+                        query and reading its answer are separate permissions.
+                    </p>
+                    <table class="form-table" role="presentation">
+                        <tr>
+                            <th scope="row"><label for="bigquery_credentials_json">Service account key</label></th>
+                            <td>
+                                <textarea id="bigquery_credentials_json" name="bigquery_credentials_json"
+                                          class="large-text code" rows="5" autocomplete="off"
+                                          spellcheck="false"><?php echo esc_textarea((string) ($settings['bigquery_credentials_json'] ?? '')); ?></textarea>
+                                <p class="description">
+                                    Takes precedence over option A if both are filled in. Base64 is accepted too,
+                                    if pasting raw JSON gets mangled.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <table class="form-table" role="presentation">
+                        <tr>
+                            <th scope="row"><label for="bigquery_project_id">Billing project ID</label></th>
+                            <td>
+                                <input type="text" id="bigquery_project_id" name="bigquery_project_id"
+                                       class="regular-text"
+                                       value="<?php echo esc_attr((string) ($settings['bigquery_project_id'] ?? '')); ?>" />
+                                <p class="description">
+                                    Which project the query is billed to. Required with option A; a service
+                                    account key names its own, so it can be left empty with option B.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
                 </div>
 
                 <p>
