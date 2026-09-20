@@ -39,6 +39,26 @@ class CalendlyClient
     protected const PREFLIGHT_BUDGET_SECONDS = 8.0;
 
     /**
+     * The same three budgets, for the background utilization count.
+     *
+     * countBookedEvents() used the PREFLIGHT_* values until 2026-09-20, which meant a cron job
+     * inherited a budget tuned for a visitor sitting on a booking submit: five seconds a request
+     * and eight for the whole pool, so one unresponsive Calendly left room for exactly one more
+     * token before the count gave up. Nothing is waiting on this one — a timed-out count is not a
+     * slow page, it is a missing figure on the next card — so it can afford to be patient.
+     *
+     * The budget is deliberately only a little over one timeout rather than several. It is sized
+     * to buy exactly one clean failover after an unresponsive token, which is the failure that
+     * actually happens; sizing it for four would multiply by the six counts a single cost-alert
+     * snapshot makes, and turn a Calendly outage into a cron tick measured in minutes.
+     */
+    public const UTILIZATION_TIMEOUT_SECONDS = 15;
+
+    public const UTILIZATION_CONNECT_TIMEOUT_SECONDS = 4;
+
+    public const UTILIZATION_BUDGET_SECONDS = 20.0;
+
+    /**
      * How many pages of `/scheduled_events` a utilization count will walk before giving up.
      *
      * A four-day window on this account is one page. The cap exists so a mis-set window cannot
@@ -346,10 +366,24 @@ class CalendlyClient
      * an empty calendar, which is the healthiest reading there is, so handing it back for a failed
      * lookup would report a tier that is about to sell out as wide open. Callers must treat null
      * as "no opinion" and skip the check.
+     *
+     * The timeouts default to UTILIZATION_* because both callers today run after the response or
+     * on cron — the hourly cost-alert warm and the deferred tier probe. A caller that ever runs
+     * *in front of* a visitor must pass the PREFLIGHT_* values explicitly; the defaults here will
+     * happily hold a request open for the better part of a minute, which is right for a cron tick
+     * and wrong for anything else.
      */
-    public function countBookedEvents(string $eventTypeUri, string $minStartIso, string $maxStartIso): ?int
-    {
-        $deadline = microtime(true) + self::PREFLIGHT_BUDGET_SECONDS;
+    public function countBookedEvents(
+        string $eventTypeUri,
+        string $minStartIso,
+        string $maxStartIso,
+        ?int $timeoutSeconds = null,
+        ?int $connectTimeoutSeconds = null,
+        ?float $budgetSeconds = null
+    ): ?int {
+        $timeoutSeconds ??= self::UTILIZATION_TIMEOUT_SECONDS;
+        $connectTimeoutSeconds ??= self::UTILIZATION_CONNECT_TIMEOUT_SECONDS;
+        $deadline = microtime(true) + ($budgetSeconds ?? self::UTILIZATION_BUDGET_SECONDS);
 
         foreach ($this->tokenPool->getEligibleTokens(null) as $item) {
             if (microtime(true) >= $deadline) {
@@ -369,7 +403,17 @@ class CalendlyClient
                 continue;
             }
 
-            $booked = $this->walkScheduledEvents($token, $identity, $eventTypeUri, $minStartIso, $maxStartIso, $who);
+            $booked = $this->walkScheduledEvents(
+                $token,
+                $identity,
+                $eventTypeUri,
+                $minStartIso,
+                $maxStartIso,
+                $who,
+                $timeoutSeconds,
+                $connectTimeoutSeconds,
+                $deadline
+            );
 
             if ($booked !== null) {
                 return $booked;
@@ -394,7 +438,10 @@ class CalendlyClient
         string $eventTypeUri,
         string $minStartIso,
         string $maxStartIso,
-        string $who
+        string $who,
+        int $timeoutSeconds,
+        int $connectTimeoutSeconds,
+        float $deadline
     ): ?int {
         $base = [
             'status' => 'active',
@@ -419,12 +466,23 @@ class CalendlyClient
             $booked = 0;
 
             for ($page = 0; $page < self::SCHEDULED_EVENTS_PAGE_CAP; $page++) {
+                /*
+                 * Checked per page, not only per token. The budget is what bounds the walk in
+                 * wall-clock terms, and a five-page window on a slow Calendly spends it entirely
+                 * inside this loop where the caller's between-tokens check never runs.
+                 */
+                if (microtime(true) >= $deadline) {
+                    Log::warning('CalendlyClient: utilization count exceeded its time budget mid-walk, discarding a partial count');
+
+                    return null;
+                }
+
                 $response = $this->getForToken(
                     $token,
                     $url,
                     $query,
-                    self::PREFLIGHT_TIMEOUT_SECONDS,
-                    self::PREFLIGHT_CONNECT_TIMEOUT_SECONDS
+                    $timeoutSeconds,
+                    $connectTimeoutSeconds
                 );
 
                 if ($response === null) {

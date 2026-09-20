@@ -7,6 +7,7 @@ use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
 use App\Domains\Scheduling\Services\AvailabilityHealthMonitor;
 use App\Infrastructure\Slack\SlackTransport;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
@@ -362,6 +363,79 @@ describe('Counting the booked side', function () {
          */
         expect($client->countBookedEvents('https://api.calendly.com/event_types/t10', '2026-09-17T00:00:00Z', '2026-09-21T00:00:00Z'))
             ->toBeNull();
+    });
+
+    test('a token that times out fails over to the next one in the pool', function () {
+        $wanted = 'https://api.calendly.com/event_types/t10';
+
+        Http::fake(function (Request $request) use ($wanted) {
+            if (str_contains($request->url(), '/users/me')) {
+                return Http::response(['resource' => [
+                    'uri' => 'https://api.calendly.com/users/u1',
+                    'current_organization' => 'https://api.calendly.com/organizations/o1',
+                ]], 200);
+            }
+
+            /*
+             * What Sentry caught on 2026-09-20: Calendly accepted the connection and then sent
+             * nothing, so the first token spent its whole request timeout for zero bytes. The
+             * count is not allowed to give up there — it is a background figure with three more
+             * accounts that can answer the same question.
+             */
+            if (str_contains((string) $request->header('Authorization')[0], 'tok-count-hangs')) {
+                throw new ConnectionException('cURL error 28: Operation timed out after 15001 milliseconds');
+            }
+
+            return Http::response([
+                'collection' => [['event_type' => $wanted], ['event_type' => $wanted]],
+                'pagination' => ['next_page' => null],
+            ], 200);
+        });
+
+        $client = new CalendlyClient(new CalendlyTokenPool([
+            ['label' => 'Pool 1', 'token' => 'tok-count-hangs', 'enabled' => true],
+            ['label' => 'Pool 2', 'token' => 'tok-count-answers', 'enabled' => true],
+        ]));
+
+        expect($client->countBookedEvents($wanted, '2026-09-17T00:00:00Z', '2026-09-21T00:00:00Z'))->toBe(2);
+    });
+
+    test('the time budget is enforced between pages, not only between tokens', function () {
+        $wanted = 'https://api.calendly.com/event_types/t10';
+        $pages = 0;
+
+        Http::fake(function (Request $request) use ($wanted, &$pages) {
+            if (str_contains($request->url(), '/users/me')) {
+                return Http::response(['resource' => [
+                    'uri' => 'https://api.calendly.com/users/u1',
+                    'current_organization' => 'https://api.calendly.com/organizations/o1',
+                ]], 200);
+            }
+
+            $pages++;
+            usleep(120000);
+
+            return Http::response([
+                'collection' => [['event_type' => $wanted]],
+                // Always another page: only the budget can end this walk.
+                'pagination' => ['next_page' => 'https://api.calendly.com/scheduled_events?page_token=p'.$pages],
+            ], 200);
+        });
+
+        $client = new CalendlyClient(new CalendlyTokenPool([
+            ['label' => 'Pool 1', 'token' => 'tok-count-slow', 'enabled' => true],
+        ]));
+
+        $booked = $client->countBookedEvents(
+            $wanted,
+            '2026-09-17T00:00:00Z',
+            '2026-09-21T00:00:00Z',
+            budgetSeconds: 0.1,
+        );
+
+        // A partial count reads as a tier with room left on the busiest calendar there is.
+        expect($booked)->toBeNull()
+            ->and($pages)->toBe(1);
     });
 
     test('a token refused at the organization scope retries as the user', function () {
