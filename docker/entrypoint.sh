@@ -82,6 +82,64 @@ if [ "${SKIP_CHOWN:-0}" != "1" ]; then
   chown -R www-data:www-data /var/www/html/web/app/uploads || true
 fi
 
+# ---------------------------------------------------------------------------
+# Point Acorn's cache at the Redis WordPress is already using -- but only once a real connection
+# has been proved.
+#
+# Two caches read two different sets of variables. WP_REDIS_* configures the object cache drop-in;
+# Acorn's Cache facade -- the marketing snapshot, the admin dashboard KPI blocks, the domain
+# overview -- reads CACHE_STORE, REDIS_HOST, REDIS_PASSWORD. The task definition sets only the
+# first set, so Acorn silently used the `file` driver: a private copy per ECS task, discarded by
+# every rolling deploy. The visible symptom was a Slack card reading correctly at 07:00 beside a
+# dashboard widget still showing 06:56, on the same site at the same moment.
+#
+# ## Why this probes instead of just exporting
+#
+# A first attempt derived host and port and switched the store on that alone. It took staging's
+# admin down and production's with it. Two reasons, and both matter:
+#
+#   - The credentials differ. WP_REDIS_PASSWORD and WP_REDIS_SCHEME have no effect on Acorn, so a
+#     Redis behind auth or TLS was reachable for WordPress and refused for Acorn.
+#   - WordPress is configured to survive that and Acorn is not. config/application.php sets
+#     WP_REDIS_GRACEFUL, so the drop-in degrades quietly when Redis is unreachable -- which is why
+#     the redis-cache plugin can report itself connected while Acorn cannot connect at all. Acorn
+#     throws instead, and the first failed Cache::get is a critical error on every admin screen
+#     that uses one. The public site stays up, so a green deploy says nothing.
+#
+# So the store is switched only when this container has actually connected, authenticated and
+# selected the cache database with Acorn's own client. Anything else leaves `file` in place: a
+# per-task cache is a wrong dashboard, an unreachable one is a broken site, and the failure has to
+# land on the smaller of the two.
+if [ -n "${WP_REDIS_HOST:-}" ] && [ -z "${CACHE_STORE:-}" ]; then
+  _rl_redis_host="${REDIS_HOST:-$WP_REDIS_HOST}"
+  _rl_redis_port="${REDIS_PORT:-${WP_REDIS_PORT:-6379}}"
+  _rl_redis_pass="${REDIS_PASSWORD:-${WP_REDIS_PASSWORD:-}}"
+  _rl_redis_db="${REDIS_CACHE_DB:-1}"
+
+  # phpredis takes TLS as a host prefix rather than an option, and Acorn's redis config has no
+  # scheme key to set. Prefixing the host is how a TLS endpoint is reached through it.
+  if [ "${WP_REDIS_SCHEME:-tcp}" = "tls" ]; then
+    _rl_redis_host="tls://${_rl_redis_host#tls://}"
+  fi
+
+  if PROBE_HOST="$_rl_redis_host" PROBE_PORT="$_rl_redis_port" PROBE_PASS="$_rl_redis_pass" \
+     PROBE_DB="$_rl_redis_db" php /usr/local/bin/redis-probe.php 2>/dev/null; then
+    export REDIS_HOST="$_rl_redis_host"
+    export REDIS_PORT="$_rl_redis_port"
+    export REDIS_CACHE_DB="$_rl_redis_db"
+    [ -n "$_rl_redis_pass" ] && export REDIS_PASSWORD="$_rl_redis_pass"
+    export CACHE_STORE="redis"
+
+    echo "entrypoint: Acorn cache store is redis via ${_rl_redis_host}:${_rl_redis_port} db ${_rl_redis_db}"
+  else
+    echo "entrypoint: WARNING - Redis is configured for WordPress but Acorn could not connect to" >&2
+    echo "entrypoint:   ${_rl_redis_host}:${_rl_redis_port} db ${_rl_redis_db}. Keeping the file cache," >&2
+    echo "entrypoint:   which is per-task: the admin dashboard may disagree with itself between tasks." >&2
+  fi
+
+  unset _rl_redis_host _rl_redis_port _rl_redis_pass _rl_redis_db
+fi
+
 if wp core is-installed --allow-root >/dev/null 2>&1; then
   wp plugin activate redis-cache --allow-root || true
 
