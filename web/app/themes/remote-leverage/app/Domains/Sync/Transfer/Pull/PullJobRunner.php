@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Sync\Transfer\Pull;
 
+use App\Domains\Sync\Datasets\Dataset;
 use App\Domains\Sync\Datasets\DatasetRegistry;
 use App\Domains\Sync\SyncClient;
 use App\Domains\Sync\Transfer\Import\ContentImporter;
@@ -28,7 +29,12 @@ use Throwable;
  */
 class PullJobRunner
 {
-    public const BATCH_SIZE = 25;
+    /**
+     * The posts/meta batch size, kept as a constant because it is the figure
+     * the progress and resume tests pin. A table-backed dataset asks its own
+     * Dataset instead — see Dataset::batchSize().
+     */
+    public const BATCH_SIZE = Dataset::POST_BATCH_SIZE;
 
     public const FILE_CHUNK_BYTES = 1048576;
 
@@ -157,7 +163,8 @@ class PullJobRunner
      */
     private function tableRows(SyncClient $client, PullJob $job, string $dataset): void
     {
-        $tables = $this->registry->get($dataset)->transferTables;
+        $definition = $this->registry->get($dataset);
+        $tables = $definition->transferTables;
         $table = $tables[$job->tableIndex] ?? null;
 
         if ($table === null) {
@@ -171,7 +178,7 @@ class PullJobRunner
             'dataset' => $dataset,
             'table_index' => $job->tableIndex,
             'after' => $job->cursor,
-            'limit' => self::BATCH_SIZE,
+            'limit' => $definition->batchSize(),
         ]);
 
         if (($batch['ok'] ?? false) !== true) {

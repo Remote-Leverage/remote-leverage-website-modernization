@@ -225,6 +225,18 @@ request and be resumable.
    entry, which would be unrecoverable.
 2. **Chunk** — the exporting side streams gzipped, base64-encoded batches. Each chunk
    is checksummed and acknowledged, so a dropped request retries just that chunk.
+
+   **Batch size is per dataset**, because the two row shapes have nothing in common.
+   A posts row drags its `post_content` and every attached meta row, so those move
+   25 at a time (`Dataset::POST_BATCH_SIZE`). A lead row is a handful of narrow
+   columns, and moves 100 (`Dataset::TABLE_BATCH_SIZE`).
+
+   The figure matters more than it looks, because a batch is a whole HTTPS round
+   trip and a transfer is entirely latency-bound. The first production leads pull
+   ran at 25 and took **19,737 rows in 790 sequential requests, 15m39s** — about
+   1.2s per request, nearly all of it waiting. 100 is not a tuned optimum, it is the
+   ceiling `ExportTransferBatchAbility` clamps to; going higher means changing that
+   clamp and redeploying both ends.
 3. **Commit** — the importing side applies batches across repeated calls, each
    bounded well under `max_execution_time`, reporting progress. The admin screen
    polls until done.

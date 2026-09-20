@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domains\Sync\Datasets\Dataset;
 use App\Domains\Sync\Datasets\DatasetRegistry;
 use App\Domains\Sync\SyncClient;
 use App\Domains\Sync\SyncNotPermittedException;
@@ -438,8 +439,14 @@ describe('pushing the leads dataset', function () {
             ]);
     });
 
+    /*
+     * Deliberately Dataset::TABLE_BATCH_SIZE and not PushJobRunner::BATCH_SIZE.
+     * A table-backed dataset moves 100 rows a request while the posts pipeline
+     * moves 25, so seeding against the posts figure would fit inside one chunk
+     * and the test would pass while asserting nothing about batching.
+     */
     it('walks a wide table across several batches', function () {
-        foreach (range(1, PushJobRunner::BATCH_SIZE + 3) as $id) {
+        foreach (range(1, Dataset::TABLE_BATCH_SIZE + 3) as $id) {
             seedPushLead($id);
         }
 
@@ -458,7 +465,7 @@ describe('pushing the leads dataset', function () {
          */
         expect($chunks)->toHaveCount(5)
             ->and($ids)->toBe(array_unique($ids))
-            ->and($ids)->toHaveCount(PushJobRunner::BATCH_SIZE + 3);
+            ->and($ids)->toHaveCount(Dataset::TABLE_BATCH_SIZE + 3);
     });
 
     it('counts lead rows toward the progress total, not the content set', function () {

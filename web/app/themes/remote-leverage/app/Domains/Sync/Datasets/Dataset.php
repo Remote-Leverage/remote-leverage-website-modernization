@@ -52,11 +52,42 @@ final class Dataset
     ) {}
 
     /**
+     * Rows per request for a dataset moving through the posts/meta pipeline.
+     *
+     * Small because a "row" here is a post that drags its `post_content` and
+     * every meta row attached to it, and one batch has to fit comfortably inside
+     * a single request on both sides.
+     */
+    public const POST_BATCH_SIZE = 25;
+
+    /**
+     * Rows per request for a table-backed dataset.
+     *
+     * Four times the posts figure, and the ceiling ExportTransferBatchAbility
+     * clamps to — raising it further means redeploying both ends.
+     *
+     * A lead row is a handful of narrow columns, so 25 of them spent a full
+     * HTTPS round trip to move a few kilobytes: the first production leads pull
+     * was 19,737 rows in 790 sequential requests and 15m39s, essentially all of
+     * it latency. The batch size is per-dataset rather than one constant
+     * precisely because the two shapes have nothing in common.
+     */
+    public const TABLE_BATCH_SIZE = 100;
+
+    /**
      * Whether this dataset travels as whole table rows rather than as posts.
      */
     public function isTableBacked(): bool
     {
         return $this->transferTables !== [];
+    }
+
+    /**
+     * How many rows to move per request for this dataset.
+     */
+    public function batchSize(): int
+    {
+        return $this->isTableBacked() ? self::TABLE_BATCH_SIZE : self::POST_BATCH_SIZE;
     }
 
     /**
