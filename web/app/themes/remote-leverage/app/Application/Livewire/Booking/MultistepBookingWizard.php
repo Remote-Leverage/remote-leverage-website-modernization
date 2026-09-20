@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Livewire\Booking;
 
 use App\Domains\Lead\Actions\CaptureLeadAction;
+use App\Domains\Lead\Data\LeadAudience;
 use App\Domains\Lead\Data\LeadCaptureData;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\AttributionCollector;
@@ -238,6 +239,22 @@ class MultistepBookingWizard extends Component
      * dismissed. A flag that survives the trip is what breaks the loop.
      */
     public bool $warningAcknowledged = false;
+
+    /**
+     * Whether the "looking for VA work?" interstitial is showing.
+     *
+     * Sits in the same slot as the pricing warning — after step 1's gates, before the calendar —
+     * and for the same reason: the partial lead is already captured, so somebody who leaves for
+     * the jobs site is still a lead, and somebody who came to hire has not lost anything.
+     */
+    public bool $showApplicantNotice = false;
+
+    /**
+     * The visitor said they are here to hire. Survives the trip back through step 1 so the
+     * notice cannot re-fire on the same signals and trap them in a loop — the mistake
+     * `warningAcknowledged` exists to document.
+     */
+    public bool $applicantNoticeDismissed = false;
 
     public ?string $referralCode = null;
 
@@ -526,6 +543,18 @@ class MultistepBookingWizard extends Component
 
                 // Parity with rl-testing capture_partial_lead on Step 1 completion
                 $this->capturePartialLead();
+
+                /*
+                 * Checked before the pricing warning, because it answers a different question
+                 * and answers it first. Telling somebody who wants a VA job that our recruiting
+                 * fee might be beyond their budget is a conversation about the wrong product.
+                 */
+                if (! $this->applicantNoticeDismissed && $this->applicantNotice() !== null) {
+                    $this->showApplicantNotice = true;
+                    $this->trackStepEvent('va_applicant_notice_shown', ['lead_id' => $this->leadId]);
+
+                    return;
+                }
 
                 /*
                  * The revenue-band warning, shown before the calendar rather than after booking.
@@ -866,6 +895,44 @@ class MultistepBookingWizard extends Component
             $lead = $captureAction->execute($leadData);
             $lead->refresh();
 
+            /*
+             * A booking the scheduling domain has given up on — today that means the slot was
+             * taken between this visitor rendering the picker and submitting it, which Calendly
+             * answers with `already_filled`.
+             *
+             * Everything below assumes a meeting exists. It sets a confirmation, then redirects
+             * to /VAThankYou/, which fires GA4 `appointment_booked` and two live Google Ads
+             * conversions. Sending a failed booking down that path tells someone to expect a
+             * call nobody is going to make, and trains Ads bidding on a conversion that never
+             * happened. Both were happening until 2026-09-20.
+             *
+             * A *transient* failure still shows the confirmation on purpose: the retry ladder
+             * has the slot and will usually land it within thirty seconds. Only a failure marked
+             * as final gets this branch.
+             */
+            if (! empty($this->selectedSlot) && $lead->status === 'booking_failed') {
+                $takenSlot = $this->selectedSlot;
+
+                $this->isBooked = false;
+                $this->selectedSlot = null;
+                $this->currentStep = 3;
+                $this->errorMessage = 'That time was booked by someone else moments before you confirmed. These are the times still open — please pick another.';
+
+                if ($this->selectedDate) {
+                    // The cached day still lists the slot that has just gone.
+                    Cache::forget('rl_avail_slots_'.md5($this->getActiveEventTypeUri().$this->selectedDate.$this->timezone));
+                    $this->loadSlotsForDate($this->selectedDate);
+                }
+
+                $this->trackStepEvent('booking_failed', [
+                    'lead_id' => $lead->id,
+                    'selected_time' => $takenSlot,
+                    'role' => $this->roleNeeded,
+                ]);
+
+                return;
+            }
+
             if ($lead->status === 'booked' || ! empty($this->selectedSlot)) {
                 $this->isBooked = true;
                 $bookingLog = $lead->activityLogs()
@@ -874,7 +941,9 @@ class MultistepBookingWizard extends Component
                     ->first();
                 $payload = $bookingLog?->payload ?? [];
 
-                $this->meetingUrl = $payload['meet_url'] ?? 'https://meet.google.com/rl-strategy-'.substr((string) $lead->uuid, 0, 8);
+                // Null, not an invented room. The confirmation view already hides the link
+                // when there is none, and a retry that lands will write the real one.
+                $this->meetingUrl = $payload['meet_url'] ?? null;
                 $this->bookingReference = (string) ($payload['meeting_id'] ?? $lead->uuid);
                 $this->confirmedTime = $this->selectedSlot
                     ? Carbon::parse($this->selectedSlot, $this->timezone)->format('l, F j, Y \a\t g:i A').' ('.$this->timezone.')'
@@ -1486,6 +1555,87 @@ class MultistepBookingWizard extends Component
         }
 
         return $band;
+    }
+
+    /**
+     * The VA-applicant notice's copy, or null when this visitor does not look like one.
+     *
+     * Who counts as a possible VA is {@see LeadAudience}'s decision, not
+     * this component's — the same rule that draws the "Possible VA" badge, the audience filter
+     * and the export column on the leads dashboard. Asking it rather than re-deriving it means
+     * the widget and the dashboard can never disagree about the same person.
+     *
+     * Read off the partial lead rather than off this component's own fields, because the rule
+     * includes a referral override and `source_type` is resolved inside CaptureLeadAction — the
+     * wizard does not know it. `capturePartialLead()` has already run by the time step 1 reaches
+     * this gate, so the row is there; when it is not (capture skipped or failed), the notice
+     * stays down, which is the right way to be wrong.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function applicantNotice(): ?array
+    {
+        $config = (array) config('booking.applicant_notice', []);
+
+        if (empty($config['enabled']) || empty($config['jobs_url']) || empty($this->leadId)) {
+            return null;
+        }
+
+        $lead = Lead::find($this->leadId);
+
+        return $lead?->audience()->label() === null ? null : $config;
+    }
+
+    /**
+     * "No, I'm here to hire a VA." The inference was wrong, so carry on to the calendar.
+     *
+     * Advances directly rather than through `goToStep(2)`, for the reason spelled out in
+     * {@see self::acknowledgeWarning()}: step 1's gates have already run, and re-running them
+     * spends a second email-verification credit and writes a second partial capture.
+     */
+    public function dismissApplicantNotice(): void
+    {
+        if (! $this->showApplicantNotice) {
+            return;
+        }
+
+        $this->trackStepEvent('va_applicant_notice_dismissed');
+
+        $this->applicantNoticeDismissed = true;
+        $this->showApplicantNotice = false;
+
+        if ($this->skipCalendar) {
+            $this->submitBooking();
+
+            return;
+        }
+
+        $this->currentStep = 2;
+        $this->loadMonthAvailability();
+        $this->trackStepEvent('step_date_selection');
+        $this->trackStepEvent('step_viewed', ['step' => 2]);
+    }
+
+    /**
+     * Back out of the applicant notice to step 1, as the pricing warning's arrow does.
+     */
+    public function backFromApplicantNotice(): void
+    {
+        $this->showApplicantNotice = false;
+        $this->currentStep = 1;
+
+        // Backing out is not "I'm hiring". Someone who returns to correct the field that
+        // triggered this must be able to see it again.
+        $this->applicantNoticeDismissed = false;
+    }
+
+    /**
+     * They took the jobs link. Recorded server-side so the handoff is measurable against
+     * `va_applicant_notice_shown` rather than inferred from a gap.
+     */
+    public function trackApplicantJobsClick(): void
+    {
+        $this->trackStepEvent('va_applicant_jobs_opened');
     }
 
     /**

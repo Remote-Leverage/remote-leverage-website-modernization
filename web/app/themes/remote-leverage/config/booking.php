@@ -77,4 +77,40 @@ return [
         '$50k-$100k Per Month' => ['show_warning' => false],
         '$100k+ Per Month' => ['show_warning' => false],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | VA applicant notice
+    |--------------------------------------------------------------------------
+    |
+    | People looking for VA work find the hiring form and book sales calls with it. This is the
+    | copy for the interstitial that points them at the jobs site instead.
+    |
+    | *Who sees it is not decided here.* That is {@see \App\Domains\Lead\Data\LeadAudience},
+    | the same rule behind the "Possible VA" badge, the audience filter and the export column on
+    | the leads dashboard — a phone country outside US/CA, unless the lead was referred. One
+    | definition of "possible VA" for the whole product: a second one living in this file would
+    | drift from the dashboard the first time either moved, and the two would disagree about the
+    | same person on the same screen.
+    |
+    | It is a signpost, not a gate. LeadAudience calls itself a prompt rather than a verdict, and
+    | the secondary action here carries on to the calendar for exactly that reason: an overseas
+    | client being told they look like a job applicant is worse than a wasted call.
+    */
+    'applicant_notice' => [
+        'enabled' => true,
+
+        'jobs_url' => 'https://remoteleveragejobs.com',
+
+        'heading' => "Looking for VA work?\nYou're in the right family, wrong form.",
+
+        'body' => [
+            ['type' => 'paragraph', 'text' => 'This form books a call with our sales team for business owners who want to hire a Virtual Assistant. If you are the Virtual Assistant, we would love to hear from you — just somewhere else.'],
+            ['type' => 'paragraph', 'text' => 'Every open role we are recruiting for is on our jobs site, and applying there puts you in front of the recruiting team directly.'],
+        ],
+
+        'button' => 'See VA openings',
+
+        'continue' => "No — I'm here to hire a VA",
+    ],
 ];

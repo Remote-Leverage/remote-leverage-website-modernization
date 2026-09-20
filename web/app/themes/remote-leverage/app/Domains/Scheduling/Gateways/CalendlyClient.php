@@ -70,6 +70,21 @@ class CalendlyClient
 
     protected ?string $userUri;
 
+    /**
+     * Calendly's own error code from the last createInvitee() refusal — `already_filled`,
+     * `invalid_argument` and friends — or null when the last call succeeded, or failed for a
+     * reason Calendly never named (a timeout, an exhausted pool).
+     *
+     * Read it immediately after createInvitee() and nowhere else. It is per-call state on a
+     * container singleton, and "immediately after" is the whole contract.
+     *
+     * It exists for one distinction the caller cannot otherwise make: a booking Calendly
+     * *refused* is not a booking Calendly *missed*. `already_filled` means somebody took the
+     * slot between the picker rendering and this submit, and no amount of retrying will get it
+     * back — the only honest answer is to ask for another time.
+     */
+    protected ?string $lastInviteeErrorCode = null;
+
     public function __construct(?CalendlyTokenPool $tokenPool = null)
     {
         $this->tokenPool = $tokenPool ?: new CalendlyTokenPool;
@@ -194,6 +209,18 @@ class CalendlyClient
     }
 
     /**
+     * Why Calendly refused the last createInvitee() call, in Calendly's own vocabulary.
+     *
+     * {@see self::$lastInviteeErrorCode} for the read-it-immediately contract. Null means the
+     * booking was not refused — it either worked, or never got an answer at all, and those two
+     * are told apart by createInvitee()'s return value.
+     */
+    public function lastInviteeErrorCode(): ?string
+    {
+        return $this->lastInviteeErrorCode;
+    }
+
+    /**
      * Fetch event type availability slots from Calendly.
      * Ported from CalendlyIntegration::get_availability().
      */
@@ -283,6 +310,8 @@ class CalendlyClient
         array $questionsAnswers = [],
         array $tracking = []
     ): ?array {
+        $this->lastInviteeErrorCode = null;
+
         try {
             $payload = [
                 'event_type' => $eventUri,
@@ -334,8 +363,12 @@ class CalendlyClient
             }
 
             if ($response->failed()) {
+                $code = $response->json('details.0.code');
+                $this->lastInviteeErrorCode = is_string($code) && $code !== '' ? $code : 'unspecified';
+
                 Log::error('CalendlyClient Invitee Creation Failed', [
                     'status' => $response->status(),
+                    'code' => $this->lastInviteeErrorCode,
                     'response' => $response->json(),
                 ]);
 

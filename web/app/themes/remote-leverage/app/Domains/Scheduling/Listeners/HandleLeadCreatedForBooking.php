@@ -119,7 +119,9 @@ class HandleLeadCreatedForBooking
                     $bookingData,
                     $calendlyEventUri,
                     $result['message'] ?? 'Failed to book slot with calendar provider',
-                    $this->activityLogger
+                    $this->activityLogger,
+                    // A slot that is already filled cannot be won back by trying again.
+                    retryable: ($result['error_code'] ?? null) !== 'slot_taken',
                 );
             }
         } catch (\Throwable $e) {

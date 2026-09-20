@@ -158,7 +158,13 @@ class BookMeetingAction
                     }
                 }
 
-                $meetUrl = $meetUrl ?: ($invitee['scheduling_url'] ?? 'https://meet.google.com/rl-strategy-'.substr(md5($data->email), 0, 8));
+                /*
+                 * No invented link. This used to fall back to a meet.google.com URL built from
+                 * a hash of the email, which is a room that has never existed — see the same
+                 * mistake, with the same consequences, in Path B below. Null renders as "no
+                 * link yet" and the invitee still gets Calendly's own confirmation email.
+                 */
+                $meetUrl = $meetUrl ?: ($invitee['scheduling_url'] ?? null);
 
                 $this->cancelPriorBookingForDifferentSlot($data->email, $startTime->toIso8601String());
 
@@ -171,6 +177,35 @@ class BookMeetingAction
                     'end_time' => $endTime->toIso8601String(),
                     'client_name' => $data->name,
                     'client_email' => $data->email,
+                ];
+            }
+
+            /*
+             * Calendly *refused* the booking rather than failing to answer, and the two want
+             * opposite handling. Falling through to Google is defensible when Calendly is
+             * unreachable; it is indefensible for a refusal, and actively harmful for the
+             * common one.
+             *
+             * `already_filled` means somebody else took the slot between this visitor rendering
+             * the picker and submitting it — which is exactly what happened on 2026-09-20.
+             * Path B would then put a meeting on the consultant's calendar at a time they are
+             * already booked, and hand the visitor a confirmation for it.
+             */
+            $refusal = $this->calendlyClient->lastInviteeErrorCode();
+
+            if ($refusal !== null) {
+                Log::warning("BookMeetingAction: Calendly refused the booking ({$refusal}), not falling back to Google", [
+                    'email' => $data->email,
+                    'start_time' => $startTime->toIso8601String(),
+                    'event_uri' => $eventUri,
+                ]);
+
+                return [
+                    'success' => false,
+                    'error_code' => $refusal === 'already_filled' ? 'slot_taken' : 'calendly_rejected',
+                    'message' => $refusal === 'already_filled'
+                        ? 'That time was taken by someone else before the booking went through.'
+                        : "Calendly rejected the booking request ({$refusal}).",
                 ];
             }
         }
@@ -193,7 +228,22 @@ class BookMeetingAction
             description: $description,
         );
 
-        $meetUrl = $appointment['conferenceData']['entryPoints'][0]['uri'] ?? 'https://meet.google.com/rl-consult';
+        /*
+         * The fallback's own fallback used to be `success: true` with a uniqid() meeting id and
+         * a hardcoded meet.google.com/rl-consult — a link that is not even a valid Meet code.
+         * A lead was marked booked, sent a confirmation, and counted as a Google Ads conversion
+         * for a meeting that existed on no calendar anywhere. Reporting the failure is also what
+         * puts the lead on the retry ladder in HandlesBookingRetryBackoff.
+         */
+        if ($appointment === null) {
+            return [
+                'success' => false,
+                'error_code' => 'provider_unavailable',
+                'message' => 'Neither Calendly nor Google Calendar could take the booking.',
+            ];
+        }
+
+        $meetUrl = $appointment['conferenceData']['entryPoints'][0]['uri'] ?? $appointment['hangoutLink'] ?? null;
 
         $this->cancelPriorBookingForDifferentSlot($data->email, $startTime->toIso8601String());
 

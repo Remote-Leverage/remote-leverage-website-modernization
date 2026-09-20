@@ -1,8 +1,60 @@
 <div class="w-full" x-data="rlBookingStepScroll()">
+  {{-- "Looking for VA work?" Shown when the partial lead reads as a possible VA — LeadAudience
+       decides that, the same rule as the dashboard's badge and filter; config/booking.php holds
+       only the copy. Checked before the pricing warning because it is a different conversation.
+       The secondary action carries on to the calendar: the rule is a prompt rather than a
+       verdict, and being told you look like an applicant when you came to hire is worse than a
+       wasted call. --}}
+  @if ($showApplicantNotice && ($applicant = $this->applicantNotice()))
+    <div class="w-full max-w-[640px] mx-auto rounded-[28px] bg-brand-purple-deep/95 border border-white/10 p-7 sm:p-9 text-white shadow-2xl"
+         wire:key="va-applicant-notice">
+      <button type="button" wire:click="backFromApplicantNotice" aria-label="Go back"
+              class="w-11 h-11 rounded-full bg-white/90 hover:bg-white text-brand-purple-deep flex items-center justify-center mb-6 transition cursor-pointer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+      </button>
+
+      <h2 class="text-2xl sm:text-[28px] font-bold leading-snug mb-5 whitespace-pre-line">{{ $applicant['heading'] ?? '' }}</h2>
+
+      <div class="space-y-3 text-[15px] leading-relaxed text-white/90">
+        @foreach (($applicant['body'] ?? []) as $block)
+          @if (($block['type'] ?? '') === 'bullet')
+            <div class="flex gap-3 pl-1">
+              <span class="mt-2 w-1.5 h-1.5 rounded-full bg-white/70 shrink-0" aria-hidden="true"></span>
+              <p>{{ $block['text'] ?? '' }}</p>
+            </div>
+          @else
+            <p>
+              @isset($block['lead'])<strong class="font-semibold text-white">{{ $block['lead'] }}</strong> @endisset
+              {{ $block['text'] ?? '' }}
+            </p>
+          @endif
+        @endforeach
+      </div>
+
+      {{-- Alpine rather than wire:click: a Livewire click handler on an anchor risks swallowing
+           the navigation, and a jobs link that does not open is the one failure this panel
+           cannot afford. $wire records the handoff without touching the default action. --}}
+      <a href="{{ $applicant['jobs_url'] }}" target="_blank" rel="noopener"
+         x-on:click="$wire.trackApplicantJobsClick()"
+         class="mt-7 w-full py-4 px-6 rounded-full bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-bold text-base tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shadow-md cursor-pointer">
+        {{ $applicant['button'] ?? 'See VA openings' }}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </a>
+
+      <button type="button" wire:click="dismissApplicantNotice" wire:loading.attr="disabled"
+              class="mt-4 w-full py-2 text-sm font-semibold text-white/80 hover:text-white underline underline-offset-4 transition cursor-pointer disabled:opacity-60">
+        {{ $applicant['continue'] ?? "No — I'm here to hire a VA" }}
+      </button>
+    </div>
+
   {{-- Revenue-band pricing warning. Sits between step 1 and the calendar: the visitor has
        already been captured as a partial lead, so leaving here still produces a lead and a
        Slack alert. See config/booking.php for the copy and which bands trigger it. --}}
-  @if ($showWarning && ($warning = $this->warningForBand()))
+  @elseif ($showWarning && ($warning = $this->warningForBand()))
     <div class="w-full max-w-[640px] mx-auto rounded-[28px] bg-brand-purple-deep/95 border border-white/10 p-7 sm:p-9 text-white shadow-2xl"
          wire:key="pricing-warning">
       <button type="button" wire:click="dismissWarning" aria-label="Go back"

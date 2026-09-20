@@ -27,10 +27,18 @@ trait HandlesBookingRetryBackoff
         BookingRequestData $bookingData,
         ?string $calendlyEventUri,
         string $reason,
-        LeadActivityLogger $activityLogger
+        LeadActivityLogger $activityLogger,
+        bool $retryable = true
     ): void {
         $retryCount = $lead->booking_retry_count + 1;
-        $exhausted = $retryCount > self::MAX_RETRIES;
+
+        /*
+         * Some failures are not worth a ladder. A slot somebody else took is gone, so the five
+         * attempts over the next 32 minutes would all re-submit the same dead time and end where
+         * they started — with the difference that the lead spends half an hour believing a
+         * booking is in flight.
+         */
+        $exhausted = ! $retryable || $retryCount > self::MAX_RETRIES;
 
         $payload = [
             'preferred_slot' => $bookingData->startTime,
@@ -55,9 +63,11 @@ trait HandlesBookingRetryBackoff
             eventType: 'LeadCreated',
             actorDomain: 'Scheduling',
             outcome: 'failed',
-            description: $exhausted
-                ? "Booking failed permanently after {$retryCount} attempts: {$reason}"
-                : "Booking attempt #{$retryCount} failed, retry scheduled: {$reason}",
+            description: match (true) {
+                ! $retryable => "Booking failed and cannot be retried: {$reason}",
+                $exhausted => "Booking failed permanently after {$retryCount} attempts: {$reason}",
+                default => "Booking attempt #{$retryCount} failed, retry scheduled: {$reason}",
+            },
             payload: $payload
         );
 

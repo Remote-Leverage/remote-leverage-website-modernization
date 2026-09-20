@@ -287,6 +287,11 @@ if (! Capsule::schema()->hasTable('rl_leads')) {
         $table->string('source_type')->default('organic')->index();
         $table->string('source_id')->nullable()->index();
         $table->string('status')->default('captured')->index();
+
+        // 2026_09_09_000004_add_booking_retry_columns_to_leads_table.
+        $table->unsignedTinyInteger('booking_retry_count')->default(0);
+        $table->timestamp('booking_next_retry_at')->nullable();
+
         $table->timestamps();
         $table->softDeletes();
     });
