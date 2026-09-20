@@ -14,8 +14,6 @@ use App\Domains\Marketing\Data\FunnelSnapshot;
 use App\Domains\Marketing\Data\PlatformSlice;
 use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Support\AlertWindow;
-use App\Domains\Scheduling\Gateways\CalendlyClient;
-use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -78,8 +76,6 @@ class FunnelMetricsService
     private const TRAILING_SAMPLE = 1000;
 
     public function __construct(
-        private readonly ?CalendlyClient $calendly = null,
-        private readonly ?CalendlyEventTypeRoleResolver $roles = null,
         private readonly ?AlertReconciler $reconciler = null,
         private readonly ?BigQueryClient $warehouse = null,
     ) {}
@@ -94,16 +90,18 @@ class FunnelMetricsService
      * The last warmed snapshot, or null when there is not one yet.
      *
      * **This never computes.** That is the whole point of it. {@see self::snapshot()} runs about
-     * twenty-five queries and, when Calendly is configured, up to four network round trips; it is
-     * the right cost for an hourly job and a wholly unacceptable one for a wp-admin widget that
-     * renders on every dashboard load.
+     * twenty-five queries and two or three warehouse round trips; it is the right cost for an
+     * hourly job and a wholly unacceptable one for a wp-admin widget that renders on every
+     * dashboard load.
      *
      * It used to compute on a miss, via `Cache::remember()`. Two things made that worse than it
      * looks. The cache never actually hit — see {@see FunnelSnapshot::toArray()} for why — so
-     * "on a miss" meant "every time"; and the work it fell back to is dominated by Calendly,
+     * "on a miss" meant "every time"; and the work it fell back to was dominated by Calendly,
      * measured between 1.1 and 10.0 seconds *for the same call*. The admin dashboard therefore
      * took 9 to 16 seconds to finish loading, unpredictably, which is exactly how it was
-     * reported: slow "sometimes".
+     * reported: slow "sometimes". The Calendly calls are gone — the consultation counts come from
+     * the warehouse now — but the read path stays pure regardless: the remaining work is still
+     * twenty-five queries and a warehouse the widget has no business waiting on.
      *
      * So the read path is now pure. {@see self::warmCache()} does the computing, on the hourly
      * cron tick that was already running, and a widget with nothing to show says so.
@@ -137,8 +135,8 @@ class FunnelMetricsService
      * Skips the work when the stored copy is younger than `$minAgeSeconds`, which is what keeps
      * the hourly tick from computing twice: inside the alert's reporting window
      * `SendCostAlertAction` has already computed and stored a fresh snapshot by the time this
-     * runs, and recomputing would mean four more Calendly and Meta round trips for figures that
-     * are seconds old.
+     * runs, and recomputing would mean another round of warehouse queries for figures that are
+     * seconds old.
      */
     public function warmCache(int $ttlSeconds = self::CACHE_TTL, int $minAgeSeconds = 1800): ?FunnelSnapshot
     {
@@ -191,10 +189,9 @@ class FunnelMetricsService
         /*
          * Named steps rather than a spinner.
          *
-         * This method is 25-odd queries and, with Calendly configured, up to four network round
-         * trips measured between 1.1 and 10.0 seconds. A caller watching it needs to know which
-         * of those it is waiting on — "Reading the marketing warehouse" and "Fetching
-         * consultations from Calendly" fail for entirely different reasons and are fixed by
+         * This method is 25-odd queries and two or three warehouse round trips. A caller watching
+         * it needs to know which of those it is waiting on — "Reading the marketing warehouse"
+         * and "Counting leads and bookings" fail for entirely different reasons and are fixed by
          * different people. The percentages are rough and deliberately so; they order the steps,
          * they do not predict them.
          */
@@ -293,14 +290,13 @@ class FunnelMetricsService
         [$trailingBooked, $trailingSize] = $this->bookingRate(self::TRAILING_SAMPLE);
 
         /*
-         * Hoisted out of the constructor call below so each can be announced before it runs.
-         * Calendly is the slowest thing here by an order of magnitude and the one most worth
-         * naming while somebody waits on it.
+         * Hoisted out of the constructor call below so it can be announced before it runs. This
+         * used to be six Calendly round trips and the slowest thing here by an order of
+         * magnitude; it is now one warehouse query covering all three days at once.
          */
-        $step('Fetching consultations from Calendly', 70);
+        $step('Reading the consultation calendar load', 70);
 
-        $consultationsToday = $this->consultationsOn($now);
-        $upcomingConsultations = $this->upcomingConsultations($now);
+        [$consultationsToday, $upcomingConsultations] = $this->consultationLoad($now);
 
         $step('Averaging the previous days', 85);
 
@@ -757,88 +753,68 @@ class FunnelMetricsService
     }
 
     /**
-     * Meetings sitting on the calendar for a given local day, across both revenue tiers.
+     * Calendar load for today and the next two business days, in one warehouse query.
      *
      * Not the same thing as bookings created today, and the legacy alert printed the two under
      * names close enough to be read as one — "Total New Appts: 14" beside "Consultation
      * Appointments Today: 97". This is the calendar's load; that is the day's production.
      *
-     * Null on any failure, and null is rendered as "unavailable" rather than as zero. Calendly
-     * is a network call inside a scheduled job, and an empty calendar and an unreachable one
-     * must not read the same in a channel where an empty calendar means a revenue stop.
+     * ## Why this is not Calendly any more
+     *
+     * It was, until 2026-09-20: `CalendlyClient::countBookedEvents()`, twice per day, over the
+     * event-type URIs in the `t0` and `t10` roles. The account has ten active event types named a
+     * VA Hiring Consultation — the two automated `(A)` tiers the booking wizard writes into, a
+     * shared manual `(M)` type, and one per sales rep — so the card counted two of ten and
+     * reported roughly three quarters of the calendar as the whole of it. On 2026-09-21 it said 80
+     * against a true 112, and sales read the gap as the calendar emptying out and moved to switch
+     * ads off. The failure was silent because every part of it worked: both tiers answered, the
+     * total was internally consistent, and nothing in the count knew the other eight types existed.
+     *
+     * Widening the role list would have fixed that day and not the next one — a rep's event type
+     * is created in Calendly, not here, so the list is wrong again the moment somebody is hired.
+     * `gold.sales_consultation_meetings` matches on the event *name* across every type, drops
+     * cancelled and rescheduled-away meetings, and unions in the consultations that only ever
+     * existed in Google Calendar. See resources/sql/consultation-calendar-load.sql.
+     *
+     * ## One query, three days
+     *
+     * The Calendly version cost two round trips per day and six per snapshot, and was the slowest
+     * thing in it by an order of magnitude — measured between 1.1 and 10.0 seconds for the same
+     * call. This is one query for all three days, about 1.5 seconds warm, and it takes the page
+     * cap, the token pool and the time budget out of this path entirely.
+     *
+     * ## Missing means unavailable; zero means zero
+     *
+     * The query LEFT JOINs the days it was asked about, so a day the warehouse answered for is
+     * present even when nothing is booked on it. A key that is absent therefore means the
+     * warehouse could not be read, and is rendered as "unavailable" rather than as zero — an
+     * empty calendar and an unreadable one must not read the same in a channel where an empty
+     * calendar means a revenue stop. Today legitimately reads 0 at weekends.
+     *
+     * Resolved per day rather than all-or-nothing, which is the opposite of what the Calendly
+     * version did. There it was right: the two tiers were *summed*, so a missing tier made the
+     * total silently wrong. These are three independent figures printed side by side, so one
+     * unreadable day costs that day and not the other two.
+     *
+     * @return array{0: int|null, 1: array<string, int|null>} Today, then "Monday 21st" => count.
      */
-    private function consultationsOn(CarbonImmutable $day): ?int
+    private function consultationLoad(CarbonImmutable $now): array
     {
-        if ($this->calendly === null || $this->roles === null) {
-            return null;
-        }
+        $upcoming = $this->nextBusinessDays($now, 2);
 
-        $fromIso = $day->startOfDay()->utc()->toIso8601String();
-        $toIso = $day->endOfDay()->utc()->toIso8601String();
+        $load = ($this->warehouse ?? new BigQueryClient)->consultationLoad(array_map(
+            static fn (CarbonImmutable $day): string => $day->toDateString(),
+            array_merge([$now], $upcoming),
+        )) ?? [];
 
-        $total = 0;
-        $answered = 0;
-        $asked = 0;
+        $labelled = [];
 
-        foreach (['t0', 't10'] as $role) {
-            try {
-                $uri = (string) $this->roles->get($role);
-
-                if ($uri === '') {
-                    continue;
-                }
-
-                $asked++;
-                $count = $this->calendly->countBookedEvents($uri, $fromIso, $toIso);
-
-                if ($count !== null) {
-                    $total += $count;
-                    $answered++;
-                }
-            } catch (\Throwable $e) {
-                Log::warning('FunnelMetricsService: Calendly consultation count failed', [
-                    'role' => $role,
-                    'day' => $day->toDateString(),
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        /*
-         * Every tier has to answer, or the figure is withheld.
-         *
-         * Summing whichever tiers happened to reply and presenting it as the calendar's load is
-         * the same mistake AdSpendCollector exists to prevent one domain over: T10 answers with 4
-         * while T0's token pool is exhausted, and the card prints "4 consultations today" with no
-         * caveat when the real number is 4 plus every T0 meeting. A partial total is worse than
-         * none, because none gets chased.
-         */
-        return $asked > 0 && $answered === $asked ? $total : null;
-    }
-
-    /**
-     * Calendar load for the next business days, labelled by date.
-     *
-     * Two of them, which is what a Friday afternoon needs: "next business day" on a Friday means
-     * Monday, and the day after it is Tuesday, and neither is obvious from a card that only says
-     * "next business day". Naming them removes the arithmetic from the reader.
-     *
-     * Each day costs two Calendly round trips, so this takes the snapshot from four to six. That
-     * is paid by the hourly job rather than by a page load — the dashboard widget reads the
-     * cached copy the job warms, which is why {@see self::cachedSnapshot()} never computes.
-     *
-     * @return array<string, int|null>
-     */
-    private function upcomingConsultations(CarbonImmutable $now): array
-    {
-        $counts = [];
-
-        foreach ($this->nextBusinessDays($now, 2) as $day) {
+        foreach ($upcoming as $day) {
             // "Monday 21st". The year is not in it: nobody reading a daily card needs it.
-            $counts[$day->format('l jS')] = $this->consultationsOn($day);
+            $labelled[$day->format('l jS')] = $load[$day->toDateString()] ?? null;
         }
 
-        return $counts;
+        return [$load[$now->toDateString()] ?? null, $labelled];
     }
 
     /**

@@ -11,8 +11,6 @@ use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Services\AlertReconciler;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use App\Domains\Marketing\Support\AlertWindow;
-use App\Domains\Scheduling\Gateways\CalendlyClient;
-use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use App\Infrastructure\Slack\SlackTransport;
 use App\Infrastructure\WordPress\Admin\MarketingCostAlertWidget;
 use Illuminate\Support\Facades\Log;
@@ -66,14 +64,6 @@ class MarketingServiceProvider extends ServiceProvider
         $this->app->singleton(BigQueryClient::class, fn () => new BigQueryClient);
 
         $this->app->singleton(FunnelMetricsService::class, fn ($app) => new FunnelMetricsService(
-            /*
-             * Calendly is optional here on purpose. The consultation counts are the one figure in
-             * the alert that needs a network call, and an environment with no Calendly token
-             * should still get every other number rather than no message at all — so the service
-             * takes a null client and renders that line as unavailable.
-             */
-            $app->bound(CalendlyClient::class) ? $app->make(CalendlyClient::class) : null,
-            $app->bound(CalendlyEventTypeRoleResolver::class) ? $app->make(CalendlyEventTypeRoleResolver::class) : null,
             $app->make(AlertReconciler::class),
             $app->make(BigQueryClient::class),
         ));
@@ -107,8 +97,8 @@ class MarketingServiceProvider extends ServiceProvider
      * the only place they can appear.
      *
      * The widget is resolved inside the `wp_dashboard_setup` callback rather than in `boot()`.
-     * Resolving it eagerly pulled the whole graph — FunnelMetricsService, CalendlyClient, the
-     * token pool, the role resolver, the spend collector and the Meta client — into being on
+     * Resolving it eagerly pulled the whole graph — FunnelMetricsService, the warehouse client
+     * and the reconciler — into being on
      * every front-end request, to register one action that only ever fires in wp-admin. The
      * constructors are cheap, so this was waste rather than breakage; the part that was not
      * merely waste is that a throw from any of them would have come out of `boot()` as a 500 on
@@ -125,7 +115,7 @@ class MarketingServiceProvider extends ServiceProvider
          * by `wp_dashboard_setup` the request it needs to intercept is already past.
          *
          * The request parameter is checked *before* the widget is resolved. Resolving it pulls
-         * FunnelMetricsService, CalendlyClient, the token pool and every spend client into being,
+         * FunnelMetricsService, the warehouse client and every spend client into being,
          * and doing that on every admin request to serve a button almost nobody presses is the
          * eagerness this provider already had once.
          */
@@ -266,7 +256,7 @@ class MarketingServiceProvider extends ServiceProvider
              * `execute()` returns early outside the reporting window, so the send cannot be
              * relied on to leave fresh figures behind — but when it has just run, this is nearly
              * free: `warmCache()` no-ops when the stored copy is recent, so it costs a cache read
-             * rather than a second round of Calendly and warehouse calls.
+             * rather than a second round of warehouse calls.
              */
             try {
                 $this->app->make(FunnelMetricsService::class)->warmCache();

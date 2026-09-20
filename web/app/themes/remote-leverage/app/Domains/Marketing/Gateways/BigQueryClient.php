@@ -190,16 +190,113 @@ class BigQueryClient
     }
 
     /**
-     * Run a query and return its first row as `column => value`.
+     * How many consultations sit on the calendar for each of the given local days.
+     *
+     * Replaces the Calendly round trips this figure used to be built from — six per snapshot, two
+     * per day, over the two event-type URIs held in the `t0` and `t10` roles. The account has ten
+     * active event types named a VA Hiring Consultation, so that counted two of ten: on
+     * 2026-09-21 the card said 80 against a true 112, and sales read the gap as the calendar
+     * emptying out. See resources/sql/consultation-calendar-load.sql for why the warehouse view
+     * is a better answer than widening the role list would have been.
+     *
+     * Returns `YYYY-MM-DD => count`, and a day the warehouse answered for is present even when
+     * its count is zero — the query LEFT JOINs the requested days precisely so that an empty
+     * Sunday and an unreachable warehouse are distinguishable. Callers read a missing key as
+     * "unavailable", never as zero.
+     *
+     * Per-day rather than all-or-nothing, which is the opposite of what the Calendly version did.
+     * There it was right: the tiers were *summed*, so a missing tier made the total silently
+     * wrong. These are independent figures printed side by side, so one unreadable day costs that
+     * day and not the other two.
+     *
+     * Null on any failure, like everything else feeding the card.
+     *
+     * @param  array<int, string>  $dates  Local days as YYYY-MM-DD.
+     * @return array<string, int>|null
+     */
+    public function consultationLoad(array $dates): ?array
+    {
+        $problem = $this->misconfiguration();
+
+        if ($problem !== null) {
+            Log::info('BigQueryClient: not reading the consultation calendar load — '.$problem);
+
+            return null;
+        }
+
+        /*
+         * Validated, not bound. queryRows() posts raw SQL with no parameter support, so the only
+         * thing safe to interpolate is a string proven to be exactly a date — the same rule
+         * supplement() follows for @@DATE@@.
+         */
+        $valid = array_values(array_unique(array_filter(
+            $dates,
+            static fn (string $date): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1,
+        )));
+
+        if ($valid === [] || count($valid) !== count($dates)) {
+            Log::warning('BigQueryClient: refusing a consultation load query for malformed dates', [
+                'dates' => $dates,
+            ]);
+
+            return null;
+        }
+
+        $literals = implode(', ', array_map(
+            static fn (string $date): string => "DATE '".$date."'",
+            $valid,
+        ));
+
+        try {
+            $rows = $this->queryRows(str_replace(
+                '@@DATES@@',
+                $literals,
+                $this->sql('consultation-calendar-load'),
+            ));
+        } catch (\Throwable $e) {
+            Log::warning('BigQueryClient: could not read the consultation calendar load', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        $load = [];
+
+        foreach ($rows as $row) {
+            $date = (string) ($row['date'] ?? '');
+
+            if ($date !== '') {
+                $load[$date] = (int) ($row['consultations'] ?? 0);
+            }
+        }
+
+        return $load;
+    }
+
+    /**
+     * Run a query and return its first row as `column => value`, or null when it returned none.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function queryOneRow(string $sql): ?array
+    {
+        $rows = $this->queryRows($sql);
+
+        return $rows === [] ? null : $rows[0];
+    }
+
+    /**
+     * Run a query and return every row as `column => value`.
      *
      * BigQuery's REST response separates the schema from the rows — fields come back as a list of
      * `{v: ...}` in schema order, with no names on them. Zipping them here is what lets the rest
      * of the code read `$row['cpb_paid']` instead of `$row['f'][18]['v']`, which would silently
      * read the wrong column the day somebody adds one to the SELECT.
      *
-     * @return array<string, mixed>|null
+     * @return array<int, array<string, mixed>>
      */
-    private function queryOneRow(string $sql): ?array
+    private function queryRows(string $sql): array
     {
         $response = Http::withToken($this->accessToken())
             ->timeout(self::TIMEOUT_SECONDS)
@@ -249,7 +346,7 @@ class BigQueryClient
         $rows = (array) ($response->json('rows') ?? []);
 
         if ($rows === []) {
-            return null;
+            return [];
         }
 
         $names = array_map(
@@ -257,16 +354,21 @@ class BigQueryClient
             (array) ($response->json('schema.fields') ?? []),
         );
 
-        $values = array_map(
-            static fn ($cell) => is_array($cell) ? ($cell['v'] ?? null) : null,
-            (array) ($rows[0]['f'] ?? []),
-        );
+        return array_values(array_map(
+            static function ($row) use ($names): array {
+                $values = array_map(
+                    static fn ($cell) => is_array($cell) ? ($cell['v'] ?? null) : null,
+                    (array) ((is_array($row) ? $row['f'] : null) ?? []),
+                );
 
-        if (count($names) !== count($values)) {
-            throw new \RuntimeException('the result schema and row do not line up');
-        }
+                if (count($names) !== count($values)) {
+                    throw new \RuntimeException('the result schema and row do not line up');
+                }
 
-        return array_combine($names, $values);
+                return array_combine($names, $values);
+            },
+            $rows,
+        ));
     }
 
     /**

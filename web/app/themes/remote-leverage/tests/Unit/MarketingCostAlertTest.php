@@ -511,7 +511,7 @@ describe('metrics', function () {
          * snapshot is the partition itself. Without it every snapshot in the suite carries the
          * "warehouse did not answer" finding and `warnings` stops being able to say anything.
          */
-        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(costAlertDay([
+        $snapshot = (new FunnelMetricsService(null, warehouseStub(costAlertDay([
             'total_appointments' => '6',
         ]))))->snapshot($now);
 
@@ -707,6 +707,73 @@ describe('the message', function () {
 
         expect(json_encode($transport->posted[0]['blocks']))
             ->toContain('12 today, unavailable Monday 21st, 4 Tuesday 22nd');
+    });
+
+    /*
+     * The figure that started this.
+     *
+     * It came from Calendly until 2026-09-20, counted over the two event-type URIs held in the
+     * `t0` and `t10` roles — two of the ten active event types named a VA Hiring Consultation. On
+     * 2026-09-21 that printed 80 against a true 112, and sales moved to switch ads off over the
+     * gap. It is one warehouse query now, covering all three days at once.
+     */
+    test('the calendar load covers today and the next two business days, from the warehouse', function () {
+        // A Friday, so "the next two business days" has to skip a weekend to reach Monday.
+        $now = CarbonImmutable::parse('2026-09-18 16:00:00', 'UTC');
+
+        $snapshot = (new FunnelMetricsService(null, warehouseStub(null, null, [
+            '2026-09-18' => 75,
+            '2026-09-21' => 112,
+            '2026-09-22' => 45,
+        ])))->snapshot($now);
+
+        expect($snapshot->consultationsToday)->toBe(75)
+            ->and($snapshot->upcomingConsultations)->toBe([
+                'Monday 21st' => 112,
+                'Tuesday 22nd' => 45,
+            ]);
+    });
+
+    /*
+     * The distinction the LEFT JOIN in consultation-calendar-load.sql exists to preserve.
+     *
+     * A day the warehouse answered for is present even at zero; a day it did not answer for is
+     * absent. Those mean opposite things — an empty calendar is a revenue stop somebody has to be
+     * told about, an unreadable one is a pipeline to go and fix — and collapsing them into the
+     * same silence is how a quiet Sunday and a broken warehouse become indistinguishable.
+     */
+    test('a warehouse day with no meetings reads as zero, a day it could not answer for as unavailable', function () {
+        // A Sunday. Nothing is booked, and that is a fact rather than a failure.
+        $now = CarbonImmutable::parse('2026-09-20 16:00:00', 'UTC');
+
+        $snapshot = (new FunnelMetricsService(null, warehouseStub(null, null, [
+            '2026-09-20' => 0,
+            '2026-09-21' => 112,
+            // Tuesday deliberately absent.
+        ])))->snapshot($now);
+
+        expect($snapshot->consultationsToday)->toBe(0)
+            ->and($snapshot->upcomingConsultations)->toBe([
+                'Monday 21st' => 112,
+                'Tuesday 22nd' => null,
+            ]);
+    });
+
+    /*
+     * Resolved per day, not all-or-nothing. The Calendly version withheld the whole figure when
+     * one tier went missing, and was right to: the tiers were summed, so a partial total was a
+     * wrong total. These three are independent figures printed side by side.
+     */
+    test('an unreadable warehouse leaves every calendar day unavailable', function () {
+        $now = CarbonImmutable::parse('2026-09-18 16:00:00', 'UTC');
+
+        $snapshot = (new FunnelMetricsService(null, warehouseStub(null, null, null)))->snapshot($now);
+
+        expect($snapshot->consultationsToday)->toBeNull()
+            ->and($snapshot->upcomingConsultations)->toBe([
+                'Monday 21st' => null,
+                'Tuesday 22nd' => null,
+            ]);
     });
 
     /*
@@ -1022,7 +1089,7 @@ describe('the warehouse half, end to end', function () {
             'utm_source' => 'facebook', 'utm_medium' => 'paid-social', 'created_at' => $now->subHours(3),
         ]), $now->subHour());
 
-        $metrics = new FunnelMetricsService(null, null, null, warehouseStub(null));
+        $metrics = new FunnelMetricsService(null, warehouseStub(null));
         $snapshot = $metrics->snapshot($now);
 
         expect($snapshot->marketingDay)->toBeNull()
@@ -1185,7 +1252,7 @@ describe('the warehouse half, end to end', function () {
             ]), $now->subHour());
         }
 
-        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(costAlertDay())))->snapshot($now);
+        $snapshot = (new FunnelMetricsService(null, warehouseStub(costAlertDay())))->snapshot($now);
 
         expect($snapshot->platforms['meta']->bookings)->toBe(10)
             ->and($snapshot->platforms['meta']->paidBookings())->toBe(6)
@@ -1322,11 +1389,20 @@ function costAlertDay(array $overrides = []): MarketingDay
  * Null is the unreachable case and it is a first-class one: half the tests in this file are about
  * what the card says when the cost figures are not there.
  */
-function warehouseStub(?MarketingDay $day, ?PartialDay $today = null): BigQueryClient
+/**
+ * @param  array<string, int>|null  $consultations  YYYY-MM-DD => count, or null for a warehouse
+ *                                                  that could not answer for the calendar at all.
+ */
+function warehouseStub(?MarketingDay $day, ?PartialDay $today = null, ?array $consultations = null): BigQueryClient
 {
-    return new class($day, $today) extends BigQueryClient
+    return new class($day, $today, $consultations) extends BigQueryClient
     {
-        public function __construct(private ?MarketingDay $day, private ?PartialDay $today) {}
+        /** @param  array<string, int>|null  $consultations */
+        public function __construct(
+            private ?MarketingDay $day,
+            private ?PartialDay $today,
+            private ?array $consultations = null,
+        ) {}
 
         public function isConfigured(): bool
         {
@@ -1341,6 +1417,23 @@ function warehouseStub(?MarketingDay $day, ?PartialDay $today = null): BigQueryC
         public function todaySoFar(): ?PartialDay
         {
             return $this->today;
+        }
+
+        /**
+         * Returns only the requested days it was given counts for, which is what the real client
+         * does: a day the query answered for is present even at zero, and a day it did not is
+         * absent and reads as unavailable.
+         *
+         * @param  array<int, string>  $dates
+         * @return array<string, int>|null
+         */
+        public function consultationLoad(array $dates): ?array
+        {
+            if ($this->consultations === null) {
+                return null;
+            }
+
+            return array_intersect_key($this->consultations, array_flip($dates));
         }
     };
 }
@@ -1427,7 +1520,7 @@ function recordingCostTransport(): object
 function costAlertAction(SlackTransport $transport, ?MarketingDay $day = null, ?PartialDay $today = null): SendCostAlertAction
 {
     return new SendCostAlertAction(
-        new FunnelMetricsService(null, null, null, warehouseStub($day, $today)),
+        new FunnelMetricsService(null, warehouseStub($day, $today)),
         $transport,
         new SlackMessageRenderer,
     );
@@ -1452,7 +1545,7 @@ describe('the day the card reports', function () {
         costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 14:00:00', 'UTC')]);
         costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-20 03:00:00', 'UTC')]);
 
-        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(
+        $snapshot = (new FunnelMetricsService(null, warehouseStub(
             costAlertDay(['Date' => '2026-09-19', 'report_kind' => 'CLOSING']),
             PartialDay::fromRow(['date' => '2026-09-20', 'as_of_et' => '03:52', 'total_leads' => 1]),
         )))->snapshot(CarbonImmutable::parse('2026-09-20 03:52:00', 'UTC'));
@@ -1465,7 +1558,7 @@ describe('the day the card reports', function () {
         // 22:00 yesterday is after a 15:00 read, so an hour-capped baseline must not count it.
         costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-19 22:00:00', 'UTC')]);
 
-        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(costAlertDay([
+        $snapshot = (new FunnelMetricsService(null, warehouseStub(costAlertDay([
             'Date' => '2026-09-20',
             'report_kind' => 'DAY-TO-DATE',
         ]))))->snapshot(CarbonImmutable::parse('2026-09-20 15:00:00', 'UTC'));
@@ -1476,7 +1569,7 @@ describe('the day the card reports', function () {
     test('an unreadable warehouse still counts today', function () {
         costAlertLead(['created_at' => CarbonImmutable::parse('2026-09-20 09:00:00', 'UTC')]);
 
-        $snapshot = (new FunnelMetricsService(null, null, null, warehouseStub(null)))
+        $snapshot = (new FunnelMetricsService(null, warehouseStub(null)))
             ->snapshot(CarbonImmutable::parse('2026-09-20 15:00:00', 'UTC'));
 
         expect($snapshot->leads)->toBe(1);

@@ -32,6 +32,7 @@ are deliberately not duplicated here.
 | The Block Kit layout | `marketing_cost_alert` in [`config/slack-notifications.php`](../config/slack-notifications.php) |
 | The reporting hours, shared by the action and the reconciler | [`AlertWindow`](../app/Domains/Marketing/Support/AlertWindow.php) |
 | Console entry point | [`SendCostAlertCommand`](../app/Domains/Marketing/Commands/SendCostAlertCommand.php) |
+| Calendar load for today and the next two business days | [`consultation-calendar-load.sql`](../resources/sql/consultation-calendar-load.sql) |
 | Wiring, the hourly cron hook, the widget registration | [`MarketingServiceProvider`](../app/Infrastructure/Providers/MarketingServiceProvider.php) |
 | The same snapshot on the wp-admin dashboard | [`MarketingCostAlertWidget`](../app/Infrastructure/WordPress/Admin/MarketingCostAlertWidget.php) |
 | Whether a visit was paid, and if not what kind of free | [`LeadChannel`](../app/Domains/Lead/Services/LeadChannel.php) |
@@ -115,7 +116,7 @@ Decoded from the 2026-09-18 15:00 sample by arithmetic:
 | Last lead | Minutes since the newest lead row | Rebuilt, and now a reconciliation check rather than a neutral statistic |
 | Last booking | Minutes since the newest booking, plus the name | Rebuilt. The name is what makes the line checkable by a human |
 | Last 10 / last 1000 booking rate | Rolling conversion | Rebuilt |
-| Consultation Appointments 97 / 29 | Meetings **on the calendar** today and next business day — not bookings created today | Rebuilt via `CalendlyClient::countBookedEvents()`, and the card now says which of the two it is |
+| Consultation Appointments 97 / 29 | Meetings **on the calendar** today and next business day — not bookings created today | Rebuilt, and the card now says which of the two it is. Was Calendly until 2026-09-20; now one warehouse query — see §11 |
 | `<platform>` Ads: no active issues | Account health: disapprovals, budget exhaustion, billing | Blocked on vendor access |
 
 The arithmetic reconciles cleanly, so the legacy numbers were internally consistent with each
@@ -426,7 +427,7 @@ belongs.
 The cost-alert snapshot renders as a wp-admin dashboard widget, registered whether or not Slack is wired —
 an environment with no bot token is exactly the one where the dashboard is the only place the
 figures can appear. The widget reads a five-minute cache and prints the age of the figures in its
-heading, because a snapshot is around twenty-five queries plus Calendly round trips and that is the
+heading, because a snapshot is around twenty-five queries plus its warehouse round trips and that is the
 wrong cost for every admin page load. The scheduled alert deliberately does not use the cache.
 Neither surface computes anything of its own: if the two ever disagree it is a rendering bug, not a
 measurement one.
@@ -624,3 +625,88 @@ The daily card is for reading. A separate, immediate message when CPB breaches i
 warehouse goes quiet is for acting.
 [`AvailabilityHealthMonitor`](../app/Domains/Scheduling/Services/AvailabilityHealthMonitor.php) is
 already the pattern and is already tested.
+
+---
+
+## 11. The consultation count moved to the warehouse
+
+**2026-09-20.** Sales read the card's "80 consultations tomorrow" against a CRM showing 113 and
+moved to switch ads off, on the reasonable belief that the calendar was emptying out. The true
+figure was 112. The card was wrong, the CRM was very nearly right, and the warehouse had known the
+answer all along.
+
+### What was wrong
+
+`FunnelMetricsService::consultationsOn()` counted two event types:
+
+```php
+foreach (['t0', 't10'] as $role) {
+```
+
+Those are the two tiers the booking wizard writes into. The Calendly account has **ten** active
+event types whose name is a VA Hiring Consultation — the two automated `(A)` tiers, a shared
+manual `(M)` type, and one per sales rep:
+
+| Count on 2026-09-21 | Event type | Counted |
+| ---: | :--- | :--- |
+| 57 | VA Hiring Consultation T10 (A) | yes |
+| 24 | VA Hiring Consultation T0 (A) | yes |
+| 21 | VA Hiring Consultation (M) | **no** |
+| 3 | Janna: VA Hiring Consultation (M) | **no** |
+| 1 each | Andre / Daniel / George / Jhoselyn / Mary / Terry: … (M) | **no** |
+
+81 of 111, and the rest of the calendar was invisible. Nothing failed: both tiers answered, the
+total was internally consistent, and the count had no way to know the other eight types existed.
+It is the same class of error as §3.2 — a number that is right about what it measures and wrong
+about what it is called.
+
+Widening the role list would have fixed that day and not the next. Rep event types are created in
+Calendly, so any list kept here is wrong again the next time somebody is hired.
+
+### What replaced it
+
+[`gold.sales_consultation_meetings`](../resources/sql/consultation-calendar-load.sql), which the
+data team already maintains, and which does more than a corrected role list could:
+
+- matches on the event **name** across every type, so a new rep's calendar counts from day one;
+- takes `status = 'active'`, dropping cancelled and rescheduled-away meetings — there were 52
+  cancelled consultations on 2026-09-21 alone;
+- unions in consultations that only ever existed in Google Calendar — manual and rebooked
+  meetings Calendly cannot see — de-duplicated against Calendly by external event id and by
+  (email, date, hour).
+
+Six Calendly round trips per snapshot became one warehouse query covering all three days, about
+1.5s warm against 1.1–10.0s for the Calendly version, and the page cap, token pool and time budget
+left this path entirely. `CalendlyClient::countBookedEvents()` stays — `TierUtilizationProbe` is
+still its caller.
+
+### Two things that bite
+
+**Count `DISTINCT meeting_key`.** The view's last join is `ON m.client_email = d.email`, so a
+client holding two RecruitCRM deals fans one meeting into two rows. That is the whole of the
+difference between 113 and 112 on 2026-09-21, and it inflated three of the next four days. The CRM
+screenshot that started this said 113 for exactly this reason — so the number sales quoted was
+itself slightly off, in the opposite direction to the card.
+
+**The Google Calendar leg is asymmetric across past and future.** It dedups down to ~1 for a
+future day and leaves 8–21 on a day already underway, because manual and rebooked consultations
+get created close to or on the day:
+
+| Meeting day | Calendly | gold distinct | of which Google Calendar |
+| :--- | ---: | ---: | ---: |
+| Thu 17 (past) | 85 | 98 | 13 |
+| Fri 18 (past) | 75 | 83 | 8 |
+| Mon 21 (future) | 111 | 112 | 1 |
+| Tue 22 (future) | 44 | 45 | 1 |
+
+Each day's figure is right for that day. The three printed side by side are **not** a trend — today
+accumulates a tail that tomorrow has not grown yet, so today reads roughly 10–15% richer by the
+end of it. Do not read a decline off the row.
+
+### A related trap next door
+
+`silver.recruitcrm_deals.consultation_at` is a date stored as midnight UTC — every row for a given
+day sits at hour 00. Converting it to Eastern moves every consultation back a day: bucketed in New
+York it reports 115 on Sep 20 and 43 on Sep 21, when the true Sep 21 figure is 115. Anything
+reading that column with a timezone cast is silently off by one. The gold view sidesteps it by
+going to Calendly's own `start_at`.

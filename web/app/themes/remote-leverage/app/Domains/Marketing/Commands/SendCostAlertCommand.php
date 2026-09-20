@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Marketing\Commands;
 
 use App\Domains\Marketing\Actions\SendCostAlertAction;
+use App\Domains\Marketing\Data\FunnelSnapshot;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use App\Domains\Marketing\Support\DemoSnapshot;
 use Carbon\CarbonImmutable;
@@ -69,6 +70,27 @@ class SendCostAlertCommand extends Command
         $this->info("Today's cost alert is posted or refreshed.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The calendar load in one line, in the same shape and order the card prints it.
+     *
+     * "unavailable" rather than 0 for a day the warehouse could not answer for, because that is
+     * the distinction the whole figure turns on: an empty calendar is a revenue stop, an
+     * unreadable one is a pipeline to fix, and printing both as zero hides one behind the other.
+     */
+    private function consultationLine(FunnelSnapshot $snapshot): string
+    {
+        $parts = [sprintf(
+            '%s today',
+            $snapshot->consultationsToday === null ? 'unavailable' : (string) $snapshot->consultationsToday,
+        )];
+
+        foreach ($snapshot->upcomingConsultations as $label => $count) {
+            $parts[] = sprintf('%s %s', $count === null ? 'unavailable' : (string) $count, $label);
+        }
+
+        return implode(', ', $parts);
     }
 
     /**
@@ -142,6 +164,14 @@ class SendCostAlertCommand extends Command
             ['Bookings (this site)', $snapshot->bookings],
             ['Excluded as VA', $snapshot->excludedVaLeads.' leads, '.$snapshot->excludedVaBookings.' bookings'],
             ['Booking rate', round($snapshot->trailingBookingRate * 100).'%'],
+
+            /*
+             * The calendar load, which `--dry` exists to let somebody check before it reaches a
+             * channel — and which was the one figure on the card not shown here on 2026-09-20,
+             * the day it was wrong by 30 meetings and sales moved to switch ads off. See §11 of
+             * docs/marketing-cost-alerts.md.
+             */
+            ['Consultations', $this->consultationLine($snapshot)],
         ]);
 
         foreach (($day->channels ?? []) as $channel) {
