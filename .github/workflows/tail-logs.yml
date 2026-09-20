@@ -1,0 +1,87 @@
+name: Tail logs
+
+# Nobody on this team has a shell on staging or production, so when a page returns "There has been
+# a critical error" the stack trace is in CloudWatch and effectively unreachable. On 2026-09-20
+# that turned a one-line diagnosis into two wrong guesses and a production revert.
+#
+# This is read-only: it discovers the log group from the running task definition and prints a
+# window of it into the run output.
+on:
+  workflow_dispatch:
+    inputs:
+      github_environment:
+        description: Which environment's logs to read
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+      since:
+        description: How far back to read (e.g. 15m, 2h)
+        type: string
+        default: 30m
+      filter:
+        description: Only lines containing this text (leave empty for everything)
+        type: string
+        default: ''
+
+concurrency:
+  group: tail-logs-${{ inputs.github_environment }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  tail:
+    name: ${{ inputs.github_environment }} logs
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.github_environment }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # The log group lives in the task definition, which is managed outside this repo, so it is
+      # read rather than hardcoded -- a hardcoded guess would silently tail nothing.
+      - name: Find the log group
+        id: group
+        run: |
+          TASK_DEF=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].taskDefinition' --output text)
+          echo "task definition: $TASK_DEF"
+
+          GROUP=$(aws ecs describe-task-definition --task-definition "$TASK_DEF" \
+            --query 'taskDefinition.containerDefinitions[?logConfiguration!=`null`].logConfiguration.options."awslogs-group"' \
+            --output text | head -1)
+
+          if [ -z "$GROUP" ] || [ "$GROUP" = "None" ]; then
+            echo "::error::no awslogs group on the task definition; logs may go elsewhere"
+            exit 1
+          fi
+
+          echo "log group: $GROUP"
+          echo "group=$GROUP" >> "$GITHUB_OUTPUT"
+
+      - name: Print the logs
+        env:
+          GROUP: ${{ steps.group.outputs.group }}
+          SINCE: ${{ inputs.since }}
+          FILTER: ${{ inputs.filter }}
+        run: |
+          echo "::group::$GROUP (last $SINCE)"
+          if [ -n "$FILTER" ]; then
+            aws logs tail "$GROUP" --since "$SINCE" --format short --filter-pattern "$FILTER"
+          else
+            aws logs tail "$GROUP" --since "$SINCE" --format short
+          fi
+          echo "::endgroup::"
