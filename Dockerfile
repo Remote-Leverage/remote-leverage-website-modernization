@@ -103,9 +103,6 @@ COPY docker/www.conf /usr/local/etc/php-fpm.d/www.conf
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY docker/wp-cron.sh /usr/local/bin/wp-cron.sh
-# Read by the entrypoint before it decides whether Acorn may use Redis. Not executable: it is run
-# as `php redis-probe.php`, so it needs no shebang and no exec bit.
-COPY docker/redis-probe.php /usr/local/bin/redis-probe.php
 # Lands as /etc/cron.d/wp-cron: no dot in the name and not group-writable, both of which Debian
 # cron requires before it will read a file there.
 COPY docker/wp-cron.crontab /etc/cron.d/wp-cron
