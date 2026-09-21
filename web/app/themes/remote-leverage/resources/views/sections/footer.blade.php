@@ -73,6 +73,7 @@
           <ul class="space-y-2.5 text-sm">
             <li><a href="{{ home_url('/careers/') }}" class="text-slate-400 hover:text-white transition-colors">{{ __('All Jobs', 'remote-leverage') }}</a></li>
             <li><a href="{{ home_url('/quick-application/') }}" class="text-slate-400 hover:text-white transition-colors">{{ __('Quick Application', 'remote-leverage') }}</a></li>
+            <li><a href="https://remoteleveragejobs.com/" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-white transition-colors">{{ __('Looking for a job?', 'remote-leverage') }}</a></li>
           </ul>
         </div>
 

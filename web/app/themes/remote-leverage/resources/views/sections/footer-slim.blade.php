@@ -45,7 +45,11 @@
     <div class="flex flex-col items-start gap-6 text-[15px] text-slate-300 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
       <p>{{ date('Y') }} {{ $siteName ?? 'Remote Leverage' }} {{ __('All Rights Reserved', 'remote-leverage') }}</p>
 
-      <nav class="flex flex-wrap items-center gap-x-8 gap-y-3" aria-label="{{ __('Legal', 'remote-leverage') }}">
+      {{-- Not purely legal since the jobs link landed, hence the broader label. --}}
+      <nav class="flex flex-wrap items-center gap-x-8 gap-y-3" aria-label="{{ __('Footer', 'remote-leverage') }}">
+        <a href="https://remoteleveragejobs.com/" target="_blank" rel="noopener noreferrer" class="transition-colors hover:text-white">
+          {{ __('Looking for a job?', 'remote-leverage') }}
+        </a>
         <a href="{{ home_url('/terms-of-use/') }}" class="transition-colors hover:text-white">
           {{ __('Terms of Service', 'remote-leverage') }}
         </a>
