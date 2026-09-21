@@ -129,6 +129,52 @@ $app->singleton('cache', function () {
 
             return true;
         }
+
+        /**
+         * Enough of Laravel's lock contract for `MultistepBookingWizard::submitBooking()` to run.
+         *
+         * Its absence is why nothing had ever driven a booking end to end: the very first thing
+         * that method does after building the lead data is take a `Cache::lock()`, so every test
+         * that tried died on `Call to undefined method ::lock()` before reaching the booking. The
+         * whole submit path — capture, the Scheduling listener, the retry ladder, the confirmation
+         * — was unreachable from a test for that one reason.
+         *
+         * Single-process and honest about contention: a second `get()` on a name already held
+         * returns false, which is what the double-submit guard is there to do.
+         */
+        public function lock($name, $seconds = 0, $owner = null)
+        {
+            return new class($this->locks, $name)
+            {
+                public function __construct(private array &$locks, private string $name) {}
+
+                public function get($callback = null)
+                {
+                    if (! empty($this->locks[$this->name])) {
+                        return false;
+                    }
+
+                    $this->locks[$this->name] = true;
+
+                    return $callback === null ? true : $callback();
+                }
+
+                public function release()
+                {
+                    unset($this->locks[$this->name]);
+
+                    return true;
+                }
+
+                public function forceRelease()
+                {
+                    return $this->release();
+                }
+            };
+        }
+
+        /** @var array<string, bool> */
+        protected array $locks = [];
     };
 });
 

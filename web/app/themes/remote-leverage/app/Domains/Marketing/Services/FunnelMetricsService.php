@@ -336,6 +336,14 @@ class FunnelMetricsService
             'warehouse_bookings' => $todaySoFar?->appointments ?? $marketingDay?->appointments,
 
             /*
+             * Bookings this site confirmed and no provider ever issued a meeting for. Read off
+             * our own activity log rather than against the warehouse, for the reason in
+             * {@see self::bookingsWithoutMeeting()}: "no RecruitCRM deal" is mostly people who
+             * are fine, and "no meeting identifier" is nobody who is.
+             */
+            'bookings_without_meeting' => $this->bookingsWithoutMeeting($fromUtc, $toUtc),
+
+            /*
              * How old the warehouse's own copy is, and which ad platforms were still catching up
              * when it was taken. Both are about whether the figures above can be trusted, which is
              * the reconciler's entire job.
@@ -721,6 +729,111 @@ class FunnelMetricsService
             $this->minutesSince($now, CarbonImmutable::parse($log->created_at)),
             $name !== null && trim((string) $name) !== '' ? (string) $name : null,
         ];
+    }
+
+    /**
+     * Bookings this site confirmed that no provider ever issued a meeting for.
+     *
+     * ## Why this is read off our own log rather than against the warehouse
+     *
+     * The obvious version of this question is "which of today's bookings has no RecruitCRM
+     * deal", and it is the wrong one: three of the four reasons a booking legitimately has no
+     * deal are ordinary — a repeat booker reuses the deal opened weeks ago, two lead rows for
+     * one person share a deal, internal bookings never reach the CRM. A list built that way is
+     * mostly people who are fine, which is how a warning stops being read.
+     *
+     * A booking with no meeting *identifier* is not ambiguous. Every real one carries something
+     * the provider issued — a `https://api.calendly.com/...` invitee uri, or a Google event id —
+     * and it is what anybody would use to find, move or cancel the meeting. When that is absent
+     * there is nothing on any calendar, whatever the lead's status says.
+     *
+     * ## The prefixes
+     *
+     * These are the identifiers this application minted for itself when a provider gave it
+     * nothing, each from a `uniqid()` call site in `BookMeetingAction` or `RouteInstantCallAction`.
+     * A lead carrying one was told a consultant was expecting them. Five did between 19 and 21
+     * September; the last, at 10:54 ET on the 21st, is the reason this exists.
+     *
+     * They are matched rather than removed from history because the rows are already written —
+     * and because a list keyed on the fabrication is exact, where one keyed on "no deal" is not.
+     *
+     * @return array<int, string> Lead names, newest booking first.
+     */
+    private function bookingsWithoutMeeting(CarbonImmutable $fromUtc, CarbonImmutable $toUtc): array
+    {
+        $ids = $this->bookedLeadIdsBetween($fromUtc, $toUtc);
+
+        if ($ids === []) {
+            return [];
+        }
+
+        /*
+         * Exactly the three rows that can carry a meeting: the wizard's first attempt and the
+         * retry ladder both log `LeadCreated`/Scheduling, and an instant call logs
+         * `InstantLiveCall`/Scheduling. `LeadBookingCompleted` rows are written by the Slack,
+         * webhook and referral listeners and never hold a payload, so matching on actor alone
+         * would read every booking as meetingless.
+         *
+         * Taking the newest per lead is what keeps a landed retry honest: the first attempt's
+         * failure is a separate row, and the attempt that succeeded carries the real id.
+         *
+         * A lead with none of these rows is deliberately not flagged. That is a booking made at
+         * Calendly directly and reported back by webhook — the meeting demonstrably exists,
+         * because Calendly is the one that told us about it.
+         */
+        $newest = LeadActivityLog::query()
+            ->where('actor_domain', 'Scheduling')
+            ->where('stage', 'consumption')
+            ->where('outcome', 'succeeded')
+            ->whereIn('event_type', ['LeadCreated', 'InstantLiveCall'])
+            ->whereIn('lead_id', $ids)
+            ->orderByDesc('created_at')
+            ->get(['lead_id', 'payload'])
+            ->unique('lead_id');
+
+        $unverified = $newest
+            ->filter(static function (LeadActivityLog $log): bool {
+                $payload = $log->payload ?? [];
+
+                /*
+                 * Two keys, because the two paths that book never agreed on one. The wizard and
+                 * the retry ladder write `meeting_id`; `RouteInstantCallAction` writes
+                 * `invitee_uri` and no `meeting_id` at all. Reading only the first would report
+                 * every instant live call as a booking with no meeting — a warning that fires on
+                 * the healthy case, which is the exact failure this class is meant to avoid.
+                 */
+                $meetingId = trim((string) ($payload['meeting_id'] ?? $payload['invitee_uri'] ?? ''));
+
+                if ($meetingId === '') {
+                    return true;
+                }
+
+                // Every `uniqid()` that has ever reached a `meeting_id`. A real Calendly
+                // identifier is a `https://api.calendly.com/...` uri, so none of these can
+                // collide with one.
+                foreach (['gcal_', 'cal_', 'cal_dedup_', 'live_'] as $minted) {
+                    if (str_starts_with($meetingId, $minted)) {
+                        return true;
+                    }
+                }
+
+                return $meetingId === 'deduplicated';
+            })
+            ->pluck('lead_id')
+            ->all();
+
+        if ($unverified === []) {
+            return [];
+        }
+
+        return Lead::query()
+            ->whereIn('id', $unverified)
+            ->orderByDesc('created_at')
+            ->pluck('name')
+            ->map(static fn ($name): string => trim((string) $name))
+            ->filter(static fn (string $name): bool => $name !== '')
+            ->values()
+            ->all();
     }
 
     private function minutesSince(CarbonImmutable $now, ?CarbonImmutable $then): ?int

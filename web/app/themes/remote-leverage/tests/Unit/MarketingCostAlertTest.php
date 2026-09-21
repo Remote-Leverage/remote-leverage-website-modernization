@@ -103,6 +103,46 @@ function costAlertBooking(Lead $lead, CarbonImmutable $at, string $actor = 'Sche
     $lead->update(['status' => 'booked']);
 }
 
+/**
+ * The row that actually carries the meeting.
+ *
+ * Separate from costAlertBooking() because they are different rows in production and the
+ * distinction is the whole point: the booking is logged by the Slack, webhook and referral
+ * listeners under `LeadBookingCompleted`, and only the Scheduling domain's own `LeadCreated` row
+ * holds the identifier the provider issued.
+ */
+function schedulingMeeting(Lead $lead, CarbonImmutable $at, string $meetingId): void
+{
+    LeadActivityLog::create([
+        'lead_id' => $lead->id,
+        'event_type' => 'LeadCreated',
+        'actor_domain' => 'Scheduling',
+        'stage' => 'consumption',
+        'outcome' => 'succeeded',
+        'payload' => ['meeting_id' => $meetingId, 'provider' => 'calendly'],
+        'created_at' => $at->format('Y-m-d H:i:s'),
+    ]);
+}
+
+/**
+ * The phantom-booking finding out of a snapshot's warnings, or null.
+ *
+ * Picked out by substring rather than asserting on the whole array, so these tests say nothing
+ * about whether the warehouse answered — which, with no BigQuery credential, it usually has not.
+ *
+ * @param  array<int, string>  $warnings
+ */
+function phantomBookingFinding(array $warnings): ?string
+{
+    foreach ($warnings as $warning) {
+        if (str_contains($warning, 'no meeting on any calendar')) {
+            return $warning;
+        }
+    }
+
+    return null;
+}
+
 beforeEach(function () {
     Lead::query()->forceDelete();
     LeadActivityLog::query()->delete();
@@ -269,12 +309,69 @@ describe('reconciliation', function () {
      * A quarter, floored at three: a quiet morning where one booking differs must not cry wolf,
      * and a day where thirty do must not pass.
      */
-    test('a wide gap between the warehouse bookings and this site is flagged', function () use ($clean) {
+    /*
+     * The finding that would have caught Marvin Rodriguez at 10:54 ET on 2026-09-21, and the four
+     * before him, instead of a warehouse gap being investigated for an unrelated reason three
+     * days later.
+     */
+    test('a booking with no meeting anywhere is named, not counted', function () use ($clean) {
+        $findings = (new AlertReconciler)->check([
+            ...$clean,
+            'bookings_without_meeting' => ['Marvin Rodriguez'],
+        ]);
+
+        expect($findings)->toHaveCount(1)
+            ->and($findings[0])->toContain('Marvin Rodriguez is marked booked with no meeting')
+            ->and($findings[0])->toContain('This needs a call');
+    });
+
+    test('several of them are listed by name and lead the card', function () use ($clean) {
+        $findings = (new AlertReconciler)->check([
+            ...$clean,
+            // Also a wide warehouse surplus, to pin the ordering: a person to call outranks a
+            // number to reconcile.
+            'warehouse_bookings' => 40,
+            'bookings_without_meeting' => ['Susan Ornstein', 'Virji Angelo', 'Patrick Chism'],
+        ]);
+
+        expect($findings)->toHaveCount(2)
+            ->and($findings[0])->toContain('3 bookings are marked booked')
+            ->and($findings[0])->toContain('Susan Ornstein, Virji Angelo and Patrick Chism')
+            ->and($findings[1])->toContain('warehouse reports 40 bookings');
+    });
+
+    test('bookings that all name a real meeting say nothing', function () use ($clean) {
+        expect((new AlertReconciler)->check([...$clean, 'bookings_without_meeting' => []]))->toBe([]);
+    });
+
+    test('a warehouse well ahead of this site is flagged', function () use ($clean) {
+        // The lag runs one way only — a site booking becomes a RecruitCRM deal minutes later, never
+        // the reverse — so a surplus in the warehouse cannot be the lag.
         $findings = (new AlertReconciler)->check([...$clean, 'warehouse_bookings' => 40]);
 
         expect($findings)->toHaveCount(1)
             ->and($findings[0])->toContain('warehouse reports 40 bookings')
-            ->and($findings[0])->toContain('this site recorded 10');
+            ->and($findings[0])->toContain('this site recorded only 10');
+    });
+
+    /*
+     * The 2026-09-21 11:05 card, which said "4 bookings today and this site recorded 10" and was
+     * wrong to call it a contradiction. All ten reconciled against the four: three of them were
+     * repeat bookers whose RecruitCRM deal was opened on 1, 7 and 18 September, two were one
+     * person submitting twice, one was an internal test, and the newest were simply still inside
+     * the few minutes it takes a deal to appear.
+     */
+    test('a warehouse behind this site is the normal shape of a day in progress', function () use ($clean) {
+        expect((new AlertReconciler)->check([...$clean, 'warehouse_bookings' => 4]))->toBe([])
+            ->and((new AlertReconciler)->check([...$clean, 'warehouse_bookings' => 1]))->toBe([]);
+    });
+
+    test('no deals at all against a site that has been booking is the CRM intake stopping', function () use ($clean) {
+        $findings = (new AlertReconciler)->check([...$clean, 'warehouse_bookings' => 0]);
+
+        expect($findings)->toHaveCount(1)
+            ->and($findings[0])->toContain('no bookings today')
+            ->and($findings[0])->toContain('CRM intake has stopped');
     });
 
     test('the two booking counts differing a little is not a finding', function () use ($clean) {
@@ -473,6 +570,77 @@ describe('metrics', function () {
         }
 
         expect((new FunnelMetricsService)->snapshot($now)->bookings)->toBe(1);
+    });
+
+    /*
+     * End to end, because the wiring is the part that can be wrong while both halves look right:
+     * the meeting lives on a `LeadCreated`/Scheduling row, and the booking that makes the lead
+     * count lives on a `LeadBookingCompleted` row written by a different listener.
+     */
+    test('a booking whose meeting id was minted here reaches the card by name', function () {
+        $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
+
+        $phantom = costAlertLead(['name' => 'Marvin Rodriguez', 'created_at' => $now->subHours(2)]);
+        costAlertBooking($phantom, $now->subHour());
+        schedulingMeeting($phantom, $now->subHour(), 'gcal_6ab1450a4b7021.28353181');
+
+        $real = costAlertLead(['name' => 'Vanessa Mayer', 'created_at' => $now->subHours(2)]);
+        costAlertBooking($real, $now->subHour());
+        schedulingMeeting($real, $now->subHour(), 'https://api.calendly.com/scheduled_events/af92/invitees/592e');
+
+        $finding = phantomBookingFinding((new FunnelMetricsService)->snapshot($now)->warnings);
+
+        expect($finding)->not->toBeNull()
+            ->and($finding)->toContain('Marvin Rodriguez')
+            ->and($finding)->not->toContain('Vanessa Mayer');
+    });
+
+    test('a retry that lands clears a first attempt that did not', function () {
+        $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
+
+        $lead = costAlertLead(['name' => 'Retried', 'created_at' => $now->subHours(2)]);
+        costAlertBooking($lead, $now->subHour());
+
+        schedulingMeeting($lead, $now->subMinutes(40), 'gcal_first_attempt');
+        schedulingMeeting($lead, $now->subMinutes(10), 'https://api.calendly.com/scheduled_events/ok/invitees/ok');
+
+        // The newest Scheduling row is the one that counts, or every landed retry would be
+        // reported for the attempt before it.
+        expect(phantomBookingFinding((new FunnelMetricsService)->snapshot($now)->warnings))->toBeNull();
+    });
+
+    test('an instant live call is not reported as a booking with no meeting', function () {
+        $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
+
+        $lead = costAlertLead(['name' => 'Live Caller', 'created_at' => $now->subHours(2)]);
+        costAlertBooking($lead, $now->subHour());
+
+        /*
+         * RouteInstantCallAction writes `invitee_uri` and no `meeting_id`. A detector reading only
+         * `meeting_id` reports every healthy live call as a phantom — the warning that fires on
+         * the good case, which is worse than no warning.
+         */
+        LeadActivityLog::create([
+            'lead_id' => $lead->id,
+            'event_type' => 'InstantLiveCall',
+            'actor_domain' => 'Scheduling',
+            'stage' => 'consumption',
+            'outcome' => 'succeeded',
+            'payload' => ['meeting_url' => 'https://calendly.com/x', 'invitee_uri' => 'https://api.calendly.com/invitees/live'],
+            'created_at' => $now->subHour()->format('Y-m-d H:i:s'),
+        ]);
+
+        expect(phantomBookingFinding((new FunnelMetricsService)->snapshot($now)->warnings))->toBeNull();
+    });
+
+    test('a booking made at Calendly and reported by webhook is not flagged', function () {
+        $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
+
+        $lead = costAlertLead(['name' => 'Webhook Booker', 'created_at' => $now->subHours(2)]);
+        // No Scheduling row at all: the wizard never ran. Calendly is the one that told us.
+        costAlertBooking($lead, $now->subHour(), 'Slack');
+
+        expect(phantomBookingFinding((new FunnelMetricsService)->snapshot($now)->warnings))->toBeNull();
     });
 
     test("a lead captured yesterday that books today is today's booking", function () {
@@ -1222,7 +1390,7 @@ describe('the warehouse half, end to end', function () {
         $json = (string) json_encode($transport->posted[0]['blocks']);
 
         expect($json)->toContain('warehouse reports 40 bookings')
-            ->and($json)->toContain('this site recorded 1')
+            ->and($json)->toContain('this site recorded only 1')
             ->and($transport->posted[0]['color'])->toBe('#b91c1c');
     });
 
@@ -1579,7 +1747,7 @@ describe('the day the card reports', function () {
         $findings = (new AlertReconciler)->check([
             'leads' => 124, 'bookings' => 82, 'platform_bookings' => 82, 'booked_by_status' => 82,
             'last_lead_minutes' => 5, 'last_booking_minutes' => 20, 'within_window' => true,
-            'warehouse_bookings' => 3,
+            'warehouse_bookings' => 0,
             'report_date' => '2026-09-19',
             'report_is_closing' => true,
         ]);

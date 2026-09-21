@@ -39,13 +39,15 @@ Defined via `Config::define()` in `config/application.php` and `config/environme
 
 The four event-type vars seed `CalendlyEventTypeRoleResolver` (option `rl_calendly_event_type_roles`); once set in wp-admin, the option wins.
 
-## Scheduling — Google Calendar
+## Scheduling — live calls
 
 | Variable | Read by |
 | :--- | :--- |
-| `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_CALENDAR_REFRESH_TOKEN`, `GOOGLE_CALENDAR_ID` | `GoogleCalendarClient` (`GOOGLE_CALENDAR_ID` defaults to `primary`) |
 | `LIVE_CALL_MEET_URL` | `LiveCallAvailabilityRouter` — overrides the default Meet room. **Not in `.env` or `.env.example`.** |
-| `STRATEGY_CONSULTANT_EMAIL` | Instant-call routing. **Not in `.env` or `.env.example`.** |
+
+The `GOOGLE_CALENDAR_*` keys and `STRATEGY_CONSULTANT_EMAIL` were read by the Google Calendar
+booking fallback, removed on 2026-09-21 — see [domains/scheduling.md](domains/scheduling.md) for
+why. Nothing reads them now; they are safe to drop from `.env` and from Secrets Manager.
 
 ## Lead
 
@@ -162,7 +164,7 @@ Verified by grepping `app/`, `config/`, `resources/`, `routes/` and the Bedrock 
 | `BARBA_ENABLED` | No Barba.js in the codebase |
 | `LOCOMOTIVE_ENABLED` | No Locomotive Scroll in the codebase |
 | `PRISM_SERVER_ENABLED` | `PrismAiAuditor` does not read it |
-| `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | The code reads `GOOGLE_CALENDAR_CLIENT_ID`/`_SECRET` |
+| `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_CALENDAR_*`, `STRATEGY_CONSULTANT_EMAIL` | Nothing — the Google Calendar booking fallback was removed on 2026-09-21 |
 
 `STRIPE_TEST_KEY` / `STRIPE_TEST_SECRET` were on the same kill list in an earlier draft of [known-issues.md](known-issues.md) and **were kept** — see the Referral table above: the embedded card checkout reads them through `services.stripe.test_publishable_key` / `test_secret_key`.
 
@@ -181,7 +183,7 @@ It is now generated from the tables above: every key the code reads, grouped by 
 - a key with **no** code default is present and blank (`CALENDLY_WEBHOOK_SIGNING_KEY=`);
 - a key **with** a working code default is commented out with the default shown (`# GOOGLE_CALENDAR_ID='primary'`), so copying the template does not silently blank it.
 
-The keys that fall in the second group: `DB_HOST`, `DB_PREFIX`, `CALENDLY_DEFAULT_EVENT_TYPE`, `CALENDLY_T10_EVENT_TYPE`, `CALENDLY_T0_EVENT_TYPE`, `GOOGLE_CALENDAR_ID`, `LIVE_CALL_MEET_URL`, `STRATEGY_CONSULTANT_EMAIL`, `POSTHOG_HOST`, `STRIPE_TEST_MODE`, `REFERRAL_DEFAULT_REWARD_AMOUNT`, and every `AI_AGENT_*`.
+The keys that fall in the second group: `DB_HOST`, `DB_PREFIX`, `CALENDLY_DEFAULT_EVENT_TYPE`, `CALENDLY_T10_EVENT_TYPE`, `CALENDLY_T0_EVENT_TYPE`, `LIVE_CALL_MEET_URL`, `POSTHOG_HOST`, `STRIPE_TEST_MODE`, `REFERRAL_DEFAULT_REWARD_AMOUNT`, and every `AI_AGENT_*`.
 
 ## AI content agent
 

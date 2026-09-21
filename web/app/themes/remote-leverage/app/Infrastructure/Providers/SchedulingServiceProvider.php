@@ -11,7 +11,6 @@ use App\Domains\Scheduling\Events\LiveCallRequested;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Gateways\CalendlyMetadataCache;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
-use App\Domains\Scheduling\Gateways\GoogleCalendarClient;
 use App\Domains\Scheduling\Listeners\HandleLeadCreatedForBooking;
 use App\Domains\Scheduling\Listeners\HandleLiveCallEventsForSlack;
 use App\Domains\Scheduling\Services\CalendlyEventTypeDiscoveryService;
@@ -34,7 +33,6 @@ class SchedulingServiceProvider extends ServiceProvider
         $this->app->singleton(CalendlyMetadataCache::class);
         $this->app->singleton(CalendlyEventTypeDiscoveryService::class);
         $this->app->singleton(CalendlyEventTypeRoleResolver::class);
-        $this->app->singleton(GoogleCalendarClient::class, fn () => new GoogleCalendarClient);
         $this->app->singleton(LiveCallAvailabilityRouter::class, fn () => new LiveCallAvailabilityRouter);
         $this->app->singleton(TierUtilizationProbe::class);
         $this->app->singleton(HandleLeadCreatedForBooking::class);

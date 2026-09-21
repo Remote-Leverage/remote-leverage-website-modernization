@@ -11,7 +11,6 @@ use App\Domains\Scheduling\Data\BookingRequestData;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Gateways\CalendlyMetadataCache;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
-use App\Domains\Scheduling\Gateways\GoogleCalendarClient;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Facade;
@@ -69,15 +68,8 @@ describe('a slot taken out from under a booking', function () {
             ->and($client->lastInviteeErrorCode())->toBeNull();
     });
 
-    test('the booking fails instead of falling through to Google Calendar', function () {
+    test('a refused slot is a failure, with nowhere left to fall through to', function () {
         Http::fake(['api.calendly.com/*' => Http::response(SLOT_TAKEN_BODY, 400)]);
-
-        $google = $this->createMock(GoogleCalendarClient::class);
-        /*
-         * The heart of it. Google would happily create an event at a time the consultant is now
-         * booked by whoever won the race, and hand this visitor a confirmation for it.
-         */
-        $google->expects($this->never())->method('createAppointment');
 
         $activityLogger = $this->createMock(LeadActivityLogger::class);
         $activityLogger->method('findRecentBookingForSlot')->willReturn(null);
@@ -92,7 +84,6 @@ describe('a slot taken out from under a booking', function () {
 
         $action = new BookMeetingAction(
             new CalendlyClient($pool),
-            $google,
             $pool,
             $roles,
             $metadata,
@@ -105,11 +96,11 @@ describe('a slot taken out from under a booking', function () {
             ->and($result['error_code'])->toBe('slot_taken');
     });
 
-    test('a failed Google fallback is a failure, not a confirmation for a meeting nobody has', function () {
-        // No pooled tokens, so Path A is skipped entirely and Path B is the whole story.
-        $google = $this->createMock(GoogleCalendarClient::class);
-        $google->method('createAppointment')->willReturn(null);
-
+    test('no usable Calendly credential is a failure, not a confirmation for a meeting nobody has', function () {
+        /*
+         * No pooled tokens, so Calendly is skipped. This used to be the point where the Google
+         * fallback took over and invented a booking; there is no second provider now.
+         */
         $activityLogger = $this->createMock(LeadActivityLogger::class);
         $activityLogger->method('findRecentBookingForSlot')->willReturn(null);
 
@@ -123,7 +114,6 @@ describe('a slot taken out from under a booking', function () {
 
         $action = new BookMeetingAction(
             new CalendlyClient($pool),
-            $google,
             $pool,
             $roles,
             $metadata,
@@ -139,6 +129,66 @@ describe('a slot taken out from under a booking', function () {
         expect($result['success'])->toBeFalse()
             ->and($result['error_code'])->toBe('provider_unavailable')
             ->and($result)->not->toHaveKey('meet_url');
+    });
+
+    /*
+     * The 19–21 September phantoms, and why there is one provider now.
+     *
+     * Five leads were marked booked carrying a `uniqid()` this code minted when a provider
+     * returned nothing nameable — the last at 10:54 ET on 21 September, with a `gcal_` id and
+     * `https://meet.google.com/rl-consult` for a meeting on no calendar. Every one of them came
+     * through the Google fallback, which in the whole history of this application produced five
+     * bookings and zero real events. It is gone; this is the same failure mode on the path that
+     * remains.
+     */
+    test('a Calendly invitee with no uri is a failure, not a made-up reference', function () {
+        // 201, and nothing in it names the invitee Calendly says it created.
+        Http::fake(['api.calendly.com/*' => Http::response(['resource' => ['status' => 'active']], 201)]);
+
+        $activityLogger = $this->createMock(LeadActivityLogger::class);
+        $activityLogger->method('findRecentBookingForSlot')->willReturn(null);
+
+        $metadata = $this->createMock(CalendlyMetadataCache::class);
+        $metadata->method('getEventQuestions')->willReturn([]);
+
+        $roles = $this->createMock(CalendlyEventTypeRoleResolver::class);
+        $roles->method('get')->willReturn('https://api.calendly.com/event_types/t10');
+
+        $pool = new CalendlyTokenPool([['label' => 'Pool 1', 'token' => 'tok-no-uri', 'enabled' => true]]);
+
+        $result = (new BookMeetingAction(
+            new CalendlyClient($pool), $pool, $roles, $metadata, $activityLogger,
+        ))->execute(bookingRequest());
+
+        expect($result['success'])->toBeFalse()
+            ->and($result['error_code'])->toBe('provider_unavailable')
+            ->and($result)->not->toHaveKey('meeting_id');
+    });
+
+    test('a prior booking log naming no meeting is not replayed as a success', function () {
+        $stale = new LeadActivityLog(['payload' => ['provider' => 'google_calendar', 'meet_url' => null]]);
+
+        $activityLogger = $this->createMock(LeadActivityLogger::class);
+        $activityLogger->method('findRecentBookingForSlot')->willReturn($stale);
+
+        $metadata = $this->createMock(CalendlyMetadataCache::class);
+        $metadata->method('getEventQuestions')->willReturn([]);
+
+        $roles = $this->createMock(CalendlyEventTypeRoleResolver::class);
+        $roles->method('get')->willReturn('https://api.calendly.com/event_types/t10');
+
+        $pool = new CalendlyTokenPool([]);
+
+        $result = (new BookMeetingAction(
+            new CalendlyClient($pool), $pool, $roles, $metadata, $activityLogger,
+        ))->execute(bookingRequest());
+
+        /*
+         * Otherwise one phantom booking becomes the answer to every retry for the next five
+         * minutes, and the failure confirms itself.
+         */
+        expect($result['success'])->toBeFalse()
+            ->and($result['error_code'])->toBe('provider_unavailable');
     });
 
     test('a slot that is gone is not put on the retry ladder', function () {

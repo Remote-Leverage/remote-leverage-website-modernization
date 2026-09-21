@@ -105,8 +105,8 @@ class LeadActivityLogger
      * Bonus reschedule support: the most recent prior real Calendly booking
      * for this email at a DIFFERENT slot than the one just booked, so it can
      * be canceled. Ignores the fake 'deduplicated' placeholder, bookings with
-     * no real meeting_id, and non-Calendly (Google Calendar fallback)
-     * bookings — nothing cancelable there. Not time-windowed like the dedup
+     * no real meeting_id, and any non-Calendly provider left in the log by the
+     * former Google fallback — nothing cancelable there. Not time-windowed like the dedup
      * guard above: a reschedule of a booking made hours ago should still be
      * caught, not just one from the last few minutes.
      */

@@ -7,7 +7,7 @@ namespace App\Domains\Lead\Events;
 use App\Domains\Lead\Models\Lead;
 
 /**
- * Dispatched when Scheduling successfully books the Calendly / Google Calendar consultation for a Lead.
+ * Dispatched when Scheduling successfully books the Calendly consultation for a Lead.
  */
 class LeadBookingCompleted
 {

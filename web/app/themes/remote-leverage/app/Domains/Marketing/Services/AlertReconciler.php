@@ -43,6 +43,7 @@ class AlertReconciler
      *     platform_bookings: int,
      *     within_window: bool,
      *     booked_by_status?: int,
+     *     bookings_without_meeting?: array<int, string>,
      *     warehouse_bookings?: int|null,
      *     warehouse_unavailable?: bool,
      *     warehouse_age_minutes?: int|null,
@@ -159,43 +160,117 @@ class AlertReconciler
         }
 
         /*
+         * Bookings this site confirmed that no provider issued a meeting for.
+         *
+         * The first finding here that is about a person rather than a number, and deliberately so
+         * — it is the only one somebody can act on within the hour, by picking up a phone. Each
+         * of these leads reached `booked`, was shown a confirmation, and has nothing on any
+         * calendar; the consultant does not know they are coming and they do not know nobody is
+         * expecting them.
+         *
+         * Named rather than counted for the same reason `lastBookingName` is: "3 bookings have no
+         * meeting" is a number nobody can chase, and three names are three calls.
+         *
+         * Placed first because it outranks every cost figure on the card. Between 19 and 21
+         * September five of these accumulated unnoticed, and the one that surfaced them did so
+         * only because a warehouse gap was being investigated for an unrelated reason.
+         */
+        $withoutMeeting = array_values(array_filter(
+            (array) ($facts['bookings_without_meeting'] ?? []),
+            static fn ($name): bool => is_string($name) && trim($name) !== '',
+        ));
+
+        if ($withoutMeeting !== []) {
+            $findings[] = count($withoutMeeting) === 1
+                ? sprintf(
+                    '%s is marked booked with no meeting on any calendar. Nothing was created at Calendly '.
+                    'or Google, so no consultant is expecting them and they have been told otherwise. '.
+                    'This needs a call, not a fix.',
+                    $withoutMeeting[0],
+                )
+                : sprintf(
+                    '%d bookings are marked booked with no meeting on any calendar — %s. Nothing was created '.
+                    'at Calendly or Google, so no consultant is expecting them and they have been told '.
+                    'otherwise. These need calls, not a fix.',
+                    count($withoutMeeting),
+                    self::plainList($withoutMeeting),
+                );
+        }
+
+        /*
          * The warehouse's booking count against this site's own.
          *
-         * They are allowed to differ — different definitions, different load times, and the site
-         * excludes likely VA applicants where the warehouse may not. A wide gap is different: the
-         * card reports the warehouse's number, so if the site recorded materially fewer or more,
-         * one of the two is wrong and nobody should be dividing spend by either until it is known
-         * which.
+         * ## Why this is no longer a symmetric gap check
          *
-         * A quarter, floored at three, so a quiet morning where one booking differs does not cry
-         * wolf and a busy day where forty do is caught.
+         * It used to fire whenever the two differed by more than a quarter, and say that one of
+         * them must be wrong. On 2026-09-21 at 11:05 it reported 4 against 10 and neither number
+         * was wrong: the ten reconciled against the four exactly, record by record, once you knew
+         * what each side counts.
+         *
+         * `vw_mkt_home_daily.bookings` does not read this site. It counts **RecruitCRM deals
+         * created** that day, from `vw_mkt_deals`. This site counts leads whose first
+         * `LeadBookingCompleted` lands that day. Four things separate them, all of them ordinary:
+         *
+         *   - a 4–8 minute lag from a site booking to the deal existing, so the newest bookings
+         *     are always missing from the warehouse on a day-to-date card;
+         *   - **a repeat booker opens no new deal.** Three of that morning's ten already had
+         *     deals from 1, 7 and 18 September, so the warehouse counted them on those days;
+         *   - two lead rows for one person are two bookings here and one deal there;
+         *   - internal and test bookings are booked on the site and never reach the CRM.
+         *
+         * And it runs the other way too: deals are created in RecruitCRM by hand, which this site
+         * never sees. So `warehouse < site` on a day in progress is the normal shape, and a check
+         * that fires on the normal shape teaches people to skip the warnings — which is the thing
+         * this class exists to prevent.
+         *
+         * ## What is still worth saying
+         *
+         * Two asymmetric cases, both of which mean a pipeline rather than a definition:
+         *
+         *   - the warehouse is materially *ahead* of the site. The lag only runs one way, so this
+         *     is not the lag. Either booking logging here has stopped, or a batch of deals was
+         *     created outside the site;
+         *   - the warehouse is at zero while this site has been booking all day. That is the CRM
+         *     intake having stopped, and every cost figure on the card divides by it.
          */
         $warehouseBookings = $facts['warehouse_bookings'] ?? null;
         $siteBookings = (int) ($facts['bookings'] ?? 0);
 
         if ($warehouseBookings !== null) {
-            $gap = abs((int) $warehouseBookings - $siteBookings);
-            $tolerance = max(3, (int) ceil(max((int) $warehouseBookings, $siteBookings) * 0.25));
+            $warehouseBookings = (int) $warehouseBookings;
 
-            if ($gap > $tolerance) {
-                /*
-                 * Name the day rather than saying "today".
-                 *
-                 * Before 08:00 Eastern the warehouse reports yesterday closed and this card
-                 * follows it, so "today" would be false on exactly the cards most likely to
-                 * surprise someone. It was also what made this warning unreadable when the two
-                 * halves covered different days: it shouted that one source was wrong when the
-                 * real answer was that they were not being compared.
-                 */
-                $when = ($facts['report_is_closing'] ?? false) && ($facts['report_date'] ?? '') !== ''
-                    ? 'on '.$facts['report_date']
-                    : 'today';
+            /*
+             * Name the day rather than saying "today".
+             *
+             * Before 08:00 Eastern the warehouse reports yesterday closed and this card follows
+             * it, so "today" would be false on exactly the cards most likely to surprise someone.
+             */
+            $when = ($facts['report_is_closing'] ?? false) && ($facts['report_date'] ?? '') !== ''
+                ? 'on '.$facts['report_date']
+                : 'today';
 
+            /*
+             * A quarter, floored at three, so a quiet morning where one booking differs does not
+             * cry wolf and a busy day where forty do is caught.
+             */
+            $tolerance = max(3, (int) ceil(max($warehouseBookings, $siteBookings) * 0.25));
+
+            if ($warehouseBookings - $siteBookings > $tolerance) {
                 $findings[] = sprintf(
-                    'The warehouse reports %d bookings %s and this site recorded %d. The figures above are '.
-                    'the warehouse\'s; a gap this wide means one of the two is wrong.',
-                    (int) $warehouseBookings,
+                    'The warehouse reports %d bookings %s and this site recorded only %d. The warehouse counts '.
+                    'RecruitCRM deals, which normally lag this site rather than lead it, so a surplus there is '.
+                    'either booking logging having stopped here or deals created outside the site.',
+                    $warehouseBookings,
                     $when,
+                    $siteBookings,
+                );
+            } elseif ($warehouseBookings === 0 && $siteBookings > $tolerance) {
+                $findings[] = sprintf(
+                    'The warehouse reports no bookings %s while this site recorded %d. The two count different '.
+                    'things — deals created against bookings taken — but not one deal against %d of them means '.
+                    'the CRM intake has stopped, and every cost per booking above divides by zero.',
+                    $when,
+                    $siteBookings,
                     $siteBookings,
                 );
             }
@@ -253,6 +328,25 @@ class AlertReconciler
         }
 
         return intdiv($minutes, 60).'h '.($minutes % 60).'m';
+    }
+
+    /**
+     * "Ada", "Ada and Grace", "Ada, Grace and Marvin" — no verb attached.
+     *
+     * Separate from {@see self::andList()}, which appends "is"/"are" for the stale-platform
+     * sentence and reads wrong anywhere the list is not the end of a clause.
+     *
+     * @param  array<int, string>  $items
+     */
+    private static function plainList(array $items): string
+    {
+        if (count($items) === 1) {
+            return $items[0];
+        }
+
+        $last = array_pop($items);
+
+        return implode(', ', $items).' and '.$last;
     }
 
     /**

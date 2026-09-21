@@ -70,7 +70,7 @@ flowchart TB
 | Class | Does |
 | :--- | :--- |
 | `FetchAvailableSlotsAction` | Real-time available intervals for a date range, in the visitor's timezone, for a given event type |
-| `BookMeetingAction` | Creates the invitee (Calendly) or the appointment (Google Calendar), returns the meeting URL |
+| `BookMeetingAction` | Creates the Calendly invitee and returns the meeting URL, or reports a failure. Calendly is the only provider — see below |
 | `RetryFailedBookingAction` | Re-attempts a booking that failed, using `HandlesBookingRetryBackoff` and the `booking_retry_count` / `booking_next_retry_at` columns on `rl_leads` |
 | `RouteInstantCallAction` | Decides whether a consultant is available now and where to send the visitor |
 | `WarmCalendlyMetadataCacheAction` | Pre-fetches event-type metadata twice daily so the first booking of the day is not slow |
@@ -82,7 +82,15 @@ flowchart TB
 | `CalendlyClient` | The API surface: `getAvailableSlots`, `countBookedEvents`, `getEventType`, `getEventQuestions`, `createInvitee`, `findExistingInvitee`, `cancelScheduledEvent`, `getScheduledEvent`, `getInvitee`, `pollForMeetLocation`. Token selection goes through the pool; `getForToken()` exists for calls that must use a specific one. |
 | `CalendlyMetadataCache` | Caches event types and questions; `warm()`, `forget()`, `forgetAll()`. Schedules `rl_calendly_refresh_questions` as a single WP-Cron event rather than refetching inline. |
 | `CalendlyTokenPool` | Above. |
-| `GoogleCalendarClient` | `createAppointment()` — the alternative provider; creates an event with a Meet link and attendees. |
+
+**There is no second provider, deliberately.** A Google Calendar fallback sat behind Calendly
+until 2026-09-21, on the theory that a booking is too valuable to lose to one vendor being
+unreachable. The activity log says it never once worked: across every booking this application has
+taken, Calendly produced 241 meetings carrying a real invitee uri and Google produced five, all of
+them a `uniqid()` minted locally because `createAppointment()` had returned null. Its entire
+measurable output was five people told a consultant was expecting them. A failure that says so puts
+the lead on the retry ladder — five attempts over 32 minutes at the same slot — which is more
+booking than the fallback ever delivered, and it does not lie in the meantime.
 
 `pollForMeetLocation()` deserves a note: Calendly does not return the Google Meet URL synchronously when an invitee is created, so the client polls (20 attempts, 300ms apart by default). If you see bookings with an empty `meeting_url`, that poll timed out.
 

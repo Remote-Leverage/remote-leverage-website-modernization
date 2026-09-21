@@ -1047,6 +1047,11 @@ class MultistepBookingWizard extends Component
              */
             if ($lead->status !== 'booked' && ! empty($this->selectedSlot)) {
                 $this->isBooked = false;
+                // Pinned rather than assumed. The visitor is on step 3 when they submit, so this
+                // is almost always already 3 — but "almost always" is how the confirmation came
+                // to be shown for a booking that had not happened, and the sibling branch above
+                // pins it for the same reason.
+                $this->currentStep = 3;
                 $this->errorMessage = 'We have your time and we are still confirming it with the calendar. '
                     .'You will get an email as soon as it is confirmed — if nothing arrives within a few minutes, '
                     .'please pick another time.';

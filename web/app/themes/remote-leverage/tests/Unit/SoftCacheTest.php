@@ -68,7 +68,20 @@ function warningsWhile(callable $work): array
 }
 
 afterEach(function () {
+    /*
+     * `Facade::swap()` does two things, and clearing the facade only undoes one of them: it
+     * caches the instance on the facade *and* calls `$app->instance('cache', ...)`, which
+     * replaces the container binding for the rest of the process. So without the
+     * `forgetInstance()` below, every test that ran after this file got the cache that throws —
+     * silently, because most of them never touch it.
+     *
+     * The one that did notice was BookingFlowEndToEndTest: `submitBooking()` opens with a
+     * `Cache::lock()`, which died on the swapped object, so the whole booking flow failed in the
+     * full suite while passing on its own. Dropping the instance lets the container fall back to
+     * the singleton binding in tests/stubs.php.
+     */
     Cache::clearResolvedInstances();
+    app()->forgetInstance('cache');
     Log::clearResolvedInstances();
     SoftCache::resetReporting();
 });

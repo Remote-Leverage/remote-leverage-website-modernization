@@ -61,13 +61,6 @@ return [
         'webhook_signing_key' => env('CALENDLY_WEBHOOK_SIGNING_KEY'),
     ],
 
-    'google_calendar' => [
-        'client_id' => env('GOOGLE_CALENDAR_CLIENT_ID'),
-        'client_secret' => env('GOOGLE_CALENDAR_CLIENT_SECRET'),
-        'refresh_token' => env('GOOGLE_CALENDAR_REFRESH_TOKEN'),
-        'calendar_id' => env('GOOGLE_CALENDAR_ID', 'primary'),
-    ],
-
     'customer_io' => [
         // Track API v1 — server side only, used by CustomerIOClient.
         'site_id' => env('CUSTOMERIO_SITE_ID'),

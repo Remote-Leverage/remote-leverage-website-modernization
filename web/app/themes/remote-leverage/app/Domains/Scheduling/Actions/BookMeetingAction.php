@@ -9,7 +9,6 @@ use App\Domains\Scheduling\Data\BookingRequestData;
 use App\Domains\Scheduling\Gateways\CalendlyClient;
 use App\Domains\Scheduling\Gateways\CalendlyMetadataCache;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
-use App\Domains\Scheduling\Gateways\GoogleCalendarClient;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -18,7 +17,6 @@ class BookMeetingAction
 {
     public function __construct(
         protected CalendlyClient $calendlyClient,
-        protected GoogleCalendarClient $googleCalendarClient,
         protected CalendlyTokenPool $tokenPool,
         protected CalendlyEventTypeRoleResolver $eventTypeRoleResolver,
         protected CalendlyMetadataCache $metadataCache,
@@ -26,8 +24,10 @@ class BookMeetingAction
     ) {}
 
     /**
-     * Book a strategy consultation meeting.
-     * Supports Calendly invitee flow and Google Calendar fallback with Meet link generation.
+     * Book a strategy consultation meeting, at Calendly or not at all.
+     *
+     * There is one provider on purpose. See the note where the Google Calendar fallback used to
+     * be, at the foot of this method.
      */
     public function execute(BookingRequestData $data, ?string $calendlyEventUri = null): array
     {
@@ -38,7 +38,7 @@ class BookMeetingAction
 
         // Duplicate-booking guard A: has this email already had a successful
         // booking logged for this EXACT slot within the last 5 minutes? Short-
-        // circuits without touching Calendly/Google at all — but only for a
+        // circuits without touching Calendly at all — but only for a
         // genuine repeat of the same slot. A different slot is treated as a
         // fresh (re)booking request below, not a duplicate.
         $existingSlotBooking = $this->activityLogger->findRecentBookingForSlot(
@@ -49,10 +49,30 @@ class BookMeetingAction
         if ($existingSlotBooking) {
             $payload = $existingSlotBooking->payload ?? [];
 
+            /*
+             * Replay the *prior* booking only if it names a real meeting. A log row with no
+             * meeting id is the record of a booking that never reached a provider, and echoing
+             * it back as a success turns one phantom booking into every subsequent retry's
+             * answer — the failure becomes sticky and self-confirming.
+             */
+            if (empty($payload['meeting_id'])) {
+                Log::warning('BookMeetingAction: recent booking log for this slot names no meeting, not replaying it', [
+                    'email' => $data->email,
+                    'start_time' => $startTime->toIso8601String(),
+                    'log_id' => $existingSlotBooking->id ?? null,
+                ]);
+
+                return [
+                    'success' => false,
+                    'error_code' => 'provider_unavailable',
+                    'message' => 'The previous attempt at this time never reached the calendar.',
+                ];
+            }
+
             return [
                 'success' => true,
                 'provider' => $payload['provider'] ?? 'calendly',
-                'meeting_id' => $payload['meeting_id'] ?? 'deduplicated',
+                'meeting_id' => $payload['meeting_id'],
                 'meet_url' => $payload['meet_url'] ?? null,
                 'start_time' => $startTime->toIso8601String(),
                 'end_time' => $endTime->toIso8601String(),
@@ -70,18 +90,35 @@ class BookMeetingAction
             // slot already exist for this email on any pooled account?
             $existing = $this->calendlyClient->findExistingInvitee($data->email, $eventUri, $startTime->toIso8601String());
 
+            /*
+             * The preflight found this slot already taken by this email but could not name the
+             * invitee. Falling through would book a second one; returning a fabricated id would
+             * confirm a meeting nobody can look up. Neither is acceptable, so this reports a
+             * failure and the retry ladder asks Calendly again.
+             */
+            if ($existing && empty($existing['uri'])) {
+                Log::warning('BookMeetingAction: Calendly reported an existing invitee with no uri', [
+                    'email' => $data->email,
+                    'start_time' => $startTime->toIso8601String(),
+                    'event_uri' => $eventUri,
+                ]);
+
+                return [
+                    'success' => false,
+                    'error_code' => 'provider_unavailable',
+                    'message' => 'Calendly reported an existing booking at this time but could not identify it.',
+                ];
+            }
+
             if ($existing) {
-                $meetUrl = null;
-                if (! empty($existing['uri'])) {
-                    $eventDetails = $this->calendlyClient->getScheduledEvent($existing['uri']);
-                    $location = $eventDetails['location'] ?? [];
-                    $meetUrl = $location['join_url'] ?? $location['location'] ?? null;
-                }
+                $eventDetails = $this->calendlyClient->getScheduledEvent($existing['uri']);
+                $location = $eventDetails['location'] ?? [];
+                $meetUrl = $location['join_url'] ?? $location['location'] ?? null;
 
                 return [
                     'success' => true,
                     'provider' => 'calendly',
-                    'meeting_id' => $existing['uri'] ?? uniqid('cal_dedup_', true),
+                    'meeting_id' => $existing['uri'],
                     'meet_url' => $meetUrl,
                     'start_time' => $startTime->toIso8601String(),
                     'end_time' => $endTime->toIso8601String(),
@@ -146,6 +183,25 @@ class BookMeetingAction
                 tracking: array_filter($tracking),
             );
 
+            /*
+             * Calendly answered, but with nothing that identifies the invitee it claims to have
+             * created. There is no meeting anybody can look up, cancel or reschedule, so this is
+             * a failure however encouraging the response looked.
+             */
+            if ($invitee && empty($invitee['uri'])) {
+                Log::warning('BookMeetingAction: Calendly returned an invitee with no uri', [
+                    'email' => $data->email,
+                    'start_time' => $startTime->toIso8601String(),
+                    'event_uri' => $eventUri,
+                ]);
+
+                return [
+                    'success' => false,
+                    'error_code' => 'provider_unavailable',
+                    'message' => 'Calendly accepted the booking but did not return a meeting we can confirm.',
+                ];
+            }
+
             if ($invitee) {
                 $scheduledEventUri = $invitee['event'] ?? null;
                 $meetUrl = null;
@@ -171,7 +227,7 @@ class BookMeetingAction
                 return [
                     'success' => true,
                     'provider' => 'calendly',
-                    'meeting_id' => $invitee['uri'] ?? uniqid('cal_', true),
+                    'meeting_id' => $invitee['uri'],
                     'meet_url' => $meetUrl,
                     'start_time' => $startTime->toIso8601String(),
                     'end_time' => $endTime->toIso8601String(),
@@ -210,52 +266,35 @@ class BookMeetingAction
             }
         }
 
-        // Path B: Google Calendar Master Appointment Booking
-        $summary = "Remote Leverage Strategy Call - {$data->name}";
-        $description = "Lead Details:\n"
-            ."Name: {$data->name}\n"
-            ."Email: {$data->email}\n"
-            .'Phone: '.($data->phone ?? 'N/A')."\n"
-            .'Company: '.($data->company ?? 'N/A')."\n"
-            .'Referral Code: '.($data->referralCode ?? 'Direct')."\n"
-            .'Notes: '.($data->notes ?? 'None');
-
-        $appointment = $this->googleCalendarClient->createAppointment(
-            summary: $summary,
-            startTime: $startTime->toRfc3339String(),
-            endTime: $endTime->toRfc3339String(),
-            attendees: [$data->email, (string) env('STRATEGY_CONSULTANT_EMAIL', 'team@remoteleverage.com')],
-            description: $description,
-        );
-
         /*
-         * The fallback's own fallback used to be `success: true` with a uniqid() meeting id and
-         * a hardcoded meet.google.com/rl-consult — a link that is not even a valid Meet code.
-         * A lead was marked booked, sent a confirmation, and counted as a Google Ads conversion
-         * for a meeting that existed on no calendar anywhere. Reporting the failure is also what
-         * puts the lead on the retry ladder in HandlesBookingRetryBackoff.
+         * There is no Path B any more.
+         *
+         * A Google Calendar fallback sat here from the beginning, on the reasonable-sounding
+         * theory that a booking is too valuable to lose to one provider being unreachable. The
+         * log says it never once worked: across every booking this application has ever taken,
+         * Calendly produced 241 meetings carrying a real invitee uri and Google produced five,
+         * every one of them a `uniqid()` this code minted because `createAppointment()` had
+         * returned null. Not one real Google event exists. The fallback's entire measurable
+         * output is five people told a consultant was expecting them.
+         *
+         * So it was not a fallback, it was a way of converting an outage into a silent lie. A
+         * failure that says so puts the lead on the retry ladder — five attempts over 32 minutes,
+         * which is a real second chance at the same slot — and tells the visitor the truth
+         * meanwhile. That is strictly more booking than the path it replaces.
          */
-        if ($appointment === null) {
-            return [
-                'success' => false,
-                'error_code' => 'provider_unavailable',
-                'message' => 'Neither Calendly nor Google Calendar could take the booking.',
-            ];
-        }
-
-        $meetUrl = $appointment['conferenceData']['entryPoints'][0]['uri'] ?? $appointment['hangoutLink'] ?? null;
-
-        $this->cancelPriorBookingForDifferentSlot($data->email, $startTime->toIso8601String());
+        Log::warning('BookMeetingAction: Calendly could not take the booking', [
+            'email' => $data->email,
+            'start_time' => $startTime->toIso8601String(),
+            'event_uri' => $eventUri ?? null,
+            'reason' => ($eventUri && ! empty($this->tokenPool->getEligibleTokens()))
+                ? 'calendly_unreachable'
+                : 'calendly_not_configured',
+        ]);
 
         return [
-            'success' => true,
-            'provider' => 'google_calendar',
-            'meeting_id' => $appointment['id'] ?? uniqid('gcal_', true),
-            'meet_url' => $meetUrl,
-            'start_time' => $startTime->toIso8601String(),
-            'end_time' => $endTime->toIso8601String(),
-            'client_name' => $data->name,
-            'client_email' => $data->email,
+            'success' => false,
+            'error_code' => 'provider_unavailable',
+            'message' => 'The calendar could not take the booking just now.',
         ];
     }
 
