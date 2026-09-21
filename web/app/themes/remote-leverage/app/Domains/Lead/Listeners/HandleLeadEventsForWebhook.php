@@ -97,32 +97,12 @@ class HandleLeadEventsForWebhook
             return;
         }
 
-        /*
-         * `created_at`, not `now()`.
-         *
-         * The dispatch is deferred with `afterResponse()`, so `now()` is whenever the worker
-         * got round to it — seconds later, and unboundedly later if the send is ever retried
-         * or queued for real. The capture time is a property of the lead, so it is read off
-         * the lead. Falling back to now() only covers a model that somehow has no timestamp.
-         */
-        $capturedAt = ($event->lead->created_at ? Carbon::parse($event->lead->created_at) : Carbon::now())
-            ->setTimezone(self::EASTERN);
-
-        $payload = [
+        $payload = array_merge([
             'event' => 'lead.form_captured',
             'lead_id' => $event->lead->id,
             'email' => (string) $event->lead->email,
             'submission_type' => (string) $event->lead->submission_type,
-
-            // Wall-clock Eastern to the second, which is what the flow formats into its
-            // message. The ISO form carries the offset alongside it so a consumer that wants a
-            // real instant back is not left parsing a naive string, and `_abbreviation` says
-            // whether daylight time was in force — America/New_York reads EDT for most of the
-            // year, and a payload labelled only "est" invites someone to assume UTC-5.
-            'captured_at_est' => $capturedAt->format('Y-m-d H:i:s'),
-            'captured_at_est_iso' => $capturedAt->toIso8601String(),
-            'captured_at_est_abbreviation' => $capturedAt->format('T'),
-        ];
+        ], $this->easternStamp('captured_at_est', $event->lead->created_at));
 
         $this->deliver($event->lead, $url, $payload, 'lead.form_captured', 'LeadCreated');
     }
@@ -162,16 +142,59 @@ class HandleLeadEventsForWebhook
             return;
         }
 
-        $payload = [
-            'event' => 'hubspot.contact_synced',
-            'action' => $action ?? 'synced',
-            'lead_id' => $lead->id,
-            'email' => (string) $lead->email,
-            'hubspot_contact_id' => (string) $lead->hubspot_contact_id,
-            'hubspot_contact_url' => $contactUrl,
-        ];
+        /*
+         * Two timestamps, because they answer two different questions and the gap between
+         * them is the interesting part — a `synced_at` well after `captured_at` is a HubSpot
+         * call that queued or retried.
+         *
+         * `synced_at_est` is `now()` here, and that is correct rather than a shortcut: this
+         * runs inside the same deferred job as the `syncContact()` call that just returned,
+         * so "now" *is* when the contact reached the portal. There is no column holding it —
+         * HubSpot's own `lastmodifieddate` would cost a round trip to read back.
+         *
+         * `captured_at_est` is the same field, same format, that `lead-form` sends, so one
+         * n8n sub-workflow can read a capture time out of either payload without branching.
+         */
+        $payload = array_merge(
+            [
+                'event' => 'hubspot.contact_synced',
+                'action' => $action ?? 'synced',
+                'lead_id' => $lead->id,
+                'email' => (string) $lead->email,
+                'hubspot_contact_id' => (string) $lead->hubspot_contact_id,
+                'hubspot_contact_url' => $contactUrl,
+            ],
+            $this->easternStamp('synced_at_est'),
+            $this->easternStamp('captured_at_est', $lead->created_at),
+        );
 
         $this->deliver($lead, $url, $payload, 'hubspot.contact_synced', 'LeadCreated');
+    }
+
+    /**
+     * One instant, rendered three ways under `$prefix`, in Eastern wall-clock time.
+     *
+     * `$prefix` is the plain `Y-m-d H:i:s` string the flows format into their messages;
+     * `{$prefix}_iso` carries the offset, so a consumer that wants a real instant back is not
+     * left parsing a naive string; `{$prefix}_abbreviation` says whether daylight time was in
+     * force. That last one earns its place because `America/New_York` reads EDT for most of
+     * the year, and a field labelled only "est" invites a consumer to assume UTC-5.
+     *
+     * `$when` null means now. Pass the stored time wherever one exists: a send deferred with
+     * `afterResponse()` happens seconds after the thing it describes, and unboundedly later
+     * if it is ever really queued or retried.
+     *
+     * @return array<string, string>
+     */
+    protected function easternStamp(string $prefix, mixed $when = null): array
+    {
+        $at = ($when ? Carbon::parse($when) : Carbon::now())->setTimezone(self::EASTERN);
+
+        return [
+            $prefix => $at->format('Y-m-d H:i:s'),
+            $prefix.'_iso' => $at->toIso8601String(),
+            $prefix.'_abbreviation' => $at->format('T'),
+        ];
     }
 
     /**

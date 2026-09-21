@@ -491,6 +491,8 @@ describe('Lead Domain', function () {
             'submission_type' => 'Partial',
             'hubspot_contact_id' => '80125512',
         ]);
+
+        $lead->forceFill(['created_at' => Carbon::parse('2026-07-14 18:33:07', 'UTC')])->saveQuietly();
         $lead->refresh();
 
         $listener->handleHubSpotSynced($lead, 'created');
@@ -504,6 +506,19 @@ describe('Lead Domain', function () {
             ->and($body['action'])->toBe('created')
             ->and($body['email'])->toBe('dara@kestrellabs.com')
             ->and($body['hubspot_contact_url'])->toBe('https://app.hubspot.com/contacts/243484989/record/0-1/80125512');
+
+        /*
+         * Two stamps, and they are not the same instant. `captured_at_est` is the lead's own
+         * created_at in the same shape `lead-form` sends, so one n8n sub-workflow reads either
+         * payload; `synced_at_est` is when the contact actually reached the portal, which is
+         * now — this runs in the same deferred job as the sync that just returned.
+         */
+        expect($body['captured_at_est'])->toBe('2026-07-14 14:33:07')
+            ->and($body['captured_at_est_iso'])->toBe('2026-07-14T14:33:07-04:00')
+            ->and($body['captured_at_est_abbreviation'])->toBe('EDT')
+            ->and($body['synced_at_est'])->toMatch('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/')
+            ->and($body['synced_at_est_abbreviation'])->toBeIn(['EST', 'EDT'])
+            ->and($body['synced_at_est'])->not->toBe($body['captured_at_est']);
 
         // An update is the returning-lead case and sends too, tagged so the flow can branch.
         $listener->handleHubSpotSynced($lead, 'updated');
