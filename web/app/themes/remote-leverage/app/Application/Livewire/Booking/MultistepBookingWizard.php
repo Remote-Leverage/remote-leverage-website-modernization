@@ -1496,13 +1496,26 @@ class MultistepBookingWizard extends Component
              * the form eating characters: the response lands late and patches the DOM over what
              * was typed meanwhile.
              */
-            $event = new AnalyticsEventData(
-                event: $eventName,
-                distinctId: $this->resolveDistinctId(),
-                properties: $payload,
-            );
+            /*
+             * No email, no Customer.io. `CustomerIOClient::track()` enforces this for every
+             * caller — see it for why a stand-in id is not a placeholder but a new profile —
+             * and the check is repeated here only to avoid queuing a deferred HTTP job that is
+             * already known to be dropped. `form_loaded` fires from mount(), on the front page,
+             * every post and the booking footer, so that is most of the site's traffic.
+             *
+             * The anonymous steps are not lost: capturePostHog() below still records them.
+             */
+            $distinctId = $this->resolveDistinctId();
 
-            $this->deferTracking(static fn () => app(CustomerIOClient::class)->track($event));
+            if ($distinctId !== '') {
+                $event = new AnalyticsEventData(
+                    event: $eventName,
+                    distinctId: $distinctId,
+                    properties: $payload,
+                );
+
+                $this->deferTracking(static fn () => app(CustomerIOClient::class)->track($event));
+            }
 
             // Browser-side effects last, and each one isolated: a Livewire lifecycle that
             // cannot accept a `js()` effect must not take the Customer.io dispatch with it.
@@ -1883,27 +1896,19 @@ class MultistepBookingWizard extends Component
      * keyed to that person. Anything sent under a different id creates a second profile that no
      * campaign will ever match.
      *
-     * This used to prefer PostHog's browser distinct id, from back when the same payload was
+     * There is deliberately **no fallback**. This returned the Laravel session id when the email
+     * was still empty, and the Track API turned each of those into a real, emailless person —
+     * 40-character ids filling the workspace, none of them reachable by any campaign, and never
+     * merged into the real profile once the email finally arrived and the id changed under them.
+     * An empty string here means "nobody to send this to yet", and the caller drops the event.
+     *
+     * It also used to prefer PostHog's browser distinct id, from back when the same payload was
      * dual-dispatched to PostHog as well. PostHog is captured in the browser now, so that id has
-     * no reader here and the honest fallback is the component's own session.
+     * no reader here.
      */
     protected function resolveDistinctId(): string
     {
-        if ($this->email !== '') {
-            return $this->email;
-        }
-
-        try {
-            $sessionId = (string) session()->getId();
-
-            if ($sessionId !== '') {
-                return $sessionId;
-            }
-        } catch (\Throwable) {
-            // No session driver bound; fall through to the component's own id.
-        }
-
-        return $this->sessionId ?: 'anonymous';
+        return $this->email;
     }
 
     /**

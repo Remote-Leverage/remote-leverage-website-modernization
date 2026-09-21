@@ -25,6 +25,13 @@ use App\Domains\Tracking\Gateways\CustomerIOClient;
  * in the browser (see `postHogCaptureExpression()` and the assertions further down), so it is not
  * observable here — but both are driven from the same `trackStepEvent()` call with the same name
  * and the same payload, which is what these tests pin.
+ *
+ * **The wizard must hold an email for anything to arrive here.** Customer.io is keyed to email
+ * and the wizard now sends nothing without one, so a wizard built inside `$exercise` has to be
+ * given one first — `bookingWizardWithEmail()` does that. Without it these tests pass vacuously
+ * on an empty array, which is why the two that assert an *absence* use it as well. See
+ * `CustomerIOClient::track()` for why the emailless events are dropped rather than sent under a
+ * stand-in id.
  */
 function captureWizardEvents(callable $exercise): array
 {
@@ -70,10 +77,24 @@ function eventNames(array $events): array
     return array_map(static fn (AnalyticsEventData $e) => $e->event, $events);
 }
 
+/**
+ * A wizard past step 1, which is the only state in which Customer.io is a destination.
+ *
+ * This is not a convenience for the harness — it is the real funnel. Step 1 collects the email,
+ * so every event these tests pin except `form_loaded` genuinely happens with one in hand.
+ */
+function bookingWizardWithEmail(): MultistepBookingWizard
+{
+    $wizard = new MultistepBookingWizard;
+    $wizard->email = 'lead@example.com';
+
+    return $wizard;
+}
+
 describe('booking funnel emits the legacy event names', function () {
     test('selecting a time slot emits hour_selected with the slot', function () {
         $events = captureWizardEvents(function () {
-            $wizard = new MultistepBookingWizard;
+            $wizard = bookingWizardWithEmail();
             $wizard->selectSlot('2026-10-01T15:00:00Z');
         });
 
@@ -85,7 +106,7 @@ describe('booking funnel emits the legacy event names', function () {
 
     test('the first property update emits form_started exactly once', function () {
         $events = captureWizardEvents(function () {
-            $wizard = new MultistepBookingWizard;
+            $wizard = bookingWizardWithEmail();
             $wizard->updated('email');
             $wizard->updated('phone');
             $wizard->updated('company');
@@ -96,7 +117,7 @@ describe('booking funnel emits the legacy event names', function () {
 
     test('calendar paging and timezone do not count as starting the form', function () {
         $events = captureWizardEvents(function () {
-            $wizard = new MultistepBookingWizard;
+            $wizard = bookingWizardWithEmail();
             $wizard->updated('timezone');
             $wizard->updated('currentMonth');
             $wizard->updated('currentYear');
@@ -107,7 +128,7 @@ describe('booking funnel emits the legacy event names', function () {
 
     test('every emitted event carries the legacy property shape', function () {
         $events = captureWizardEvents(function () {
-            $wizard = new MultistepBookingWizard;
+            $wizard = bookingWizardWithEmail();
             $wizard->selectSlot('2026-10-01T15:00:00Z');
         });
 
@@ -122,13 +143,60 @@ describe('booking funnel emits the legacy event names', function () {
 
     test('no event is emitted under the booking_wizard_ prefix', function () {
         $events = captureWizardEvents(function () {
-            $wizard = new MultistepBookingWizard;
+            $wizard = bookingWizardWithEmail();
             $wizard->selectSlot('2026-10-01T15:00:00Z');
             $wizard->updated('email');
         });
 
         foreach (eventNames($events) as $name) {
             expect($name)->not->toStartWith('booking_wizard_');
+        }
+    });
+});
+
+describe('Customer.io only hears about people it can reach', function () {
+    /*
+     * The workspace filled with thousands of emailless profiles under 40-character ids.
+     *
+     * `form_loaded` fires from mount(), and the wizard renders on the front page, every single
+     * post and the booking footer — so this was close to one profile per visitor per session.
+     * The id was the Laravel session id, which the Track API's events endpoint happily *creates*
+     * a customer for; it also rolled with the session and was replaced by the email once step 1
+     * completed, so the earlier steps were stranded on a profile nothing would ever merge.
+     */
+    test('no event reaches Customer.io before the email is known', function () {
+        $events = captureWizardEvents(function () {
+            $wizard = new MultistepBookingWizard;   // mount() emits form_loaded
+            $wizard->updated('phone');              // and this emits form_started
+            $wizard->selectSlot('2026-10-01T15:00:00Z');
+        });
+
+        expect($events)->toBeEmpty();
+    });
+
+    test('every event that does reach Customer.io is keyed to an email', function () {
+        $events = captureWizardEvents(function () {
+            $wizard = bookingWizardWithEmail();
+            $wizard->selectSlot('2026-10-01T15:00:00Z');
+            $wizard->updated('email');
+        });
+
+        expect($events)->not->toBeEmpty();
+
+        foreach ($events as $event) {
+            expect(filter_var($event->distinctId, FILTER_VALIDATE_EMAIL))->not->toBeFalse();
+        }
+    });
+
+    test('the gateway itself refuses an identifier that is not an email', function () {
+        // The container swap above cannot catch a caller that builds its own client, and
+        // CheckoutTelemetry and the Calendly webhook both used to fall back to literal
+        // `anonymous` / `unknown` strings — one shared profile pooling unrelated people.
+        $client = new CustomerIOClient;
+
+        foreach (['anonymous', 'unknown', '', 'DvqJ50VGx659N5arXKXej60HA9jyRcUFY0IkEwS7'] as $id) {
+            expect($client->track(new AnalyticsEventData(event: 'step_viewed', distinctId: $id)))
+                ->toBeFalse();
         }
     });
 });

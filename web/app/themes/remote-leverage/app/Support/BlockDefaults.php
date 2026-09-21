@@ -28,7 +28,7 @@ class BlockDefaults
      */
     public static function rewriteLocalAbsoluteUrls(mixed $html, mixed $home = null): string
     {
-        if (! is_string($html) || $html === '') {
+        if (!is_string($html) || $html === '') {
             return is_string($html) ? $html : '';
         }
 
@@ -53,7 +53,7 @@ class BlockDefaults
 
         $host = parse_url($homeUrl, PHP_URL_HOST);
         if (is_string($host) && $host !== '' && str_starts_with($homeUrl, 'https://')) {
-            $html = str_replace('http://'.$host, 'https://'.$host, $html);
+            $html = str_replace('http://' . $host, 'https://' . $host, $html);
         }
 
         return $html;
@@ -65,7 +65,7 @@ class BlockDefaults
      */
     public static function repairStarRatingAria(mixed $html): string
     {
-        if (! is_string($html) || $html === '') {
+        if (!is_string($html) || $html === '') {
             return is_string($html) ? $html : '';
         }
 
@@ -89,7 +89,7 @@ class BlockDefaults
             $newSrc = self::preferWebp($originalSrc);
 
             if ($newSrc !== $originalSrc) {
-                $image = str_replace($m[0], ' src='.$m[1].esc_attr($newSrc).$m[1], $image);
+                $image = str_replace($m[0], ' src=' . $m[1] . esc_attr($newSrc) . $m[1], $image);
             }
         }
 
@@ -112,11 +112,11 @@ class BlockDefaults
                 $parts = preg_split('/\s+/', $candidate, 2);
                 $url = self::preferWebp($parts[0]);
 
-                $candidates[] = isset($parts[1]) ? $url.' '.$parts[1] : $url;
+                $candidates[] = isset($parts[1]) ? $url . ' ' . $parts[1] : $url;
             }
 
             if ($candidates !== []) {
-                $image = str_replace($m[0], ' srcset='.$m[1].esc_attr(implode(', ', $candidates)).$m[1], $image);
+                $image = str_replace($m[0], ' srcset=' . $m[1] . esc_attr(implode(', ', $candidates)) . $m[1], $image);
             }
         }
 
@@ -137,7 +137,7 @@ class BlockDefaults
 
         foreach ($bases as $baseUrl => $baseDir) {
             if ($baseUrl !== '' && str_starts_with($url, $baseUrl)) {
-                return $baseDir.substr($url, strlen($baseUrl));
+                return $baseDir . substr($url, strlen($baseUrl));
             }
         }
 
@@ -156,12 +156,12 @@ class BlockDefaults
 
         $parsedPath = parse_url($url, PHP_URL_PATH) ?? '';
         $ext = strtolower(pathinfo($parsedPath, PATHINFO_EXTENSION));
-        if (! in_array($ext, ['png', 'jpg', 'jpeg'], true)) {
+        if (!in_array($ext, ['png', 'jpg', 'jpeg'], true)) {
             return $url;
         }
 
         $path = self::urlToPath($url);
-        if (! $path || ! is_file($path)) {
+        if (!$path || !is_file($path)) {
             return $url;
         }
 
@@ -169,12 +169,12 @@ class BlockDefaults
         // (Frame-76-5.jpg.webp) rather than a swapped one, because the swapped form would
         // collide — see the hasStemCollision() note in vite/theme-images.js. Prefer the
         // appended file when it exists so each source keeps its own conversion.
-        if (is_file($path.'.webp')) {
-            $webpPath = $path.'.webp';
-            $webpUrl = $url.'.webp';
+        if (is_file($path . '.webp')) {
+            $webpPath = $path . '.webp';
+            $webpUrl = $url . '.webp';
         } else {
-            $webpPath = preg_replace('/\.'.preg_quote($ext, '/').'$/i', '.webp', $path);
-            $webpUrl = preg_replace('/\.'.preg_quote($ext, '/').'$/i', '.webp', $url);
+            $webpPath = preg_replace('/\.' . preg_quote($ext, '/') . '$/i', '.webp', $path);
+            $webpUrl = preg_replace('/\.' . preg_quote($ext, '/') . '$/i', '.webp', $url);
         }
 
         // A zero-byte file means an earlier conversion failed part-way. Treat it as absent
@@ -196,7 +196,7 @@ class BlockDefaults
 
     protected static function generateWebp(string $sourcePath, string $destPath): bool
     {
-        if (! function_exists('wp_get_image_editor')) {
+        if (!function_exists('wp_get_image_editor')) {
             return false;
         }
 
@@ -213,7 +213,7 @@ class BlockDefaults
             return false;
         }
 
-        if (is_wp_error($saved) || ! is_file($destPath) || filesize($destPath) === 0) {
+        if (is_wp_error($saved) || !is_file($destPath) || filesize($destPath) === 0) {
             // Never leave a truncated file behind: preferWebp would hand it out forever.
             @unlink($destPath);
 
@@ -269,13 +269,13 @@ class BlockDefaults
      */
     public static function getAttachmentId(mixed $value): mixed
     {
-        if (! is_string($value) || empty($value)) {
+        if (!is_string($value) || empty($value)) {
             return $value;
         }
 
         $parsedPath = parse_url($value, PHP_URL_PATH) ?? '';
         $ext = strtolower(pathinfo($parsedPath, PATHINFO_EXTENSION));
-        if (! in_array($ext, ['webp', 'png', 'jpg', 'jpeg', 'svg', 'gif'], true)) {
+        if (!in_array($ext, ['webp', 'png', 'jpg', 'jpeg', 'svg', 'gif'], true)) {
             return $value;
         }
 
@@ -306,9 +306,9 @@ class BlockDefaults
             return self::homeImg(substr($path, 5));
         }
 
-        $themePath = get_theme_file_path('public/images/'.$path);
+        $themePath = get_theme_file_path('public/images/' . $path);
         if (self::isUsableFile($themePath)) {
-            return esc_url(set_url_scheme(get_template_directory_uri().'/public/images/'.$path, 'https'));
+            return esc_url(set_url_scheme(get_template_directory_uri() . '/public/images/' . $path, 'https'));
         }
 
         return self::homeImg(basename($path));
@@ -331,27 +331,27 @@ class BlockDefaults
         $file = ltrim($file, '/');
         $name = pathinfo($file, PATHINFO_FILENAME);
         $dirs = [
-            WP_CONTENT_DIR.'/uploads/home' => content_url('/uploads/home'),
-            WP_CONTENT_DIR.'/uploads/hire-va-4' => content_url('/uploads/hire-va-4'),
-            WP_CONTENT_DIR.'/uploads/2026/09' => content_url('/uploads/2026/09'),
-            WP_CONTENT_DIR.'/uploads/2026/07' => content_url('/uploads/2026/07'),
-            WP_CONTENT_DIR.'/uploads/2026/06' => content_url('/uploads/2026/06'),
-            WP_CONTENT_DIR.'/uploads/2026/05' => content_url('/uploads/2026/05'),
-            WP_CONTENT_DIR.'/uploads/2026/04' => content_url('/uploads/2026/04'),
-            get_theme_file_path('public/images/home') => get_template_directory_uri().'/public/images/home',
-            get_theme_file_path('public/images/hire-va-4') => get_template_directory_uri().'/public/images/hire-va-4',
+            WP_CONTENT_DIR . '/uploads/home' => content_url('/uploads/home'),
+            WP_CONTENT_DIR . '/uploads/hire-va-4' => content_url('/uploads/hire-va-4'),
+            WP_CONTENT_DIR . '/uploads/2026/09' => content_url('/uploads/2026/09'),
+            WP_CONTENT_DIR . '/uploads/2026/07' => content_url('/uploads/2026/07'),
+            WP_CONTENT_DIR . '/uploads/2026/06' => content_url('/uploads/2026/06'),
+            WP_CONTENT_DIR . '/uploads/2026/05' => content_url('/uploads/2026/05'),
+            WP_CONTENT_DIR . '/uploads/2026/04' => content_url('/uploads/2026/04'),
+            get_theme_file_path('public/images/home') => get_template_directory_uri() . '/public/images/home',
+            get_theme_file_path('public/images/hire-va-4') => get_template_directory_uri() . '/public/images/hire-va-4',
         ];
 
         foreach ($dirs as $dir => $url) {
             foreach (['webp', 'png', 'jpg', 'jpeg', 'svg'] as $ext) {
-                $path = $dir.'/'.$name.'.'.$ext;
+                $path = $dir . '/' . $name . '.' . $ext;
                 if (self::isUsableFile($path)) {
-                    return esc_url(set_url_scheme(rtrim($url, '/').'/'.$name.'.'.$ext, 'https'));
+                    return esc_url(set_url_scheme(rtrim($url, '/') . '/' . $name . '.' . $ext, 'https'));
                 }
             }
         }
 
-        return esc_url(set_url_scheme(self::imgBase().'/'.$file, 'https'));
+        return esc_url(set_url_scheme(self::imgBase() . '/' . $file, 'https'));
     }
 
     /**
@@ -379,11 +379,11 @@ class BlockDefaults
         $candidates = [];
 
         if (defined('WP_CONTENT_DIR')) {
-            $candidates[WP_CONTENT_DIR.'/uploads/videos/'.$file] = content_url('/uploads/videos/'.$file);
+            $candidates[WP_CONTENT_DIR . '/uploads/videos/' . $file] = content_url('/uploads/videos/' . $file);
         }
 
-        $candidates[get_theme_file_path('public/videos/'.$file)] =
-            get_template_directory_uri().'/public/videos/'.$file;
+        $candidates[get_theme_file_path('public/videos/' . $file)] =
+            get_template_directory_uri() . '/public/videos/' . $file;
 
         foreach ($candidates as $path => $url) {
             if (self::isUsableFile($path)) {
@@ -393,7 +393,7 @@ class BlockDefaults
 
         // Nothing on disk yet. Point at uploads rather than the theme: that is the location an
         // operator can fix without a deploy, and it is where the missing file is expected to be.
-        return esc_url(set_url_scheme(content_url('/uploads/videos/'.$file), 'https'));
+        return esc_url(set_url_scheme(content_url('/uploads/videos/' . $file), 'https'));
     }
 
     /**
@@ -439,17 +439,17 @@ class BlockDefaults
     {
         $path = ltrim($path, '/');
 
-        if (! function_exists('get_theme_file_path') || ! function_exists('get_template_directory_uri')) {
+        if (!function_exists('get_theme_file_path') || !function_exists('get_template_directory_uri')) {
             return null;
         }
 
-        $themePath = get_theme_file_path('public/images/'.$path);
+        $themePath = get_theme_file_path('public/images/' . $path);
 
-        if (! self::isUsableFile($themePath)) {
+        if (!self::isUsableFile($themePath)) {
             return null;
         }
 
-        return esc_url(set_url_scheme(get_template_directory_uri().'/public/images/'.$path, 'https'));
+        return esc_url(set_url_scheme(get_template_directory_uri() . '/public/images/' . $path, 'https'));
     }
 
     /**
@@ -524,12 +524,12 @@ class BlockDefaults
         // This is the branch that actually carries the sample-applicant media:
         // those files were synced into uploads/ without being registered as
         // attachments, so the library lookup above finds nothing.
-        if (defined('WP_CONTENT_DIR') && self::isUsableFile(WP_CONTENT_DIR.'/uploads/'.$relative)) {
+        if (defined('WP_CONTENT_DIR') && self::isUsableFile(WP_CONTENT_DIR . '/uploads/' . $relative)) {
             // Re-encode per segment: $relative was decoded for the filesystem
             // probe, and filenames here really do contain spaces.
             $encoded = implode('/', array_map('rawurlencode', explode('/', $relative)));
 
-            return content_url('/uploads/'.$encoded);
+            return content_url('/uploads/' . $encoded);
         }
 
         return '';
@@ -548,7 +548,7 @@ class BlockDefaults
 
         global $wpdb;
 
-        if (! isset($wpdb) || ! is_object($wpdb) || ! method_exists($wpdb, 'get_results')) {
+        if (!isset($wpdb) || !is_object($wpdb) || !method_exists($wpdb, 'get_results')) {
             return self::$attachmentsByFilename;
         }
 
@@ -562,7 +562,7 @@ class BlockDefaults
         foreach ((array) $rows as $row) {
             $file = is_object($row) ? ($row->meta_value ?? '') : ($row['meta_value'] ?? '');
 
-            if (! is_string($file) || $file === '') {
+            if (!is_string($file) || $file === '') {
                 continue;
             }
 
@@ -598,7 +598,7 @@ class BlockDefaults
     public static function unscaledName(string $basename): ?string
     {
         return preg_match('/^(.+)-scaled(\.[A-Za-z0-9]+)$/', $basename, $m) === 1
-            ? $m[1].$m[2]
+            ? $m[1] . $m[2]
             : null;
     }
 
@@ -638,7 +638,7 @@ class BlockDefaults
             return '';
         }
 
-        $key = 'rl_img_size_'.md5($url);
+        $key = 'rl_img_size_' . md5($url);
         $cached = function_exists('wp_cache_get') ? wp_cache_get($key, 'rl_images') : false;
 
         if (is_array($cached)) {
@@ -667,7 +667,7 @@ class BlockDefaults
             if ($id > 0) {
                 $meta = wp_get_attachment_metadata($id);
 
-                if (! empty($meta['width']) && ! empty($meta['height'])) {
+                if (!empty($meta['width']) && !empty($meta['height'])) {
                     return [(int) $meta['width'], (int) $meta['height']];
                 }
             }
@@ -679,7 +679,7 @@ class BlockDefaults
         if ($path !== null && is_readable($path)) {
             $size = @getimagesize($path);
 
-            if (is_array($size) && ! empty($size[0]) && ! empty($size[1])) {
+            if (is_array($size) && !empty($size[0]) && !empty($size[1])) {
                 return [(int) $size[0], (int) $size[1]];
             }
         }
@@ -692,20 +692,20 @@ class BlockDefaults
      */
     private static function localPathForUrl(string $url): ?string
     {
-        if (! function_exists('get_theme_file_path') || ! function_exists('get_theme_file_uri')) {
+        if (!function_exists('get_theme_file_path') || !function_exists('get_theme_file_uri')) {
             return null;
         }
 
         $base = rtrim((string) get_theme_file_uri(), '/');
         $path = parse_url($url, PHP_URL_PATH);
 
-        if ($base === '' || ! is_string($path)) {
+        if ($base === '' || !is_string($path)) {
             return null;
         }
 
         $basePath = parse_url($base, PHP_URL_PATH);
 
-        if (! is_string($basePath) || ! str_starts_with($path, $basePath)) {
+        if (!is_string($basePath) || !str_starts_with($path, $basePath)) {
             return null;
         }
 
@@ -741,7 +741,7 @@ class BlockDefaults
      */
     public static function cleanText(mixed $text): string
     {
-        if (! is_string($text) || empty($text)) {
+        if (!is_string($text) || empty($text)) {
             return (string) $text;
         }
 
@@ -766,7 +766,7 @@ class BlockDefaults
         }
 
         // If user explicitly deleted all rows and saved, ACF metadata is '0'
-        if (! empty($postId) && function_exists('acf_get_metadata') && acf_get_metadata($postId, $field['name']) === '0') {
+        if (!empty($postId) && function_exists('acf_get_metadata') && acf_get_metadata($postId, $field['name']) === '0') {
             return [];
         }
 
@@ -776,11 +776,11 @@ class BlockDefaults
         return match ($fieldName) {
             'steps' => self::formatRepeaterForAcf('field_process_steps_block_steps', self::steps()),
             'cards' => match ($fieldKey) {
-                'field_department_cards_block_cards' => self::formatRepeaterForAcf('field_department_cards_block_cards', self::departmentCards()),
-                'field_feature_cards_block_cards' => self::formatRepeaterForAcf('field_feature_cards_block_cards', self::featureCards('3')),
-                'field_roles_grid_block_cards' => self::formatRepeaterForAcf('field_roles_grid_block_cards', self::rolesGridCards()),
-                default => $value,
-            },
+                    'field_department_cards_block_cards' => self::formatRepeaterForAcf('field_department_cards_block_cards', self::departmentCards()),
+                    'field_feature_cards_block_cards' => self::formatRepeaterForAcf('field_feature_cards_block_cards', self::featureCards('3')),
+                    'field_roles_grid_block_cards' => self::formatRepeaterForAcf('field_roles_grid_block_cards', self::rolesGridCards()),
+                    default => $value,
+                },
             'rows' => self::formatRepeaterForAcf('field_data_table_block_rows', self::dataTableRows()),
             'testimonials' => self::formatRepeaterForAcf('field_testimonials_block_testimonials', self::testimonials()),
             'faqs' => self::formatRepeaterForAcf('field_accordion_faq_block_faqs', self::faqsForAcf()),
@@ -821,7 +821,7 @@ class BlockDefaults
     public static function encodeRepeater(string $fieldName, string $fieldKey, array $rows, array &$data = []): array
     {
         $data[$fieldName] = count($rows);
-        $data['_'.$fieldName] = $fieldKey;
+        $data['_' . $fieldName] = $fieldKey;
         foreach ($rows as $i => $row) {
             foreach ($row as $subfield => $val) {
                 $subKey = "{$fieldKey}_{$subfield}";
@@ -846,12 +846,12 @@ class BlockDefaults
      */
     private static function isNestedRepeater(mixed $value): bool
     {
-        if (! is_array($value) || $value === [] || ! array_is_list($value)) {
+        if (!is_array($value) || $value === [] || !array_is_list($value)) {
             return false;
         }
 
         foreach ($value as $row) {
-            if (! is_array($row)) {
+            if (!is_array($row)) {
                 return false;
             }
         }
@@ -868,7 +868,7 @@ class BlockDefaults
             'mode' => 'preview',
         ], $attrs);
 
-        return '<!-- wp:acf/'.$slug.' '.json_encode($blockAttrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE).' /-->';
+        return '<!-- wp:acf/' . $slug . ' ' . json_encode($blockAttrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ' /-->';
     }
 
     // --- PROCESS STEPS ---
@@ -917,7 +917,7 @@ class BlockDefaults
             ['con-06.png', 'Luana Dias', 'Executive Assistant', '3+ years of experience supporting C-level executives in fast-paced environments. High organization, anticipate needs, and protect executive’s time like it’s my own.', 'NU-bank-01.png'],
         ];
 
-        return array_map(static fn (array $r): array => [
+        return array_map(static fn(array $r): array => [
             'name' => $r[1],
             'title' => $r[2],
             'desc' => $r[3],
@@ -937,7 +937,7 @@ class BlockDefaults
         self::encodeRepeater(
             'paragraphs',
             'field_partner_hero_block_paragraphs',
-            array_map(static fn (string $text): array => ['text' => $text], $paragraphs),
+            array_map(static fn(string $text): array => ['text' => $text], $paragraphs),
             $data,
         );
 
@@ -980,7 +980,7 @@ class BlockDefaults
 
         foreach ($values as $name => $value) {
             $data[$name] = $value;
-            $data['_'.$name] = 'field_'.$group.'_'.$name;
+            $data['_' . $name] = 'field_' . $group . '_' . $name;
         }
 
         return $data;
@@ -989,7 +989,7 @@ class BlockDefaults
     /** Theme-file URL for an asset that belongs to a single migrated page. */
     public static function pageImg(string $page, string $file): string
     {
-        return get_theme_file_uri('public/images/'.$page.'/'.$file);
+        return get_theme_file_uri('public/images/' . $page . '/' . $file);
     }
 
     /**
@@ -1001,18 +1001,36 @@ class BlockDefaults
     public static function countryPlacements(): array
     {
         $rows = [
-            ['Mexico', '317', 'mexico.png'], ['Colombia', '185', 'Colombia.png'], ['Honduras', '145', 'Honduras.png'],
-            ['Jamaica', '140', 'jamaica.png'], ['Brazil', '102', 'Brazil.png'], ['Costa Rica', '95', 'Costa_rica.png'],
-            ['Nicaragua', '90', 'Nicaragua.png'], ['El Salvador', '85', 'El-Salvador.png'], ['D. Republic', '82', 'D.-Repblic.png'],
-            ['Guatemala', '68', 'Guatemala.png'], ['Argentina', '56', 'Argentina.png'], ['Ecuador', '38', 'ecuador.png'],
-            ['Peru', '37', 'Peru.png'], ['Panama', '34', 'Panama.png'], ['Belize', '31', 'Belize.png'],
-            ['Bolivia', '19', 'Bolivia.png'], ['Chile', '17', 'chile.png'], ['T. and Tobago', '8', 'T.-and-Tobago.png'],
-            ['Paraguay', '8', 'Paraguay.png'], ['Barbados', '7', 'barbados.png'], ['Guyana', '7', 'Guyana.png'],
-            ['Uruguay', '6', 'Uruguay.png'], ['St. Lucia', '5', 'St.-Lucia.png'], ['Dominica', '2', 'Dominica.png'],
-            ['A. and Barbuda', '1', 'A.-and-Barbuda.png'], ['C. Islands', '1', 'C.-Islands.png'], ['Curacao', '1', 'Curacao.png'],
+            ['Mexico', '317', 'mexico.png'],
+            ['Colombia', '185', 'Colombia.png'],
+            ['Honduras', '145', 'Honduras.png'],
+            ['Jamaica', '140', 'jamaica.png'],
+            ['Brazil', '102', 'Brazil.png'],
+            ['Costa Rica', '95', 'Costa_rica.png'],
+            ['Nicaragua', '90', 'Nicaragua.png'],
+            ['El Salvador', '85', 'El-Salvador.png'],
+            ['D. Republic', '82', 'D.-Repblic.png'],
+            ['Guatemala', '68', 'Guatemala.png'],
+            ['Argentina', '56', 'Argentina.png'],
+            ['Ecuador', '38', 'ecuador.png'],
+            ['Peru', '37', 'Peru.png'],
+            ['Panama', '34', 'Panama.png'],
+            ['Belize', '31', 'Belize.png'],
+            ['Bolivia', '19', 'Bolivia.png'],
+            ['Chile', '17', 'chile.png'],
+            ['T. and Tobago', '8', 'T.-and-Tobago.png'],
+            ['Paraguay', '8', 'Paraguay.png'],
+            ['Barbados', '7', 'barbados.png'],
+            ['Guyana', '7', 'Guyana.png'],
+            ['Uruguay', '6', 'Uruguay.png'],
+            ['St. Lucia', '5', 'St.-Lucia.png'],
+            ['Dominica', '2', 'Dominica.png'],
+            ['A. and Barbuda', '1', 'A.-and-Barbuda.png'],
+            ['C. Islands', '1', 'C.-Islands.png'],
+            ['Curacao', '1', 'Curacao.png'],
         ];
 
-        return array_map(static fn (array $r): array => [
+        return array_map(static fn(array $r): array => [
             'country' => $r[0],
             'count' => $r[1],
             'flag' => self::pageImg('impact-report-2026/flags', $r[2]),
@@ -1032,7 +1050,7 @@ class BlockDefaults
 
         foreach (['headline', 'subheadline'] as $text) {
             if (isset($overrides[$text])) {
-                $data['_'.$text] = 'field_roles_carousel_block_'.$text;
+                $data['_' . $text] = 'field_roles_carousel_block_' . $text;
             }
         }
 
@@ -1238,7 +1256,7 @@ class BlockDefaults
                 'video_url' => 'https://vimeo.com/1067577208',
                 'image' => self::homeImg('PRES-Property-Management.jpg'),
                 'duration' => '00:38',
-                'quote' => '“I can\'t say enought about how every step of the way it just wowed me.”',
+                'quote' => '“I can\'t say enough about how every step of the way it just wowed me.”',
                 'company' => 'PRES Property Management',
             ],
             [
@@ -1474,14 +1492,14 @@ class BlockDefaults
         // is what it did inside the role pages' proof banner at 390px.
         $chrome = $size === 'compact' ? 'gap-5 pl-7 pr-6' : 'gap-9 pl-10 pr-8';
 
-        $base = 'group inline-flex items-center justify-center '.$chrome.' rounded-full bg-brand-magenta '
-            .'py-[19px] font-display text-[17px] font-bold uppercase leading-none '
-            .'tracking-[-0.45px] whitespace-nowrap text-white outline outline-[1.5px] outline-offset-4 '
-            .'outline-brand-magenta transition-all duration-200 hover:bg-brand-magenta-hover '
-            .'hover:outline-brand-magenta-hover focus:outline-brand-magenta focus-visible:ring-2 '
-            .'focus-visible:ring-brand-magenta focus-visible:ring-offset-2 sm:text-[19px]';
+        $base = 'group inline-flex items-center justify-center ' . $chrome . ' rounded-full bg-brand-magenta '
+            . 'py-[19px] font-display text-[17px] font-bold uppercase leading-none '
+            . 'tracking-[-0.45px] whitespace-nowrap text-white outline outline-[1.5px] outline-offset-4 '
+            . 'outline-brand-magenta transition-all duration-200 hover:bg-brand-magenta-hover '
+            . 'hover:outline-brand-magenta-hover focus:outline-brand-magenta focus-visible:ring-2 '
+            . 'focus-visible:ring-brand-magenta focus-visible:ring-offset-2 sm:text-[19px]';
 
-        return trim($base.' '.$extra);
+        return trim($base . ' ' . $extra);
     }
 
     /**
@@ -1761,37 +1779,37 @@ class BlockDefaults
         //    the one thing this page should not inherit from production.
         //  - The trust badge is omitted entirely in the comp. Hidden rather than unset, because
         //    `badge_text` also feeds desktop, which keeps it.
-        'hero' => "@media (max-width: 639.98px) {\n".
-            "    & > div:first-child { display: none }\n".
-            "    selector { background-image: linear-gradient(235deg, #120E1E 0%, #3E1270 45%, #5C1492 78%, #5C1492 100%) }\n".
-            "    h1 { margin-bottom: 16px }\n".
-            "    .order-1 > .inline-flex { display: none }\n".
-            "    .order-3 > .grid { grid-template-columns: repeat(2, 1fr); column-gap: 12px; row-gap: 10px }\n".
-            "    & > div:last-child > .grid { margin-top: 0; row-gap: 20px; padding-top: 0; padding-bottom: 0 }\n".
+        'hero' => "@media (max-width: 639.98px) {\n" .
+            "    & > div:first-child { display: none }\n" .
+            "    selector { background-image: linear-gradient(235deg, #120E1E 0%, #3E1270 45%, #5C1492 78%, #5C1492 100%) }\n" .
+            "    h1 { margin-bottom: 16px }\n" .
+            "    .order-1 > .inline-flex { display: none }\n" .
+            "    .order-3 > .grid { grid-template-columns: repeat(2, 1fr); column-gap: 12px; row-gap: 10px }\n" .
+            "    & > div:last-child > .grid { margin-top: 0; row-gap: 20px; padding-top: 0; padding-bottom: 0 }\n" .
             // `div.` is load-bearing, exactly as `.rounded-full` is on the button rule below.
             // Production's rule was a bare `.bg-white`, and the revenue pills add `bg-white`
             // when selected — so selecting one gave that <label> the form card's 20px padding,
             // growing the pill 8px and jolting the whole row from 34px to 58px. The form card is
             // the only <div> carrying `bg-white` in this block; the pills are <label>s.
-            "    div.bg-white { padding: 20px }\n".
-            "    div.bg-white > .mb-6 { margin-bottom: 16px }\n".
-            "}\n".
+            "    div.bg-white { padding: 20px }\n" .
+            "    div.bg-white > .mb-6 { margin-bottom: 16px }\n" .
+            "}\n" .
             // `.rounded-full` is load-bearing. Production's rule was a bare `button.w-full`,
             // and the booking wizard renders every available time slot as a full-width button
             // too (`rounded-card`), so the bare selector painted the whole slot list magenta and
             // destroyed the Confirm affordance. Only the submit button is `rounded-full`.
-            "button.w-full.rounded-full { background-color: #F90066; opacity: 1 }\n".
+            "button.w-full.rounded-full { background-color: #F90066; opacity: 1 }\n" .
             'button.w-full.rounded-full:hover { background-color: #D60057 }',
 
         // Roles grid sits directly under the hero, so it opens tighter than the other bands.
-        'roles' => "@media (max-width: 639.98px) {\n".
-            "    selector { padding-top: 32px; padding-bottom: 40px }\n".
+        'roles' => "@media (max-width: 639.98px) {\n" .
+            "    selector { padding-top: 32px; padding-bottom: 40px }\n" .
             '}',
 
         // Shared by why-hire, the guarantee card and the comparison matrix. One string on
         // purpose: identical payloads hash to one `.rl-d-` class and one emitted rule.
-        'band' => "@media (max-width: 639.98px) {\n".
-            "    selector { padding-top: 40px; padding-bottom: 40px }\n".
+        'band' => "@media (max-width: 639.98px) {\n" .
+            "    selector { padding-top: 40px; padding-bottom: 40px }\n" .
             '}',
 
         // Why-hire keeps the band padding and adds the comp's two mobile-only arrangements.
@@ -1804,10 +1822,10 @@ class BlockDefaults
         //  - The globe sits bottom-right and bleeds off the card edge. `margin-left: auto` is
         //    what moves it: the wrapper is a flex row with `justify-center`, and an auto margin
         //    beats `justify-content` without having to override the wrapper's own class.
-        'why-hire' => "@media (max-width: 639.98px) {\n".
-            "    selector { padding-top: 40px; padding-bottom: 40px }\n".
-            "    .rounded-card-md { flex-direction: column; gap: 16px }\n".
-            "    img[alt=\"Global Talent Distribution\"] { margin-left: auto; margin-right: -8px }\n".
+        'why-hire' => "@media (max-width: 639.98px) {\n" .
+            "    selector { padding-top: 40px; padding-bottom: 40px }\n" .
+            "    .rounded-card-md { flex-direction: column; gap: 16px }\n" .
+            "    img[alt=\"Global Talent Distribution\"] { margin-left: auto; margin-right: -8px }\n" .
             '}',
 
         // The three blocks below sit inside `wp:group` wrappers whose 5rem/6rem padding is far
@@ -1817,26 +1835,26 @@ class BlockDefaults
         // which a phone has no way to trigger, so on mobile every review reads as bare media on
         // the grey band. The comp shows a settled white card, so it is made unconditional here,
         // at the comp's 20px padding rather than the theme's 12px `--padding-card`.
-        'testimonials' => "@media (max-width: 639.98px) {\n".
-            "    selector { margin-bottom: -56px }\n".
-            "    .rounded-card { background-color: #FFFFFF; padding: 20px }\n".
+        'testimonials' => "@media (max-width: 639.98px) {\n" .
+            "    selector { margin-bottom: -56px }\n" .
+            "    .rounded-card { background-color: #FFFFFF; padding: 20px }\n" .
             // Comp sets the quote at 20px/25px, not the block's 16px: its ink box is 20px tall
             // over three lines where ours is 16px over two.
-            "    h3 { font-size: 20px; line-height: 25px }\n".
+            "    h3 { font-size: 20px; line-height: 25px }\n" .
             '}',
 
-        'process' => "@media (max-width: 639.98px) {\n".
-            "    selector { margin-bottom: -56px }\n".
-            "    .rl-process-container { margin-top: 24px }\n".
+        'process' => "@media (max-width: 639.98px) {\n" .
+            "    selector { margin-bottom: -56px }\n" .
+            "    .rl-process-container { margin-top: 24px }\n" .
             '}',
 
-        'faq' => "@media (max-width: 639.98px) {\n".
-            "    selector { margin-top: -40px; margin-bottom: -56px }\n".
+        'faq' => "@media (max-width: 639.98px) {\n" .
+            "    selector { margin-top: -40px; margin-bottom: -56px }\n" .
             '}',
 
         // The booking footer's own wrapper carries no padding — its first child does.
-        'booking' => "@media (max-width: 639.98px) {\n".
-            "    & > div:first-child { padding-top: 40px; padding-bottom: 40px }\n".
+        'booking' => "@media (max-width: 639.98px) {\n" .
+            "    & > div:first-child { padding-top: 40px; padding-bottom: 40px }\n" .
             '}',
     ];
 
@@ -1848,7 +1866,7 @@ class BlockDefaults
      */
     public static function hireVa4Mobile(string $section, array $data = []): array
     {
-        if (! isset(self::HIRE_VA_4_MOBILE[$section])) {
+        if (!isset(self::HIRE_VA_4_MOBILE[$section])) {
             throw new \InvalidArgumentException("Unknown /hire-va-4/ mobile override: {$section}");
         }
 
@@ -1960,7 +1978,7 @@ class BlockDefaults
         ];
 
         return array_map(
-            static fn (array $step, string $title) => [...$step, 'title' => $title],
+            static fn(array $step, string $title) => [...$step, 'title' => $title],
             self::hireVa4ProcessSteps(),
             $titles,
         );
@@ -2104,7 +2122,7 @@ class BlockDefaults
         $byCompany = array_column(self::hireVa4Testimonials(), null, 'company');
 
         return array_values(array_filter(array_map(
-            static fn (string $company) => $byCompany[$company] ?? null,
+            static fn(string $company) => $byCompany[$company] ?? null,
             $order,
         )));
     }
@@ -2193,7 +2211,7 @@ class BlockDefaults
                 'video_url' => 'https://vimeo.com/1067577208',
                 'image' => self::homeImg('PRES-Property-Management.jpg'),
                 'duration' => '00:38',
-                'quote' => '“I can\'t say enought about how every step of the way it just wowed me.”',
+                'quote' => '“I can\'t say enough about how every step of the way it just wowed me.”',
                 'company' => 'PRES Property Management',
             ],
             [
@@ -3044,7 +3062,7 @@ class BlockDefaults
         // refactor away from being ignored.
         foreach (['variant', 'columns'] as $key) {
             if (array_key_exists($key, $merged)) {
-                $merged['_'.$key] = 'field_roles_pricing_grid_block_'.$key;
+                $merged['_' . $key] = 'field_roles_pricing_grid_block_' . $key;
             }
         }
 
@@ -3811,7 +3829,7 @@ Google Ads',
      */
     public static function renderEcom(string $slug, array $rows, array $overrides = [], array $attrs = []): string
     {
-        if (! isset(self::REPEATER_KEYS[$slug])) {
+        if (!isset(self::REPEATER_KEYS[$slug])) {
             throw new \InvalidArgumentException("No repeater key registered for block '{$slug}'.");
         }
 
@@ -3900,7 +3918,7 @@ Google Ads',
      */
     public static function referralProgramRows(): array
     {
-        $img = fn (string $file): string => self::pageImg('referral-program', $file);
+        $img = fn(string $file): string => self::pageImg('referral-program', $file);
 
         $rows = [
             [
@@ -3925,7 +3943,7 @@ Google Ads',
             ],
         ];
 
-        return array_values(array_map(fn (array $row, int $i): array => [
+        return array_values(array_map(fn(array $row, int $i): array => [
             'headline' => $row[0],
             'body' => $row[1],
             'image' => $img($row[2]),
@@ -4022,10 +4040,22 @@ Google Ads',
     {
         // Production's order, not the archive's.
         $order = [
-            '1067577208', '1067577369', '1067577489', '1067577248',
-            '1067577464', '1067577620', '1067577549', '1067577665',
-            '1067577688', '1067577383', '1067577228', '1067577598',
-            '1067577293', '1067577442', '1067577645', '1067577717',
+            '1067577208',
+            '1067577369',
+            '1067577489',
+            '1067577248',
+            '1067577464',
+            '1067577620',
+            '1067577549',
+            '1067577665',
+            '1067577688',
+            '1067577383',
+            '1067577228',
+            '1067577598',
+            '1067577293',
+            '1067577442',
+            '1067577645',
+            '1067577717',
         ];
 
         $byId = [];
@@ -4044,7 +4074,7 @@ Google Ads',
         ];
 
         return array_values(array_filter(array_map(
-            fn (string $id): ?array => $byId[$id] ?? null,
+            fn(string $id): ?array => $byId[$id] ?? null,
             $order,
         )));
     }

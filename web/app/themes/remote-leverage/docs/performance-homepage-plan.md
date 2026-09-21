@@ -315,25 +315,89 @@ rather than assuming the deltas add up.
 
 ---
 
-## Adjacent findings — not this plan, but do not lose them
+## The origin and the CDN — measured 2026-09-20, one change made
 
-These surfaced while measuring and are about the origin, not JavaScript. They may well matter more
-to a real visitor than anything above.
+This started as "raise the CDN TTL" and turned into two separate problems.
 
-1. **A 20.5 s TTFB was actually observed** on one production run. Not a timeout, not a blocked
-   request — the document itself took 20 seconds. One occurrence, cause unknown.
-2. **The CDN TTL is 60 s** (`cache-control: public, s-maxage=60, stale-while-revalidate=30`). Origin
-   render is ~850 ms cold against ~100 ms served from CloudFront. On a site with this traffic
-   profile, a 60 s TTL means a meaningful share of visitors pay the origin cost. Raising it is
-   plausibly a larger, cheaper win than any JavaScript change here.
-3. **Intermittent `301` to itself** at the start of each cache cycle (see `performance-baseline.md`
-   Part 6). Same neighbourhood as (1) and (2); possibly the same root cause.
+### What was measured
 
-**Recommendation: investigate 1–3 in parallel with phase 1.** They are cheap to look at, they are
-origin-side rather than vendor-side, and a 750 ms TTFB delta on every uncached request is the same
-order as the entire Google Tag blocking cost.
+| Probe | What it exercises | TTFB observed |
+| :--- | :--- | :--- |
+| `/healthz` | nginx only, literal `return 200 "ok\n"`, **no PHP** | 0.29 s – **2.46 s** |
+| `/__probe-<rand>/` | full WordPress 404 render, unique cache key | 0.74 s – **3.60 s** |
+| `/` on a CloudFront hit | edge only | ~0.20 s typical, spikes to **15.7 s** |
+| Lighthouse runs | — | **~45 % exceeded a 400 ms band** |
 
----
+**`/healthz` is the important row.** It returns a hardcoded string from nginx and never touches
+PHP; it should be ~50 ms. At 2.46 s the latency is upstream of WordPress entirely, so **this is
+not a WordPress problem and not a cache-TTL problem.** The nginx config notes the origin runs on
+1 vCPU; a CPU-starved container or the ALB path fits what is measured. It needs origin-side
+investigation (task CPU, task count, ALB target latency) that cannot be done from here.
+
+> An earlier probe in this session reported a "~36 s cold render" using `?cb=` query strings to
+> force a miss. **That measurement was invalid** — CloudFront does not reliably key on arbitrary
+> query strings, so those requests did not do what was intended. The table above replaces it.
+> (Search is unaffected: `/?s=…` returns real results, so there is no query-string bug.)
+
+### What was fixed: the stale window was far too small
+
+`age` was observed cycling **9 → 69** under steady traffic. 69 > `s-maxage=60` is direct proof
+CloudFront honours `stale-while-revalidate` on this distribution — the mechanism works, the window
+was just wrong.
+
+At `s-maxage=60, stale-while-revalidate=30`, an object idle for more than ~90 s falls out of the
+stale-serve window and the next visitor pays a **blocking** origin fetch. On this traffic profile
+that is common, and it is exactly why ~45 % of Lighthouse attempts missed: runs are minutes apart.
+Real visitors arriving after a quiet spell hit the same thing.
+
+**Changed in [`docker/nginx.conf`](../../../../../docker/nginx.conf)** (validated with `nginx -t`,
+not deployed):
+
+```diff
+-"public, s-maxage=60, stale-while-revalidate=30"
++"public, s-maxage=60, stale-while-revalidate=600, stale-if-error=86400"
+```
+
+- `stale-while-revalidate=600` — CloudFront answers instantly from cache after a quiet spell and
+  refreshes in the background. **This does not widen real staleness**: the first stale request
+  triggers the revalidation, which completes in seconds, so content is behind by one request
+  rather than by the window. The window only matters when revalidation keeps failing, which is
+  when serving stale is the right answer. 600 s rather than a day, so a persistently broken origin
+  surfaces rather than being masked.
+- `stale-if-error=86400` — an origin 5xx serves the last good copy instead of an error page.
+
+### What was deliberately NOT changed: `s-maxage`
+
+**`s-maxage` stays at 60 s, and raising it is blocked on a prerequisite.** Nothing invalidates this
+cache: there is no CloudFront invalidation on deploy and no purge on publish —
+[`deployment.md`](deployment.md) documents invalidation as a *manual* step taken only after a
+cache-header change. So `s-maxage` is the sole bound on how long an editor's change takes to go
+live, and raising it directly degrades the publishing experience.
+
+To unlock a longer TTL, add a purge first. In rough order of value:
+
+1. **Invalidate on deploy** — one `aws cloudfront create-invalidation --paths '/*'` step in
+   `deploy-production.yml` / `deploy-staging.yml`. The command is already documented; it is simply
+   not wired in. Also fixes the stale-response-header problem `deployment.md` warns about.
+2. **Purge on publish** — a `save_post` / `transition_post_status` hook invalidating the affected
+   URLs plus `/`. This is what actually decouples TTL from editor experience.
+3. **Then** raise `s-maxage` to hours and let invalidation handle freshness.
+
+### Note on the deploy-time header change
+
+The new `Cache-Control` only reaches visitors for objects fetched after the deploy. Entries
+CloudFront already holds keep serving the old `stale-while-revalidate=30` **and their stored
+headers** until they age out. Per `deployment.md`, **invalidate the distribution after deploying
+this**, or the change will look like it did nothing.
+
+### Still open
+
+- **The origin is slow independently of caching** (`/healthz` at 2.46 s). Widening the stale window
+  hides this from most visitors; it does not fix it, and everyone who does reach the origin still
+  waits. Highest-value remaining item on this page, and it is infrastructure, not code.
+- **Intermittent `301` to itself** at the start of a cache cycle (see
+  [`performance-baseline.md`](performance-baseline.md) Part 6). Plausibly the same root cause as
+  the latency spikes; not diagnosed.
 
 ## What this plan deliberately does not do
 

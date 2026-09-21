@@ -821,7 +821,7 @@
                                     'image' => $img('PRES-Property-Management.jpg'),
                                     'duration' => '00:38',
                                     'quote' =>
-                                        '“I can\'t say enought about how every step of the way it just wowed me.”',
+                                        '“I can\'t say enough about how every step of the way it just wowed me.”',
                                     'company' => 'PRES Property Management',
                                 ],
                                 [
