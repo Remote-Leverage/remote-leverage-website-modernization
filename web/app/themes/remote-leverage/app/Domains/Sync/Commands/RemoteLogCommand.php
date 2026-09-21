@@ -33,8 +33,7 @@ class RemoteLogCommand extends Command
         {--lines=200 : How many of the most recent lines to show}
         {--contains= : Only show lines containing this text}
         {--clear : Truncate the log once it has been read}
-        {--keep-bytes=0 : With --clear, leave this many bytes of the tail behind}
-        {--status : Report why the hourly cost alert will or will not post there, instead of reading the log}';
+        {--keep-bytes=0 : With --clear, leave this many bytes of the tail behind}';
 
     /**
      * @var string
@@ -44,10 +43,6 @@ class RemoteLogCommand extends Command
     public function handle(): int
     {
         $source = (string) $this->option('source');
-
-        if ($this->option('status')) {
-            return $this->showStatus($source);
-        }
 
         $input = array_filter([
             'lines' => (int) $this->option('lines'),
@@ -101,45 +96,6 @@ class RemoteLogCommand extends Command
 
         if (($payload['cleared'] ?? false) === true) {
             $this->info('Cleared. Now '.$this->bytes((int) ($payload['size_bytes_after'] ?? 0)).'.');
-        }
-
-        return self::SUCCESS;
-    }
-
-    /**
-     * The one question the log cannot answer.
-     *
-     * When the alert is switched off its WP-Cron event is removed, so the code that would log a
-     * reason never runs again — the silence is total and self-sustaining. This asks the
-     * environment what it currently believes instead.
-     */
-    private function showStatus(string $source): int
-    {
-        try {
-            $result = (new SyncClient($source))->run('app/cost-alert-status', []);
-        } catch (Throwable $e) {
-            $this->error($e->getMessage());
-
-            return self::FAILURE;
-        }
-
-        $payload = $result['result'] ?? $result['data'] ?? $result;
-
-        foreach ($payload as $key => $value) {
-            $shown = match (true) {
-                is_bool($value) => $value ? 'true' : 'false',
-                is_array($value) => json_encode($value),
-                $value === null => 'null',
-                default => (string) $value,
-            };
-
-            $this->line(sprintf('  <comment>%-22s</comment> %s', $key, $shown));
-        }
-
-        if (($payload['will_post'] ?? true) === false) {
-            $this->warn('The alert is switched off here, so its hourly event is not scheduled and nothing will log a reason.');
-        } elseif (($payload['cron_scheduled'] ?? true) === false) {
-            $this->warn('Enabled, but the hourly event is missing — it was dropped while switched off and has not been re-added yet.');
         }
 
         return self::SUCCESS;
