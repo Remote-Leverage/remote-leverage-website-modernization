@@ -387,19 +387,45 @@ class MarketingCostAlertWidget
         return '— '.implode(', ', $parts);
     }
 
-    /** @param  array<string, mixed>  $finding */
+    /**
+     * The control that clears a finding, or puts it back.
+     *
+     * A bare "×" rather than the word, because the word competed with the finding for attention:
+     * a warning that matters ending in a button labelled *Dismiss* reads as though dismissing is
+     * the suggested action. The affordance should be quiet and the sentence should be loud.
+     *
+     * `title` and `aria-label` carry the meaning the glyph drops, and both name the finding, so a
+     * screen reader announces which one is being cleared rather than "close, close, close".
+     *
+     * @param  array<string, mixed>  $finding
+     */
     private function renderDismissButton(array $finding, bool $restore): void
     {
+        $text = (string) ($finding['text'] ?? '');
+
+        // The person, or the first clause — enough to tell two findings apart in a tooltip.
+        $subject = trim((string) strtok($text, '.'));
+
+        $label = $restore
+            ? sprintf('Undo dismissing: %s', $subject)
+            : sprintf('Dismiss: %s', $subject);
+
         ?>
-        <form method="post" action="<?php echo esc_url(admin_url('admin.php')); ?>" style="display:inline;">
+        <form method="post" action="<?php echo esc_url(admin_url('index.php')); ?>" style="display:inline;">
             <?php wp_nonce_field(self::DISMISS_ACTION); ?>
             <input type="hidden" name="rl_action" value="<?php echo esc_attr(self::DISMISS_ACTION); ?>" />
             <input type="hidden" name="rl_finding" value="<?php echo esc_attr((string) ($finding['key'] ?? '')); ?>" />
-            <input type="hidden" name="rl_finding_text" value="<?php echo esc_attr((string) ($finding['text'] ?? '')); ?>" />
+            <input type="hidden" name="rl_finding_text" value="<?php echo esc_attr($text); ?>" />
             <input type="hidden" name="rl_permanent" value="<?php echo ($finding['permanent'] ?? false) ? '1' : '0'; ?>" />
             <input type="hidden" name="rl_restore" value="<?php echo $restore ? '1' : '0'; ?>" />
-            <button type="submit" class="button-link" style="font-size:11px;vertical-align:baseline;">
-                <?php echo $restore ? 'Undo' : 'Dismiss'; ?>
+            <button type="submit"
+                    title="<?php echo esc_attr($label); ?>"
+                    aria-label="<?php echo esc_attr($label); ?>"
+                    style="border:0;background:none;padding:0 2px;margin-left:4px;cursor:pointer;
+                           font-size:13px;line-height:1;vertical-align:baseline;
+                           color:<?php echo $restore ? '#6b7280' : '#b91c1c'; ?>;opacity:.55;"
+                    onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">
+                <?php echo $restore ? '&#8631;' : '&times;'; ?>
             </button>
         </form>
         <?php
@@ -586,11 +612,24 @@ class MarketingCostAlertWidget
     {
         $result = sanitize_text_field((string) ($_GET['rl_cost_alert'] ?? ''));
         ?>
-        <?php if ($result !== '') { ?>
-            <p class="rl-dash-kpi-meta" style="margin-top:12px;color:<?php echo $result === 'sent' ? '#15803d' : '#b91c1c'; ?> !important;">
-                <?php echo $result === 'sent'
-                    ? 'Posted to Slack as a new card, so the channel keeps the history.'
-                    : 'Slack rejected the message, or the alert is switched off. See the error log.'; ?>
+        <?php
+        /*
+         * Keyed on the result rather than on "is it 'sent'", which is what it was when sending was
+         * the only thing this screen did. Dismissing then landed here and was announced as
+         * "Slack rejected the message" in red, because anything that was not a send read as one
+         * that had failed.
+         */
+        $notice = match ($result) {
+            'sent' => ['#15803d', 'Posted to Slack as a new card, so the channel keeps the history.'],
+            'dismissed' => ['#15803d', 'Dismissed. It will not be announced again — the dashboard keeps it below, with an undo.'],
+            'restored' => ['#15803d', 'Put back. The next card will carry it again.'],
+            'failed' => ['#b91c1c', 'Slack rejected the message, or the alert is switched off. See the error log.'],
+            default => null,
+        };
+        ?>
+        <?php if ($notice !== null) { ?>
+            <p class="rl-dash-kpi-meta" style="margin-top:12px;color:<?php echo esc_attr($notice[0]); ?> !important;">
+                <?php echo esc_html($notice[1]); ?>
             </p>
         <?php } ?>
 

@@ -3,6 +3,7 @@
 use App\Ai\Abilities\ClonePageAbility;
 use App\Ai\Abilities\CreateLandingPageAbility;
 use App\Ai\Abilities\DescribePageAbility;
+use App\Ai\Abilities\ErrorLogAbility;
 use App\Ai\Abilities\LeadStatsAbility;
 use App\Ai\Abilities\ListPagesAbility;
 use App\Ai\Abilities\ListPatternsAbility;
@@ -113,6 +114,11 @@ return [
         // does not get it by default. Grant with `wp acorn rl:ai:grant-insights`.
         LeadStatsAbility::class,
         QueryLeadsAbility::class,
+
+        // Reading a remote environment's application log, because nobody on this team has a
+        // shell on one and every failure path here logs and carries on. REST-only, invoked by
+        // `wp acorn rl:logs`, gated on the sync capability the credential already holds.
+        ErrorLogAbility::class,
 
         // Local↔remote settings/page sync — REST-only, invoked by wp rl:sync:*.
         ExportSyncableSettingsAbility::class,

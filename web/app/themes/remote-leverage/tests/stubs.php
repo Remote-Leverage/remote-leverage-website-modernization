@@ -85,6 +85,22 @@ $app->singleton('validator', function ($app) {
     return new Factory($translator, $app);
 });
 
+/*
+ * Acorn's storage path, which ErrorLogAbility resolves its log file through.
+ *
+ * A test writes a fixture log into a temporary directory and points this at it; without the
+ * global, the ability would read this machine's real 2MB development log and the assertions would
+ * be about whatever happened to be in it.
+ */
+if (! function_exists('storage_path')) {
+    function storage_path(string $path = ''): string
+    {
+        $base = $GLOBALS['rl_test_storage_path'] ?? sys_get_temp_dir().'/rl-acorn-storage';
+
+        return rtrim($base, '/').($path !== '' ? '/'.ltrim($path, '/') : '');
+    }
+}
+
 $app->singleton('cache', function () {
     return new class
     {
