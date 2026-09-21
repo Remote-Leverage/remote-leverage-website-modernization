@@ -173,11 +173,25 @@ anywhere to explain it.
 
 `send_default_pii` stays `false` — this is a public marketing site, and that flag would attach
 every anonymous visitor's IP address to their errors along with it. Instead
-`SentryReporting::identifyUser()` sets the Sentry user (`id` + `email`) explicitly, and only once
-`get_current_user_id()` is non-zero, so a guest's request never gets tagged as "user 0" — a
-logged-out `wp_get_current_user()` still returns a `WP_User`, just with empty/zero fields, not
-`null`. This gets the thing the id is actually for — attributing an admin-triggered error to the
-admin who triggered it — without turning on IP capture for the whole site.
+`SentryReporting::identifyUser()` sets the Sentry user explicitly, choosing one of two identities:
+
+1. **A logged-in WordPress user** (`id` + `email`), and only once `get_current_user_id()` is
+   non-zero — a guest's request never gets tagged as "user 0", because a logged-out
+   `wp_get_current_user()` still returns a `WP_User`, just with empty/zero fields, not `null`.
+2. **Otherwise, the visitor's own attribution** — nearly all traffic on a public site, since almost
+   none of it is logged in. `identifyByAttribution()` reads the request through the same
+   `AttributionCollector` `CaptureLeadAction` uses for `rl_leads`, so "who is this" in Sentry means
+   the same thing it does on a lead row: `device_id` (the first-party `rl_vid` cookie, set
+   client-side by `TrackingHooks::injectVisitorCookie()`) becomes the `id`, and
+   `utm_source`/`utm_medium`/`utm_campaign` ride along as plain fields on that same user. An issue
+   then reads as "this campaign's traffic is crashing" directly, without cross-referencing leads.
+   `device_id` is absent on a visitor's very first request — the JS that sets it hasn't run yet on
+   that request, and that first request is exactly when a fresh `utm_source` is most likely to be
+   present — so identification falls back to UTM alone rather than requiring both; only a request
+   carrying neither is left unidentified.
+
+Either way, this gets the thing an id is actually for — attributing an error to who or what brought
+the visitor here — without turning on IP capture for the whole site.
 
 ### Browser side — `resources/js/app.js`
 
