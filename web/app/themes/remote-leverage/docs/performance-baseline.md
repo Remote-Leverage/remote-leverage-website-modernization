@@ -1185,3 +1185,158 @@ the result is pixel-identical.** The 1x arm is the floor, not the common case.
 - **Flags are served at `thumbnail` (150 px) into a 24 px circle** because that is the smallest
   registered size. It is 2–4 KB each as WebP; not worth a new subsize.
 - **CLS on `/case-study/` is still 0.002–0.052 and still unstable.** Untouched here.
+
+---
+
+# Part 6 — The live homepage on production (2026-09-20)
+
+> ⚠️ **The metric numbers in this Part are superseded.** They are `n = 1` with uncontrolled TTFB.
+> A TTFB-banded 2-run median taken the same day reads **Perf 30 / LCP 13.58 s / TTI 16.59 s /
+> TBT 1,550 ms** — worse on every metric except TBT. Use
+> [`scripts/perf-measure.sh`](../scripts/perf-measure.sh) (`npm run perf`) and see
+> [`performance-homepage-plan.md`](performance-homepage-plan.md) for the controlled figures.
+>
+> **What stands is the composition**, which is what this Part was written to establish: the LCP
+> element is a text node, 47 of 61 images are already lazy, and third-party JavaScript — not
+> images — is the cost.
+
+**This is the first measurement of this document taken against the real site rather than local
+Herd, and it overturns Part 1's reading of `/`.** Local scored `/` at Perf 99 / LCP 1.5 s. The
+same page in production scores **43**, with **TTI 14.8 s** — which is the "about 14 seconds to
+fully load" that prompted the run.
+
+Measured against `https://remoteleverage.com/` with `lighthouse@12.8.2`, default mobile preset
+(Moto G Power, simulated Slow 4G, 4× CPU), headless Chrome. **n = 1**, not the 3-run median used
+in Parts 1 and 3 — treat the individual numbers as indicative and the *composition* as the
+finding, since composition is the part that does not move between runs.
+
+| Metric | Local (Part 1) | **Production** |
+| :--- | ---: | ---: |
+| Performance | 99 | **43** |
+| FCP | 1.21 s | 1.9 s |
+| **LCP** | 1.69 s | **10.1 s** |
+| **TTI** | — | **14.8 s** |
+| **TBT** | 0 ms | **2 370 ms** |
+| CLS | 0.011 | **0.000** ✅ |
+| `server-response-time` | 757 ms | **100 ms** ✅ |
+
+The server is not the problem — CloudFront answers the document in 100 ms. CLS is now a clean
+zero. **Everything that regressed is main-thread JavaScript, and almost all of it is third party.**
+
+## It is not the images
+
+Worth stating plainly, because "lazy-load the images" was the hypothesis this run was opened to
+test:
+
+- The homepage requests **61 images, 47 of them already `loading="lazy"`** (77 %). The 14 eager
+  ones are the header logo, the hero, and the above-fold logo strip — all correctly eager.
+- All same-origin assets together are **1.12 MB across 65 files**: 519 KB eager images, 305 KB
+  lazy images, 284 KB JS, 35 KB CSS.
+- **The LCP element is the `<h1>`** — a text node. No image is on the LCP path at all, so
+  deferring images cannot move LCP by construction.
+
+Lazy loading is already applied here and has no headroom left. The three hero rasters
+(`hero-bruno`, `hero-maria`, `hero-luana`) are ~170 KB each and *are* worth re-encoding, but that
+is a byte-size question, not a loading-strategy one, and it is second-order next to the below.
+
+## Third-party JavaScript is ~100 % of the blocking time
+
+| Entity | Main thread | Blocking | Transfer |
+| :--- | ---: | ---: | ---: |
+| Facebook | 1 145 ms | **979 ms** | 277.1 KiB |
+| Google Tag Manager | 926 ms | **749 ms** | 340.8 KiB |
+| posthog.com | 960 ms | **654 ms** | 180.3 KiB |
+| Customer.io | 89 ms | 0 ms | 29.6 KiB |
+| LinkedIn Ads | 68 ms | 0 ms | 24.3 KiB |
+| openai.com | 66 ms | 0 ms | 29.5 KiB |
+| Bing Ads | 49 ms | 0 ms | 16.3 KiB |
+| Google/Doubleclick, stape.ai, other | 17 ms | 0 ms | 8.7 KiB |
+| **Total** | **~3 320 ms** | **2 382 ms** | **~907 KiB** |
+
+Measured TBT is 2 370 ms. The three blocking entities sum to 2 382 ms. **Within noise, the
+entire Total Blocking Time of the homepage is Meta + Google Tag + PostHog**, and third-party
+transfer (~907 KiB) is *nine times* the theme's own JS.
+
+## The two vendors excluded from the defer list are the two that matter
+
+`config/pixels.php` already implements deferred SDK loading, and `MarketingPixelHooks::DEFERRABLE`
+is `['linkedin', 'openai', 'bing_uet', 'tiktok']` — **every one of which is already at 0 ms
+blocking**. The deferral is working perfectly on vendors that were never the problem. Meta and
+`google_tag` are excluded on purpose, and between them they are **1 728 ms of the 2 370 ms TBT**.
+
+The stated reasons, against what production actually measures:
+
+- **`meta` — "Facebook is 67% of paid acquisition … not the pixel to experiment on."** This is a
+  business call, not a technical one, and it stands on its own terms. Note only that it is being
+  paid for twice: **two pixel IDs are configured and both fire** (`1430907207548734` and
+  `1482937899395718`), each pulling its own ~140 KiB `signals/config` bundle, 758 ms of eval
+  between them. If both are genuinely needed, the cost is understood; if one is historical, it is
+  the single cheapest win available and costs no attribution. Worth asking marketing — this file
+  already warns that "production … runs LinkedIn and OpenAI twice each because two people solved
+  the same problem in two places."
+- **`google_tag` — "the tag is already `async` so it costs no parse time."** ⚠️ **This is
+  measurably wrong and should not be relied on.** `async` defers *fetch*, not *evaluation*: once
+  downloaded the script still evaluates on the main thread. Google Tag Manager measures **926 ms
+  of main-thread time, 749 ms of it blocking, across two containers** (`GT-NCNQ6N2` 195 KiB and
+  `AW-1140618301` 146 KiB). Whether GA4 and Ads conversions *should* wait is still a legitimate
+  business call — but it should be made knowing the tag costs three quarters of a second of
+  blocking time, not zero.
+
+## Also found
+
+- **PostHog session replay is on.** `posthog-recorder.js` (66 KiB) loads on top of `array.js`
+  (96.7 KiB); PostHog totals 960 ms of main thread. No `disable_session_recording` /
+  `session_recording` setting appears in `TrackingHooks`, so this is the library default rather
+  than a decision. Replay on 100 % of homepage traffic is unusual; sampling it is a config change.
+- **The theme's own bundle is 84 % unused on this page** — `prod-BXM4E1SX.js`, 110.5 KiB unused of
+  132.2 KiB. The only first-party item in the opportunity list.
+- **`uses-rel-preconnect` still claims 430 ms**, the same finding as Part 1 — now against six
+  distinct third-party origins.
+
+## Intermittent 301-to-self on the apex — **unrelated to the above, worth its own look**
+
+While probing, `https://remoteleverage.com/` was observed returning **`301` with
+`location: https://remoteleverage.com/`** — a redirect to itself — on the first request of a
+CloudFront cache cycle (`age: 1`), then `200` for the remainder of the 60 s TTL. Reproduced across
+12 sequential requests and on both `GET` and `HEAD`, with and without a cache-busting query
+string. `cache-control` is `public, s-maxage=60, stale-while-revalidate=30`.
+
+Browsers mostly do not notice, because the 200 is what gets cached and served for the next ~59 s —
+which is why this is not visible in the Lighthouse run. But a monitor, link checker or social
+scraper that happens to hit the revalidation edge sees an infinite redirect. Mechanism not
+established; a canonical/`WP_HOME` redirect firing on the origin's cache-miss path is the obvious
+suspect. **Not diagnosed here — flagged only.**
+
+## What this changes about Part 1
+
+Part 1's warning that local numbers are "a floor and a relative signal" is now quantified for one
+page: local missed a 2.4 s main-thread stall entirely, because **none of the third-party tags that
+cause it are configured on local**. Any future performance claim about this site needs a
+production run; the local suite cannot see the dominant cost.
+
+## Follow-up: blocked-vendor arms (controlled, 2026-09-20)
+
+Superseded the uncontrolled arms first recorded here. `npm run perf -- --ceiling --runs 3
+--ttfb-max 400` — median of 3, every run inside a 70–233 ms TTFB band:
+
+| Arm | Perf | LCP | TTI | TBT | Δ TBT |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| `baseline` | 31 | 13.26 s | 15.71 s | 1,549 ms | — |
+| `no-meta` | 34 | 10.95 s | 14.27 s | 1,041 ms | −508 ms |
+| `no-google-tag` | 33 | 13.22 s | 16.57 s | 1,062 ms | −487 ms |
+| `no-posthog` | 33 | 13.14 s | 13.60 s | 1,380 ms | −169 ms |
+| `no-three` | **59** | 8.24 s | 8.36 s | **13 ms** | **−1,536 ms** |
+
+- **The three are 99.2 % of Total Blocking Time**, confirmed under control.
+- **Removal is superadditive**: individual savings sum to 1,164 ms, all three together save
+  1,536 ms. Each vendor removed alone under-delivers by about a third, because the others expand
+  into the freed main thread.
+- **PostHog is the smallest contributor (−169 ms), not the largest.** The uncontrolled run that
+  ranked it first at −1,360 ms was measuring TTFB noise.
+- **`no-three` still only scores 59 with LCP 8.24 s**, so a second, bandwidth-bound problem sits
+  underneath the JavaScript one.
+- **TBT banded tightly** (`no-meta`: 1041/1043/1036 ms) but **LCP did not** (same runs: 10.45 /
+  10.95 / 20.12 s). Do not read LCP across arms.
+- **~45 % of attempts were discarded for missing the CDN**, at 400 ms–1.9 s origin TTFB.
+
+What to do about it: [`performance-homepage-plan.md`](performance-homepage-plan.md).

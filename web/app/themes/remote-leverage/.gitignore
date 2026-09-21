@@ -13,3 +13,6 @@ npm-debug.log
 # query was never committed. A file the running code needs is not a dump.
 !resources/sql/*.sql
 /.scrape-cache
+
+# Lighthouse runs from scripts/perf-measure.sh — raw JSON, regenerable, sometimes large.
+.perf/

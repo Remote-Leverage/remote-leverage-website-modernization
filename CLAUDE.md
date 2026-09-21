@@ -64,7 +64,20 @@ BlockDefaults::renderFeatureCards('3', [], $cards, '413/152', 'flush');
 
 ## Verifying a migrated page
 
-Content parity is not visual parity. Compare rendered screenshots against production:
+> **"Production" in this section means the old Elementor site, and it is no longer on the web.**
+> The apex cut over on ~2026-09-19: `remoteleverage.com` now serves *this theme*, and `www.` and
+> `production.remoteleverage.com` 301 to it. There is nothing left to diff a migration against over
+> HTTP — `legacy.remoteleverage.com` 404s.
+>
+> The reference is now the local snapshot: **`legacy-snapshots/pages/<slug>.html`**, 238 rendered
+> Elementor pages captured 2026-09-19, which render standalone in a browser (`file://`) with the
+> legacy CSS and images alongside. It is gitignored and ~946MB, so it is per-checkout, not on the
+> remote — see [`legacy-snapshots/README.md`](legacy-snapshots/README.md). Everything below still
+> applies; point it at a snapshot file instead of a URL. Anything that genuinely needs the live
+> legacy site can no longer be checked, so say so rather than measuring the v2 site and calling it
+> production.
+
+Content parity is not visual parity. Compare rendered screenshots against the legacy snapshot:
 
 - Playwright + `channel: 'chrome'` at 1440px.
 - Force `img.loading = 'eager'` and scroll the full page before capturing — lazy images and
@@ -84,10 +97,10 @@ Content parity is not visual parity. Compare rendered screenshots against produc
   different" on `/blog/` immediately after the image work — all 180 image URLs returned 200.
   Force `decoding='sync'` and `await img.decode()`; that took the same diff to 0px. Expect this
   on exactly the pages you just made faster.
-- Read design tokens off production with `getComputedStyle` rather than estimating.
-- Check a section is actually *visible* on production before reproducing it; some are
+- Read design tokens off the snapshot with `getComputedStyle` rather than estimating.
+- Check a section is actually *visible* in the snapshot before reproducing it; some are
   `display:none` at every breakpoint.
-- Production is not self-consistent. Check for separate desktop and mobile Elementor stacks
+- The legacy site is not self-consistent. Check for separate desktop and mobile Elementor stacks
   (`elementor-hidden-mobile` / `elementor-hidden-desktop`) before assuming one responsive
   layout — `/services/` ships two, and the mobile one carries **different prices** because
   someone updated the desktop copy and forgot the other. Reproducing the wrong one ships wrong
@@ -190,7 +203,7 @@ back to the built `public/videos/`. Never hand-write a video URL.
 - Do not commit or push unless asked.
 - **Container width is the one thing you do NOT measure off production.** The canonical container
   is `w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8`, and every root `wp:group` declares
-  `"layout":{"type":"constrained","contentSize":"1380px"}`. Production's Elementor pages measure
+  `"layout":{"type":"constrained","contentSize":"1380px"}`. The legacy Elementor pages measure
   1260–1320px; migrated pages still use 1380px. `/signedup/` and `/referral-program/` were built
-  at production's measured 1260px and had to be corrected on 2026-09-15. Measure production for
-  type scale, spacing and colour — never for the container. See `docs/design-system.md` rule 1.
+  at the legacy measured 1260px and had to be corrected on 2026-09-15. Measure the legacy snapshot
+  for type scale, spacing and colour — never for the container. See `docs/design-system.md` rule 1.

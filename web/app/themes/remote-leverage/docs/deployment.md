@@ -1,6 +1,17 @@
 # Deployment
 
-Two AWS environments exist: **staging** (`staging.remoteleverage.com`) and a production **preview** host (`production.remoteleverage.com`). Apex `remoteleverage.com` stays on the legacy site until DNS is under our control and we cut over.
+Two AWS environments exist: **staging** (`staging.remoteleverage.com`) and **production**, which serves the
+live site at apex `remoteleverage.com`.
+
+> **Apex cutover is done (verified 2026-09-20).** `remoteleverage.com` is the main site and runs this
+> theme — the legacy Elementor site no longer serves it. `www.remoteleverage.com` and the old preview
+> host `production.remoteleverage.com` both **301 to the apex**, and the apex and preview host return
+> byte-identical HTML. `home`/`siteurl` are the apex, and `DISALLOW_INDEXING` is off (no `noindex`
+> meta, no `X-Robots-Tag`, production `robots.txt` served).
+>
+> Sections below that still say "preview host" or "not this pass" describe how the cutover was reached
+> and are kept as the record. Read `production.remoteleverage.com` as an alias of the apex, not as a
+> separate site to test on.
 
 Runtime secrets are **edited in GitHub Environment secrets** and copied into Secrets Manager. ECS still reads Secrets Manager at runtime. `ACF_PRO_KEY` is also a repository secret so pull-request CI can install ACF (PRs have no AWS OIDC).
 
@@ -124,7 +135,7 @@ exec nginx -g "daemon off;"
 
 `SKIP_CHOWN=1` skips the uploads chown — set in `docker-compose.yml`, because chowning a bind-mounted host directory is slow and unnecessary locally. Production ECS also sets it because uploads live on EFS.
 
-On the production preview host, `DISALLOW_INDEXING=true` is injected by Terraform. `config/environments/production.php` turns that env var into Bedrock's constant so Google does not index a second copy of the site. After apex cutover, set `disallow_indexing = false` and redeploy.
+`DISALLOW_INDEXING=true` is injected by Terraform, and `config/environments/production.php` turns that env var into Bedrock's constant. It existed so Google would not index a second copy of the site while the preview host ran alongside the legacy one. **Since the apex cutover it is off in production** (`disallow_indexing = false`), which is why the live site emits no `noindex`. Staging is still noindex.
 
 ## Post-deploy tasks (`wp acorn rl:deploy`)
 
@@ -198,12 +209,12 @@ Empty GitHub secrets are skipped so they do not blank keys already in Secrets Ma
 | Cache | Redis `WP_REDIS_*` | Redis `WP_REDIS_*` |
 | Secrets | `/wordpress-staging/app` | `/wordpress-production/app` |
 | `WP_ENV` | `staging` | `production` |
-| Indexing | noindex | noindex (`DISALLOW_INDEXING`) until apex cutover |
-| URL | <https://staging.remoteleverage.com> | <https://production.remoteleverage.com> |
+| Indexing | noindex | **indexable** (`DISALLOW_INDEXING` off since apex cutover) |
+| URL | <https://staging.remoteleverage.com> | <https://remoteleverage.com> (apex; `production.` and `www.` 301 here) |
 
 Terraform: `terraform/envs/wordpress-staging` and `terraform/envs/wordpress-production`. State keys `envs/wordpress-staging/terraform.tfstate` and `envs/wordpress-production/terraform.tfstate`.
 
-## DNS (preview hostname)
+## DNS (historical — how the preview hostname was stood up)
 
 ACM validation and the `production` CNAME go at **whoever currently hosts `remoteleverage.com` DNS**. That does not have to be GoDaddy yet. Do **not** change apex or `www`.
 
@@ -216,9 +227,9 @@ After `terraform apply` in `terraform/envs/wordpress-production`, `terraform out
 
 Until the ACM record exists, CloudFront and the ALB HTTPS listener cannot be created — the certificate is `PENDING_VALIDATION`. The rest of the stack (VPC, Aurora, EFS, Redis, ECR, ECS) is already up. Add the ACM CNAME, wait for ISSUED, then `terraform apply` again.
 
-### Later cutover to `remoteleverage.com` (not this pass)
+### Cutover to `remoteleverage.com` — **completed**
 
-When you control DNS:
+Done. Kept as the record of what the cutover involved:
 
 - Add CloudFront aliases `remoteleverage.com` and `www.remoteleverage.com` (ACM SAN).
 - `wp search-replace 'https://production.remoteleverage.com' 'https://remoteleverage.com' --all-tables --precise`
@@ -238,7 +249,7 @@ Empty ECR will not stay healthy. Order:
    webhook secret can wait — Stripe webhooks 503 until it is set.
 3. Push a release tag (`v-YYYYMMDD-v1`) and approve the production environment job.
 4. Import SQL + extract uploads (below).
-5. Smoke-test the booking form, media, and admin on the preview host.
+5. Smoke-test the booking form, media, and admin on the production host.
 
 ## Content import (one-time)
 
@@ -268,7 +279,7 @@ wp search-replace 'https://remoteleverage-v2.test' 'https://production.remotelev
 
 Also set `home` / `siteurl` to `https://production.remoteleverage.com` and `https://production.remoteleverage.com/wp`.
 
-Do **not** rewrite `https://remoteleverage.com` in post body during the preview period — those are live-site links and still resolve.
+Historically this import targeted `production.remoteleverage.com` and deliberately left `https://remoteleverage.com` in post bodies alone, because those pointed at the then-live legacy site. **Post-cutover the apex is this site**, so a fresh import should search-replace to `https://remoteleverage.com` throughout and there is no longer a second host to preserve links to.
 
 `wp acorn rl:deploy` already runs on container start and applies migrations after the import. Leftover `.test` / localhost hosts in `the_content` still get rewritten by `BlockDefaults::rewriteLocalAbsoluteUrls`.
 
