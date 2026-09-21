@@ -756,14 +756,17 @@ return [
             ],
 
             /*
-             * The audit, first and unmissable, because its whole purpose is to stop someone
-             * acting on the figures below it.
+             * The audit is NOT here.
+             *
+             * It sat at the top of the card, in a red attachment, from the day the card was
+             * built — on the reasoning that its whole purpose is to stop someone acting on the
+             * figures below it. In practice the findings that fire most are the ordinary ones, so
+             * the card was red most of the day and the colour stopped meaning anything.
+             *
+             * The findings now go in a threaded reply instead: still attached to the card they
+             * are about, still unmissable to anyone reading it, and no longer repainting the
+             * whole message. See SendCostAlertAction::deliver().
              */
-            [
-                'type' => 'section',
-                '_when' => ['warnings'],
-                'text' => ['type' => 'mrkdwn', 'text' => "*Check before trusting these numbers*\n{{ warnings }}"],
-            ],
 
             [
                 'type' => 'section',

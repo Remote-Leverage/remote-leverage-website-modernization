@@ -134,17 +134,27 @@ class SendCostAlertAction
             return false;
         }
 
-        /*
-         * Red only when the reconciliation found something.
-         *
-         * Overriding the template's own colour rather than adding a second template: the layout
-         * is identical either way, and two copies of it would be two things to keep in step.
-         */
-        $color = $snapshot->warnings !== [] ? '#b91c1c' : $rendered['color'];
-
         $step('Posting to Slack', 96);
 
-        return $this->deliver($rendered['text'], $rendered['blocks'], $color, $now, $snapshot->marketingDay);
+        /*
+         * The card keeps its own colour whatever the reconciliation found.
+         *
+         * It used to go red on any finding. That was right when findings were rare and meant a
+         * number was not to be trusted; it stopped being right once the most common ones were
+         * ordinary — a booking to chase, spend still settling — and the card spent most of the
+         * day red. A colour that is always on is not a signal, and it made every card look like
+         * an incident.
+         *
+         * The findings go to a threaded reply instead. See deliver().
+         */
+        return $this->deliver(
+            $rendered['text'],
+            $rendered['blocks'],
+            $rendered['color'],
+            $now,
+            $snapshot->marketingDay,
+            $snapshot->warnings,
+        );
     }
 
     /**
@@ -183,7 +193,7 @@ class SendCostAlertAction
         return $this->slack->post(
             $rendered['text'],
             $rendered['blocks'],
-            $snapshot->warnings !== [] ? '#b91c1c' : $rendered['color'],
+            $rendered['color'],
             null,
             false,
             $channel !== '' ? $channel : null,
@@ -201,12 +211,17 @@ class SendCostAlertAction
      * See the class docblock: the channel is the history, so each hourly run leaves its own
      * record. The posted message is remembered only so its timestamp exists somewhere.
      */
+    /**
+     * @param  array<int, array<string, mixed>>  $blocks
+     * @param  array<int, string>  $warnings  Reconciliation findings, posted under the card.
+     */
     private function deliver(
         string $text,
         array $blocks,
         ?string $color,
         CarbonImmutable $now,
         ?MarketingDay $day = null,
+        array $warnings = [],
     ): bool {
         $channel = trim((string) config('marketing.cost_alert.channel', ''));
 
@@ -228,9 +243,70 @@ class SendCostAlertAction
                 'ts' => (string) $result['ts'],
                 'channel' => (string) $result['channel'],
             ]);
+
+            $this->replyWithFindings($warnings, (string) $result['ts'], (string) $result['channel']);
         }
 
         return true;
+    }
+
+    /**
+     * Put the reconciliation's findings under the card, as a reply.
+     *
+     * They used to sit at the top of the card itself, in a red attachment. Both of those were
+     * the same bet — that a finding is rare and alarming — and the bet stopped paying once the
+     * findings that fire most were the ordinary ones. A card that is red every hour reads as a
+     * card with a decorative red stripe.
+     *
+     * A reply keeps what mattered and drops what did not. It is attached to the card it is about,
+     * so nobody has to work out which run it belongs to; it is unmissable to anyone reading that
+     * card; and the figures above it stay legible as figures.
+     *
+     * Not broadcast. A broadcast reply is also posted into the channel, which would put the
+     * findings back where they just came from and undo most of the point. The trade is real —
+     * a finding naming somebody whose meeting does not exist is worth seeing, and a collapsed
+     * thread can bury it — so if these start being missed, `broadcast: true` is the one-word
+     * change, and the card's reply count is the thing to watch in the meantime.
+     *
+     * The channel is the *id* Slack returned for the card, not the configured name, so the reply
+     * cannot land anywhere other than under the message it belongs to.
+     *
+     * Best effort by design: the card is already posted and is the thing that matters, so a
+     * failure here is logged and swallowed rather than reported as the alert having failed.
+     *
+     * @param  array<int, string>  $warnings
+     */
+    private function replyWithFindings(array $warnings, string $threadTs, string $channel): void
+    {
+        $warnings = array_values(array_filter(
+            $warnings,
+            static fn ($warning): bool => is_string($warning) && trim($warning) !== '',
+        ));
+
+        if ($warnings === []) {
+            return;
+        }
+
+        $body = "*Check before trusting these numbers*\n".implode("\n", array_map(
+            static fn (string $warning): string => '• '.$warning,
+            $warnings,
+        ));
+
+        $posted = $this->slack->post(
+            'Check before trusting these numbers',
+            [['type' => 'section', 'text' => ['type' => 'mrkdwn', 'text' => $body]]],
+            null,
+            $threadTs,
+            false,
+            $channel !== '' ? $channel : null,
+        );
+
+        if ($posted === null) {
+            Log::warning('SendCostAlertAction: the card posted but its findings reply did not.', [
+                'thread_ts' => $threadTs,
+                'findings' => count($warnings),
+            ]);
+        }
     }
 
     /**

@@ -34,6 +34,32 @@ use Carbon\CarbonImmutable;
  * So the tests are mostly about suppression and honesty — what the alert refuses to claim.
  */
 
+/**
+ * The cards, without the findings replies posted under them.
+ *
+ * The reconciliation's findings used to be a red section inside the card; they are a threaded
+ * reply now, so a run that finds something posts twice. Every assertion about "the card" means
+ * the top-level one.
+ *
+ * @param  array<int, array<string, mixed>>  $posted
+ * @return array<int, array<string, mixed>>
+ */
+function cardsAmong(array $posted): array
+{
+    return array_values(array_filter($posted, static fn (array $p): bool => ($p['thread_ts'] ?? null) === null));
+}
+
+/**
+ * The findings replies, in the order they were posted.
+ *
+ * @param  array<int, array<string, mixed>>  $posted
+ * @return array<int, array<string, mixed>>
+ */
+function findingsAmong(array $posted): array
+{
+    return array_values(array_filter($posted, static fn (array $p): bool => ($p['thread_ts'] ?? null) !== null));
+}
+
 function costAlertConfig(array $overrides = []): void
 {
     $GLOBALS['_app_config'] = [];
@@ -778,7 +804,7 @@ describe('the message', function () {
 
         $action->execute(CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC'), force: true);
 
-        expect($transport->posted)->toHaveCount(1)
+        expect(cardsAmong($transport->posted))->toHaveCount(1)
             ->and(json_encode($transport->posted[0]['blocks']))
             ->toContain('did not answer this run')
             ->not->toContain('$0.00');
@@ -1002,7 +1028,19 @@ describe('the message', function () {
         expect(preg_match('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]/u', (string) $json))->toBe(0);
     });
 
-    test('is red only when the reconciliation found something', function () {
+    test('a run with nothing to report posts no reply at all', function () {
+        $now = CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC');
+        $day = costAlertDay(['total_appointments' => '0', 'cpb_all' => null, 'cpb_paid' => null]);
+
+        $quiet = costAlertAction($transport = recordingCostTransport(), $day);
+        $quiet->execute($now, force: true);
+
+        // An empty thread is what makes a reply mean something when one appears.
+        expect(findingsAmong($transport->posted))->toBeEmpty()
+            ->and(cardsAmong($transport->posted))->toHaveCount(1);
+    });
+
+    test('findings go under the card as a reply, and never repaint it', function () {
         $now = CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC');
 
         /*
@@ -1030,7 +1068,16 @@ describe('the message', function () {
         $loud = costAlertAction($flagged = recordingCostTransport(), $day);
         $loud->execute($now, force: true);
 
-        expect($flagged->posted[0]['color'])->toBe('#b91c1c');
+        /*
+         * The card looks exactly as it did on the quiet run. What changed is that there is now a
+         * reply under it — which is the whole point: the figures stay legible as figures, and the
+         * thing to act on is attached to them rather than painted over them.
+         */
+        expect($flagged->posted[0]['color'])->toBeNull()
+            ->and(cardsAmong($flagged->posted))->toHaveCount(1)
+            ->and(findingsAmong($flagged->posted))->toHaveCount(1)
+            ->and(json_encode(findingsAmong($flagged->posted)[0]['blocks']))
+            ->toContain('Check before trusting these numbers');
     });
 
     /*
@@ -1045,11 +1092,11 @@ describe('the message', function () {
         $now = CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC');
 
         expect($action->execute($now))->toBeFalse()
-            ->and($transport->posted)->toBeEmpty();
+            ->and(cardsAmong($transport->posted))->toBeEmpty();
 
         // A person who typed the command has asked for it, wherever they are.
         expect($action->execute($now, force: true))->toBeTrue()
-            ->and($transport->posted)->toHaveCount(1);
+            ->and(cardsAmong($transport->posted))->toHaveCount(1);
 
         // The forced run above remembered today's card, so without this the next one correctly
         // takes the edit path and posts nothing. That behaviour has its own test.
@@ -1059,7 +1106,7 @@ describe('the message', function () {
         $second = costAlertAction($live = recordingCostTransport());
 
         expect($second->execute($now))->toBeTrue()
-            ->and($live->posted)->toHaveCount(1);
+            ->and(cardsAmong($live->posted))->toHaveCount(1);
     });
 
     test('an explicit enabled=false stops it even in production', function () {
@@ -1069,7 +1116,7 @@ describe('the message', function () {
         $action = costAlertAction($transport = recordingCostTransport());
 
         expect($action->execute(CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC')))->toBeFalse()
-            ->and($transport->posted)->toBeEmpty();
+            ->and(cardsAmong($transport->posted))->toBeEmpty();
     });
 
     /*
@@ -1080,7 +1127,7 @@ describe('the message', function () {
         $action = costAlertAction($transport = recordingCostTransport());
 
         expect($action->execute(CarbonImmutable::parse('2026-09-18 03:00:00', 'UTC')))->toBeTrue()
-            ->and($transport->posted)->toHaveCount(1);
+            ->and(cardsAmong($transport->posted))->toHaveCount(1);
     });
 
     test('still honours a narrowed window, and force still bypasses it', function () {
@@ -1090,7 +1137,7 @@ describe('the message', function () {
         $middleOfTheNight = CarbonImmutable::parse('2026-09-18 03:00:00', 'UTC');
 
         expect($action->execute($middleOfTheNight))->toBeFalse()
-            ->and($transport->posted)->toBeEmpty()
+            ->and(cardsAmong($transport->posted))->toBeEmpty()
             ->and($action->execute($middleOfTheNight, force: true))->toBeTrue();
     });
 
@@ -1130,7 +1177,7 @@ describe('the message', function () {
         $action->execute(CarbonImmutable::parse('2026-09-18 09:00:00', 'UTC'), force: true);
         $action->execute(CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC'), force: true);
 
-        expect($transport->posted)->toHaveCount(2)
+        expect(cardsAmong($transport->posted))->toHaveCount(2)
             ->and($transport->updated)->toBeEmpty();
     });
 
@@ -1145,7 +1192,7 @@ describe('the message', function () {
         $action->execute(CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC'), force: true);
         $action->execute(CarbonImmutable::parse('2026-09-19 09:00:00', 'UTC'), force: true);
 
-        expect($transport->posted)->toHaveCount(2)
+        expect(cardsAmong($transport->posted))->toHaveCount(2)
             ->and($transport->updated)->toBeEmpty();
     });
 
@@ -1272,8 +1319,10 @@ describe('the warehouse half, end to end', function () {
 
         expect($json)->toContain('did not answer this run')
             ->and($json)->not->toContain('$0.00')
-            // A missing cost half is a reconciliation finding, and findings colour the card red.
-            ->and($transport->posted[0]['color'])->toBe('#b91c1c')
+            // The finding is a threaded reply now, and the card keeps its own colour. See
+            // SendCostAlertAction::replyWithFindings().
+            ->and($transport->posted[0]['color'])->not->toBe('#b91c1c')
+            ->and(json_encode(findingsAmong($transport->posted)))->toContain('did not answer')
             /*
              * And the notification preview says it too. That line is what somebody reads on a
              * phone without opening Slack, so a preview of plausible-looking nothing is the one
@@ -1376,7 +1425,7 @@ describe('the warehouse half, end to end', function () {
      * number means one of the two is wrong. Nobody should be dividing spend by either until it is
      * known which, and the finding says which number the card went with.
      */
-    test('a warehouse and a site that disagree on the booking count put it on the card', function () {
+    test('a warehouse and a site that disagree on the booking count are reported under the card', function () {
         $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
 
         // One booking here, forty in the warehouse.
@@ -1387,11 +1436,19 @@ describe('the warehouse half, end to end', function () {
         ]));
         $action->execute($now, force: true);
 
-        $json = (string) json_encode($transport->posted[0]['blocks']);
+        $card = (string) json_encode($transport->posted[0]['blocks']);
+        $replies = findingsAmong($transport->posted);
 
-        expect($json)->toContain('warehouse reports 40 bookings')
-            ->and($json)->toContain('this site recorded only 1')
-            ->and($transport->posted[0]['color'])->toBe('#b91c1c');
+        expect($replies)->toHaveCount(1)
+            ->and(json_encode($replies[0]['blocks']))->toContain('warehouse reports 40 bookings')
+            ->and(json_encode($replies[0]['blocks']))->toContain('this site recorded only 1')
+            // Under the card it is about, and only there — a broadcast reply is also posted to
+            // the channel, which would put the findings back where they came from.
+            ->and($replies[0]['thread_ts'])->toBe($transport->posted[0]['ts'])
+            ->and($replies[0]['broadcast'])->toBeFalse()
+            // And off the card itself, which keeps its own colour.
+            ->and($card)->not->toContain('warehouse reports 40 bookings')
+            ->and($transport->posted[0]['color'])->not->toBe('#b91c1c');
     });
 
     /*
@@ -1645,7 +1702,7 @@ function recordingCostTransport(): object
 {
     return new class extends SlackTransport
     {
-        /** @var array<int, array{text: string, blocks: array, color: ?string, channel: ?string}> */
+        /** @var array<int, array{text: string, blocks: array, color: ?string, channel: ?string, thread_ts: ?string}> */
         public array $posted = [];
 
         /** @var array<int, array{channel: string, ts: string}> */
@@ -1659,9 +1716,21 @@ function recordingCostTransport(): object
             bool $broadcast = false,
             ?string $channel = null,
         ): ?array {
-            $this->posted[] = ['text' => $text, 'blocks' => $blocks, 'color' => $color, 'channel' => $channel];
+            // The ts is recorded as well as returned, so a test can assert that a reply was
+            // threaded under the card that actually preceded it rather than under a literal.
+            $ts = '1700000000.000'.(count($this->posted) + 1);
 
-            return ['ts' => '1700000000.000'.count($this->posted), 'channel' => 'C-COST'];
+            $this->posted[] = [
+                'text' => $text,
+                'blocks' => $blocks,
+                'color' => $color,
+                'channel' => $channel,
+                'thread_ts' => $threadTs,
+                'broadcast' => $broadcast,
+                'ts' => $ts,
+            ];
+
+            return ['ts' => $ts, 'channel' => 'C-COST'];
         }
 
         public function update(
@@ -1782,7 +1851,7 @@ describe('every run leaves its own card', function () {
         costAlertAction($transport, $closing)->execute(CarbonImmutable::parse('2026-09-20 02:00:00', 'UTC'), force: true);
         costAlertAction($transport, $closing)->execute(CarbonImmutable::parse('2026-09-20 03:00:00', 'UTC'), force: true);
 
-        expect($transport->posted)->toHaveCount(2)
+        expect(cardsAmong($transport->posted))->toHaveCount(2)
             ->and($transport->updated)->toBeEmpty();
     });
 
@@ -1799,7 +1868,7 @@ describe('every run leaves its own card', function () {
             'report_kind' => 'DAY-TO-DATE',
         ]))->execute(CarbonImmutable::parse('2026-09-20 13:00:00', 'UTC'), force: true);
 
-        expect($transport->posted)->toHaveCount(2)
+        expect(cardsAmong($transport->posted))->toHaveCount(2)
             ->and($transport->updated)->toBeEmpty();
     });
 
