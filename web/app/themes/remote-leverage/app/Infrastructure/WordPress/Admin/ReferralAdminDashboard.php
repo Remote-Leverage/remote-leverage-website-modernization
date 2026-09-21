@@ -6,16 +6,29 @@ namespace App\Infrastructure\WordPress\Admin;
 
 use App\Domains\Referral\Actions\FulfillReferralAction;
 use App\Domains\Referral\Actions\ProcessPayoutAction;
+use App\Domains\Referral\Data\ReferrerData;
 use App\Domains\Referral\Models\Referral;
 use App\Domains\Referral\Models\ReferralClick;
 use App\Domains\Referral\Models\ReferralReward;
 use App\Domains\Referral\Models\Referrer;
+use App\Domains\Referral\Repositories\ReferrerRepositoryInterface;
 use App\Domains\Referral\Services\ReferralSettingsService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 class ReferralAdminDashboard
 {
     protected const REFERRAL_STATUSES = ['pending', 'qualified', 'fulfilled', 'rewarded', 'rejected'];
+
+    /**
+     * Every status a referrer row is allowed to hold.
+     *
+     * `active` is the only one `Referrer::scopeActive()` — and therefore attribution — accepts;
+     * the table's own column default is `pending`, and `inactive` is what the badge styles on
+     * this screen have always rendered for a partner who is off the program.
+     */
+    protected const REFERRER_STATUSES = ['active', 'pending', 'inactive'];
 
     public function register(): void
     {
@@ -105,6 +118,98 @@ class ReferralAdminDashboard
             check_admin_referer('rl_export_referrers_nonce');
             $this->exportReferrersCsv();
             exit;
+        }
+
+        if ($action === 'create_referrer') {
+            check_admin_referer('rl_create_referrer_nonce');
+
+            $result = $this->createReferrer([
+                'name' => wp_unslash($_POST['name'] ?? ''),
+                'email' => wp_unslash($_POST['email'] ?? ''),
+                'company' => wp_unslash($_POST['company'] ?? ''),
+                'referral_code' => wp_unslash($_POST['referral_code'] ?? ''),
+                'status' => wp_unslash($_POST['status'] ?? 'active'),
+            ]);
+
+            if ($result['success']) {
+                // The generated password rides a one-shot transient rather than the redirect
+                // URL: a query string is written to the server access log and kept in the
+                // admin's browser history, both of which outlive the notice that shows it.
+                $this->flash('new_referrer_password', [
+                    'email' => $result['referrer']->email,
+                    'password' => $result['password'],
+                ]);
+                Cache::forget('rl_referral_analytics_metrics');
+                wp_safe_redirect(admin_url('admin.php?page=rl-referrers-list&referrer_created=1'));
+            } else {
+                $this->flash('referrer_form', ['errors' => $result['errors'], 'input' => $result['input']]);
+                wp_safe_redirect(admin_url('admin.php?page=rl-referrers-list&new=1'));
+            }
+            exit;
+        }
+
+        if ($action === 'delete_referrer') {
+            check_admin_referer('rl_delete_referrer_nonce');
+            $referrer = Referrer::find(absint($_GET['referrer_id'] ?? 0));
+
+            if ($referrer) {
+                /*
+                 * The referrer row and nothing else, by deliberate choice. Their referrals,
+                 * rewards, clicks and payouts stay on the books as the record of money that was
+                 * earned and paid; every screen that joins back to a referrer already renders a
+                 * missing one as an em dash. There are no database-level foreign keys on these
+                 * tables, so nothing cascades behind our back either.
+                 *
+                 * The one thing orphaning costs: the batch payout selector on the Rewards screen
+                 * is built from whereHas('referrals.rewards'), so a still-due reward left behind
+                 * here can no longer be paid from that button. Issue or pay anything outstanding
+                 * before deleting the partner.
+                 */
+                $referrer->delete();
+                Cache::forget('rl_referral_analytics_metrics');
+                wp_safe_redirect(admin_url('admin.php?page=rl-referrers-list&referrer_deleted=1'));
+                exit;
+            }
+        }
+
+        if ($action === 'create_referral') {
+            check_admin_referer('rl_create_referral_nonce');
+
+            $result = $this->createReferral([
+                'referrer_id' => $_POST['referrer_id'] ?? 0,
+                'lead_name' => wp_unslash($_POST['lead_name'] ?? ''),
+                'lead_email' => wp_unslash($_POST['lead_email'] ?? ''),
+                'lead_phone' => wp_unslash($_POST['lead_phone'] ?? ''),
+                'landing_page' => wp_unslash($_POST['landing_page'] ?? ''),
+                'source' => wp_unslash($_POST['source'] ?? ''),
+                'status' => wp_unslash($_POST['status'] ?? 'pending'),
+                'notes' => wp_unslash($_POST['notes'] ?? ''),
+            ]);
+
+            Cache::forget('rl_referral_analytics_metrics');
+
+            if ($result['success']) {
+                wp_safe_redirect(admin_url('admin.php?page=rl-referrers-referrals&referral_created=1'));
+            } else {
+                $this->flash('referral_form', ['errors' => $result['errors'], 'input' => $result['input']]);
+                wp_safe_redirect(admin_url('admin.php?page=rl-referrers-referrals&new=1'));
+            }
+            exit;
+        }
+
+        if ($action === 'delete_referral') {
+            check_admin_referer('rl_delete_referral_nonce');
+            $referral = Referral::find(absint($_GET['referral_id'] ?? 0));
+
+            if ($referral) {
+                // Row only, matching delete_referrer above. Any reward already generated for
+                // this referral survives and stays payable — the Rewards screen resolves the
+                // referral with null-safe operators and shows an em dash once it is gone.
+                $referral->delete();
+                Cache::forget('rl_referral_analytics_metrics');
+                wp_safe_redirect(admin_url('admin.php?page=rl-referrers-referrals&referral_deleted=1'));
+                exit;
+            }
         }
 
         if ($action === 'update_referral_status') {
@@ -613,6 +718,77 @@ class ReferralAdminDashboard
                 padding-bottom: 8px;
             }
 
+            /* --- Inline Create Forms --- */
+            .rl-form-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 14px;
+                margin-bottom: 14px;
+            }
+            .rl-field {
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+            }
+            .rl-field-wide {
+                grid-column: 1 / -1;
+            }
+            .rl-label {
+                font-size: 12px;
+                font-weight: 600;
+                color: #3f3f46;
+            }
+            .rl-required {
+                color: #dc2626;
+            }
+            .rl-admin-wrap .rl-input,
+            .rl-admin-wrap .rl-textarea {
+                width: 100%;
+                padding: 7px 10px;
+                font-size: 13px;
+                line-height: 1.4;
+                border: 1px solid #e4e4e7;
+                border-radius: 6px;
+                background: #ffffff;
+                color: #09090b;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+                min-height: 0;
+            }
+            .rl-admin-wrap .rl-textarea {
+                min-height: 72px;
+                resize: vertical;
+            }
+            .rl-admin-wrap .rl-input:focus,
+            .rl-admin-wrap .rl-textarea:focus,
+            .rl-admin-wrap .rl-select:focus {
+                outline: none;
+                border-color: #18181b;
+                box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
+            }
+            .rl-form-grid .rl-select {
+                width: 100%;
+            }
+            .rl-form-actions {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+            .rl-hint {
+                margin: 0 0 14px 0;
+                font-size: 12px;
+                color: #71717a;
+            }
+            .rl-credential {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                font-size: 13px;
+                background: #f4f4f5;
+                border: 1px solid #e4e4e7;
+                border-radius: 6px;
+                padding: 8px 10px;
+                display: inline-block;
+                user-select: all;
+            }
+
             /* --- WordPress Notice Modernization (Shadcn Callout) --- */
             .rl-admin-wrap .notice,
             .wp-admin.rl-referrers-screen .notice {
@@ -899,6 +1075,12 @@ class ReferralAdminDashboard
 
         $exportUrl = wp_nonce_url(admin_url('admin.php?page=rl-referrers-list&rl_action=export_referrers_csv'), 'rl_export_referrers_nonce');
 
+        // Taken once, here, because reading a flash consumes it: the form needs the errors and
+        // the "should I be open?" answer out of the same read.
+        $formFlash = $this->takeFlash('referrer_form');
+        $showForm = ! empty($_GET['new']) || $formFlash !== null;
+        $newCredentials = $this->takeFlash('new_referrer_password');
+
         ?>
         <div class="wrap rl-admin-wrap">
             <div class="rl-admin-header">
@@ -910,10 +1092,29 @@ class ReferralAdminDashboard
                     <a href="<?php echo esc_url($exportUrl); ?>" class="rl-btn rl-btn-outline">
                         <?php echo $this->iconDownload(); ?> Export CSV
                     </a>
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=rl-referrers-list&new=1')); ?>" class="rl-btn rl-btn-primary">
+                        <?php echo $this->iconPlus(); ?> Add Referrer
+                    </a>
                 </div>
             </div>
 
             <?php $this->renderNav('rl-referrers-list'); ?>
+
+            <?php if ($newCredentials) { ?>
+                <div class="notice notice-success">
+                    <p><strong>Referrer created.</strong> The portal password below is shown this once — it is stored only as a hash, and there is no self-service reset, so copy it now and send it to the partner.</p>
+                    <p class="rl-credential"><?php echo esc_html($newCredentials['email']); ?> &nbsp;&middot;&nbsp; <?php echo esc_html($newCredentials['password']); ?></p>
+                </div>
+            <?php } elseif (! empty($_GET['referrer_created'])) { ?>
+                <div class="notice notice-success is-dismissible"><p>Referrer created.</p></div>
+            <?php } ?>
+            <?php if (! empty($_GET['referrer_deleted'])) { ?>
+                <div class="notice notice-success is-dismissible"><p>Referrer deleted. Their referrals, rewards and payouts were kept and now show no referrer.</p></div>
+            <?php } ?>
+
+            <?php if ($showForm) {
+                $this->renderReferrerForm($formFlash['errors'] ?? [], $formFlash['input'] ?? []);
+            } ?>
 
             <div class="rl-filter-bar">
                 <form method="get" class="rl-filter-form">
@@ -943,11 +1144,12 @@ class ReferralAdminDashboard
                             <th>Referrals</th>
                             <th>Stripe Connected</th>
                             <th>Joined</th>
+                            <th style="text-align: right;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if ($referrers->isEmpty()) { ?>
-                            <tr><td colspan="7" style="text-align: center; padding: 48px; color: #a1a1aa;">No referrers found.</td></tr>
+                            <tr><td colspan="8" style="text-align: center; padding: 48px; color: #a1a1aa;">No referrers found.</td></tr>
                         <?php } else { ?>
                             <?php foreach ($referrers as $referrer) { ?>
                                 <tr>
@@ -977,6 +1179,11 @@ class ReferralAdminDashboard
                                         <?php } ?>
                                     </td>
                                     <td><?php echo esc_html($referrer->created_at?->format('M j, Y') ?? ''); ?></td>
+                                    <td style="text-align: right;">
+                                        <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=rl-referrers-list&rl_action=delete_referrer&referrer_id='.$referrer->id), 'rl_delete_referrer_nonce')); ?>"
+                                           onclick="return confirm('Delete <?php echo esc_js($referrer->name); ?>? Their <?php echo esc_js((string) $referrer->referrals_count); ?> referral(s), rewards and payout history are kept, but will no longer show a referrer — and any reward still due to them can no longer be paid from the batch payout button.');"
+                                           class="rl-btn rl-btn-destructive rl-btn-sm">Delete</a>
+                                    </td>
                                 </tr>
                             <?php } ?>
                         <?php } ?>
@@ -1003,12 +1210,21 @@ class ReferralAdminDashboard
         $total = (clone $query)->count();
         $referrals = $query->forPage($page, $perPage)->get();
 
+        $formFlash = $this->takeFlash('referral_form');
+        $showForm = ! empty($_GET['new']) || $formFlash !== null;
+        $referrerOptions = Referrer::query()->orderBy('name')->get();
+
         ?>
         <div class="wrap rl-admin-wrap">
             <div class="rl-admin-header">
                 <div>
                     <h1 class="rl-admin-title">Referrals</h1>
                     <p class="rl-admin-subtitle">Every lead attributed to a referral partner, from first click to closed deal.</p>
+                </div>
+                <div class="rl-actions-group">
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=rl-referrers-referrals&new=1')); ?>" class="rl-btn rl-btn-primary">
+                        <?php echo $this->iconPlus(); ?> Add Referral
+                    </a>
                 </div>
             </div>
 
@@ -1017,6 +1233,16 @@ class ReferralAdminDashboard
             <?php if (! empty($_GET['status_updated'])) { ?>
                 <div class="notice notice-success is-dismissible"><p>Referral status updated.</p></div>
             <?php } ?>
+            <?php if (! empty($_GET['referral_created'])) { ?>
+                <div class="notice notice-success is-dismissible"><p>Referral recorded.</p></div>
+            <?php } ?>
+            <?php if (! empty($_GET['referral_deleted'])) { ?>
+                <div class="notice notice-success is-dismissible"><p>Referral deleted. Any reward already generated for it was kept.</p></div>
+            <?php } ?>
+
+            <?php if ($showForm) {
+                $this->renderReferralForm($referrerOptions, $formFlash['errors'] ?? [], $formFlash['input'] ?? []);
+            } ?>
 
             <div class="rl-filter-bar">
                 <form method="get" class="rl-filter-form">
@@ -1046,11 +1272,12 @@ class ReferralAdminDashboard
                             <th>Status</th>
                             <th>Created</th>
                             <th>Update Status</th>
+                            <th style="text-align: right;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if ($referrals->isEmpty()) { ?>
-                            <tr><td colspan="6" style="text-align: center; padding: 48px; color: #a1a1aa;">No referrals found.</td></tr>
+                            <tr><td colspan="7" style="text-align: center; padding: 48px; color: #a1a1aa;">No referrals found.</td></tr>
                         <?php } else { ?>
                             <?php foreach ($referrals as $referral) { ?>
                                 <tr>
@@ -1081,6 +1308,11 @@ class ReferralAdminDashboard
                                             </select>
                                             <button type="submit" class="rl-btn rl-btn-outline rl-btn-sm">Update</button>
                                         </form>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=rl-referrers-referrals&rl_action=delete_referral&referral_id='.$referral->id), 'rl_delete_referral_nonce')); ?>"
+                                           onclick="return confirm('Delete the referral for <?php echo esc_js($referral->lead_name ?: 'this lead'); ?>? Any reward already generated for it is kept and stays payable.');"
+                                           class="rl-btn rl-btn-destructive rl-btn-sm">Delete</a>
                                     </td>
                                 </tr>
                             <?php } ?>
@@ -1342,6 +1574,225 @@ class ReferralAdminDashboard
         <?php
     }
 
+    /**
+     * Create a referrer from the admin screen.
+     *
+     * Goes through the repository rather than RegisterReferrerAction on purpose. That action
+     * dispatches ReferrerRegistered, which mails the partner their referral link — right for a
+     * public sign-up, wrong for an admin back-filling a partner who was onboarded elsewhere. So
+     * this path stays silent, while still hashing the password and shaping the referral code
+     * exactly the way the action does.
+     *
+     * Split out from the request handler so it can be exercised without superglobals; returns
+     * the same {success, errors} shape as ReferralSettingsService::save().
+     *
+     * @param  array<string, mixed>  $input
+     * @return array{success: bool, errors: array<int, string>, input: array<string, string>, referrer: ?Referrer, password: ?string}
+     */
+    public function createReferrer(array $input): array
+    {
+        $name = sanitize_text_field(trim((string) ($input['name'] ?? '')));
+        $email = strtolower(trim((string) ($input['email'] ?? '')));
+        $company = sanitize_text_field(trim((string) ($input['company'] ?? '')));
+        $code = sanitize_title((string) ($input['referral_code'] ?? ''));
+        $status = sanitize_text_field(trim((string) ($input['status'] ?? 'active')));
+
+        $clean = [
+            'name' => $name,
+            'email' => $email,
+            'company' => $company,
+            'referral_code' => $code,
+            'status' => $status,
+        ];
+
+        $errors = [];
+
+        if ($name === '') {
+            $errors[] = 'Name is required.';
+        }
+
+        if ($email === '') {
+            $errors[] = 'Email is required.';
+        } elseif (! is_email($email)) {
+            $errors[] = 'That email address is not valid.';
+        }
+
+        if (! in_array($status, self::REFERRER_STATUSES, true)) {
+            $errors[] = 'Status must be one of: '.implode(', ', self::REFERRER_STATUSES).'.';
+        }
+
+        $repository = app(ReferrerRepositoryInterface::class);
+
+        // Both columns are UNIQUE, so an unchecked duplicate surfaces as a raw query exception
+        // rather than a message anyone can act on.
+        if ($email !== '' && $repository->findByEmail($email)) {
+            // RegisterReferrerAction quietly hands back the existing row here, which is the
+            // right call for a sign-up form and the wrong one for this: an admin who typed a
+            // duplicate needs to be told, not given a record they did not create.
+            $errors[] = 'A referrer with that email already exists.';
+        }
+
+        if ($code !== '' && $repository->findByReferralCode($code)) {
+            $errors[] = 'That referral code is already taken.';
+        }
+
+        if ($errors !== []) {
+            return ['success' => false, 'errors' => $errors, 'input' => $clean, 'referrer' => null, 'password' => null];
+        }
+
+        $password = wp_generate_password(20, true, false);
+
+        $referrer = $repository->create(ReferrerData::fromArray([
+            'name' => $name,
+            'email' => $email,
+            'referral_code' => $code !== '' ? $code : $this->generateReferralCode($name),
+            'company' => $company !== '' ? $company : null,
+            'password' => password_hash($password, PASSWORD_BCRYPT),
+            'status' => $status,
+            'metadata' => [
+                'created_via' => 'wp_admin',
+                'created_by' => get_current_user_id(),
+            ],
+        ]));
+
+        return ['success' => true, 'errors' => [], 'input' => $clean, 'referrer' => $referrer, 'password' => $password];
+    }
+
+    /**
+     * Record a referral by hand, attributed to an existing referrer.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array{success: bool, errors: array<int, string>, input: array<string, string>, referral: ?Referral}
+     */
+    public function createReferral(array $input): array
+    {
+        $referrerId = absint($input['referrer_id'] ?? 0);
+        $leadName = sanitize_text_field(trim((string) ($input['lead_name'] ?? '')));
+        $leadEmail = strtolower(trim((string) ($input['lead_email'] ?? '')));
+        $leadPhone = sanitize_text_field(trim((string) ($input['lead_phone'] ?? '')));
+        $landingPage = esc_url_raw(trim((string) ($input['landing_page'] ?? '')));
+        $source = sanitize_text_field(trim((string) ($input['source'] ?? '')));
+        $status = sanitize_text_field(trim((string) ($input['status'] ?? 'pending')));
+        $notes = sanitize_textarea_field(trim((string) ($input['notes'] ?? '')));
+
+        if ($source === '') {
+            $source = 'admin_manual';
+        }
+
+        $clean = [
+            'referrer_id' => (string) $referrerId,
+            'lead_name' => $leadName,
+            'lead_email' => $leadEmail,
+            'lead_phone' => $leadPhone,
+            'landing_page' => $landingPage,
+            'source' => $source,
+            'status' => $status,
+            'notes' => $notes,
+        ];
+
+        $errors = [];
+
+        $referrer = $referrerId > 0 ? Referrer::find($referrerId) : null;
+        if (! $referrer) {
+            $errors[] = 'Choose the referrer this referral belongs to.';
+        }
+
+        if ($leadName === '') {
+            $errors[] = 'Lead name is required.';
+        }
+
+        if ($leadEmail !== '' && ! is_email($leadEmail)) {
+            $errors[] = 'That lead email address is not valid.';
+        }
+
+        if ($leadEmail === '' && $leadPhone === '') {
+            // The portal's direct-lead modal enforces the same rule, for the same reason: with
+            // neither identifier there is nothing for HandleLeadBookingCompletedForReferrer to
+            // match on, so the referral could never be credited when the prospect books.
+            $errors[] = 'Provide either a lead email or a lead phone number.';
+        }
+
+        if (! in_array($status, self::REFERRAL_STATUSES, true)) {
+            $errors[] = 'Status must be one of: '.implode(', ', self::REFERRAL_STATUSES).'.';
+        }
+
+        if ($errors !== [] || ! $referrer) {
+            return ['success' => false, 'errors' => $errors, 'input' => $clean, 'referral' => null];
+        }
+
+        /*
+         * The rl_referrals row and nothing more. The portal's direct-lead modal also runs
+         * CaptureLeadAction, which is right there — a prospect arriving for the first time — and
+         * wrong here: this form is back-office data entry, and firing the lead pipeline would
+         * push a HubSpot contact, a Slack alert and an n8n webhook for someone who already
+         * exists somewhere. `lead_id` is nullable for exactly this case; `lead_email` and
+         * `lead_phone` are not, which is why the blanks go in as empty strings.
+         */
+        $referral = $referrer->referrals()->create([
+            'lead_name' => $leadName,
+            'lead_email' => $leadEmail,
+            'lead_phone' => $leadPhone,
+            'landing_page' => $landingPage !== '' ? $landingPage : null,
+            'source' => $source,
+            'status' => $status,
+            'notes' => $notes !== '' ? $notes : null,
+        ]);
+
+        // A referral entered as already closed earns its reward on the spot, exactly as the
+        // status dropdown on this screen does it. FulfillReferralAction is idempotent.
+        if (in_array($status, Referral::FULFILLED_STATUSES, true)) {
+            app(FulfillReferralAction::class)->execute($referral);
+        }
+
+        return ['success' => true, 'errors' => [], 'input' => $clean, 'referral' => $referral];
+    }
+
+    /**
+     * Build a referral code that is free at the moment it is issued.
+     *
+     * Same shape as RegisterReferrerAction's, plus the collision retry it lacks — the column is
+     * UNIQUE, so a four-character clash there comes back as a query exception.
+     */
+    protected function generateReferralCode(string $name): string
+    {
+        $base = Str::slug($name) ?: 'referrer';
+        $repository = app(ReferrerRepositoryInterface::class);
+
+        do {
+            $code = $base.'-'.strtolower(Str::random(4));
+        } while ($repository->findByReferralCode($code));
+
+        return $code;
+    }
+
+    /**
+     * Stash a value for exactly one following request, per admin user.
+     *
+     * Form errors and the one-time generated password both have to survive the
+     * POST-redirect-GET every action here ends with, and neither belongs in a query string.
+     */
+    protected function flash(string $key, mixed $value): void
+    {
+        set_transient($this->flashKey($key), $value, 5 * MINUTE_IN_SECONDS);
+    }
+
+    /**
+     * Read a flashed value and consume it, so a refresh does not show it a second time.
+     */
+    protected function takeFlash(string $key): mixed
+    {
+        $name = $this->flashKey($key);
+        $value = get_transient($name);
+        delete_transient($name);
+
+        return $value === false ? null : $value;
+    }
+
+    protected function flashKey(string $key): string
+    {
+        return 'rl_referrers_flash_'.$key.'_'.get_current_user_id();
+    }
+
     protected function exportReferrersCsv(): void
     {
         $filename = 'remoteleverage-referrers-'.gmdate('Y-m-d-His').'.csv';
@@ -1371,6 +1822,163 @@ class ReferralAdminDashboard
         });
 
         fclose($output);
+    }
+
+    /**
+     * The Add Referrer form, shown above the table on ?new=1 and again after a failed submit.
+     *
+     * Rendered inline rather than behind a toggle so it survives with no JavaScript: the header
+     * button is a plain link to ?new=1, and a rejected submit redirects back to the same URL
+     * with the typed values re-filled from the flash.
+     *
+     * @param  array<int, string>  $errors
+     * @param  array<string, string>  $values
+     */
+    protected function renderReferrerForm(array $errors, array $values): void
+    {
+        ?>
+        <div class="rl-detail-card">
+            <h3 class="rl-detail-title">Add Referrer</h3>
+
+            <?php if ($errors !== []) { ?>
+                <div class="notice notice-error"><p><?php echo esc_html(implode(' ', $errors)); ?></p></div>
+            <?php } ?>
+
+            <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=rl-referrers-list')); ?>">
+                <?php wp_nonce_field('rl_create_referrer_nonce'); ?>
+                <input type="hidden" name="rl_action" value="create_referrer" />
+
+                <div class="rl-form-grid">
+                    <div class="rl-field">
+                        <label class="rl-label" for="rl-referrer-name">Name <span class="rl-required">*</span></label>
+                        <input id="rl-referrer-name" class="rl-input" type="text" name="name" required value="<?php echo esc_attr($values['name'] ?? ''); ?>" />
+                    </div>
+                    <div class="rl-field">
+                        <label class="rl-label" for="rl-referrer-email">Email <span class="rl-required">*</span></label>
+                        <input id="rl-referrer-email" class="rl-input" type="email" name="email" required value="<?php echo esc_attr($values['email'] ?? ''); ?>" />
+                    </div>
+                    <div class="rl-field">
+                        <label class="rl-label" for="rl-referrer-company">Company</label>
+                        <input id="rl-referrer-company" class="rl-input" type="text" name="company" value="<?php echo esc_attr($values['company'] ?? ''); ?>" />
+                    </div>
+                    <div class="rl-field">
+                        <label class="rl-label" for="rl-referrer-code">Referral code</label>
+                        <input id="rl-referrer-code" class="rl-input" type="text" name="referral_code" placeholder="Generated from the name" value="<?php echo esc_attr($values['referral_code'] ?? ''); ?>" />
+                    </div>
+                    <div class="rl-field">
+                        <label class="rl-label" for="rl-referrer-status">Status</label>
+                        <select id="rl-referrer-status" class="rl-select" name="status">
+                            <?php foreach (self::REFERRER_STATUSES as $status) { ?>
+                                <option value="<?php echo esc_attr($status); ?>" <?php selected($values['status'] ?? 'active', $status); ?>><?php echo esc_html(ucfirst($status)); ?></option>
+                            <?php } ?>
+                        </select>
+                    </div>
+                </div>
+
+                <p class="rl-hint">
+                    A portal password is generated for you and shown once on the next screen. No welcome
+                    email is sent, so pass the login details to the partner yourself. Only an
+                    <strong>active</strong> referrer earns attribution on their link.
+                </p>
+
+                <div class="rl-form-actions">
+                    <button type="submit" class="rl-btn rl-btn-primary">Create Referrer</button>
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=rl-referrers-list')); ?>" class="rl-btn rl-btn-outline">Cancel</a>
+                </div>
+            </form>
+        </div>
+        <?php
+    }
+
+    /**
+     * The Add Referral form. Mirrors renderReferrerForm's no-JavaScript arrangement.
+     *
+     * @param  Collection<int, Referrer>  $referrers
+     * @param  array<int, string>  $errors
+     * @param  array<string, string>  $values
+     */
+    protected function renderReferralForm(Collection $referrers, array $errors, array $values): void
+    {
+        ?>
+        <div class="rl-detail-card">
+            <h3 class="rl-detail-title">Add Referral</h3>
+
+            <?php if ($errors !== []) { ?>
+                <div class="notice notice-error"><p><?php echo esc_html(implode(' ', $errors)); ?></p></div>
+            <?php } ?>
+
+            <?php if ($referrers->isEmpty()) { ?>
+                <p class="rl-hint">A referral has to belong to a referrer, and there are none yet.</p>
+                <div class="rl-form-actions">
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=rl-referrers-list&new=1')); ?>" class="rl-btn rl-btn-primary">Add a Referrer First</a>
+                </div>
+            <?php } else { ?>
+                <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=rl-referrers-referrals')); ?>">
+                    <?php wp_nonce_field('rl_create_referral_nonce'); ?>
+                    <input type="hidden" name="rl_action" value="create_referral" />
+
+                    <div class="rl-form-grid">
+                        <div class="rl-field">
+                            <label class="rl-label" for="rl-referral-referrer">Referrer <span class="rl-required">*</span></label>
+                            <select id="rl-referral-referrer" class="rl-select" name="referrer_id" required>
+                                <option value="">Select a referrer</option>
+                                <?php foreach ($referrers as $referrer) { ?>
+                                    <option value="<?php echo esc_attr((string) $referrer->id); ?>" <?php selected($values['referrer_id'] ?? '', (string) $referrer->id); ?>>
+                                        <?php echo esc_html($referrer->name.' ('.$referrer->referral_code.')'); ?>
+                                    </option>
+                                <?php } ?>
+                            </select>
+                        </div>
+                        <div class="rl-field">
+                            <label class="rl-label" for="rl-referral-lead-name">Lead name <span class="rl-required">*</span></label>
+                            <input id="rl-referral-lead-name" class="rl-input" type="text" name="lead_name" required value="<?php echo esc_attr($values['lead_name'] ?? ''); ?>" />
+                        </div>
+                        <div class="rl-field">
+                            <label class="rl-label" for="rl-referral-lead-email">Lead email</label>
+                            <input id="rl-referral-lead-email" class="rl-input" type="email" name="lead_email" value="<?php echo esc_attr($values['lead_email'] ?? ''); ?>" />
+                        </div>
+                        <div class="rl-field">
+                            <label class="rl-label" for="rl-referral-lead-phone">Lead phone</label>
+                            <input id="rl-referral-lead-phone" class="rl-input" type="text" name="lead_phone" value="<?php echo esc_attr($values['lead_phone'] ?? ''); ?>" />
+                        </div>
+                        <div class="rl-field">
+                            <label class="rl-label" for="rl-referral-source">Source</label>
+                            <input id="rl-referral-source" class="rl-input" type="text" name="source" placeholder="admin_manual" value="<?php echo esc_attr($values['source'] ?? ''); ?>" />
+                        </div>
+                        <div class="rl-field">
+                            <label class="rl-label" for="rl-referral-landing">Landing page</label>
+                            <input id="rl-referral-landing" class="rl-input" type="url" name="landing_page" value="<?php echo esc_attr($values['landing_page'] ?? ''); ?>" />
+                        </div>
+                        <div class="rl-field">
+                            <label class="rl-label" for="rl-referral-status">Status</label>
+                            <select id="rl-referral-status" class="rl-select" name="status">
+                                <?php foreach (self::REFERRAL_STATUSES as $status) { ?>
+                                    <option value="<?php echo esc_attr($status); ?>" <?php selected($values['status'] ?? 'pending', $status); ?>><?php echo esc_html(ucfirst($status)); ?></option>
+                                <?php } ?>
+                            </select>
+                        </div>
+                        <div class="rl-field rl-field-wide">
+                            <label class="rl-label" for="rl-referral-notes">Notes</label>
+                            <textarea id="rl-referral-notes" class="rl-textarea" name="notes"><?php echo esc_textarea($values['notes'] ?? ''); ?></textarea>
+                        </div>
+                    </div>
+
+                    <p class="rl-hint">
+                        Give an email or a phone number — one of the two is what credits this referral when
+                        the prospect books. No lead record is created and no CRM, Slack or webhook
+                        notification fires; this writes the referral only. Saving it straight to
+                        <strong>fulfilled</strong> or <strong>rewarded</strong> generates the reward
+                        immediately, the same as changing the status later would.
+                    </p>
+
+                    <div class="rl-form-actions">
+                        <button type="submit" class="rl-btn rl-btn-primary">Create Referral</button>
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=rl-referrers-referrals')); ?>" class="rl-btn rl-btn-outline">Cancel</a>
+                    </div>
+                </form>
+            <?php } ?>
+        </div>
+        <?php
     }
 
     protected function renderNav(string $activeSlug): void
@@ -1460,6 +2068,11 @@ class ReferralAdminDashboard
     protected function iconSearch(): string
     {
         return '<svg class="rl-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>';
+    }
+
+    protected function iconPlus(): string
+    {
+        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>';
     }
 
     protected function iconDownload(): string

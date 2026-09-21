@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Domains\Referral\Repositories\EloquentReferrerRepository;
+use App\Domains\Referral\Repositories\ReferrerRepositoryInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Container\Container;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -208,6 +210,13 @@ $capsule->bootEloquent();
 // under Acorn — production code uses DB::table(), not Capsule directly.
 $app->instance('db', $capsule->getDatabaseManager());
 $app->instance('db.schema', $capsule->getConnection()->getSchemaBuilder());
+
+// ReferralServiceProvider never boots here, so the domain's repository interface has to be
+// bound by hand — anything resolving it through the container fails outright otherwise.
+$app->bind(
+    ReferrerRepositoryInterface::class,
+    EloquentReferrerRepository::class
+);
 
 // Ensure test schema exists
 if (! Capsule::schema()->hasTable('rl_referrers')) {
@@ -864,6 +873,47 @@ if (! function_exists('sanitize_email')) {
     }
 }
 
+if (! function_exists('is_email')) {
+    function is_email($email)
+    {
+        return filter_var(trim((string) $email), FILTER_VALIDATE_EMAIL) ? trim((string) $email) : false;
+    }
+}
+
+if (! function_exists('wp_unslash')) {
+    function wp_unslash($value)
+    {
+        return is_string($value) ? stripslashes($value) : $value;
+    }
+}
+
+if (! function_exists('wp_generate_password')) {
+    function wp_generate_password($length = 12, $special_chars = true, $extra_special_chars = false)
+    {
+        $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        if ($special_chars) {
+            $chars .= '!@#$%^&*()';
+        }
+        if ($extra_special_chars) {
+            $chars .= '-_ []{}<>~`+=,.;:/?|';
+        }
+
+        $password = '';
+        for ($i = 0; $i < $length; $i++) {
+            $password .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+
+        return $password;
+    }
+}
+
+if (! function_exists('get_current_user_id')) {
+    function get_current_user_id()
+    {
+        return (int) ($GLOBALS['_wp_mock_current_user_id'] ?? 1);
+    }
+}
+
 if (! function_exists('sanitize_textarea_field')) {
     function sanitize_textarea_field($str)
     {
@@ -1344,6 +1394,10 @@ if (! function_exists('get_post_types')) {
 
 if (! defined('HOUR_IN_SECONDS')) {
     define('HOUR_IN_SECONDS', 3600);
+}
+
+if (! defined('MINUTE_IN_SECONDS')) {
+    define('MINUTE_IN_SECONDS', 60);
 }
 
 /*
