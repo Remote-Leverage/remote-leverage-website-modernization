@@ -1184,6 +1184,20 @@ if (sentryDsn && !isAutomated()) {
       // Performance sampling is separate from error sampling and much cheaper to lose.
       tracesSampleRate: 0.1,
 
+      /*
+       * Crash Free Sessions (Release Health). Already the SDK default — spelled out so it can't
+       * silently change upstream. Starts a session on page load, tagged with `release`, and marks
+       * it crashed only for an *unhandled* error that survives every filter below: ignoreErrors,
+       * denyUrls, allowUrls, then beforeSend. An event any of those drops never reaches the point
+       * where it could mark a session crashed, so "crashed" tracks the same class of error this
+       * file already treats as a real defect, not the third-party noise the rest of it exists to
+       * drop.
+       *
+       * PHP has no equivalent — the Sentry PHP SDK has no session-tracking API at all
+       * (getsentry/sentry-php#1290, closed as not planned), so Release Health is browser-only here.
+       */
+      autoSessionTracking: true,
+
       ignoreErrors: SENTRY_IGNORE,
       denyUrls: SENTRY_DENY,
 

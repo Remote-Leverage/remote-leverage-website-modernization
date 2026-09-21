@@ -41,6 +41,11 @@ use function Sentry\configureScope;
  * 3. `Log::error()` and above, through a Sentry log channel. The booking wizard's own docblock
  *    notes that swallowed-but-logged failures went "to CloudWatch and nowhere else"; that was the
  *    gap that hid a dead funnel until someone happened to read the logs.
+ * 4. The logged-in WordPress user, attached to the scope as `id` + `email` so an admin-triggered
+ *    error is attributable to who hit it. `config/sentry.php` keeps `send_default_pii` off
+ *    deliberately — this is a public marketing site, and that flag would start attaching every
+ *    anonymous visitor's IP to their errors too. Setting the user explicitly, and only once
+ *    someone is actually authenticated, gets the admin-side benefit without that trade.
  *
  * ## Not in local
  *
@@ -67,6 +72,7 @@ final class SentryReporting
         self::$registered = true;
 
         $this->tagEnvironment();
+        $this->identifyUser();
         $this->captureUnhandledExceptions();
         $this->captureFatalErrors();
         $this->captureErrorLogs();
@@ -113,6 +119,40 @@ final class SentryReporting
             });
         } catch (Throwable) {
             // A tag is a nicety. Never let it be the reason reporting fails to install.
+        }
+    }
+
+    /**
+     * Attach the logged-in WordPress user to the scope, guest visitors excluded.
+     *
+     * Guarded on `get_current_user_id()` rather than just `is_user_logged_in()` — a logged-out
+     * visitor's `wp_get_current_user()` still returns a `WP_User` with id `0` and empty fields,
+     * and setting that as the Sentry user would tag every anonymous error as "user 0" instead of
+     * leaving it correctly unidentified.
+     */
+    private function identifyUser(): void
+    {
+        if (! function_exists('is_user_logged_in') || ! \is_user_logged_in()) {
+            return;
+        }
+
+        $id = function_exists('get_current_user_id') ? (int) \get_current_user_id() : 0;
+
+        if ($id < 1) {
+            return;
+        }
+
+        $email = function_exists('wp_get_current_user') ? (string) \wp_get_current_user()->user_email : '';
+
+        try {
+            configureScope(static function (Scope $scope) use ($id, $email): void {
+                $scope->setUser([
+                    'id' => $id,
+                    'email' => $email,
+                ]);
+            });
+        } catch (Throwable) {
+            // Identifying the user is a nicety. Never let it be the reason reporting fails to install.
         }
     }
 

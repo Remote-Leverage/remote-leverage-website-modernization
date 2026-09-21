@@ -169,6 +169,16 @@ traffic that has no customer behind it.
 misspelled class fails silently: the filter matches nothing and the noise returns with no error
 anywhere to explain it.
 
+### Identifying who hit an error
+
+`send_default_pii` stays `false` — this is a public marketing site, and that flag would attach
+every anonymous visitor's IP address to their errors along with it. Instead
+`SentryReporting::identifyUser()` sets the Sentry user (`id` + `email`) explicitly, and only once
+`get_current_user_id()` is non-zero, so a guest's request never gets tagged as "user 0" — a
+logged-out `wp_get_current_user()` still returns a `WP_User`, just with empty/zero fields, not
+`null`. This gets the thing the id is actually for — attributing an admin-triggered error to the
+admin who triggered it — without turning on IP capture for the whole site.
+
 ### Browser side — `resources/js/app.js`
 
 The browser SDK had no filtering at all, so it would have inherited production's noise profile at
@@ -185,6 +195,22 @@ cutover. In rough order of how much each removes:
 `allowUrls` is strict by design. **If the theme bundle is ever served from a CDN on a different
 host than the page, real errors stop reporting** — and the failure mode is silence, not an error.
 The fix at that point is to add the asset host to the array.
+
+### Crash Free Sessions (Release Health)
+
+`autoSessionTracking: true` is already the SDK default — set explicitly so a future SDK change
+can't quietly turn it off. It starts a session per page load, tagged with `release`, and only
+marks one crashed for an *unhandled* error that survives every filter above, in order:
+`ignoreErrors`, `denyUrls`, `allowUrls`, then `beforeSend`. An event any of those drops never
+reaches the point where it could mark a session crashed — so the Release Health dashboard's
+crash-free rate tracks the same class of error this file already treats as a real defect, not the
+third-party noise the rest of it exists to drop.
+
+**Browser only.** The Sentry PHP SDK has no session-tracking API at all —
+[`getsentry/sentry-php#1290`](https://github.com/getsentry/sentry-php/issues/1290), closed as not
+planned, cites PHP's single-threaded request model as the blocker that Ruby and Python solve with
+a background flush thread. `config/sentry.php` has nothing equivalent, and nothing here changes
+that.
 
 ### Release tagging
 
