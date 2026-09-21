@@ -4,6 +4,7 @@ use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Scheduling\Gateways\CalendlyTokenPool;
 use App\Domains\Scheduling\Services\CalendlyEventTypeDiscoveryService;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
+use App\Domains\Tools\Settings\ToolSettings;
 
 return [
 
@@ -96,6 +97,22 @@ return [
          * variables win on their own again.
          */
         LeadSettingsService::OPTION_KEY,
+
+        /*
+         * The OpenAI key behind the legacy tool pages (config/job-widget.php).
+         *
+         * Here for the same reason as the blob above, and this is the case that proved the
+         * reason is real rather than historical: OPENAI_API_KEY was set on the staging GitHub
+         * Environment, synced into Secrets Manager and the service force-restarted, and the
+         * routes still did not register, because the task definition enumerates Secrets Manager
+         * keys one at a time and a newly added one is not on that list. Syncing the option is
+         * what lets the key be pasted locally and pushed, instead of typed into an environment
+         * nobody has a shell on.
+         *
+         * Its own row rather than part of the Lead blob: it belongs to the Tools domain, which
+         * has nothing to do with lead capture.
+         */
+        ToolSettings::OPENAI_KEY_OPTION,
     ],
 
     /*

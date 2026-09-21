@@ -36,6 +36,7 @@ Eight pages, per `grep -rl "jobwidget/v1" legacy-snapshots/pages`:
 | Class | Responsibility |
 | :--- | :--- |
 | `Http\JobWidgetRestRoutes` | Registers the three routes on `rest_api_init`. Wiring only. |
+| `Settings\ToolSettings` | This domain's own options. Currently just the OpenAI key. |
 | `Services\OpenAiProxyGuard` | Every rule: enablement, origin, nonce, rate limit, payload allowlist. |
 | `Services\OpenAiProxy` | The outbound call. Adds the credential and the timeouts, nothing else. |
 
@@ -60,12 +61,29 @@ Two of those are less obvious than they look and are the subject of their own te
 
 **Upstream's status never reaches the browser.** A 401 from OpenAI means *our* key is wrong. Passing it through lets an anonymous caller probe the state of our credential, and tells the visitor nothing they can act on.
 
+## Where the key comes from
+
+**Environment first, admin setting second** — the precedence `SlackCredentials`, `AdPlatformCredentials` and `HubSpotGateway` all use:
+
+1. `OPENAI_API_KEY` in the environment.
+2. **Tools → Legacy Tools** in wp-admin, stored in this domain's own `rl_tools_openai_api_key` option.
+
+The second is not a convenience, and staging is why it exists. The key was set on the staging GitHub Environment, synced into Secrets Manager (`Secrets Manager already matches GitHub`) and the service force-restarted — and the routes still did not register. The ECS task definition maps Secrets Manager keys to environment variables **one at a time**, so a key that is newly added to the secret does not reach the container until the infrastructure repo enumerates it. `docs/deployment.md` says so directly: "writing it into Secrets Manager is not enough on its own". It is the same trap `config/services.php` describes for the Sentry DSN, where "holding it in Secrets Manager only made it unreachable" — worked around there by committing a publishable default, which is not an option for a real credential.
+
+So the settings screen is the path that does not need another repository. It is one autoloaded option, read per request rather than cached, so a pasted key takes effect immediately. It is in the environment sync whitelist (`config/rl-sync.php`), so the key can be set locally and pushed rather than typed into an environment nobody has a shell on.
+
+**The setting belongs to this domain, not to `LeadSettingsService`.** That blob is where every admin-set credential in this codebase had accumulated — Slack, HubSpot, ZeroBounce, BigQuery — because it was the first screen to need one. A key for the legacy tool pages has nothing to do with lead capture, and a settings screen that owns credentials for subsystems its own code never calls is how that blob got that way. `ToolsAdmin` is under the WordPress **Tools** menu for the same reason.
+
+`OpenAiProxyGuard::apiKey()` wraps the lookup in a `try`. It runs on `rest_api_init` for every REST request, including on an install where that option has never been written, and a lookup that threw would take down the whole REST API rather than leave one tool dark.
+
+The screen states which source is in effect. That is not decoration: the whole reason it exists is that a key can be set in an environment and still not arrive, so a form that showed an empty box while the environment supplied a key would answer the one question it is there to answer incorrectly.
+
 ## Turning it off
 
-Unset `OPENAI_API_KEY`, and no route is registered — the endpoints 404 exactly as they did before this existed. That is the default for any environment that was never wired up, and it is why the routes gate themselves at `rest_api_init` rather than answering 503 on a route that cannot work.
+Clear both sources and no route is registered — the endpoints 404 exactly as they did before this existed, which is why the routes gate themselves at `rest_api_init` rather than answering 503 on a route that cannot work.
 
-`JOB_WIDGET_PROXY_ENABLED=false` does the same thing with the key still present.
+`JOB_WIDGET_PROXY_ENABLED=false` does the same thing with a key still present.
 
 ## The key itself
 
-The key recovered from the backup is **compromised by construction** — it sat in a theme file served as part of the site, behind an endpoint with no auth. It works, which is the problem. Rotate it, set the new value as `OPENAI_API_KEY`, and never restore the old constant.
+The key recovered from the backup is **compromised by construction** — it sat in a theme file served as part of the site, behind an endpoint with no auth. It works, which is the problem. Rotate it, then set the new value in either place above, and never restore the old constant.

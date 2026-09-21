@@ -23,9 +23,9 @@ return [
 
     /*
      * Off means the routes are never registered, so they 404 exactly as they do
-     * today. On by default: a deployed environment with no OPENAI_API_KEY is
-     * already inert (see `api_key` below), so the flag is for deliberately
-     * taking the tools down, not for keeping them off by accident.
+     * today. On by default: an environment with no key at all is already inert
+     * (see `api_key` below), so the flag is for deliberately taking the tools
+     * down, not for keeping them off by accident.
      */
     'enabled' => filter_var(env('JOB_WIDGET_PROXY_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
 
@@ -38,9 +38,15 @@ return [
      * create a way for them to drift.
      *
      * `?:` rather than env()'s default argument: `OPENAI_API_KEY=` with nothing
-     * after it hands back an empty string, which beats a default. Empty means
-     * "not configured", and not configured means the routes are not registered.
-     * The same trap documented in config/services.php for POSTHOG_API_KEY.
+     * after it hands back an empty string, which beats a default. The same trap
+     * documented in config/services.php for POSTHOG_API_KEY.
+     *
+     * Empty here is not the end of the lookup. `OpenAiProxyGuard::apiKey()` falls
+     * back to the Leads settings screen, because the ECS task definition maps
+     * Secrets Manager keys to environment variables one at a time and a newly
+     * added key cannot reach a deployed environment until the infrastructure repo
+     * enumerates it — which is exactly what happened to this key on staging.
+     * Environment wins wherever it is set.
      */
     'api_key' => trim((string) env('OPENAI_API_KEY', '')),
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Tools\Services;
 
+use App\Domains\Tools\Settings\ToolSettings;
+use Throwable;
 use WP_Error;
 
 /**
@@ -45,9 +47,39 @@ class OpenAiProxyGuard
             && $this->apiKey() !== '';
     }
 
+    /**
+     * The OpenAI credential: **environment first, admin setting second.**
+     *
+     * The same precedence `SlackCredentials`, `AdPlatformCredentials` and `HubSpotGateway` use,
+     * and this is the case that proved why it is needed. The key was set on the staging GitHub
+     * Environment, synced into Secrets Manager and the service force-restarted, and the routes
+     * still did not register: the ECS task definition maps Secrets Manager keys to environment
+     * variables **one at a time**, so a newly added key does not reach the container until the
+     * infrastructure repo enumerates it. The same trap `config/services.php` describes for the
+     * Sentry DSN, where "holding it in Secrets Manager only made it unreachable".
+     *
+     * The setting is this domain's own option, not a corner of the Lead settings blob — see
+     * {@see ToolSettings}. It is read per call rather than cached, so a key pasted into wp-admin
+     * takes effect on the next request, which is the entire point of the setting existing.
+     */
     public function apiKey(): string
     {
-        return trim((string) ($this->config['api_key'] ?? ''));
+        $fromEnvironment = trim((string) ($this->config['api_key'] ?? ''));
+
+        if ($fromEnvironment !== '') {
+            return $fromEnvironment;
+        }
+
+        /*
+         * Guarded, not assumed. This runs on `rest_api_init` for every REST request, including
+         * on an install where the option has never been written, and a lookup that throws would
+         * take down the whole REST API rather than leave one tool dark.
+         */
+        try {
+            return ToolSettings::openAiApiKey();
+        } catch (Throwable) {
+            return '';
+        }
     }
 
     /**

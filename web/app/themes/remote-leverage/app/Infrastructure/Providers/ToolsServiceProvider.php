@@ -7,6 +7,7 @@ namespace App\Infrastructure\Providers;
 use App\Domains\Tools\Http\JobWidgetRestRoutes;
 use App\Domains\Tools\Services\OpenAiProxy;
 use App\Domains\Tools\Services\OpenAiProxyGuard;
+use App\Infrastructure\WordPress\Admin\ToolsAdmin;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -25,6 +26,7 @@ class ToolsServiceProvider extends ServiceProvider
             $app->make(OpenAiProxyGuard::class),
             $app->make(OpenAiProxy::class),
         ));
+        $this->app->singleton(ToolsAdmin::class, fn () => new ToolsAdmin);
     }
 
     /**
@@ -34,5 +36,11 @@ class ToolsServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->app->make(JobWidgetRestRoutes::class)->register();
+
+        /*
+         * Registered unconditionally, unlike the routes. The screen is where a key is set, so
+         * gating it on a key being set would hide the only way to set one.
+         */
+        $this->app->make(ToolsAdmin::class)->register();
     }
 }

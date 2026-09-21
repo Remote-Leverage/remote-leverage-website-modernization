@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domains\Tools\Services\OpenAiProxy;
 use App\Domains\Tools\Services\OpenAiProxyGuard;
+use App\Domains\Tools\Settings\ToolSettings;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Facades\Http;
@@ -42,9 +43,20 @@ function jobWidgetConfig(array $overrides = []): array
 
 beforeEach(function () {
     $GLOBALS['_wp_mock_transients'] = [];
+    $GLOBALS['_wp_mock_options'] = [];
 
     Facade::clearResolvedInstance(HttpFactory::class);
     Http::swap(new HttpFactory);
+});
+
+/*
+ * These tests write the real `rl_lead_settings` option, and the stub option store is a global
+ * that outlives the file. Without this, the retention_days this file leaves behind is still
+ * there when LeadDomainTest runs and PurgeOldLeadsAction reads it — a failure in a file nobody
+ * touched, which is the most expensive kind to chase.
+ */
+afterEach(function () {
+    $GLOBALS['_wp_mock_options'] = [];
 });
 
 it('registers nothing on an environment with no API key', function () {
@@ -309,4 +321,68 @@ it('treats an empty transcript as a failure rather than an empty success', funct
 
     expect($error)->toBeInstanceOf(WP_Error::class)
         ->and($error->get_error_code())->toBe('jobwidget_no_transcript');
+})->group('job-widget');
+
+/*
+ * The admin-setting fallback.
+ *
+ * Not a convenience. The key was set on the staging GitHub Environment, synced into Secrets
+ * Manager and the service force-restarted, and the routes still did not register: the ECS task
+ * definition maps Secrets Manager keys to environment variables one at a time, so a newly added
+ * key never reaches the container. Without this fallback the tools cannot be turned on in a
+ * deployed environment without a change in a different repository.
+ *
+ * The option belongs to the Tools domain. It briefly lived in the Lead settings blob, which is
+ * where every admin-set credential in this codebase had accumulated, and it does not belong
+ * there: nothing about an OpenAI key for the legacy tool pages concerns lead capture.
+ */
+it('falls back to the Tools setting when the environment has none', function () {
+    update_option(ToolSettings::OPENAI_KEY_OPTION, 'sk-from-admin-screen');
+
+    $guard = new OpenAiProxyGuard(jobWidgetConfig(['api_key' => '']));
+
+    expect($guard->apiKey())->toBe('sk-from-admin-screen')
+        ->and($guard->enabled())->toBeTrue();
+})->group('job-widget');
+
+it('lets the environment win over the settings screen', function () {
+    update_option(ToolSettings::OPENAI_KEY_OPTION, 'sk-from-admin-screen');
+
+    $guard = new OpenAiProxyGuard(jobWidgetConfig(['api_key' => 'sk-from-env']));
+
+    expect($guard->apiKey())->toBe('sk-from-env');
+})->group('job-widget');
+
+it('stays disabled when neither source has a key', function () {
+    update_option(ToolSettings::OPENAI_KEY_OPTION, '   ');
+
+    $guard = new OpenAiProxyGuard(jobWidgetConfig(['api_key' => '']));
+
+    expect($guard->apiKey())->toBe('')
+        ->and($guard->enabled())->toBeFalse();
+})->group('job-widget');
+
+/*
+ * apiKey() runs on rest_api_init for every REST request, including on an install where the
+ * option has never been written. A lookup that threw there would take down the entire REST API
+ * rather than leave one tool dark.
+ */
+it('survives an install where the Tools setting has never been saved', function () {
+    $guard = new OpenAiProxyGuard(jobWidgetConfig(['api_key' => '']));
+
+    expect($guard->apiKey())->toBe('')
+        ->and($guard->enabled())->toBeFalse();
+})->group('job-widget');
+
+/*
+ * The Lead settings blob must not be what turns these routes on. It was, briefly; this is here
+ * so that arrangement cannot come back by accident.
+ */
+it('does not read the key out of the Lead settings blob', function () {
+    update_option('rl_lead_settings', ['openai_api_key' => 'sk-wrong-domain']);
+
+    $guard = new OpenAiProxyGuard(jobWidgetConfig(['api_key' => '']));
+
+    expect($guard->apiKey())->toBe('')
+        ->and($guard->enabled())->toBeFalse();
 })->group('job-widget');
