@@ -3,13 +3,20 @@
    * Status vocabulary, in one place. Referral::STATUSES is the source of truth — the old
    * template branched on `closed_won`, which nothing writes, so fulfilled referrals displayed
    * as "Pending Review".
+   *
+   * The words are ReferralTimeline::MAP's, deliberately: the expanded history under a row
+   * narrates a referral as "Referral received" then "Consultation booked", and the badge above
+   * it used to call the same two states "Pending review" and "In progress". Three vocabularies
+   * for one pipeline — badge, filter chip and history — read as three different things
+   * happening. `rewarded` is the one status the history has no entry for, because nothing logs
+   * a payout as a lead event; "Reward paid" keeps its register and says what the status means.
    */
   $statusStyles = [
-      'pending'   => ['label' => 'Pending review', 'class' => 'bg-amber-50 text-amber-700 ring-amber-200'],
-      'qualified' => ['label' => 'In progress',    'class' => 'bg-blue-50 text-blue-700 ring-blue-200'],
-      'fulfilled' => ['label' => 'Deal closed',    'class' => 'bg-emerald-50 text-emerald-700 ring-emerald-200'],
-      'rewarded'  => ['label' => 'Rewarded',       'class' => 'bg-emerald-600 text-white ring-emerald-600'],
-      'rejected'  => ['label' => 'Not proceeding', 'class' => 'bg-slate-100 text-slate-500 ring-slate-200'],
+      'pending'   => ['label' => 'Referral received',     'class' => 'bg-amber-50 text-amber-700 ring-amber-200'],
+      'qualified' => ['label' => 'Consultation booked',   'class' => 'bg-blue-50 text-blue-700 ring-blue-200'],
+      'fulfilled' => ['label' => 'Deal closed',           'class' => 'bg-emerald-50 text-emerald-700 ring-emerald-200'],
+      'rewarded'  => ['label' => 'Reward paid',           'class' => 'bg-emerald-600 text-white ring-emerald-600'],
+      'rejected'  => ['label' => 'Consultation canceled', 'class' => 'bg-slate-100 text-slate-500 ring-slate-200'],
   ];
 
   $toneStyles = [
@@ -282,10 +289,23 @@
               </div>
 
               @php
-                $filters = [
-                    'all' => 'All', 'pending' => 'Pending', 'qualified' => 'In progress',
-                    'fulfilled' => 'Closed', 'rewarded' => 'Rewarded', 'stale' => 'Needs a nudge',
-                ];
+                /*
+                 * Built from $statusStyles rather than restated, so a chip and the badges it
+                 * returns can never again disagree about what a status is called — which is
+                 * how "Closed" came to filter to rows badged "Deal closed".
+                 *
+                 * `all` and `stale` bracket it because neither is a status: `all` clears the
+                 * filter, and `stale` cuts across the others on time since the last change.
+                 * `rejected` is the one real status with no chip, as before — a referrer has
+                 * no use for a shortcut to their dead referrals, and "All" still lists them.
+                 */
+                $filters = ['all' => 'All'];
+                foreach ($statusStyles as $filterStatus => $filterStyle) {
+                    if ($filterStatus !== 'rejected') {
+                        $filters[$filterStatus] = $filterStyle['label'];
+                    }
+                }
+                $filters['stale'] = 'Needs a nudge';
               @endphp
               <div class="flex flex-wrap items-center gap-1.5 mt-4" role="group" aria-label="Filter referrals by status">
                 @foreach ($filters as $value => $label)
@@ -293,7 +313,12 @@
                     type="button"
                     wire:click="setStatusFilter('{{ $value }}')"
                     aria-pressed="{{ $statusFilter === $value ? 'true' : 'false' }}"
-                    class="px-2.5 py-1 rounded-pill text-[11px] font-bold uppercase tracking-wider transition cursor-pointer ring-1
+                    {{-- Sentence case, not the uppercase-with-tracking these chips used to
+                         carry. Measured in Chrome at 1440px against the built CSS: the six
+                         labels come to 720px in caps and wrap onto a second row inside a 636px
+                         card, and 569px here, which fits on one. A nineteen-character phrase in
+                         wide-tracked caps is a hard read besides. --}}
+                    class="px-2.5 py-1 rounded-pill text-[11px] font-bold transition cursor-pointer ring-1
                       {{ $statusFilter === $value
                           ? 'bg-brand-hero text-white ring-brand-hero'
                           : 'bg-white text-slate-500 ring-slate-200 hover:text-brand-purple hover:ring-brand-purple/40' }}"
