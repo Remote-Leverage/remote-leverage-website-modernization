@@ -136,6 +136,20 @@ export function phoneInputComponent(config = {}) {
       input.addEventListener('change', sync);
       input.addEventListener('blur', sync);
 
+      /*
+       * Autofill catch-up. Now that phone is a required field, a browser or password manager
+       * that fills the box without emitting `input` would leave `$wire.phone` empty and block
+       * a visitor who can plainly see their number on screen. Cheap to re-check; the same
+       * staggered timings adjustPhonePadding already uses.
+       */
+      const syncIfFilledSilently = () => {
+        if (String(input.value ?? '').trim() !== '' && String(this.phoneVal ?? '').trim() === '') {
+          sync();
+        }
+      };
+      setTimeout(syncIfFilledSilently, 400);
+      setTimeout(syncIfFilledSilently, 1200);
+
       const wire = this.getWire();
       // Livewire hands this back as a reactive proxy, not always a plain string —
       // intl-tel-input calls .indexOf() on it and throws if it isn't one.
@@ -198,10 +212,20 @@ export function rlBookingWizardIsolated(config = {}) {
           && this.wireString('lastName').trim().length > 0;
       }
       if (f === 'phone') {
-        // Always true. The phone input sits inside `wire:ignore` and is owned by
-        // phoneInputComponent, which only writes `$wire.phone` on input/change/blur/
-        // countrychange — so a keystroke-level gate here would lag the typing.
-        return true;
+        /*
+         * Read the input, not `$wire.phone`. The field sits inside `wire:ignore` and is owned
+         * by phoneInputComponent, which writes `$wire.phone` on input/change/blur/
+         * countrychange — so gating on the wire property lags the typing by a round trip, and
+         * misses an autofill that never emitted those events entirely. The DOM value is what
+         * the visitor can actually see.
+         *
+         * This used to return true unconditionally while the label carried a red asterisk and
+         * the server rule read `nullable`, which is how bookings reached `booked` with no
+         * phone number.
+         */
+        const input = document.getElementById('booking-phone-input');
+        if (input) return String(input.value ?? '').trim().length > 0;
+        return this.wireString('phone').trim().length > 0;
       }
       if (f === 'monthly_revenue') {
         return this.wireString('monthlyRevenue').trim().length > 0;

@@ -222,6 +222,7 @@ describe('Booking Wizard MRR Routing & Tracking Parity', function () {
         $wizard->firstName = 'John';
         $wizard->lastName = 'Doe';
         $wizard->monthlyRevenue = '$10k to $25k Per Month';
+        $wizard->phone = '+12015550123';
         $wizard->roleNeeded = 'Executive Assistant';
 
         $wizard->goToStep(2);

@@ -338,12 +338,26 @@ class MultistepBookingWizard extends Component
         3 => 'Select a Time',
     ];
 
+    /**
+     * The phone input sits inside `wire:ignore` and is written by phoneInputComponent, so a
+     * value the visitor can see is not necessarily a value the server received. "The phone
+     * field is required" in front of a filled-in box would read as a broken form.
+     */
+    protected array $validationMessages = [
+        'phone.required' => 'Please enter your phone number — re-type it if it was filled in automatically.',
+    ];
+
     protected array $validationRules = [
         1 => [
             'email' => 'required|email|max:150',
             'firstName' => 'required|string|min:1|max:60',
             'lastName' => 'required|string|min:1|max:60',
-            'phone' => 'nullable|string|max:30',
+            // Required, matching the asterisk the label has always carried. It was nullable
+            // until 2026-09-21, and nothing else enforced it either: the input has no native
+            // `required`, the wizard has no <form> for the browser to validate, and the
+            // isolated sub-step gate returned true for phone unconditionally. Leads reached
+            // `booked` with no number at all.
+            'phone' => 'required|string|max:30',
             'monthlyRevenue' => 'required|string',
         ],
         2 => [
@@ -550,7 +564,7 @@ class MultistepBookingWizard extends Component
 
             // Validate current step before advancing
             if (isset($this->validationRules[$this->currentStep])) {
-                $this->validate($this->validationRules[$this->currentStep]);
+                $this->validate($this->validationRules[$this->currentStep], $this->validationMessages);
             }
 
             if ($this->currentStep === 1) {
@@ -1017,7 +1031,36 @@ class MultistepBookingWizard extends Component
                 return;
             }
 
-            if ($lead->status === 'booked' || ! empty($this->selectedSlot)) {
+            /*
+             * A slot was chosen but no provider has taken it yet — the retry ladder still has it.
+             *
+             * This used to render the confirmation anyway, on the reasoning that the ladder
+             * usually lands within thirty seconds. It usually does. When it does not, the visitor
+             * has already been told a consultant is expecting them and sent to /VAThankYou/,
+             * which fires two live Google Ads conversions; nothing afterwards ever corrects
+             * either. Between 19 and 21 September five people were told exactly that for meetings
+             * that existed on no calendar.
+             *
+             * So an unconfirmed booking now says it is unconfirmed. It stays in the widget rather
+             * than redirecting, which also keeps the conversion out of Ads until there is a
+             * meeting to report.
+             */
+            if ($lead->status !== 'booked' && ! empty($this->selectedSlot)) {
+                $this->isBooked = false;
+                $this->errorMessage = 'We have your time and we are still confirming it with the calendar. '
+                    .'You will get an email as soon as it is confirmed — if nothing arrives within a few minutes, '
+                    .'please pick another time.';
+
+                $this->trackStepEvent('booking_pending', [
+                    'lead_id' => $lead->id,
+                    'selected_time' => $this->selectedSlot,
+                    'role' => $this->roleNeeded,
+                ]);
+
+                return;
+            }
+
+            if ($lead->status === 'booked') {
                 $this->isBooked = true;
                 $bookingLog = $lead->activityLogs()
                     ->where('event_type', 'LeadCreated')
