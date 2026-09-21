@@ -23,6 +23,7 @@ use App\Domains\Marketing\Support\DemoSnapshot;
 use App\Infrastructure\Slack\SlackTransport;
 use App\Infrastructure\WordPress\Admin\MarketingDashboard;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Log;
 
 /*
  * The marketing cost alert.
@@ -1170,6 +1171,42 @@ describe('the message', function () {
 
         expect($second->execute($now))->toBeTrue()
             ->and(cardsAmong($live->posted))->toHaveCount(1);
+    });
+
+    test('a run blocked by the environment gate says so, with the values that decided it', function () {
+        config(['marketing.cost_alert.environments' => ['production'], 'marketing.cost_alert.enabled' => null]);
+        $GLOBALS['wp_environment_type'] = 'development';
+
+        $action = costAlertAction($transport = recordingCostTransport());
+
+        $warnings = [];
+        Log::swap(new class($warnings)
+        {
+            public function __construct(public array &$seen) {}
+
+            public function warning($message, array $context = []): void
+            {
+                $this->seen[] = (string) $message.' '.json_encode($context);
+            }
+
+            public function __call($name, $arguments) {}
+        });
+
+        expect($action->execute())->toBeFalse();
+
+        Log::clearResolvedInstances();
+
+        /*
+         * The gate that cost an afternoon on 2026-09-21. It is checked before anything is
+         * computed and used to return a bare false, so "switched off" looked exactly like Slack
+         * being down, the cron being dead, or the send throwing — and the only person who could
+         * tell the difference was firing every card by hand.
+         */
+        expect($warnings)->not->toBeEmpty()
+            ->and($warnings[0])->toContain('switched off in this environment')
+            ->and($warnings[0])->toContain('development')
+            ->and($warnings[0])->toContain('enabled_env_raw')
+            ->and(cardsAmong($transport->posted))->toBeEmpty();
     });
 
     test('an explicit enabled=false stops it even in production', function () {

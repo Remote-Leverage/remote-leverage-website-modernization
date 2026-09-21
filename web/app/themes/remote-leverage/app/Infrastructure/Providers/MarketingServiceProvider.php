@@ -235,7 +235,26 @@ class MarketingServiceProvider extends ServiceProvider
              * a disabled alert is "still running".
              */
             if (! $enabled && $scheduled) {
+                /*
+                 * Removing the event is a bigger act than skipping a run, and it used to happen in
+                 * silence. One request in which `enabledHere()` reads false takes the hourly job
+                 * off the schedule, and nothing anywhere records that it happened or why — the
+                 * next person sees a cost alert that simply stopped, with a cron list that does
+                 * not mention it, and no way to tell "switched off" from "broken".
+                 *
+                 * Logged as a warning rather than info because this is almost never intentional
+                 * on production: the deliberate path is MARKETING_COST_ALERT_ENABLED=false, and
+                 * the accidental one is that variable mapped to an empty string, which reads as
+                 * false and looks identical from the outside.
+                 */
                 \wp_unschedule_event($scheduled, self::CRON_HOOK);
+
+                Log::warning('MarketingServiceProvider: unscheduled the hourly cost alert — it is switched off here.', [
+                    'environment_type' => function_exists('wp_get_environment_type') ? \wp_get_environment_type() : null,
+                    'allowed_environments' => config('marketing.cost_alert.environments'),
+                    'enabled_config' => config('marketing.cost_alert.enabled'),
+                    'was_scheduled_for' => gmdate('c', (int) $scheduled),
+                ]);
             }
         });
 

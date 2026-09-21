@@ -89,6 +89,35 @@ class SendCostAlertAction
          * on every environment but production and gives no hint why.
          */
         if (! $force && ! AlertWindow::enabledHere()) {
+            /*
+             * Say so, once an hour, rather than returning a bare false.
+             *
+             * This gate is the whole reason the alert can stop without leaving a trace: it is
+             * checked before anything is computed, it logs nothing, and the only outward sign is
+             * the absence of a card — which looks identical to Slack being down, the cron being
+             * dead, or the send throwing. On 2026-09-21 that cost an afternoon of elimination and
+             * ended with somebody firing every hourly card by hand, because pressing the button
+             * passes `force` and sails straight past here.
+             *
+             * The resolved values, not just the verdict. "Disabled" sends you looking at a config
+             * file; "enabled is false because MARKETING_COST_ALERT_ENABLED is set to an empty
+             * string" is the answer — and an empty string is what an ECS task definition maps
+             * when a Secrets Manager key exists but has no value, which is a state nobody would
+             * think to check.
+             */
+            $explicit = config('marketing.cost_alert.enabled');
+            $raw = env('MARKETING_COST_ALERT_ENABLED');
+
+            Log::warning('SendCostAlertAction: not posting — the alert is switched off in this environment.', [
+                'environment_type' => function_exists('wp_get_environment_type') ? \wp_get_environment_type() : null,
+                'allowed_environments' => config('marketing.cost_alert.environments'),
+                'enabled_config' => $explicit,
+                'enabled_env_raw' => $raw === null ? 'unset' : var_export($raw, true),
+                'note' => $explicit !== null
+                    ? 'MARKETING_COST_ALERT_ENABLED is set and wins outright; only "unset" defers to the environment list.'
+                    : 'Deferring to the environment list, and this environment is not in it.',
+            ]);
+
             return false;
         }
 
@@ -107,6 +136,14 @@ class SendCostAlertAction
         $now = ($now ?? CarbonImmutable::now())->setTimezone($timezone);
 
         if (! $force && ! AlertWindow::contains($now)) {
+            // The other silent exit. Same reasoning as the gate above: name the window rather
+            // than leaving "no card" to be explained by whoever notices first.
+            Log::info('SendCostAlertAction: not posting — outside the reporting window.', [
+                'hour' => $now->hour,
+                'timezone' => $timezone,
+                'window' => AlertWindow::from().'–'.AlertWindow::to(),
+            ]);
+
             return false;
         }
 
