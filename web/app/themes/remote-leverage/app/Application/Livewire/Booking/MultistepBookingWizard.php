@@ -281,6 +281,37 @@ class MultistepBookingWizard extends Component
 
     public string $timezone = 'America/New_York';
 
+    /**
+     * Set once the visitor picks a zone themselves, so a late-arriving browser
+     * detection cannot overwrite a deliberate choice.
+     */
+    public bool $timezoneChosen = false;
+
+    /**
+     * Zones offered in the picker. Desktop and mobile used to carry two different
+     * hand-written lists — desktop had Bogota and UTC, mobile had Paris — so which
+     * zones a visitor could pick depended on their screen width.
+     */
+    public const TIMEZONE_CHOICES = [
+        'America/Bogota',
+        'America/New_York',
+        'America/Chicago',
+        'America/Denver',
+        'America/Los_Angeles',
+        'Europe/London',
+        'Europe/Paris',
+        'UTC',
+    ];
+
+    public const TIMEZONE_LABELS = [
+        'America/New_York' => 'Eastern Time (ET)',
+        'America/Chicago' => 'Central Time (CT)',
+        'America/Denver' => 'Mountain Time (MT)',
+        'America/Los_Angeles' => 'Pacific Time (PT)',
+        'Europe/London' => 'London (GMT/BST)',
+        'Europe/Paris' => 'Central Europe (CET)',
+    ];
+
     public array $availableSlots = [];
 
     // Step 4: Additional Info & Guests
@@ -786,6 +817,58 @@ class MultistepBookingWizard extends Component
         $this->goToStep(3);
     }
 
+    /**
+     * Adopt the browser's own zone on load. Nothing detected one before: every visitor
+     * was shown New York times regardless of where they were, and the only way to see
+     * their own was to notice the dropdown and use it.
+     *
+     * Ignored once the visitor has chosen a zone, and ignored for anything that is not
+     * a real zone identifier — the value arrives from the client and reaches Calendly.
+     */
+    public function detectTimezone(string $tz): void
+    {
+        if ($this->timezoneChosen || $tz === '' || $tz === $this->timezone) {
+            return;
+        }
+
+        if (! in_array($tz, timezone_identifiers_list(), true)) {
+            return;
+        }
+
+        $this->timezone = $tz;
+
+        $now = Carbon::now($this->timezone);
+        $this->currentMonth = (int) $now->format('n');
+        $this->currentYear = (int) $now->format('Y');
+
+        $this->loadMonthAvailability();
+
+        if ($this->selectedDate) {
+            $this->loadSlotsForDate($this->selectedDate);
+        }
+    }
+
+    /**
+     * The offered zones, with the visitor's own prepended when it is not one of them —
+     * a <select> that cannot represent its current value displays a different zone than
+     * the one the times are actually in.
+     */
+    public function timezoneChoices(): array
+    {
+        $choices = self::TIMEZONE_CHOICES;
+
+        if (! in_array($this->timezone, $choices, true)) {
+            array_unshift($choices, $this->timezone);
+        }
+
+        return $choices;
+    }
+
+    public function timezoneLabel(string $tz): string
+    {
+        return self::TIMEZONE_LABELS[$tz] ?? str_replace(['_', '/'], [' ', ', '], $tz);
+    }
+
     public function selectSlot(string $slot): void
     {
         $this->selectedSlot = $slot;
@@ -818,6 +901,7 @@ class MultistepBookingWizard extends Component
 
     public function updatedTimezone(): void
     {
+        $this->timezoneChosen = true;
         $this->loadMonthAvailability();
         if ($this->selectedDate) {
             $this->loadSlotsForDate($this->selectedDate);
@@ -945,8 +1029,10 @@ class MultistepBookingWizard extends Component
                 // when there is none, and a retry that lands will write the real one.
                 $this->meetingUrl = $payload['meet_url'] ?? null;
                 $this->bookingReference = (string) ($payload['meeting_id'] ?? $lead->uuid);
+                // Same conversion bug as the slot labels, and worse here: this one appends
+                // the timezone name to a time it never converted into that timezone.
                 $this->confirmedTime = $this->selectedSlot
-                    ? Carbon::parse($this->selectedSlot, $this->timezone)->format('l, F j, Y \a\t g:i A').' ('.$this->timezone.')'
+                    ? Carbon::parse($this->selectedSlot)->setTimezone($this->timezone)->format('l, F j, Y \a\t g:i A').' ('.$this->timezone.')'
                     : 'Scheduled Directly';
 
                 $this->trackStepEvent('booking_finished', [
@@ -1242,7 +1328,13 @@ class MultistepBookingWizard extends Component
                 foreach ($slots as $slot) {
                     $times[] = [
                         'iso' => $slot->startTime,
-                        'time' => Carbon::parse($slot->startTime, $this->timezone)->format('g:ia'),
+                        // setTimezone, not parse($iso, $tz). Calendly returns UTC Zulu and
+                        // ignores the timezone param, and PHP discards the timezone argument
+                        // whenever the string carries its own offset — so parse($iso, $tz)
+                        // silently labels every slot in UTC under a banner naming the
+                        // visitor's timezone. That is how a 15:45Z slot was offered as
+                        // "3:45pm" and booked at 10:45 Central on 2026-09-21.
+                        'time' => Carbon::parse($slot->startTime)->setTimezone($this->timezone)->format('g:ia'),
                     ];
                 }
 

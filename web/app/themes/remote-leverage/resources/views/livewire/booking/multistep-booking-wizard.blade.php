@@ -1,4 +1,5 @@
-<div class="w-full" x-data="rlBookingStepScroll()">
+<div class="w-full" x-data="rlBookingStepScroll()"
+     x-init="$wire.detectTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || '')">
   {{-- "Looking for VA work?" Shown when the partial lead reads as a possible VA — LeadAudience
        decides that, the same rule as the dashboard's badge and filter; config/booking.php holds
        only the copy. Checked before the pricing warning because it is a different conversation.
@@ -390,13 +391,9 @@
                   <span class="text-xs text-white/70 block">Time zone</span>
                   <div class="relative inline-block mt-0.5 group cursor-pointer">
                     <select wire:model.live="timezone" class="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10">
-                      <option value="America/Bogota">America, Bogota ({{ \Carbon\Carbon::now('America/Bogota')->format('H:i') }})</option>
-                      <option value="America/New_York">America, New York ({{ \Carbon\Carbon::now('America/New_York')->format('H:i') }})</option>
-                      <option value="America/Chicago">America, Chicago ({{ \Carbon\Carbon::now('America/Chicago')->format('H:i') }})</option>
-                      <option value="America/Denver">America, Denver ({{ \Carbon\Carbon::now('America/Denver')->format('H:i') }})</option>
-                      <option value="America/Los_Angeles">America, Los Angeles ({{ \Carbon\Carbon::now('America/Los_Angeles')->format('H:i') }})</option>
-                      <option value="Europe/London">Europe, London ({{ \Carbon\Carbon::now('Europe/London')->format('H:i') }})</option>
-                      <option value="UTC">UTC ({{ \Carbon\Carbon::now('UTC')->format('H:i') }})</option>
+                      @foreach ($this->timezoneChoices() as $tzChoice)
+                        <option value="{{ $tzChoice }}">{{ str_replace(['_', '/'], [' ', ', '], $tzChoice) }} ({{ \Carbon\Carbon::now($tzChoice)->format('H:i') }})</option>
+                      @endforeach
                     </select>
                     <div class="inline-flex items-center gap-1.5 text-sm font-semibold text-white group-hover:text-white/90 transition-colors duration-150 pointer-events-none">
                       <svg class="w-4 h-4 text-white/80 transition-transform duration-200 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1017,12 +1014,9 @@
                 wire:model.live="timezone" 
                 class="text-2xs font-semibold text-slate-600 bg-transparent border-0 focus:ring-0 cursor-pointer"
               >
-                <option value="America/New_York">Eastern Time (ET)</option>
-                <option value="America/Chicago">Central Time (CT)</option>
-                <option value="America/Denver">Mountain Time (MT)</option>
-                <option value="America/Los_Angeles">Pacific Time (PT)</option>
-                <option value="Europe/London">London (GMT/BST)</option>
-                <option value="Europe/Paris">Central Europe (CET)</option>
+                @foreach ($this->timezoneChoices() as $tzChoice)
+                  <option value="{{ $tzChoice }}">{{ $this->timezoneLabel($tzChoice) }}</option>
+                @endforeach
               </select>
             </div>
           </div>
