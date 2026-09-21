@@ -8,11 +8,20 @@
  *     /store/ since 2026-09-15 and now lives in resources/patterns/call-timer-widget.php;
  *     it is included below so both playbooks run one copy.
  *  2. <job-description-widget> — a shadow-DOM custom element that POSTs to the
- *     REST route /wp-json/jobwidget/v1/chat to draft a job description. That route
- *     is supplied by a production-only plugin and does NOT exist in this install,
- *     so the Generate button surfaces an error here. That is a known, accepted
- *     limitation: the markup and behaviour are kept as production has them and
- *     wiring the endpoint up is a separate decision for the team.
+ *     REST route /wp-json/jobwidget/v1/chat to draft a job description.
+ *
+ *     That route was never a plugin: it lived in the legacy hello-theme-child's
+ *     functions.php, which cutover deleted along with the theme, so from the v2
+ *     launch until 2026-09-21 every call 404'd. The widget never showed an error
+ *     for it — `rest_no_route` answers with a *JSON* body, which parses fine, so
+ *     the catch block never ran and the page reported "(No output received)"
+ *     instead. A misleading symptom, not a second bug.
+ *
+ *     The route now exists in this theme (App\Domains\Tools, config/job-widget.php),
+ *     behind a nonce, an origin check, a model allowlist and a per-IP rate limit —
+ *     the legacy one had `permission_callback => '__return_true'` and a hardcoded
+ *     key. It is inert on any environment without OPENAI_API_KEY, which registers
+ *     no route and 404s exactly as before.
  *
  * 2026-09-15 redesign: visual parity with production was dropped by client direction, so
  * both blobs are now skinned with the theme's own @theme custom properties (Tailwind emits
@@ -31,6 +40,19 @@
 <?php include get_theme_file_path('resources/patterns/call-timer-widget.php'); ?>
 
 <!-- vastore5: job description + traits generator (production <job-description-widget>) -->
+<?php
+/*
+ * The `wp_rest` nonce the generator sends as X-WP-Nonce. Minted per render rather than
+ * enqueued, because this widget is inline markup inside a pattern and has no script handle to
+ * localise onto.
+ *
+ * Safe under the 60s nginx HTML cache: a nonce is valid for 12h, and logged-in requests bypass
+ * that cache ($skip_cache_cookie), so a cached page cannot hand a logged-in user a nonce minted
+ * for uid 0. The widget still works without it if that ever stops being true — the route
+ * answers 403 with a message the widget now renders, rather than failing silently.
+ */
+?>
+<script>window.rlJobWidgetNonce = <?php echo wp_json_encode(wp_create_nonce('wp_rest')); ?>;</script>
 <script>
 class JobDescriptionWidget extends HTMLElement {
       constructor() {
@@ -176,6 +198,36 @@ class JobDescriptionWidget extends HTMLElement {
           return Array.from(new Set(items)).filter(t => t.split(" ").length <= 6);
         };
 
+        /*
+         * One place that knows how to talk to the proxy, so the two calls below cannot drift.
+         *
+         * Every failure throws, including a non-2xx with a readable body: the endpoint answers
+         * 403 (stale nonce), 429 (rate limited) and 502 (upstream down) with a `message` the
+         * visitor can act on, and the catch block below renders it. The old code inspected only
+         * `choices` and collapsed every one of those into "(No output received)".
+         */
+        const callChat = async (payload) => {
+          const headers = { "Content-Type": "application/json" };
+          if (window.rlJobWidgetNonce) headers["X-WP-Nonce"] = window.rlJobWidgetNonce;
+
+          const resp = await fetch("/wp-json/jobwidget/v1/chat", {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload)
+          });
+
+          let data = null;
+          try { data = await resp.json(); } catch { data = null; }
+
+          if (!resp.ok) {
+            throw new Error((data && data.message) || `Request failed (${resp.status}).`);
+          }
+          if (!(data && data.choices && data.choices.length)) {
+            throw new Error("The generator returned nothing. Please try again.");
+          }
+          return data.choices[0].message.content.trim();
+        };
+
         let lastCombinedPlain = "";
 
         copyBtn.addEventListener('click', async () => {
@@ -215,13 +267,10 @@ class JobDescriptionWidget extends HTMLElement {
 
           try {
             /* ----- 1) JD call ----- */
-            const jdResp = await fetch("/wp-json/jobwidget/v1/chat", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                model: "gpt-3.5-turbo",
-                messages: [
-                  { role:"system", content:`You are a job-description assistant. Output EXACTLY this format and nothing else:
+            const jdRaw = await callChat({
+              model: "gpt-3.5-turbo",
+              messages: [
+                { role:"system", content:`You are a job-description assistant. Output EXACTLY this format and nothing else:
 
 First line:
 <strong><final title></strong>
@@ -244,22 +293,12 @@ Tool inclusion:
 Additional:
 - Convert typically on-site titles to remote equivalents when needed (e.g., Receptionist → Virtual Receptionist).
 - Avoid duplicate bullets.` },
-                  { role:"user", content: prompt }
-                ],
-                max_tokens: 120,
-                temperature: 0.7
-              })
+                { role:"user", content: prompt }
+              ],
+              max_tokens: 120,
+              temperature: 0.7
             });
-            const jdData = await jdResp.json();
 
-            if (!(jdData.choices && jdData.choices.length)) {
-              resultInner.innerHTML = `<div class="result-title"><strong>(No output received)</strong></div>`;
-              resultBox.style.display = "block";
-              lastCombinedPlain = "";
-              return;
-            }
-
-            const jdRaw = jdData.choices[0].message.content.trim();
             const { title, bullets: descBullets } = parseJDOutput(jdRaw);
 
             /* ----- 2) Traits call (9–12 lines, highly relevant only) ----- */
@@ -276,21 +315,15 @@ FORMAT RULES (strict):
 - No discriminatory characteristics (age, gender, etc.)
 - No duplicates or near-duplicates`;
 
-            const traitsResp = await fetch("/wp-json/jobwidget/v1/chat", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                model: "gpt-3.5-turbo",
-                messages: [
-                  { role:"system", content:"You are a recruiting assistant. Output ONLY the bullet list requested — one trait per line." },
-                  { role:"user", content: traitsPrompt }
-                ],
-                max_tokens: 220,
-                temperature: 0.35
-              })
+            const traitsRaw = await callChat({
+              model: "gpt-3.5-turbo",
+              messages: [
+                { role:"system", content:"You are a recruiting assistant. Output ONLY the bullet list requested — one trait per line." },
+                { role:"user", content: traitsPrompt }
+              ],
+              max_tokens: 220,
+              temperature: 0.35
             });
-            const traitsData = await traitsResp.json();
-            const traitsRaw = (traitsData.choices && traitsData.choices[0]?.message?.content || "").trim();
             const traits = parseTraitsText(traitsRaw);
 
             /* ----- 3) Render combined ----- */

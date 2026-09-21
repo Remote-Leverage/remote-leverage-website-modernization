@@ -27,6 +27,7 @@ All project documentation lives here. Start with the [repository README](../../.
 | [domains/partner-hub.md](domains/partner-hub.md) | `rl_partner` CPT, co-branded hubs, CPT-backed partner directory |
 | [domains/content-audit.md](domains/content-audit.md) | Elementor audit/conversion, blog import, Yoast meta import, block inventory |
 | [domains/sync.md](domains/sync.md) | Environment-to-environment dataset transfer |
+| [domains/tools.md](domains/tools.md) | OpenAI proxy behind the legacy browser tool pages |
 | [stripe-payments.md](stripe-payments.md) | `app/Domains/Payment` — Stripe deposit/checkout gateway, funnel telemetry |
 | [social-media-kit.md](social-media-kit.md) | `/social-media-kit/` route — email-signature generator + brand asset library (ported `rl-social-kit`); the sole home of signature generation since 2026-09-15 |
 

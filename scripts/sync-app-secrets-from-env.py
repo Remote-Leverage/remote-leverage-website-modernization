@@ -115,6 +115,17 @@ ALLOWLIST = [
     "SENTRY_LARAVEL_DSN",
     # AI
     "GEMINI_API_KEY",
+    # Legacy browser tools (config/job-widget.php) — the OpenAI proxy behind the vastore5 job
+    # description generator and the other Elementor-era tool pages. Unset means the REST routes
+    # are never registered and every one of those widgets stays dark, so this is the one key
+    # that turns them on. Same variable config/ai.php reads; there is deliberately not a second.
+    "OPENAI_API_KEY",
+    # The proxy's kill switch and its rate-limit ceiling, on the same reasoning as the marketing
+    # alert switches above: this script is the only path an environment variable has into a
+    # running task, and a limit that needs a deploy to loosen is no use on the day a real
+    # visitor is being turned away by it.
+    "JOB_WIDGET_PROXY_ENABLED",
+    "JOB_WIDGET_RATE_LIMIT",
     # ai-content-agent capability flags (config/ai-wordpress.php). Not secrets, but they ride
     # with the rest of the container env, and ContentAgentProvisioner reconciles against them
     # on every deploy — so leaving one unset actively revokes the capability rather than

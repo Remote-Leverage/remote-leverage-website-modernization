@@ -471,6 +471,15 @@ if (! function_exists('sanitize_text_field')) {
     }
 }
 
+if (! function_exists('sanitize_file_name')) {
+    function sanitize_file_name($filename)
+    {
+        $filename = preg_replace('/[^A-Za-z0-9._-]/', '', (string) $filename);
+
+        return trim((string) $filename, '.-_');
+    }
+}
+
 if (! function_exists('absint')) {
     function absint($maybeint)
     {
@@ -667,7 +676,17 @@ if (! function_exists('config')) {
 if (! class_exists('WP_Error')) {
     class WP_Error
     {
-        public function __construct(protected string $code = '', protected string $message = '') {}
+        /*
+         * The third argument is not decoration: every WP_Error the theme returns from a REST
+         * callback carries `['status' => n]` there, and that is what WordPress turns into the
+         * HTTP status. Dropping it — as this stub did until 2026-09-21 — makes a test that
+         * asserts a 429 or a 413 impossible to write.
+         */
+        public function __construct(
+            protected string $code = '',
+            protected string $message = '',
+            protected mixed $data = '',
+        ) {}
 
         public function get_error_message(): string
         {
@@ -677,6 +696,11 @@ if (! class_exists('WP_Error')) {
         public function get_error_code(): string
         {
             return $this->code;
+        }
+
+        public function get_error_data($code = '')
+        {
+            return $this->data === '' ? null : $this->data;
         }
     }
 }
