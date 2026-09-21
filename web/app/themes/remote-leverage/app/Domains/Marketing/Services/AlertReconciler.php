@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Marketing\Services;
 
+use App\Domains\Marketing\Data\Finding;
+
 /**
  * Checks the alert's own numbers against each other before it is allowed to say them.
  *
@@ -56,6 +58,23 @@ class AlertReconciler
      */
     public function check(array $facts): array
     {
+        return array_map(
+            static fn (Finding $finding): string => $finding->text,
+            $this->findings($facts),
+        );
+    }
+
+    /**
+     * The same findings, each carrying the key a dismissal is recorded against.
+     *
+     * This is the real method; {@see self::check()} is the text-only view of it, kept because
+     * most callers and every assertion about wording only want the sentences.
+     *
+     * @param  array<string, mixed>  $facts
+     * @return array<int, Finding>
+     */
+    public function findings(array $facts): array
+    {
         $findings = [];
 
         $lastLead = $facts['last_lead_minutes'] ?? null;
@@ -77,12 +96,12 @@ class AlertReconciler
          * check: it teaches people that the warnings at the top of the message are noise.
          */
         if (($facts['leads'] ?? 0) === 0 && ($facts['bookings'] ?? 0) > 0) {
-            $findings[] = sprintf(
+            $findings[] = Finding::daily('bookings-without-leads', sprintf(
                 '%d bookings today and not one new lead. Every one of them would have to be an older '.
                 'lead booking late — possible, but this is also what a broken capture path looks like '.
                 'while the calendar keeps working.',
                 (int) $facts['bookings'],
-            );
+            ));
         }
 
         /*
@@ -102,12 +121,12 @@ class AlertReconciler
          * exactly the same silence, and nothing else would report it.
          */
         if (($facts['booked_by_status'] ?? 0) > 0 && ($facts['bookings'] ?? 0) === 0) {
-            $findings[] = sprintf(
+            $findings[] = Finding::daily('booked-status-without-events', sprintf(
                 '%d leads captured today are marked booked, but no booking event was recorded. Either '.
                 'these are imported rows that never passed through the site, or booking logging has '.
                 'stopped — every count and cost figure below is reading zero bookings either way.',
                 (int) $facts['booked_by_status'],
-            );
+            ));
         }
 
         /*
@@ -121,12 +140,12 @@ class AlertReconciler
          * how the slices are built cannot quietly desynchronise the table from its own total.
          */
         if (($facts['platform_bookings'] ?? 0) !== ($facts['bookings'] ?? 0)) {
-            $findings[] = sprintf(
+            $findings[] = Finding::daily('platform-bookings-mismatch', sprintf(
                 'Platform rows account for %d bookings but the total is %d. The per-platform costs '.
                 'below are dividing spend by the wrong denominator.',
                 (int) ($facts['platform_bookings'] ?? 0),
                 (int) ($facts['bookings'] ?? 0),
-            );
+            ));
         }
 
         /*
@@ -139,12 +158,12 @@ class AlertReconciler
         $stale = (int) config('marketing.cost_alert.stale_lead_minutes', 180);
 
         if (($facts['within_window'] ?? false) && $lastLead !== null && $lastLead > $stale) {
-            $findings[] = sprintf(
+            $findings[] = Finding::daily('stale-leads', sprintf(
                 'No new lead for %dm during the working day, past the %dm threshold. Check the forms '.
                 'and the ad accounts are still live.',
                 $lastLead,
                 $stale,
-            );
+            ));
         }
 
         /*
@@ -155,8 +174,11 @@ class AlertReconciler
          * the gap where the money should be does not read as a day with no spend.
          */
         if (($facts['warehouse_unavailable'] ?? false) === true) {
-            $findings[] = 'The marketing warehouse did not answer, so spend, cost per booking and the '.
-                'channel breakdown are all missing. The funnel figures below come from this site and are unaffected.';
+            $findings[] = Finding::daily(
+                'warehouse-unavailable',
+                'The marketing warehouse did not answer, so spend, cost per booking and the '.
+                'channel breakdown are all missing. The funnel figures below come from this site and are unaffected.',
+            );
         }
 
         /*
@@ -175,26 +197,30 @@ class AlertReconciler
          * September five of these accumulated unnoticed, and the one that surfaced them did so
          * only because a warehouse gap was being investigated for an unrelated reason.
          */
-        $withoutMeeting = array_values(array_filter(
-            (array) ($facts['bookings_without_meeting'] ?? []),
-            static fn ($name): bool => is_string($name) && trim($name) !== '',
-        ));
+        /*
+         * One finding per person, not one listing everybody.
+         *
+         * A grouped sentence cannot be dismissed: the dismissal is per lead — you have rung
+         * Marvin, not "the three of them" — and a sentence naming all three would go on naming a
+         * dismissed one. So each is its own finding, keyed on the lead, and each disappears when
+         * it has been dealt with.
+         */
+        foreach ((array) ($facts['bookings_without_meeting'] ?? []) as $leadId => $name) {
+            $name = is_string($name) ? trim($name) : '';
 
-        if ($withoutMeeting !== []) {
-            $findings[] = count($withoutMeeting) === 1
-                ? sprintf(
+            if ($name === '') {
+                continue;
+            }
+
+            $findings[] = Finding::settled(
+                'booking-no-meeting:'.$leadId,
+                sprintf(
                     '%s is marked booked with no meeting on any calendar. Nothing was created at Calendly '.
                     'or Google, so no consultant is expecting them and they have been told otherwise. '.
                     'This needs a call, not a fix.',
-                    $withoutMeeting[0],
-                )
-                : sprintf(
-                    '%d bookings are marked booked with no meeting on any calendar — %s. Nothing was created '.
-                    'at Calendly or Google, so no consultant is expecting them and they have been told '.
-                    'otherwise. These need calls, not a fix.',
-                    count($withoutMeeting),
-                    self::plainList($withoutMeeting),
-                );
+                    $name,
+                ),
+            );
         }
 
         /*
@@ -256,23 +282,23 @@ class AlertReconciler
             $tolerance = max(3, (int) ceil(max($warehouseBookings, $siteBookings) * 0.25));
 
             if ($warehouseBookings - $siteBookings > $tolerance) {
-                $findings[] = sprintf(
+                $findings[] = Finding::daily('warehouse-ahead-of-site', sprintf(
                     'The warehouse reports %d bookings %s and this site recorded only %d. The warehouse counts '.
                     'RecruitCRM deals, which normally lag this site rather than lead it, so a surplus there is '.
                     'either booking logging having stopped here or deals created outside the site.',
                     $warehouseBookings,
                     $when,
                     $siteBookings,
-                );
+                ));
             } elseif ($warehouseBookings === 0 && $siteBookings > $tolerance) {
-                $findings[] = sprintf(
+                $findings[] = Finding::daily('warehouse-reports-nothing', sprintf(
                     'The warehouse reports no bookings %s while this site recorded %d. The two count different '.
                     'things — deals created against bookings taken — but not one deal against %d of them means '.
                     'the CRM intake has stopped, and every cost per booking above divides by zero.',
                     $when,
                     $siteBookings,
                     $siteBookings,
-                );
+                ));
             }
         }
 
@@ -291,11 +317,11 @@ class AlertReconciler
         $maxAge = (int) config('marketing.cost_alert.max_warehouse_age_minutes', 90);
 
         if (is_int($age) && $age > $maxAge) {
-            $findings[] = sprintf(
+            $findings[] = Finding::daily('warehouse-stale', sprintf(
                 'The warehouse last refreshed %s ago. Every cost figure above is from that moment, '.
                 'not from now, however recent the timestamp on this card looks.',
                 self::humanMinutes($age),
-            );
+            ));
         }
 
         /*
@@ -308,13 +334,16 @@ class AlertReconciler
         $stalePlatforms = (array) ($facts['stale_platforms'] ?? []);
 
         if ($stalePlatforms !== []) {
-            $findings[] = sprintf(
+            $findings[] = Finding::daily('platforms-still-reporting', sprintf(
                 '%s still reporting, so spend is understated and every cost per booking above is '.
                 'lower than the real one. Treat them as a floor.',
                 self::andList($stalePlatforms),
-            );
+            ));
         } elseif (($facts['spend_pending'] ?? false) === true) {
-            $findings[] = 'Spend for this day is still settling, so the cost figures above may move.';
+            $findings[] = Finding::daily(
+                'spend-pending',
+                'Spend for this day is still settling, so the cost figures above may move.',
+            );
         }
 
         return $findings;
@@ -328,25 +357,6 @@ class AlertReconciler
         }
 
         return intdiv($minutes, 60).'h '.($minutes % 60).'m';
-    }
-
-    /**
-     * "Ada", "Ada and Grace", "Ada, Grace and Marvin" — no verb attached.
-     *
-     * Separate from {@see self::andList()}, which appends "is"/"are" for the stale-platform
-     * sentence and reads wrong anywhere the list is not the end of a clause.
-     *
-     * @param  array<int, string>  $items
-     */
-    private static function plainList(array $items): string
-    {
-        if (count($items) === 1) {
-            return $items[0];
-        }
-
-        $last = array_pop($items);
-
-        return implode(', ', $items).' and '.$last;
     }
 
     /**

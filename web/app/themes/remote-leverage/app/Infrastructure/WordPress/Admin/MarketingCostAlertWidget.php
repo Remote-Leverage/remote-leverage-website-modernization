@@ -6,8 +6,10 @@ namespace App\Infrastructure\WordPress\Admin;
 
 use App\Domains\Marketing\Actions\SendCostAlertAction;
 use App\Domains\Marketing\Data\ChannelDay;
+use App\Domains\Marketing\Data\Finding;
 use App\Domains\Marketing\Data\FunnelSnapshot;
 use App\Domains\Marketing\Gateways\BigQueryClient;
+use App\Domains\Marketing\Services\FindingDismissals;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Log;
@@ -48,6 +50,9 @@ class MarketingCostAlertWidget
 
     /** The `rl_action` value that fires an immediate send. */
     public const SEND_ACTION = 'rl_send_cost_alert';
+
+    /** The `rl_action` value that dismisses one finding, or puts a dismissed one back. */
+    public const DISMISS_ACTION = 'rl_dismiss_cost_finding';
 
     /** admin-ajax action that runs the send and streams its outcome back as JSON. */
     public const SEND_AJAX = 'rl_cost_alert_send';
@@ -106,6 +111,54 @@ class MarketingCostAlertWidget
          * the only thing being communicated is one word.
          */
         wp_safe_redirect(add_query_arg('rl_cost_alert', $result, admin_url('index.php')));
+        exit;
+    }
+
+    /**
+     * Dismiss a finding, or put a dismissed one back.
+     *
+     * Both directions through one handler because they are the same decision seen twice, and a
+     * separate "undo" endpoint would be a second thing to protect and get wrong.
+     *
+     * The key is not validated against the live findings on purpose. A finding that has just
+     * stopped firing — the warehouse answered on the run between the card and the click — is
+     * exactly the one somebody is most likely to be dismissing, and refusing it because it is no
+     * longer listed would read as the button being broken. An unknown key costs one unused row
+     * that expires on its own.
+     */
+    public function handleDismiss(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_die('You do not have permission to change the marketing cost alert.');
+        }
+
+        check_admin_referer(self::DISMISS_ACTION);
+
+        $key = trim((string) ($_REQUEST['rl_finding'] ?? ''));
+        $restore = ($_REQUEST['rl_restore'] ?? '') === '1';
+        $dismissals = app(FindingDismissals::class);
+
+        if ($key !== '') {
+            if ($restore) {
+                $dismissals->restore($key);
+            } else {
+                /*
+                 * The wording and the scope come from the request because the finding is not
+                 * recomputed here — doing that would mean a full snapshot, twenty-five queries
+                 * and a warehouse round trip, to service a button. Neither value is trusted for
+                 * anything that matters: the scope is re-read from the live finding every time
+                 * `partition()` runs, so a forged `permanent` cannot make a daily finding
+                 * permanent, and the text is only ever echoed back to the dashboard escaped.
+                 */
+                $dismissals->dismiss(new Finding(
+                    $key,
+                    trim((string) ($_REQUEST['rl_finding_text'] ?? '')),
+                    ($_REQUEST['rl_permanent'] ?? '') === '1',
+                ));
+            }
+        }
+
+        wp_safe_redirect(add_query_arg('rl_cost_alert', $restore ? 'restored' : 'dismissed', admin_url('index.php')));
         exit;
     }
 
@@ -238,19 +291,117 @@ class MarketingCostAlertWidget
      */
     private function renderWarnings(FunnelSnapshot $snapshot): void
     {
-        if ($snapshot->warnings === []) {
+        $live = $snapshot->findings;
+        $dismissed = $snapshot->dismissedFindings;
+
+        /*
+         * Fall back to the plain sentences when a cached snapshot predates the keys. The widget
+         * reads whatever the last hourly warm left behind, so for up to an hour after a deploy
+         * that is a snapshot with `warnings` and no `findings`, and rendering nothing would look
+         * like the warnings had been fixed.
+         */
+        if ($live === [] && $snapshot->warnings !== []) {
+            $live = array_map(
+                static fn (string $warning): array => ['key' => '', 'text' => $warning],
+                $snapshot->warnings,
+            );
+        }
+
+        if ($live === [] && $dismissed === []) {
             return;
         }
 
+        if ($live !== []) { ?>
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px;margin-bottom:16px;">
+                <div class="rl-dash-kpi-label" style="color:#b91c1c !important;">Check before trusting these numbers</div>
+                <ul style="margin:8px 0 0;padding-left:18px;font-size:12px;color:#7f1d1d;list-style:disc;">
+                    <?php foreach ($live as $finding) { ?>
+                        <li style="margin-bottom:6px;">
+                            <?php echo esc_html((string) ($finding['text'] ?? '')); ?>
+                            <?php if (($finding['key'] ?? '') !== '') {
+                                $this->renderDismissButton($finding, false);
+                            } ?>
+                        </li>
+                    <?php } ?>
+                </ul>
+            </div>
+        <?php }
+
+        if ($dismissed === []) {
+            return;
+        }
+
+        /*
+         * Dismissed findings stay on the screen, greyed, with who cleared them and when.
+         *
+         * Hiding them would make the dashboard disagree with itself — somebody would see a clean
+         * card, and no way to find out that a warning had been cleared or by whom, or to put it
+         * back. The point of a dismissal is to stop the notification, not to erase the record.
+         */
         ?>
-        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px;margin-bottom:16px;">
-            <div class="rl-dash-kpi-label" style="color:#b91c1c !important;">Check before trusting these numbers</div>
-            <ul style="margin:8px 0 0;padding-left:18px;font-size:12px;color:#7f1d1d;">
-                <?php foreach ($snapshot->warnings as $warning) { ?>
-                    <li style="margin-bottom:4px;"><?php echo esc_html($warning); ?></li>
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:16px;">
+            <div class="rl-dash-kpi-label" style="color:#6b7280 !important;">Dismissed</div>
+            <ul style="margin:8px 0 0;padding-left:18px;font-size:12px;color:#9ca3af;list-style:disc;">
+                <?php foreach ($dismissed as $finding) { ?>
+                    <li style="margin-bottom:6px;">
+                        <span style="text-decoration:line-through;"><?php echo esc_html((string) ($finding['text'] ?? '')); ?></span>
+                        <?php echo esc_html($this->dismissedNote($finding)); ?>
+                        <?php $this->renderDismissButton($finding, true); ?>
+                    </li>
                 <?php } ?>
             </ul>
         </div>
+        <?php
+    }
+
+    /**
+     * "— cleared by Adrián, 14:20, returns tomorrow".
+     *
+     * Saying when it comes back is the part that matters: a daily dismissal quietening today and
+     * a permanent one settling the matter look identical once the row is grey, and somebody
+     * needs to know which of the two they are looking at without reading the source.
+     *
+     * @param  array<string, mixed>  $finding
+     */
+    private function dismissedNote(array $finding): string
+    {
+        $by = trim((string) ($finding['by'] ?? ''));
+        $at = trim((string) ($finding['at'] ?? ''));
+
+        $when = '';
+
+        if ($at !== '') {
+            try {
+                $when = CarbonImmutable::parse($at)->format('H:i');
+            } catch (\Throwable) {
+                $when = '';
+            }
+        }
+
+        $parts = array_filter([
+            $by !== '' ? 'cleared by '.$by : 'cleared',
+            $when,
+            ($finding['permanent'] ?? false) ? 'settled' : 'returns tomorrow',
+        ]);
+
+        return '— '.implode(', ', $parts);
+    }
+
+    /** @param  array<string, mixed>  $finding */
+    private function renderDismissButton(array $finding, bool $restore): void
+    {
+        ?>
+        <form method="post" action="<?php echo esc_url(admin_url('admin.php')); ?>" style="display:inline;">
+            <?php wp_nonce_field(self::DISMISS_ACTION); ?>
+            <input type="hidden" name="rl_action" value="<?php echo esc_attr(self::DISMISS_ACTION); ?>" />
+            <input type="hidden" name="rl_finding" value="<?php echo esc_attr((string) ($finding['key'] ?? '')); ?>" />
+            <input type="hidden" name="rl_finding_text" value="<?php echo esc_attr((string) ($finding['text'] ?? '')); ?>" />
+            <input type="hidden" name="rl_permanent" value="<?php echo ($finding['permanent'] ?? false) ? '1' : '0'; ?>" />
+            <input type="hidden" name="rl_restore" value="<?php echo $restore ? '1' : '0'; ?>" />
+            <button type="submit" class="button-link" style="font-size:11px;vertical-align:baseline;">
+                <?php echo $restore ? 'Undo' : 'Dismiss'; ?>
+            </button>
+        </form>
         <?php
     }
 

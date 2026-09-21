@@ -8,12 +8,14 @@ use App\Domains\Lead\Services\LeadQualification;
 use App\Domains\Lead\Services\SlackMessageRenderer;
 use App\Domains\Marketing\Actions\SendCostAlertAction;
 use App\Domains\Marketing\Data\DaySupplement;
+use App\Domains\Marketing\Data\Finding;
 use App\Domains\Marketing\Data\FunnelSnapshot;
 use App\Domains\Marketing\Data\MarketingDay;
 use App\Domains\Marketing\Data\PartialDay;
 use App\Domains\Marketing\Data\PlatformSlice;
 use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Services\AlertReconciler;
+use App\Domains\Marketing\Services\FindingDismissals;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use App\Domains\Marketing\Support\AdPlatformCredentials;
 use App\Domains\Marketing\Support\AlertWindow;
@@ -351,19 +353,49 @@ describe('reconciliation', function () {
             ->and($findings[0])->toContain('This needs a call');
     });
 
-    test('several of them are listed by name and lead the card', function () use ($clean) {
-        $findings = (new AlertReconciler)->check([
+    test('several of them are one finding each, so they can be dismissed one at a time', function () use ($clean) {
+        $findings = (new AlertReconciler)->findings([
             ...$clean,
             // Also a wide warehouse surplus, to pin the ordering: a person to call outranks a
             // number to reconcile.
             'warehouse_bookings' => 40,
-            'bookings_without_meeting' => ['Susan Ornstein', 'Virji Angelo', 'Patrick Chism'],
+            'bookings_without_meeting' => [
+                4301 => 'Virji Angelo',
+                4302 => 'Susan Ornstein',
+                4213 => 'Patrick Chism',
+            ],
         ]);
 
-        expect($findings)->toHaveCount(2)
-            ->and($findings[0])->toContain('3 bookings are marked booked')
-            ->and($findings[0])->toContain('Susan Ornstein, Virji Angelo and Patrick Chism')
-            ->and($findings[1])->toContain('warehouse reports 40 bookings');
+        /*
+         * One sentence each rather than one listing all three. A grouped sentence cannot be
+         * dismissed: the dismissal is per lead, and the sentence would go on naming somebody who
+         * had already been rung.
+         */
+        expect($findings)->toHaveCount(4)
+            ->and(array_map(static fn ($f) => $f->key, $findings))->toBe([
+                'booking-no-meeting:4301',
+                'booking-no-meeting:4302',
+                'booking-no-meeting:4213',
+                'warehouse-ahead-of-site',
+            ])
+            ->and($findings[0]->text)->toContain('Virji Angelo is marked booked')
+            ->and($findings[3]->text)->toContain('warehouse reports 40 bookings');
+    });
+
+    test('a person is settled once dealt with; a day-level finding is not', function () use ($clean) {
+        $findings = (new AlertReconciler)->findings([
+            ...$clean,
+            'warehouse_bookings' => 40,
+            'bookings_without_meeting' => [4343 => 'Marvin Rodriguez'],
+        ]);
+
+        /*
+         * The safety model. Ringing Marvin does not change the row, so dismissing that settles
+         * it for good; the warehouse disagreeing is the state of a day, and silencing next
+         * month's occurrence from today's dashboard is exactly what must not be possible.
+         */
+        expect($findings[0]->permanent)->toBeTrue()
+            ->and($findings[1]->permanent)->toBeFalse();
     });
 
     test('bookings that all name a real meeting say nothing', function () use ($clean) {
@@ -633,6 +665,37 @@ describe('metrics', function () {
         // The newest Scheduling row is the one that counts, or every landed retry would be
         // reported for the attempt before it.
         expect(phantomBookingFinding((new FunnelMetricsService)->snapshot($now)->warnings))->toBeNull();
+    });
+
+    test('a dismissed finding stops reaching the card, and stays visible as dismissed', function () {
+        $now = CarbonImmutable::parse('2026-09-18 15:00:00', 'UTC');
+
+        $lead = costAlertLead(['name' => 'Marvin Rodriguez', 'created_at' => $now->subHours(2)]);
+        costAlertBooking($lead, $now->subHour());
+        schedulingMeeting($lead, $now->subHour(), 'gcal_6ab1450a4b7021.28353181');
+
+        update_option(FindingDismissals::OPTION, []);
+
+        expect(phantomBookingFinding((new FunnelMetricsService)->snapshot($now)->warnings))->not->toBeNull();
+
+        // What the Dismiss button does.
+        (new FindingDismissals)->dismiss(
+            new Finding('booking-no-meeting:'.$lead->id, 'Marvin Rodriguez is marked booked…', permanent: true),
+            $now,
+        );
+
+        $snapshot = (new FunnelMetricsService)->snapshot($now);
+
+        /*
+         * Out of `warnings`, which is what the Slack card renders — the point of the button is to
+         * stop the notification. Still in `dismissedFindings`, which is what the dashboard shows
+         * greyed with an undo, because a warning that vanishes without trace is its own problem.
+         */
+        expect(phantomBookingFinding($snapshot->warnings))->toBeNull()
+            ->and($snapshot->dismissedFindings)->toHaveCount(1)
+            ->and($snapshot->dismissedFindings[0]['key'])->toBe('booking-no-meeting:'.$lead->id);
+
+        update_option(FindingDismissals::OPTION, []);
     });
 
     test('an instant live call is not reported as a booking with no meeting', function () {

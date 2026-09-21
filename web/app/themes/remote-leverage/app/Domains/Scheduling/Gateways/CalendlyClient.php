@@ -912,9 +912,15 @@ class CalendlyClient
      */
     public function cancelScheduledEvent(string $eventUriOrUuid, string $reason = 'Rescheduled to a new time.'): bool
     {
-        $uuid = str_starts_with($eventUriOrUuid, 'http')
-            ? basename(rtrim($eventUriOrUuid, '/'))
-            : $eventUriOrUuid;
+        $uuid = self::scheduledEventUuid($eventUriOrUuid);
+
+        if ($uuid === null) {
+            Log::warning('CalendlyClient: cannot cancel, no scheduled event id in the reference', [
+                'reference' => $eventUriOrUuid,
+            ]);
+
+            return false;
+        }
 
         try {
             $response = $this->sendWithFailover(
@@ -940,6 +946,48 @@ class CalendlyClient
 
             return false;
         }
+    }
+
+    /**
+     * The scheduled *event* uuid out of whatever the booking log happens to hold.
+     *
+     * This is the whole of why cancellation never worked. `meeting_id` is not one shape: the
+     * dedupe path stores a scheduled event uri, because `findExistingInvitee()` returns an event
+     * resource, while the ordinary booking path stores the **invitee** uri that `createInvitee()`
+     * answers with -
+     *
+     *     https://api.calendly.com/scheduled_events/{event}/invitees/{invitee}
+     *
+     * and almost every booking goes through the second one. `basename()` took the last segment,
+     * so the cancellation was addressed to `/scheduled_events/{invitee}/cancellation` — a uuid
+     * that is real but is not an event. Calendly answers 404, `sendWithFailover` reads a 404 as
+     * "this token's account does not own this event" and rotates, every token in the pool answers
+     * the same way, and the pool is exhausted. The log then reads
+     *
+     *     token [x@…] returned 404, may belong to a different account, failing over
+     *
+     * once per token, which is indistinguishable from a credential or permissions problem and is
+     * what sent us looking for a missing one. Nothing was missing.
+     *
+     * Reading the segment after `scheduled_events` handles both shapes, and keeps handling the
+     * rows already written in either of them — which matters, because this path only ever runs
+     * against bookings logged earlier.
+     */
+    private static function scheduledEventUuid(string $reference): ?string
+    {
+        $reference = trim($reference);
+
+        if ($reference === '') {
+            return null;
+        }
+
+        if (preg_match('~/scheduled_events/([^/?#]+)~', $reference, $matches) === 1) {
+            return $matches[1];
+        }
+
+        // A bare id. Whether it names an event or an invitee cannot be told from here, so it is
+        // passed through as given rather than guessed at.
+        return str_starts_with($reference, 'http') ? null : $reference;
     }
 
     /**

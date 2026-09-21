@@ -74,6 +74,25 @@ readonly class FunnelSnapshot
         public array $upcomingConsultations,
         public array $baseline,
         public array $warnings,
+
+        /**
+         * The same live findings, each with the key a dismissal is recorded against.
+         *
+         * Parallel to `$warnings` rather than replacing it: the card and every assertion about
+         * wording want the sentences, and only the dashboard needs something to hang a button on.
+         *
+         * @var array<int, array{key: string, text: string}>
+         */
+        public array $findings = [],
+
+        /**
+         * Findings somebody has already dealt with, carried so the dashboard can show them muted
+         * with an undo. They are computed exactly like the live ones and then set aside; a
+         * dismissal that removed them outright would be unreviewable.
+         *
+         * @var array<int, array<string, mixed>>
+         */
+        public array $dismissedFindings = [],
         public array $unattributedByChannel = [],
 
         /*
@@ -163,6 +182,8 @@ readonly class FunnelSnapshot
             'supplement' => $this->supplement?->toArray(),
             'baseline' => $this->baseline,
             'warnings' => $this->warnings,
+            'findings' => $this->findings,
+            'dismissed_findings' => $this->dismissedFindings,
             'unattributed_by_channel' => $this->unattributedByChannel,
         ];
     }
@@ -219,6 +240,8 @@ readonly class FunnelSnapshot
                 : null,
             baseline: (array) ($data['baseline'] ?? []),
             warnings: (array) ($data['warnings'] ?? []),
+            findings: (array) ($data['findings'] ?? []),
+            dismissedFindings: (array) ($data['dismissed_findings'] ?? []),
             unattributedByChannel: (array) ($data['unattributed_by_channel'] ?? []),
         );
     }

@@ -128,6 +128,19 @@ class MarketingServiceProvider extends ServiceProvider
         });
 
         /*
+         * Dismissing a finding, and undoing that. Same lazy check and the same reason: this is a
+         * button almost nobody presses, and resolving the widget to find that out would pull the
+         * warehouse client into every admin request.
+         */
+        \add_action('admin_init', function () {
+            if (($_REQUEST['rl_action'] ?? '') !== MarketingCostAlertWidget::DISMISS_ACTION) {
+                return;
+            }
+
+            $this->app->make(MarketingCostAlertWidget::class)->handleDismiss();
+        });
+
+        /*
          * The same send, over AJAX, plus a poll for how far it has got.
          *
          * Same lazy-resolution rule as above, and it matters more here: the progress endpoint is

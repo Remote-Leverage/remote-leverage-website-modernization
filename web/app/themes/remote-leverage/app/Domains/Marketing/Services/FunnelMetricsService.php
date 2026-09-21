@@ -10,6 +10,7 @@ use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Services\LeadChannel;
 use App\Domains\Lead\Services\LeadPlatform;
 use App\Domains\Lead\Services\LeadQualification;
+use App\Domains\Marketing\Data\Finding;
 use App\Domains\Marketing\Data\FunnelSnapshot;
 use App\Domains\Marketing\Data\PlatformSlice;
 use App\Domains\Marketing\Gateways\BigQueryClient;
@@ -78,6 +79,7 @@ class FunnelMetricsService
     public function __construct(
         private readonly ?AlertReconciler $reconciler = null,
         private readonly ?BigQueryClient $warehouse = null,
+        private readonly ?FindingDismissals $dismissals = null,
     ) {}
 
     /** Where the dashboard widget's copy of the snapshot lives. */
@@ -307,7 +309,7 @@ class FunnelMetricsService
             $platforms,
         ));
 
-        $warnings = ($this->reconciler ?? new AlertReconciler)->check([
+        $found = ($this->reconciler ?? new AlertReconciler)->findings([
             'leads' => $leadCount,
             'bookings' => $bookedLeads->count(),
             'last_lead_minutes' => $lastLeadMinutes,
@@ -361,6 +363,19 @@ class FunnelMetricsService
             'warehouse_unavailable' => $marketingDay === null,
         ]);
 
+        /*
+         * Findings somebody has already dealt with drop out here, once, so the alert and the
+         * dashboard cannot disagree about what is outstanding. The dismissed ones travel on to
+         * the widget, which shows them muted — dropping them entirely would make a dismissal
+         * unreviewable and unundoable.
+         */
+        $partitioned = ($this->dismissals ?? new FindingDismissals)->partition($found, $now);
+
+        $warnings = array_map(
+            static fn (Finding $finding): string => $finding->text,
+            $partitioned['live'],
+        );
+
         return new FunnelSnapshot(
             generatedAt: $now,
             timezone: $timezone,
@@ -385,6 +400,15 @@ class FunnelMetricsService
             upcomingConsultations: $upcomingConsultations,
             baseline: $baseline,
             warnings: $warnings,
+            findings: array_map(
+                static fn (Finding $finding): array => [
+                    'key' => $finding->key,
+                    'text' => $finding->text,
+                    'permanent' => $finding->permanent,
+                ],
+                $partitioned['live'],
+            ),
+            dismissedFindings: $partitioned['dismissed'],
 
             marketingDay: $marketingDay,
             todaySoFar: $todaySoFar,
@@ -757,7 +781,8 @@ class FunnelMetricsService
      * They are matched rather than removed from history because the rows are already written —
      * and because a list keyed on the fabrication is exact, where one keyed on "no deal" is not.
      *
-     * @return array<int, string> Lead names, newest booking first.
+     * @return array<int, string> Lead name keyed by lead id, newest booking first. Keyed because
+     *                            a dismissal is recorded per lead — see Finding.
      */
     private function bookingsWithoutMeeting(CarbonImmutable $fromUtc, CarbonImmutable $toUtc): array
     {
@@ -829,10 +854,9 @@ class FunnelMetricsService
         return Lead::query()
             ->whereIn('id', $unverified)
             ->orderByDesc('created_at')
-            ->pluck('name')
+            ->pluck('name', 'id')
             ->map(static fn ($name): string => trim((string) $name))
             ->filter(static fn (string $name): bool => $name !== '')
-            ->values()
             ->all();
     }
 
