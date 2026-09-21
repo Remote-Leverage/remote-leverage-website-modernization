@@ -40,10 +40,40 @@ return [
          * A hard off switch, independent of the environment list above. Null means "defer to
          * `environments`", which is the normal state; setting it false stops the alert in
          * production without editing the list.
+         *
+         * **Blank counts as unset, for the same reason as the channel above.** This read
+         * `env(...) !== null`, and an empty string is not null: a variable mapped with no value
+         * became `filter_var('', FILTER_VALIDATE_BOOL)`, which is `false`, which is an explicit
+         * "off" that wins outright over the environment list. ECS maps a Secrets Manager key that
+         * happens to be blank exactly that way, and the channel entry three lines up already
+         * warns about it — this one did not defend against it.
+         *
+         * The consequence was not a skipped run. `MarketingServiceProvider` unschedules the
+         * hourly event when this reads false and only re-adds it when it reads true, so one such
+         * boot removed the job from WP-Cron and nothing ever put it back: no card, no error, and
+         * nothing in the cron list to suggest a card was ever expected. On 2026-09-21 that meant
+         * somebody fired every hourly alert by hand for most of a day, because the dashboard
+         * button passes `force` and bypasses this entirely.
          */
-        'enabled' => env('MARKETING_COST_ALERT_ENABLED') !== null
-            ? filter_var(env('MARKETING_COST_ALERT_ENABLED'), FILTER_VALIDATE_BOOL)
-            : null,
+        'enabled' => (static function () {
+            $raw = env('MARKETING_COST_ALERT_ENABLED');
+
+            /*
+             * Unset, or set to nothing. Both mean "nobody has expressed an opinion", so both
+             * defer to the environment list.
+             *
+             * The string test has to come after the null test and be guarded by `is_string`,
+             * because `env()` casts: `MARKETING_COST_ALERT_ENABLED=false` comes back as the
+             * boolean false, and `(string) false` is `''` — so a naive `trim((string) $raw) === ''`
+             * treats the deliberate off switch as unset and re-enables the alert on an
+             * environment somebody had switched it off on.
+             */
+            if ($raw === null || (is_string($raw) && trim($raw) === '')) {
+                return null;
+            }
+
+            return filter_var($raw, FILTER_VALIDATE_BOOL);
+        })(),
 
         /*
          * Where it posts.

@@ -1,6 +1,7 @@
 <?php
 
 use App\Ai\Abilities\ClonePageAbility;
+use App\Ai\Abilities\CostAlertStatusAbility;
 use App\Ai\Abilities\CreateLandingPageAbility;
 use App\Ai\Abilities\DescribePageAbility;
 use App\Ai\Abilities\ErrorLogAbility;
@@ -119,6 +120,11 @@ return [
         // shell on one and every failure path here logs and carries on. REST-only, invoked by
         // `wp acorn rl:logs`, gated on the sync capability the credential already holds.
         ErrorLogAbility::class,
+
+        // Why the hourly cost alert will or will not post here. The gates it reports on live
+        // inside a method that stops being called when they fail, so no amount of logging can
+        // answer this from the outside.
+        CostAlertStatusAbility::class,
 
         // Local↔remote settings/page sync — REST-only, invoked by wp rl:sync:*.
         ExportSyncableSettingsAbility::class,
