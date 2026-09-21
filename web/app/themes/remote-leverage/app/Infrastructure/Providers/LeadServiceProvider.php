@@ -129,6 +129,24 @@ class LeadServiceProvider extends ServiceProvider
                     description: $contactId ? "Synced contact to HubSpot (ID: {$contactId})" : 'HubSpot contact sync failed',
                     payload: ['hubspot_contact_id' => $contactId]
                 );
+
+                /*
+                 * Tell the n8n `hubspot-lead-creation` flow, for a create and for an update
+                 * alike.
+                 *
+                 * It has to be here rather than on an event: the contact id only exists once
+                 * the sync above has returned, so anything listening to `LeadCreated` would
+                 * run before there was a record to link to. Inside the same deferred job, so
+                 * it still costs the visitor nothing, and after the forceFill above, so
+                 * `hubspotContactUrl()` has the id it needs.
+                 *
+                 * `lastContactAction()` is read immediately, while it still describes this
+                 * sync — the gateway is a singleton and the next sync overwrites it.
+                 */
+                if ($contactId) {
+                    app(HandleLeadEventsForWebhook::class)
+                        ->handleHubSpotSynced($event->lead, $gateway->lastContactAction());
+                }
             })->afterResponse();
         });
 
@@ -143,6 +161,13 @@ class LeadServiceProvider extends ServiceProvider
         // 3. Dispatch Outgoing Webhook on LeadCreated (partial) and LeadBookingCompleted (final)
         Event::listen(LeadCreated::class, function (LeadCreated $event) {
             dispatch(static fn () => app(HandleLeadEventsForWebhook::class)->handleCreated($event))->afterResponse();
+        });
+
+        // 3a. The n8n `lead-form` flow — email plus the Eastern capture time. A second listener
+        // rather than a second call inside handleCreated(), so that one flow's endpoint being
+        // unset, slow or down cannot hold up or skip the other's POST.
+        Event::listen(LeadCreated::class, function (LeadCreated $event) {
+            dispatch(static fn () => app(HandleLeadEventsForWebhook::class)->handleLeadFormCaptured($event))->afterResponse();
         });
         Event::listen(LeadBookingCompleted::class, function (LeadBookingCompleted $event) {
             dispatch(static fn () => app(HandleLeadEventsForWebhook::class)->handleBookingCompleted($event))->afterResponse();

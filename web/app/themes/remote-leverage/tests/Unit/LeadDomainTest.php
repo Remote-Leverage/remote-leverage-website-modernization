@@ -403,6 +403,264 @@ describe('Lead Domain', function () {
             ->toBe('https://n8n.srv1338052.hstgr.cloud/webhook/gravityforms-leads');
     });
 
+    test('the lead-form webhook sends the email and the Eastern capture time, on the partial only', function () {
+        config(['services.webhooks.lead_form_url' => 'https://n8n.test/webhook/lead-form']);
+        $GLOBALS['_wp_remote_post_calls'] = [];
+        unset($GLOBALS['_wp_remote_post_response']);
+
+        $listener = new HandleLeadEventsForWebhook(new LeadActivityLogger);
+
+        // 18:33:07 UTC on a July day is 14:33:07 in New York — daylight time, UTC-4. Picked
+        // deliberately: a fixed -05:00 offset would render 13:33:07 here and the assertion
+        // below is what says which reading of "EST" shipped.
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Tomas Lindqvist',
+            'email' => 'tomas@arvoretail.se',
+            'status' => 'captured',
+            'submission_type' => 'Partial',
+        ]);
+
+        // Forced rather than passed to create(): `created_at` is not fillable, so handing it
+        // to create() is silently dropped and the row gets "now" — which would have this test
+        // pass against a hard-coded offset on a summer afternoon and fail in December.
+        $lead->forceFill(['created_at' => Carbon::parse('2026-07-14 18:33:07', 'UTC')])->saveQuietly();
+        $lead->refresh();
+
+        $listener->handleLeadFormCaptured(new LeadCreated($lead, []));
+
+        expect($GLOBALS['_wp_remote_post_calls'])->toHaveCount(1)
+            ->and($GLOBALS['_wp_remote_post_calls'][0]['url'])->toBe('https://n8n.test/webhook/lead-form');
+
+        $body = json_decode((string) $GLOBALS['_wp_remote_post_calls'][0]['args']['body'], true, 512, JSON_THROW_ON_ERROR);
+
+        expect($body['event'])->toBe('lead.form_captured')
+            ->and($body['email'])->toBe('tomas@arvoretail.se')
+            ->and($body['captured_at_est'])->toBe('2026-07-14 14:33:07')
+            ->and($body['captured_at_est_iso'])->toBe('2026-07-14T14:33:07-04:00')
+            ->and($body['captured_at_est_abbreviation'])->toBe('EDT')
+            ->and($body['submission_type'])->toBe('Partial');
+
+        // The completed submission raises LeadCreated again against the same row. This flow is
+        // the capture notification, so the second one is not sent — one POST per lead.
+        $lead->update(['submission_type' => 'Final', 'status' => 'booking_pending']);
+        $listener->handleLeadFormCaptured(new LeadCreated($lead->refresh(), []));
+
+        expect($GLOBALS['_wp_remote_post_calls'])->toHaveCount(1);
+    });
+
+    test('a winter capture reads EST, so the label is not hard-coded', function () {
+        config(['services.webhooks.lead_form_url' => 'https://n8n.test/webhook/lead-form']);
+        $GLOBALS['_wp_remote_post_calls'] = [];
+        unset($GLOBALS['_wp_remote_post_response']);
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Winter Capture',
+            'email' => 'winter@northwind.io',
+            'status' => 'captured',
+            'submission_type' => 'Partial',
+        ]);
+
+        $lead->forceFill(['created_at' => Carbon::parse('2026-01-14 18:33:07', 'UTC')])->saveQuietly();
+
+        (new HandleLeadEventsForWebhook(new LeadActivityLogger))
+            ->handleLeadFormCaptured(new LeadCreated($lead->refresh(), []));
+
+        $body = json_decode((string) $GLOBALS['_wp_remote_post_calls'][0]['args']['body'], true, 512, JSON_THROW_ON_ERROR);
+
+        expect($body['captured_at_est'])->toBe('2026-01-14 13:33:07')
+            ->and($body['captured_at_est_abbreviation'])->toBe('EST');
+    });
+
+    test('the hubspot webhook sends the email and a link to the contact record', function () {
+        config([
+            'services.webhooks.hubspot_lead_url' => 'https://n8n.test/webhook/hubspot-lead-creation',
+            'services.hubspot.portal_id' => '243484989',
+        ]);
+        $GLOBALS['_wp_remote_post_calls'] = [];
+        unset($GLOBALS['_wp_remote_post_response']);
+
+        $listener = new HandleLeadEventsForWebhook(new LeadActivityLogger);
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Dara Okonkwo',
+            'email' => 'dara@kestrellabs.com',
+            'status' => 'captured',
+            'submission_type' => 'Partial',
+            'hubspot_contact_id' => '80125512',
+        ]);
+        $lead->refresh();
+
+        $listener->handleHubSpotSynced($lead, 'created');
+
+        expect($GLOBALS['_wp_remote_post_calls'])->toHaveCount(1)
+            ->and($GLOBALS['_wp_remote_post_calls'][0]['url'])->toBe('https://n8n.test/webhook/hubspot-lead-creation');
+
+        $body = json_decode((string) $GLOBALS['_wp_remote_post_calls'][0]['args']['body'], true, 512, JSON_THROW_ON_ERROR);
+
+        expect($body['event'])->toBe('hubspot.contact_synced')
+            ->and($body['action'])->toBe('created')
+            ->and($body['email'])->toBe('dara@kestrellabs.com')
+            ->and($body['hubspot_contact_url'])->toBe('https://app.hubspot.com/contacts/243484989/record/0-1/80125512');
+
+        // An update is the returning-lead case and sends too, tagged so the flow can branch.
+        $listener->handleHubSpotSynced($lead, 'updated');
+
+        $second = json_decode((string) $GLOBALS['_wp_remote_post_calls'][1]['args']['body'], true, 512, JSON_THROW_ON_ERROR);
+
+        expect($second['action'])->toBe('updated');
+    });
+
+    test('the hubspot webhook stays silent without a link to send', function () {
+        config([
+            'services.webhooks.hubspot_lead_url' => 'https://n8n.test/webhook/hubspot-lead-creation',
+            'services.hubspot.portal_id' => '243484989',
+        ]);
+        $GLOBALS['_wp_remote_post_calls'] = [];
+        unset($GLOBALS['_wp_remote_post_response']);
+
+        $listener = new HandleLeadEventsForWebhook(new LeadActivityLogger);
+
+        // Never reached the CRM: the payload is the link, and a null one would have the flow
+        // announce a contact nobody can open.
+        $unsynced = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Unsynced Lead',
+            'email' => 'unsynced@northwind.io',
+            'status' => 'captured',
+            'submission_type' => 'Partial',
+        ]);
+
+        $listener->handleHubSpotSynced($unsynced->refresh(), 'created');
+
+        // Synced, but on the completed submission rather than the capture.
+        $final = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Final Lead',
+            'email' => 'final@northwind.io',
+            'status' => 'booking_pending',
+            'submission_type' => 'Final',
+            'hubspot_contact_id' => '80125513',
+        ]);
+
+        $listener->handleHubSpotSynced($final->refresh(), 'updated');
+
+        expect($GLOBALS['_wp_remote_post_calls'])->toBeEmpty();
+    });
+
+    test('a blocked lead reaches neither n8n flow', function () {
+        config([
+            'services.webhooks.lead_form_url' => 'https://n8n.test/webhook/lead-form',
+            'services.webhooks.hubspot_lead_url' => 'https://n8n.test/webhook/hubspot-lead-creation',
+            'services.hubspot.portal_id' => '243484989',
+        ]);
+        $GLOBALS['_wp_remote_post_calls'] = [];
+        unset($GLOBALS['_wp_remote_post_response']);
+
+        $listener = new HandleLeadEventsForWebhook(new LeadActivityLogger);
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Banned Person',
+            'email' => 'banned@throwaway.test',
+            'status' => 'captured',
+            'submission_type' => 'Partial',
+            'hubspot_contact_id' => '80125514',
+        ]);
+
+        $lead->forceFill(['is_blocked' => true])->saveQuietly();
+        $lead->refresh();
+
+        $listener->handleLeadFormCaptured(new LeadCreated($lead, []));
+        $listener->handleHubSpotSynced($lead, 'created');
+
+        expect($GLOBALS['_wp_remote_post_calls'])->toBeEmpty();
+    });
+
+    test('both n8n endpoints are committed in config, with no env or setting to fill in', function () {
+        $services = require __DIR__.'/../../config/services.php';
+
+        expect($services['webhooks']['lead_form_url'])
+            ->toBe('https://n8n.srv1338052.hstgr.cloud/webhook/lead-form')
+            ->and($services['webhooks']['hubspot_lead_url'])
+            ->toBe('https://n8n.srv1338052.hstgr.cloud/webhook/hubspot-lead-creation');
+    });
+
+    test('the lead detail view links out to the HubSpot contact record', function () {
+        config(['services.hubspot.portal_id' => '243484989']);
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Dara Okonkwo',
+            'email' => 'dara@kestrellabs.com',
+            'status' => 'captured',
+            'submission_type' => 'Partial',
+            'hubspot_contact_id' => '80125512',
+            'hubspot_lifecycle_stage' => 'lead',
+        ]);
+
+        ob_start();
+        (new LeadsAdminDashboard)->renderLeadDetail((int) $lead->id);
+        $html = (string) ob_get_clean();
+
+        expect($html)->toContain('https://app.hubspot.com/contacts/243484989/record/0-1/80125512')
+            ->and($html)->toContain('Open in HubSpot')
+            ->and($html)->toContain('80125512')
+            ->and($html)->toContain('lead');
+    });
+
+    test('a lead that never reached HubSpot says so, and offers the email search instead', function () {
+        config(['services.hubspot.portal_id' => '243484989']);
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Unsynced Lead',
+            'email' => 'unsynced@northwind.io',
+            'status' => 'captured',
+            'submission_type' => 'Partial',
+        ]);
+
+        ob_start();
+        (new LeadsAdminDashboard)->renderLeadDetail((int) $lead->id);
+        $html = (string) ob_get_clean();
+
+        /*
+         * The card renders either way. An absent card reads as "this lead has nothing to do
+         * with HubSpot", which is a different claim from "the sync did not happen" — the same
+         * reasoning the Session Replay card above it already follows.
+         */
+        expect($html)->toContain('has not reached HubSpot')
+            ->and($html)->toContain('Search HubSpot by email')
+            ->and($html)->toContain(rawurlencode('unsynced@northwind.io'))
+            ->and($html)->not->toContain('Open in HubSpot');
+    });
+
+    test('a synced lead with no portal ID configured shows the contact ID rather than nothing', function () {
+        config(['services.hubspot.portal_id' => '']);
+
+        $lead = Lead::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Linkless Lead',
+            'email' => 'linkless@northwind.io',
+            'status' => 'captured',
+            'submission_type' => 'Partial',
+            'hubspot_contact_id' => '80125599',
+        ]);
+
+        ob_start();
+        (new LeadsAdminDashboard)->renderLeadDetail((int) $lead->id);
+        $html = (string) ob_get_clean();
+
+        // Distinct from the "never synced" case above: the contact exists, and it is the
+        // portal ID that is missing. Collapsing the two would send someone hunting a sync
+        // failure that did not happen.
+        expect($html)->toContain('no HubSpot portal ID is configured')
+            ->and($html)->toContain('80125599')
+            ->and($html)->not->toContain('Open in HubSpot');
+    });
+
     test('the Slack booking alert stays silent unless it is switched on', function () {
         // Default behaviour: the legacy feed's condition is `submission_type is not Final`, so
         // a completed booking produces no second alert and no consumption row.

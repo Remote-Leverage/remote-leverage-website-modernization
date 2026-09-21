@@ -935,6 +935,30 @@ if (! function_exists('admin_url')) {
     }
 }
 
+if (! function_exists('selected')) {
+    function selected($selected, $current = true, $echo = true)
+    {
+        $result = ((string) $selected === (string) $current) ? ' selected="selected"' : '';
+        if ($echo) {
+            echo $result;
+        }
+
+        return $result;
+    }
+}
+
+if (! function_exists('wp_nonce_field')) {
+    function wp_nonce_field($action = -1, $name = '_wpnonce', $referer = true, $echo = true)
+    {
+        $result = '<input type="hidden" name="'.$name.'" value="mock_nonce" />';
+        if ($echo) {
+            echo $result;
+        }
+
+        return $result;
+    }
+}
+
 if (! function_exists('wp_nonce_url')) {
     function wp_nonce_url($actionurl, $action = -1, $name = '_wpnonce')
     {

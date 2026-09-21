@@ -13,6 +13,16 @@ use Illuminate\Support\Facades\Log;
 
 class HandleLeadEventsForWebhook
 {
+    /** The `submission_type` value that means the form was finished, not dropped. */
+    private const COMPLETED = 'Final';
+
+    /**
+     * "EST" as the business means it: New York wall-clock time, which is EDT from March to
+     * November. A fixed -05:00 would read an hour behind everyone's actual clock for most of
+     * the year. The same zone the booking wizard, the cost alerts and the BigQuery views use.
+     */
+    private const EASTERN = 'America/New_York';
+
     public function __construct(
         protected LeadActivityLogger $activityLogger,
     ) {}
@@ -56,6 +66,126 @@ class HandleLeadEventsForWebhook
             'start_time' => $event->startTime,
             'metadata' => $event->metadata,
         ]);
+    }
+
+    /**
+     * The n8n `lead-form` flow: a lead was captured.
+     *
+     * Separate from the `lead.partial_captured` feed above rather than a branch of it. That one
+     * is the Gravity Forms replacement and carries the whole lead; this one carries two fields
+     * and exists so a flow can act on a capture without parsing 60 columns it does not read.
+     * Folding them together would mean one URL's consumers constraining the other's payload.
+     *
+     * **Partial captures only.** `LeadCreated` is also raised for the completed submission, and
+     * firing on both would POST twice for every lead that books — the same duplicate
+     * `HandleLeadEventsForSlack` suppresses, and for the same reason.
+     */
+    public function handleLeadFormCaptured(LeadCreated $event): void
+    {
+        // Shadow ban, as above: stored, and silent downstream.
+        if ($event->lead->is_blocked) {
+            return;
+        }
+
+        if (! $this->isPartial($event->lead)) {
+            return;
+        }
+
+        $url = (string) config('services.webhooks.lead_form_url');
+
+        if ($url === '') {
+            return;
+        }
+
+        /*
+         * `created_at`, not `now()`.
+         *
+         * The dispatch is deferred with `afterResponse()`, so `now()` is whenever the worker
+         * got round to it — seconds later, and unboundedly later if the send is ever retried
+         * or queued for real. The capture time is a property of the lead, so it is read off
+         * the lead. Falling back to now() only covers a model that somehow has no timestamp.
+         */
+        $capturedAt = ($event->lead->created_at ? Carbon::parse($event->lead->created_at) : Carbon::now())
+            ->setTimezone(self::EASTERN);
+
+        $payload = [
+            'event' => 'lead.form_captured',
+            'lead_id' => $event->lead->id,
+            'email' => (string) $event->lead->email,
+            'submission_type' => (string) $event->lead->submission_type,
+
+            // Wall-clock Eastern to the second, which is what the flow formats into its
+            // message. The ISO form carries the offset alongside it so a consumer that wants a
+            // real instant back is not left parsing a naive string, and `_abbreviation` says
+            // whether daylight time was in force — America/New_York reads EDT for most of the
+            // year, and a payload labelled only "est" invites someone to assume UTC-5.
+            'captured_at_est' => $capturedAt->format('Y-m-d H:i:s'),
+            'captured_at_est_iso' => $capturedAt->toIso8601String(),
+            'captured_at_est_abbreviation' => $capturedAt->format('T'),
+        ];
+
+        $this->deliver($event->lead, $url, $payload, 'lead.form_captured', 'LeadCreated');
+    }
+
+    /**
+     * The n8n `hubspot-lead-creation` flow: the contact reached the CRM.
+     *
+     * Called from `LeadServiceProvider` immediately after `HubSpotGateway::syncContact()`
+     * rather than off an event, because the contact id it reports only exists at that point —
+     * `LeadCreated` fires before the sync, so a listener on it would send a link to nothing.
+     *
+     * `$action` is `created` or `updated`; both send, which is what was asked for. The link is
+     * built by the model, so it is the same URL the Slack card and the admin already use.
+     *
+     * **Partial captures only**, matching `handleLeadFormCaptured()` — the sync also runs on
+     * the completed submission, and that one is deliberately not announced.
+     */
+    public function handleHubSpotSynced(Lead $lead, ?string $action = null): void
+    {
+        if ($lead->is_blocked) {
+            return;
+        }
+
+        if (! $this->isPartial($lead)) {
+            return;
+        }
+
+        $url = (string) config('services.webhooks.hubspot_lead_url');
+        $contactUrl = $lead->hubspotContactUrl();
+
+        /*
+         * No link, no send. `hubspotContactUrl()` returns null when the portal id is missing
+         * as well as when the contact id is, and the entire point of this payload is the link
+         * — posting `null` would have the flow announce a contact nobody can open.
+         */
+        if ($url === '' || $contactUrl === null) {
+            return;
+        }
+
+        $payload = [
+            'event' => 'hubspot.contact_synced',
+            'action' => $action ?? 'synced',
+            'lead_id' => $lead->id,
+            'email' => (string) $lead->email,
+            'hubspot_contact_id' => (string) $lead->hubspot_contact_id,
+            'hubspot_contact_url' => $contactUrl,
+        ];
+
+        $this->deliver($lead, $url, $payload, 'hubspot.contact_synced', 'LeadCreated');
+    }
+
+    /**
+     * Is this the step-one capture rather than the completed submission?
+     *
+     * Case-insensitive and trimmed because two writers fill this column — the booking wizard
+     * and the Gravity import — and only their agreement on the word is guaranteed, not on its
+     * spelling. An empty value counts as partial: that is a lead that never reached step two,
+     * and treating "unset" as "completed" would silence the flows for exactly the leads they
+     * exist to report.
+     */
+    protected function isPartial(Lead $lead): bool
+    {
+        return strcasecmp(trim((string) $lead->submission_type), self::COMPLETED) !== 0;
     }
 
     /**
@@ -106,6 +236,26 @@ class HandleLeadEventsForWebhook
             'context' => $context,
         ];
 
+        $this->deliver($lead, $webhookUrl, $payload, $eventName, $this->eventTypeFor($eventName));
+    }
+
+    /**
+     * POST one JSON payload and record what came back on the lead's timeline.
+     *
+     * Shared by all three feeds. It was the tail of `dispatchWebhook()` and is factored out
+     * unchanged — the `lead-form` and `hubspot-lead-creation` flows want the same delivery
+     * semantics and the same audit entry, and a second copy of this is a second place for the
+     * "logged a send that never happened" bug to come back.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function deliver(
+        Lead $lead,
+        string $webhookUrl,
+        array $payload,
+        string $eventName,
+        string $eventType,
+    ): void {
         try {
             /*
              * `skipped`, not `succeeded`, when there is no HTTP transport.
@@ -117,7 +267,7 @@ class HandleLeadEventsForWebhook
             if (! function_exists('\wp_remote_post')) {
                 $this->activityLogger->logConsumption(
                     leadId: $lead->id,
-                    eventType: $this->eventTypeFor($eventName),
+                    eventType: $eventType,
                     actorDomain: 'OutgoingWebhook',
                     outcome: 'skipped',
                     description: "No HTTP transport available; {$eventName} webhook was not sent",
@@ -144,7 +294,7 @@ class HandleLeadEventsForWebhook
              */
             $this->activityLogger->logConsumption(
                 leadId: $lead->id,
-                eventType: $this->eventTypeFor($eventName),
+                eventType: $eventType,
                 actorDomain: 'OutgoingWebhook',
                 outcome: $success ? 'succeeded' : 'failed',
                 description: $success

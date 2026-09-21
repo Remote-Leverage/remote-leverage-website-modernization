@@ -19,6 +19,22 @@ class HubSpotGateway
 
     protected string $portalId;
 
+    /**
+     * What the last `syncContact()` call did to the contact: `created`, `updated`, or null
+     * when it did not get that far.
+     *
+     * `syncContact()` returns the same id either way — it POSTs, and falls through to a PATCH
+     * on the 409 that says the email is already in the portal — so the caller cannot otherwise
+     * tell a new contact from a returning one. The n8n `hubspot-lead-creation` flow wants both
+     * but likes to know which, and reading it back off HubSpot would be a second round trip to
+     * learn something this object already knew.
+     *
+     * Reset at the top of every `syncContact()`, so a failed sync cannot leave the previous
+     * call's answer standing. Read it immediately after the call that produced it: the gateway
+     * is a container singleton, so a second sync in the same request overwrites it.
+     */
+    protected ?string $lastContactAction = null;
+
     public function __construct(?LeadSettingsService $settings = null)
     {
         $settings ??= new LeadSettingsService;
@@ -40,6 +56,8 @@ class HubSpotGateway
      */
     public function syncContact(Lead $lead): ?string
     {
+        $this->lastContactAction = null;
+
         if (! $this->accessToken) {
             Log::warning("HubSpotGateway: no access token configured — lead #{$lead->id} ({$lead->email}) was NOT synced.");
 
@@ -56,6 +74,7 @@ class HubSpotGateway
             if ($response->successful()) {
                 $contactId = $response->json('id');
                 Log::info("HubSpotGateway: Successfully synced lead #{$lead->id} as contact {$contactId}");
+                $this->lastContactAction = 'created';
 
                 return (string) $contactId;
             }
@@ -89,6 +108,17 @@ class HubSpotGateway
 
             return null;
         }
+    }
+
+    /**
+     * `created`, `updated`, or null — what the last `syncContact()` call did.
+     *
+     * See the property for why this is held rather than derived, and why it must be read
+     * straight after the sync it describes.
+     */
+    public function lastContactAction(): ?string
+    {
+        return $this->lastContactAction;
     }
 
     /**
@@ -185,6 +215,7 @@ class HubSpotGateway
 
         if ($response->successful()) {
             Log::info("HubSpotGateway: Updated existing contact {$contactId} from lead #{$lead->id}");
+            $this->lastContactAction = 'updated';
 
             return $contactId;
         }

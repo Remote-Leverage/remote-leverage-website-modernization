@@ -1607,6 +1607,54 @@ class LeadsAdminDashboard
                         </div>
                     <?php } ?>
 
+                    <!-- HubSpot -->
+                    <?php
+                        /*
+                         * Always rendered, like the Session Replay card above and for the same
+                         * reason: an absent card reads as "this lead has nothing to do with
+                         * HubSpot", when what it usually means is that the sync failed. The
+                         * three states below are genuinely different problems and each one
+                         * names itself rather than collapsing into a missing link.
+                         */
+                        $hubspotUrl = $lead->hubspotContactUrl();
+        $hubspotContactId = trim((string) $lead->hubspot_contact_id);
+        $hubspotPortalId = trim((string) (config('services.hubspot.portal_id') ?: ''));
+        ?>
+                    <div class="rl-detail-card">
+                        <h3 class="rl-detail-title">HubSpot</h3>
+                        <?php if ($hubspotUrl) { ?>
+                            <table class="rl-key-value-table" style="margin-bottom: 12px;">
+                                <tr><td>Contact ID:</td><td><code style="background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 4px; padding: 2px 6px; font-size: 11px;"><?php echo esc_html($hubspotContactId); ?></code></td></tr>
+                                <tr><td>Lifecycle:</td><td><?php echo esc_html($lead->hubspot_lifecycle_stage ?: '—'); ?></td></tr>
+                            </table>
+                            <a href="<?php echo esc_url($hubspotUrl); ?>" target="_blank" rel="noopener noreferrer"
+                               class="button button-secondary">Open in HubSpot &rarr;</a>
+                        <?php } elseif ($hubspotContactId !== '') { ?>
+                            <!-- Synced, but unlinkable: the record exists and we hold its id, and the
+                                 portal id needed to build a URL around it does not. Showing the bare id
+                                 beats showing nothing — it is enough to find the contact by hand — and
+                                 the sentence points at the setting rather than leaving someone to
+                                 suspect the sync. -->
+                            <p style="margin: 0 0 10px; color: #52525b; font-size: 12px;">
+                                This lead synced as contact
+                                <code style="background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 4px; padding: 2px 6px; font-size: 11px;"><?php echo esc_html($hubspotContactId); ?></code>,
+                                but no HubSpot portal ID is configured, so there is nothing to build a link
+                                from. Set it under <strong>Settings</strong> and the link appears here.
+                            </p>
+                        <?php } else { ?>
+                            <p style="margin: 0 0 10px; color: #52525b; font-size: 12px;">
+                                This lead has not reached HubSpot. Either the sync failed, or it was skipped —
+                                a blocked lead never reaches the CRM by design. The timeline below records
+                                which, under <strong>HubSpot</strong>.
+                            </p>
+                            <?php if ($hubspotPortalId !== '') { ?>
+                                <a href="<?php echo esc_url('https://app.hubspot.com/contacts/'.$hubspotPortalId.'/objects/0-1/views/all/list?query='.rawurlencode((string) $lead->email)); ?>"
+                                   target="_blank" rel="noopener noreferrer"
+                                   class="button button-secondary">Search HubSpot by email &rarr;</a>
+                            <?php } ?>
+                        <?php } ?>
+                    </div>
+
                     <!-- Contact Details Card -->
                     <div class="rl-detail-card">
                         <h3 class="rl-detail-title">Contact & Qualification</h3>

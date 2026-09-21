@@ -273,11 +273,36 @@ return [
      * phpdotenv hands back an empty string, which beats the default and falls through to the
      * setting. That is the off switch, and it is why `.env.example` leaves the key commented.
      */
+    /*
+     * The two n8n flows below are literals with **no `env()` and no wp-admin setting**, unlike
+     * `lead_webhook_url` above. That is deliberate and was asked for: they are destinations
+     * rather than credentials, there is one of each for every environment, and routing them
+     * through `.env` is what left the feed above silently pointing nowhere in any environment
+     * that never set the variable. Changing where they point is a one-line edit to this file
+     * and a deploy — which is the intended way to move them.
+     *
+     * Both fire on the **partial** capture only (`submission_type` = `Partial`), never on the
+     * completed `Final` submission. `LeadCreated` is raised for both, so each listener gates on
+     * the column the same way `HandleLeadEventsForSlack` does; without that gate a lead that
+     * books would POST twice to each flow.
+     */
     'webhooks' => [
         'lead_webhook_url' => (string) env(
             'LEAD_WEBHOOK_URL',
             'https://n8n.srv1338052.hstgr.cloud/webhook/gravityforms-leads',
         ),
+
+        /*
+         * Lead captured. Payload is the email and the capture time in New York wall-clock time
+         * to the second — see `HandleLeadEventsForWebhook::handleLeadFormCaptured()`.
+         */
+        'lead_form_url' => 'https://n8n.srv1338052.hstgr.cloud/webhook/lead-form',
+
+        /*
+         * The contact reached HubSpot, created or updated. Payload is the email and a link to
+         * the contact record — see `HandleLeadEventsForWebhook::handleHubSpotSynced()`.
+         */
+        'hubspot_lead_url' => 'https://n8n.srv1338052.hstgr.cloud/webhook/hubspot-lead-creation',
     ],
 
     'referral' => [
