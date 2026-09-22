@@ -1,3 +1,6 @@
+import { loadStylesheet } from './load-stylesheet';
+import { retryImport } from './retry-import';
+
 window.intlTelInput = window.intlTelInput || null;
 
 let itiLoadPromise = null;
@@ -6,11 +9,14 @@ function loadIntlTelInput() {
   if (itiLoadPromise) return itiLoadPromise;
 
   itiLoadPromise = Promise.all([
-    import('intl-tel-input/intlTelInputWithUtils'),
-    import('intl-tel-input/build/css/intlTelInput.css'),
+    retryImport(() => import('intl-tel-input/intlTelInputWithUtils')),
+    import('intl-tel-input/build/css/intlTelInput.css?url').then(({ default: href }) => loadStylesheet(href)),
   ]).then(([mod]) => {
     window.intlTelInput = mod.default;
     return window.intlTelInput;
+  }).catch((err) => {
+    itiLoadPromise = null;
+    throw err;
   });
 
   return itiLoadPromise;

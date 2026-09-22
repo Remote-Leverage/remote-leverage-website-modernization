@@ -638,31 +638,41 @@
               <div class="p-3 rounded-card bg-emerald-50 ring-1 ring-emerald-200 text-emerald-700 text-xs">{{ $leadModalSuccess }}</div>
             @endif
 
+            {{-- Every field the main booking form makes mandatory is mandatory here too.
+                 The rules live in ReferrerPortalDashboard::submitDirectLead() and mirror
+                 MultistepBookingWizard's step 1. --}}
             <div class="space-y-3">
-              <div>
-                <label for="rl-lead-name" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Full name *</label>
-                <input id="rl-lead-name" type="text" wire:model="leadModalName" placeholder="e.g. David Vance" class="w-full px-3 py-2 rounded-card ring-1 ring-slate-200 border-0 text-xs text-slate-900 focus:ring-2 focus:ring-brand-purple" />
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label for="rl-lead-first-name" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">First name *</label>
+                  <input id="rl-lead-first-name" type="text" wire:model="leadModalFirstName" placeholder="e.g. David" class="w-full px-3 py-2 rounded-card ring-1 ring-slate-200 border-0 text-xs text-slate-900 focus:ring-2 focus:ring-brand-purple" />
+                </div>
+                <div>
+                  <label for="rl-lead-last-name" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Last name *</label>
+                  <input id="rl-lead-last-name" type="text" wire:model="leadModalLastName" placeholder="e.g. Vance" class="w-full px-3 py-2 rounded-card ring-1 ring-slate-200 border-0 text-xs text-slate-900 focus:ring-2 focus:ring-brand-purple" />
+                </div>
               </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label for="rl-lead-email" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Email</label>
+                  <label for="rl-lead-email" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Email *</label>
                   <input id="rl-lead-email" type="email" wire:model="leadModalEmail" placeholder="david@company.com" class="w-full px-3 py-2 rounded-card ring-1 ring-slate-200 border-0 text-xs text-slate-900 focus:ring-2 focus:ring-brand-purple" />
                 </div>
                 <div>
-                  <label for="rl-lead-phone" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Phone</label>
+                  <label for="rl-lead-phone" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Phone *</label>
                   <input id="rl-lead-phone" type="tel" wire:model="leadModalPhone" placeholder="+1 (555) 000-0000" class="w-full px-3 py-2 rounded-card ring-1 ring-slate-200 border-0 text-xs text-slate-900 focus:ring-2 focus:ring-brand-purple" />
                 </div>
               </div>
-              <p class="text-[11px] text-slate-400">Either an email or a phone number is required.</p>
 
               <div>
-                <label for="rl-lead-service" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Target service</label>
-                <select id="rl-lead-service" wire:model="leadModalLandingPage" class="w-full px-3 py-2 rounded-card ring-1 ring-slate-200 border-0 text-xs text-slate-900 bg-white cursor-pointer focus:ring-2 focus:ring-brand-purple">
-                  @foreach ($landingPages as $lp)
-                    <option value="{{ $lp['name'] }}">{{ $lp['name'] }}</option>
+                <label for="rl-lead-revenue" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Monthly revenue *</label>
+                <select id="rl-lead-revenue" wire:model="leadModalRevenue" class="w-full px-3 py-2 rounded-card ring-1 ring-slate-200 border-0 text-xs text-slate-900 focus:ring-2 focus:ring-brand-purple bg-white cursor-pointer">
+                  <option value="">Select a band&hellip;</option>
+                  @foreach (\App\Domains\Lead\Services\LeadQualification::REVENUE_BANDS as $band)
+                    <option value="{{ $band }}">{{ $band }}</option>
                   @endforeach
                 </select>
+                <p class="text-[11px] text-slate-400 mt-1">Asked on the main booking form too — a lead without a band cannot be qualified.</p>
               </div>
 
               <div>

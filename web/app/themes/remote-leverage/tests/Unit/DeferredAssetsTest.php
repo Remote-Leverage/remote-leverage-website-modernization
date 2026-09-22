@@ -54,6 +54,21 @@ test('font preloads stay self-hosted, manifest-resolved, and limited to the two 
             ->not->toContain('http://')
             ->not->toContain('https://');
     }
+
+    expect($preloads[0])
+        ->toContain('inter-display-latin.woff2')
+        ->toContain('fetchpriority="high"');
+    expect($preloads[1])
+        ->toContain('inter-latin-wght-normal.woff2')
+        ->not->toContain('fetchpriority');
+
+    // Homepage LCP is the Inter Display <h1>. A preload after `@php(wp_head())` loses
+    // the network race to Meta and the Google tag, which is the 1.2 s FCP / 5.4 s LCP
+    // gap a 2026-09-22 PSI mobile run measured. Match the Blade call, not the bare
+    // `wp_head()` substring — that also appears in the comments that explain why
+    // these tags have to sit above it.
+    expect(strpos($layout, 'rel="preload" as="font"'))
+        ->toBeLessThan(strpos($layout, '@php(wp_head())'));
 });
 
 test('app.css does not eagerly fetch intl-tel-input flag sprites', function () {
@@ -71,9 +86,30 @@ test('app.js boots Livewire on intersection and lazy-loads intl-tel-input', func
         ->toContain('function bootLivewire')
         ->toContain('function scheduleLivewire')
         ->toContain("import('intl-tel-input/intlTelInputWithUtils')")
-        ->toContain("import('intl-tel-input/build/css/intlTelInput.css')")
+        ->toContain("import('intl-tel-input/build/css/intlTelInput.css?url')")
         ->toContain('whenVisible(this.$el')
         ->toContain('script.async = false');
+});
+
+/*
+ * Both intl-tel-input requests (the JS chunk and its CSS) are independently retried: the JS
+ * import through retryImport() — Vite wraps every dynamic import() in a preload helper that
+ * also fetches that chunk's CSS deps and rejects the whole import if any of them fail, so a
+ * single dropped request can otherwise take down an unrelated, already-fetched JS chunk — and
+ * the CSS through loadStylesheet(), because Vite's own `import('*.css')` fire-and-forgets the
+ * <link> it injects and never reports a failed load back to the caller.
+ */
+test('app.js and payment-gateway.js retry both intl-tel-input requests independently', function () {
+    $app = file_get_contents(dirname(__DIR__, 2).'/resources/js/app.js');
+    $paymentGateway = file_get_contents(dirname(__DIR__, 2).'/resources/js/payment-gateway.js');
+
+    foreach ([$app, $paymentGateway] as $js) {
+        expect($js)
+            ->toContain("import { retryImport } from './retry-import'")
+            ->toContain("import { loadStylesheet } from './load-stylesheet'")
+            ->toContain("retryImport(() => import('intl-tel-input/intlTelInputWithUtils'))")
+            ->toContain('.then(({ default: href }) => loadStylesheet(href))');
+    }
 });
 
 test('header and nav walkers work without Alpine so Livewire can stay deferred', function () {

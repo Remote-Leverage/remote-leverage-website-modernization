@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Livewire\Referrer;
 
-use App\Domains\Lead\Actions\CaptureLeadAction;
-use App\Domains\Lead\Data\LeadCaptureData;
+use App\Domains\Referral\Actions\SubmitReferredLeadAction;
 use App\Domains\Referral\Models\Referrer;
 use App\Domains\Referral\Repositories\ReferrerRepositoryInterface;
 use App\Domains\Referral\Services\ReferralSettingsService;
@@ -73,8 +72,6 @@ class ReferrerPortalDashboard extends Component
      * or the booking funnel — pages that carry no referral offer — which made the welcome
      * notice impossible to guarantee and the destination a coin flip.
      */
-    public array $landingPages = [];
-
     /**
      * The link this referrer shares. Derived from the selected destination, never typed.
      */
@@ -92,13 +89,21 @@ class ReferrerPortalDashboard extends Component
     // Direct Lead Submission Modal
     public bool $showLeadModal = false;
 
-    public string $leadModalName = '';
+    /*
+     * First and last separately, matching MultistepBookingWizard rather than the single
+     * "Full name" box this modal used to carry. A referred lead and a self-served one land in
+     * the same `rl_leads` columns, and a lead captured here with `last_name` empty reads as a
+     * data problem everywhere downstream that splits on it.
+     */
+    public string $leadModalFirstName = '';
+
+    public string $leadModalLastName = '';
+
+    public string $leadModalRevenue = '';
 
     public string $leadModalEmail = '';
 
     public string $leadModalPhone = '';
-
-    public string $leadModalLandingPage = '';
 
     public string $leadModalNotes = '';
 
@@ -108,7 +113,6 @@ class ReferrerPortalDashboard extends Component
 
     public function mount(?string $code = null): void
     {
-        $this->landingPages = app(ReferralSettingsService::class)->get()['landing_pages'];
 
         // A previously authenticated session may be restored without re-entering a password.
         $sessionCode = session('referrer_code');
@@ -434,7 +438,6 @@ class ReferrerPortalDashboard extends Component
     {
         $this->leadModalError = null;
         $this->leadModalSuccess = null;
-        $this->leadModalLandingPage = $this->landingPages[0]['name'] ?? 'Main Homepage';
         $this->showLeadModal = true;
     }
 
@@ -445,73 +448,75 @@ class ReferrerPortalDashboard extends Component
         $this->leadModalSuccess = null;
     }
 
+    /**
+     * The first thing wrong with the modal, or null when nothing is.
+     *
+     * The rules themselves live on {@see SubmitReferredLeadAction}, because the sales-rep form
+     * at `/sales-referral` applies exactly the same ones to exactly the same referral. Two
+     * copies is how the old self-referral guard came to work on one surface and not the other.
+     */
+    protected function validateDirectLead(): ?string
+    {
+        return SubmitReferredLeadAction::validate($this->referrer, $this->modalFields());
+    }
+
+    /**
+     * The modal's inputs, in the shape SubmitReferredLeadAction reads.
+     *
+     * @return array<string, string>
+     */
+    protected function modalFields(): array
+    {
+        return [
+            'first_name' => $this->leadModalFirstName,
+            'last_name' => $this->leadModalLastName,
+            'email' => $this->leadModalEmail,
+            'phone' => $this->leadModalPhone,
+            'revenue' => $this->leadModalRevenue,
+            'notes' => $this->leadModalNotes,
+        ];
+    }
+
     public function submitDirectLead(): void
     {
         $this->leadModalError = null;
         $this->leadModalSuccess = null;
 
-        if (empty($this->leadModalName)) {
-            $this->leadModalError = 'Please enter the lead full name.';
+        /*
+         * The same rules MultistepBookingWizard applies to step 1, deliberately identical.
+         *
+         * This modal used to require a name plus *either* an email or a phone, which had two
+         * consequences. Sales received referred leads missing fields the main form has always
+         * made mandatory — no last name, no revenue band, so `LeadQualification::isT10()`
+         * reported them unqualified whatever their revenue actually was. And the self-referral
+         * guard below could not run at all on a phone-only submission: it is keyed on email,
+         * so leaving the email blank walked straight past it, and the synthesised
+         * `@remoteleverage.internal` address the lead then received matched nothing in
+         * `HandleLeadBookingCompletedForReferrer`'s guard either.
+         *
+         * Requiring both closes that, and it is the reason the guard below no longer needs to
+         * check that an email is present.
+         */
+        $this->leadModalError = $this->validateDirectLead();
 
-            return;
-        }
-
-        if (empty($this->leadModalEmail) && empty($this->leadModalPhone)) {
-            $this->leadModalError = 'Please provide either an email or phone number for the lead.';
-
-            return;
-        }
-
-        if ($this->referrer && $this->leadModalEmail && strtolower($this->leadModalEmail) === strtolower($this->referrer->email)) {
-            $this->leadModalError = 'You cannot submit yourself as a referred lead.';
-
+        if ($this->leadModalError !== null) {
             return;
         }
 
         try {
-            $captureAction = app(CaptureLeadAction::class);
-
-            $leadData = LeadCaptureData::fromArray([
-                'name' => $this->leadModalName,
-                'email' => $this->leadModalEmail ?: "lead_{$this->referrerCode}_".time().'@remoteleverage.internal',
-                'phone' => $this->leadModalPhone ?: null,
-                'notes' => $this->leadModalNotes ?: "Direct submission from referrer {$this->referrerCode}",
-                'referral_code' => $this->referrerCode,
-                'extra_data' => [
-                    'source_form' => 'ReferrerPortalDirectLeadModal',
-                    'target_page' => $this->leadModalLandingPage,
-                    'referrer_id' => $this->referrer?->id,
-                ],
-            ]);
-
-            $lead = $captureAction->execute($leadData);
-
-            // Record referral entry in rl_referrals table.
-            if ($this->referrer) {
-                $this->referrer->referrals()->create([
-                    /*
-                     * The actual foreign key. This used to be recorded only in the note below,
-                     * as prose — so nothing could join on it, and when the prospect later
-                     * booked, the email-keyed lookup in HandleLeadBookingCompletedForReferrer
-                     * failed to find this row and inserted a duplicate referral beside it. A
-                     * phone-only submission missed every time, because the lead is given a
-                     * synthesised `@remoteleverage.internal` address that matches nothing.
-                     */
-                    'lead_id' => $lead->id,
-                    'lead_name' => $this->leadModalName,
-                    'lead_email' => $this->leadModalEmail,
-                    'lead_phone' => $this->leadModalPhone,
-                    'landing_page' => $this->leadModalLandingPage,
-                    'source' => 'referrer_direct_submission',
-                    'status' => 'pending',
-                    'notes' => trim($this->leadModalNotes."\n(lead #{$lead->id}, uuid {$lead->uuid})"),
-                ]);
-            }
+            app(SubmitReferredLeadAction::class)->execute(
+                $this->referrer,
+                $this->modalFields(),
+                SubmitReferredLeadAction::SOURCE_PORTAL,
+                'ReferrerPortalDirectLeadModal',
+            );
 
             $this->leadModalSuccess = 'Lead successfully submitted and attributed to your referrer account!';
-            $this->leadModalName = '';
+            $this->leadModalFirstName = '';
+            $this->leadModalLastName = '';
             $this->leadModalEmail = '';
             $this->leadModalPhone = '';
+            $this->leadModalRevenue = '';
             $this->leadModalNotes = '';
         } catch (\Throwable $e) {
             Log::error('Failed to submit direct lead in referrer portal: '.$e->getMessage(), ['exception' => $e]);

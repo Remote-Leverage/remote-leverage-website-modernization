@@ -15,6 +15,7 @@ All project documentation lives here. Start with the [repository README](../../.
 | [deployment.md](deployment.md) | Image build, CI, ECS deploy, post-deploy tasks |
 | [observability.md](observability.md) | The integration call log, credential fingerprinting, the merged lead timeline, and Sentry noise control |
 | [slack-app.md](slack-app.md) | The one Slack app: what it posts, the thread-per-lead model, and the scopes it does not have |
+| [ab-testing.md](ab-testing.md) | Running A/B tests in the browser with PostHog: authoring an experiment, the three ways to test one before production, and why the HTML cache rules out deciding in PHP |
 
 ## Domains
 
@@ -22,7 +23,7 @@ All project documentation lives here. Start with the [repository README](../../.
 | :--- | :--- |
 | [domains/lead.md](domains/lead.md) | Lead capture, attribution, dual-write audit log, retention |
 | [domains/scheduling.md](domains/scheduling.md) | Calendly, Google Meet, revenue-tier routing, instant live calls |
-| [domains/tracking.md](domains/tracking.md) | PostHog + Customer.io dual dispatch, feature flags |
+| [domains/tracking.md](domains/tracking.md) | PostHog + Customer.io dual dispatch, the booking funnel events, the GTM container audit |
 | [domains/referral.md](domains/referral.md) | Referrer portal, click attribution, Stripe Connect payouts |
 | [domains/partner-hub.md](domains/partner-hub.md) | `rl_partner` CPT, co-branded hubs, CPT-backed partner directory |
 | [domains/content-audit.md](domains/content-audit.md) | Elementor audit/conversion, blog import, Yoast meta import, block inventory |
