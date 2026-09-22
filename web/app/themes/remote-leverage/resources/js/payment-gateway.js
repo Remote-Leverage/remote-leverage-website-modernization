@@ -39,6 +39,9 @@
  * aggregates across it. The rest are the legacy Customer.io names, tidied where they were
  * artefacts of PHP's ucfirst() on a snake_case key.
  */
+import { loadStylesheet } from './load-stylesheet';
+import { retryImport } from './retry-import';
+
 const FUNNEL = {
   gatewayViewed: 'Payment Gateway Viewed',
   checkoutStarted: 'form_started',
@@ -254,11 +257,14 @@ function loadIntlTelInput() {
   }
 
   itiPromise = Promise.all([
-    import('intl-tel-input/intlTelInputWithUtils'),
-    import('intl-tel-input/build/css/intlTelInput.css'),
+    retryImport(() => import('intl-tel-input/intlTelInputWithUtils')),
+    import('intl-tel-input/build/css/intlTelInput.css?url').then(({ default: href }) => loadStylesheet(href)),
   ]).then(([mod]) => {
     window.intlTelInput = mod.default;
     return window.intlTelInput;
+  }).catch((err) => {
+    itiPromise = null;
+    throw err;
   });
 
   return itiPromise;
