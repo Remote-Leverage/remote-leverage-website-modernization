@@ -24,6 +24,15 @@ use Illuminate\Database\Eloquent\Builder;
  * `status` answers what happened to the lead afterwards; this answers whether they finished the
  * form. They are independent, which is why both filters exist: 25 leads are `Partial` **and**
  * `booked` — people who abandoned once and came back.
+ *
+ * ## Not every submission is a sales enquiry
+ *
+ * The gated download (acf/impact-report-hero) captures a name and an email in exchange for a
+ * PDF. That is a real lead and it belongs in the table, but it is not somebody asking to be
+ * called: there is no phone number, no revenue band, no role and no hours, because the form
+ * never asked. {@see self::isSalesEnquiry()} is what the Slack alert and the outgoing webhooks
+ * gate on, and it lives here because "which submissions reach sales" is a property of the
+ * submission type rather than of any one listener.
  */
 class LeadSubmission
 {
@@ -32,6 +41,23 @@ class LeadSubmission
 
     /** The form was completed. */
     public const FINAL = 'final';
+
+    /**
+     * An email handed over for a file — the 2026 Impact Report and anything else in
+     * `config/gated-assets.php`. Never a request to be contacted.
+     */
+    public const GATED_DOWNLOAD = 'gated_download';
+
+    /**
+     * The submission types that must not reach sales.
+     *
+     * A blacklist, for the same reason {@see LeadQualification::SUB_T10_BANDS} is one: a new
+     * form that starts writing a type nobody has heard of should alert, and be silenced
+     * deliberately, rather than be swallowed because it was not on a whitelist.
+     *
+     * @var array<int, string>
+     */
+    private const NOT_SALES_ENQUIRIES = [self::GATED_DOWNLOAD];
 
     /**
      * Slug => label for the dropdown, and slug => stored value for the query.
@@ -45,7 +71,44 @@ class LeadSubmission
     private const TYPES = [
         self::PARTIAL => ['label' => 'Partial (step 1 drop-off)', 'stored' => 'Partial'],
         self::FINAL => ['label' => 'Final (completed form)', 'stored' => 'Final'],
+        self::GATED_DOWNLOAD => ['label' => 'Gated download (report, no call asked for)', 'stored' => 'Gated Download'],
     ];
+
+    /**
+     * The value a writer should put in the column for a slug.
+     *
+     * Exposed so a writer — `GatedDownloadController` today — stamps the same string this class
+     * filters and gates on, instead of keeping a second copy of the literal that can be
+     * corrected in one place and not the other.
+     */
+    public static function stored(string $slug): string
+    {
+        return self::TYPES[strtolower(trim($slug))]['stored'] ?? $slug;
+    }
+
+    /**
+     * Is this a submission a salesperson can act on?
+     *
+     * Anything unrecognised — including an empty column, which is most of the imported rows —
+     * is a yes. Silence is the expensive failure here: a lead nobody is told about is a lead
+     * nobody calls, whereas one alert too many costs a glance.
+     */
+    public static function isSalesEnquiry(?string $submissionType): bool
+    {
+        return ! in_array(self::slugOf($submissionType), self::NOT_SALES_ENQUIRIES, true);
+    }
+
+    /**
+     * The slug a stored value corresponds to.
+     *
+     * Spaces fold to underscores so `Gated Download` and `gated_download` are the same type;
+     * the column is free text, and the stored spelling is the one thing a writer is likely to
+     * get almost-right.
+     */
+    private static function slugOf(?string $value): string
+    {
+        return str_replace(' ', '_', strtolower(trim((string) $value)));
+    }
 
     /** @return array<string, string> */
     public static function options(): array
@@ -81,6 +144,11 @@ class LeadSubmission
             return;
         }
 
-        $query->whereRaw("LOWER(TRIM(COALESCE(submission_type, ''))) = ?", [$slug]);
+        // The stored spelling lowercased, not the slug: they coincide for `partial` and
+        // `final` and do not for `gated_download`, whose column value carries a space.
+        $query->whereRaw(
+            "LOWER(TRIM(COALESCE(submission_type, ''))) = ?",
+            [strtolower(self::TYPES[$slug]['stored'])],
+        );
     }
 }

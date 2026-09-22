@@ -95,7 +95,17 @@ describe('GatedDownloadController', function () {
             ->and($lead->last_name)->toBe('Beesly')
             ->and($lead->email)->toBe('pam.beesly@dundermifflin.com')
             ->and($lead->utm_source)->toBe('linkedin')
-            ->and($lead->utm_campaign)->toBe('impact-report-2026');
+            ->and($lead->utm_campaign)->toBe('impact-report-2026')
+            /*
+             * Stamped on the row, not just in the event context.
+             *
+             * This lived in `extra_data` for as long as the controller existed, which reaches
+             * the LeadCreated context and nothing else — the column stayed null, and a null
+             * submission type reads as a step-one sales capture. That is what put a phoneless
+             * "NEW LEAD" card in Slack for every report download. Nothing downstream can tell
+             * these leads apart unless it is written here.
+             */
+            ->and($lead->submission_type)->toBe('Gated Download');
 
         // Same downstream fan-out as any other lead capture — this is the whole point of
         // routing through CaptureLeadAction instead of building a second lead path.

@@ -7,6 +7,7 @@ namespace App\Application\Http\Controllers;
 use App\Domains\Lead\Actions\CaptureLeadAction;
 use App\Domains\Lead\Data\LeadCaptureData;
 use App\Domains\Lead\Services\GatedAssetResolver;
+use App\Domains\Lead\Services\LeadSubmission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,10 +19,14 @@ use Illuminate\Support\Facades\RateLimiter;
  *
  * Production gates the 2026 Impact Report behind Gravity Forms form 33, which ADR-0008
  * retired. This is the replacement: the same name/email capture, but routed through the
- * Lead domain's CaptureLeadAction so a report download raises exactly the same downstream
- * traffic as a booking-wizard partial capture — LeadFormSubmitted, the Lead row, the
- * dispatch log, LeadCreated, and from there HubSpot, Slack, the outgoing webhook and the
- * admin notification. There is deliberately no second lead path.
+ * Lead domain's CaptureLeadAction so a report download travels the same road as a
+ * booking-wizard partial capture — LeadFormSubmitted, the Lead row, the dispatch log,
+ * LeadCreated, and from there HubSpot, tracking and the admin notification. There is
+ * deliberately no second lead path.
+ *
+ * What it does **not** raise is the sales fan-out: the Slack alert and the three outgoing
+ * webhooks are for a lead somebody is about to phone, and this form collects no phone number
+ * to do it with. See {@see self::capture()}.
  *
  * ASSUMPTION: production's post-submit behaviour lives in Gravity Forms' confirmation
  * settings, which are not visible without production admin access, so whether it redirects
@@ -84,6 +89,21 @@ class GatedDownloadController
     }
 
     /**
+     * Store the lead, and mark it as the kind of lead it is.
+     *
+     * `submission_type` is stamped through `attribution_named`, which is the channel
+     * CaptureLeadAction actually writes to the row — `extra_data` reaches the LeadCreated
+     * event's context and stops there. That distinction was the bug: this controller had been
+     * putting `Gated Download` in `extra_data` since it was written, the column stayed null,
+     * and a null submission type reads as a step-one sales capture everywhere downstream. The
+     * team got a "New organic lead" card with a name and an email and nothing else on it —
+     * no phone to call, no revenue band, no role — for somebody who had only asked for a PDF.
+     *
+     * Marking it is what {@see LeadSubmission::isSalesEnquiry()} then reads, so the Slack alert
+     * and the three outgoing webhooks stay quiet. Everything else about the capture is
+     * unchanged: the row, the activity log, HubSpot, tracking and the admin email all still
+     * happen, because the lead is real — it is only sales that has nothing to act on yet.
+     *
      * @param  array{slug: string, title: string, url: string}  $asset
      */
     protected function capture(Request $request, string $name, string $email, array $asset): void
@@ -103,9 +123,11 @@ class GatedDownloadController
                 'landing_url' => $this->text($request->input('landing_url', '')) ?: null,
                 'referrer_url' => (string) $request->headers->get('referer', '') ?: null,
                 'session_id' => $this->text($request->input('session_id', '')) ?: null,
+                'attribution_named' => [
+                    'submission_type' => LeadSubmission::stored(LeadSubmission::GATED_DOWNLOAD),
+                ],
                 'extra_data' => [
                     'source_form' => 'ImpactReportHero',
-                    'submission_type' => 'Gated Download',
                     'gated_asset' => $asset['slug'],
                     'gated_asset_title' => $asset['title'],
                 ],

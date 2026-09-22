@@ -8,9 +8,19 @@ use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
+use App\Domains\Lead\Services\LeadSubmission;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * The three outgoing lead webhooks: `lead_webhook_url` (the whole lead), `lead_form_url` (the
+ * n8n `lead-form` flow) and `hubspot_lead_url` (the `hubspot-lead-creation` flow).
+ *
+ * All three exist to put a lead in front of the people who work it, which is why all three are
+ * gated on {@see LeadSubmission::isSalesEnquiry()} — the same line the Slack alert draws, drawn
+ * in the same place so the two cannot disagree. A gated-download lead is captured, stored and
+ * synced to HubSpot; it just does not get announced, because there is nothing on it to act on.
+ */
 class HandleLeadEventsForWebhook
 {
     /** The `submission_type` value that means the form was finished, not dropped. */
@@ -51,6 +61,11 @@ class HandleLeadEventsForWebhook
             return;
         }
 
+        // Only leads somebody is going to work. See the class docblock.
+        if (! $this->isSalesEnquiry($event->lead, 'lead.partial_captured')) {
+            return;
+        }
+
         $this->dispatchWebhook($event->lead, 'lead.partial_captured', $event->context);
     }
 
@@ -84,6 +99,10 @@ class HandleLeadEventsForWebhook
     {
         // Shadow ban, as above: stored, and silent downstream.
         if ($event->lead->is_blocked) {
+            return;
+        }
+
+        if (! $this->isSalesEnquiry($event->lead, 'lead.form_captured')) {
             return;
         }
 
@@ -123,6 +142,10 @@ class HandleLeadEventsForWebhook
     public function handleHubSpotSynced(Lead $lead, ?string $action = null): void
     {
         if ($lead->is_blocked) {
+            return;
+        }
+
+        if (! $this->isSalesEnquiry($lead, 'lead.hubspot_synced')) {
             return;
         }
 
@@ -209,6 +232,34 @@ class HandleLeadEventsForWebhook
     protected function isPartial(Lead $lead): bool
     {
         return strcasecmp(trim((string) $lead->submission_type), self::COMPLETED) !== 0;
+    }
+
+    /**
+     * Is this a lead the flows on the other end exist to work — and log it when it is not.
+     *
+     * The log line is the point of wrapping {@see LeadSubmission::isSalesEnquiry()} here rather
+     * than calling it three times inline. A webhook that did not fire leaves no trace anywhere
+     * else, so without this the lead's timeline shows a capture and then nothing, which reads
+     * identically to a delivery that failed silently.
+     */
+    protected function isSalesEnquiry(Lead $lead, string $eventName): bool
+    {
+        $submissionType = (string) $lead->submission_type;
+
+        if (LeadSubmission::isSalesEnquiry($submissionType)) {
+            return true;
+        }
+
+        $this->activityLogger->logConsumption(
+            leadId: $lead->id,
+            eventType: $this->eventTypeFor($eventName),
+            actorDomain: 'Webhook',
+            outcome: 'skipped',
+            description: "Not sent: {$submissionType} is not a sales enquiry",
+            payload: ['event' => $eventName, 'submission_type' => $submissionType],
+        );
+
+        return false;
     }
 
     /**

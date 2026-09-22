@@ -8,6 +8,7 @@ use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
+use App\Domains\Lead\Services\LeadSubmission;
 use App\Domains\Lead\Services\SlackMessageRenderer;
 use App\Domains\Referral\Models\Referrer;
 use App\Infrastructure\Slack\SlackCredentials;
@@ -26,6 +27,11 @@ use Illuminate\Support\Facades\Log;
  *    already booked themselves.
  *  - **The message format is what the sales team reads at a glance.** Field order and labels are
  *    reproduced from the feed rather than redesigned.
+ *
+ * A third condition is this codebase's own: **only sales enquiries are announced.** Not every
+ * `LeadCreated` is somebody to phone — the gated download captures a name and an email for a
+ * PDF — and {@see LeadSubmission::isSalesEnquiry()} is where that line is drawn, shared with
+ * the outgoing webhooks so the two cannot disagree about which leads sales hears about.
  *
  * Transport: {@see SlackTransport}, shared with the referral and live-call alerts — bot token
  * where one is configured, incoming webhook otherwise. The app is now this site's own ("Remote
@@ -59,6 +65,31 @@ class HandleLeadEventsForSlack
         }
 
         $submissionType = (string) ($event->lead->submission_type ?? '');
+
+        /*
+         * Not every lead is a lead for this channel.
+         *
+         * The gated download hands over a name and an email for a PDF. Rendered as a "NEW LEAD"
+         * card it is indistinguishable from a booking capture and actively worse than one — the
+         * card's whole job is to put a phone number, a revenue band and a role in front of
+         * somebody who is going to ring them, and a report download has none of the three. The
+         * team read a card with two facts on it and no call to make.
+         *
+         * The lead is still captured, still in the portal, still synced to HubSpot. It is the
+         * announcement that is wrong, not the lead.
+         */
+        if (! LeadSubmission::isSalesEnquiry($submissionType)) {
+            $this->activityLogger->logConsumption(
+                leadId: $event->lead->id,
+                eventType: 'LeadCreated',
+                actorDomain: 'Slack',
+                outcome: 'skipped',
+                description: "Not announced: {$submissionType} is not a sales enquiry",
+                payload: ['type' => 'partial', 'submission_type' => $submissionType],
+            );
+
+            return;
+        }
 
         // Parity with the GF feed's condition. LeadCreated fires for both the partial capture
         // and the completed booking, so without this the team gets two alerts per lead and the
