@@ -151,12 +151,14 @@
            comp, 260x260 in the 293px mobile one.
 
            fetchpriority high and no lazy attribute: this is the largest element in the first
-           viewport on every role page, so it is the LCP candidate. --}}
+           viewport on every role page, so it is the LCP candidate.
+           No `decoding="async"`: same reason as acf/hire-va-hero — async decode
+           delayed LCP promotion after the pixels were already on screen. --}}
       @if ($isImage && $heroImage)
         <div class="mt-10 w-full lg:mt-0">
           <img src="{{ $heroImage }}"
                alt="{{ trim(preg_replace('/\s+/', ' ', $headline.' '.$headlineAccent)) }}"
-               width="1000" height="1000" fetchpriority="high" decoding="async"
+               width="1000" height="1000" fetchpriority="high"
                class="aspect-square h-auto w-full rounded-card object-cover">
         </div>
       @endif

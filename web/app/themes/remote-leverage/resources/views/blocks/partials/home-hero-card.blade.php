@@ -32,9 +32,16 @@
   {{-- Absolutely placed rather than in flow so the figure stands on the card's floor and is
        clipped by its own rounded bottom edge. Every portrait is trimmed to its subject and set
        to a common 560px height upstream, so one CSS height gives all three the same scale. --}}
+  {{-- Lazy, not eager. The fan is `hidden lg:block` on the homepage, so these
+       portraits are not in the first mobile viewport — but Chrome still fetches
+       `loading=eager` images inside `display:none`, and WordPress then stamps
+       `fetchpriority=high` on the first one. A 2026-09-22 staging PSI run
+       (Moto G / Slow 4G) scored FCP 1.6 s / LCP 6.5 s because ~520 KB of
+       Mariana/Luana/Bruno stole the pipe from Inter Display, which is the
+       actual mobile LCP (the <h1>). --}}
   @if (! empty($card['photo']))
     <img src="{{ $card['photo'] }}" alt="" width="350" height="560"
          class="pointer-events-none absolute -bottom-px left-1/2 z-0 h-[73%] w-auto max-w-none -translate-x-1/2 object-contain object-bottom"
-         decoding="async" loading="eager">
+         decoding="async" loading="lazy">
   @endif
 </div>
