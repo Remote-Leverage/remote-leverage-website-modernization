@@ -19,7 +19,10 @@ use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Referral\Services\AttributionEngine;
 use App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
 use Carbon\Carbon;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Facade;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 describe('Lead Domain', function () {
@@ -280,10 +283,19 @@ describe('Lead Domain', function () {
     });
 
     test('HandleLeadEventsForSlack dispatches and logs consumption for partial and final events', function () {
-        config(['services.slack.webhook_url' => 'https://hooks.slack.com/services/test/123']);
-        // The booking alert is off by default for parity with the legacy Gravity Forms feed,
-        // which alerted on the partial only. This test covers both halves, so it opts in.
-        config(['services.slack.notify_on_booking' => true]);
+        // SlackTransport posts through the Http facade, which keeps its Factory for the process.
+        // Without a fresh swap this test inherits whatever an earlier file faked — a 503, a
+        // thrown connection — and logs outcome=failed even though the listener itself succeeded.
+        Facade::clearResolvedInstance(HttpFactory::class);
+        Http::swap(new HttpFactory);
+        Http::fake(['hooks.slack.com/*' => Http::response('ok', 200)]);
+
+        config([
+            'services.slack.webhook_url' => 'https://hooks.slack.com/services/test/123',
+            'services.slack.bot_token' => '',
+            // The booking alert is on by default; this test covers both halves.
+            'services.slack.notify_on_booking' => true,
+        ]);
         $activityLogger = new LeadActivityLogger;
         $listener = new HandleLeadEventsForSlack($activityLogger);
 
