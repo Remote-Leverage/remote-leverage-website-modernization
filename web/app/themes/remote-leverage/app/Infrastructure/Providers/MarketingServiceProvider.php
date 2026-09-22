@@ -270,7 +270,7 @@ class MarketingServiceProvider extends ServiceProvider
                 ]);
             }
 
-            $heartbeat->finish($checkIn, $ok, microtime(true) - $startedAt);
+            $this->app->make(CronHeartbeat::class)->ran($ok, microtime(true) - $startedAt);
         });
 
         \add_action(self::CRON_HOOK, function () {
@@ -282,8 +282,6 @@ class MarketingServiceProvider extends ServiceProvider
              * See CronHeartbeat for why the alerting has to come from a missing check-in rather
              * than from anything of ours noticing.
              */
-            $heartbeat = $this->app->make(CronHeartbeat::class);
-            $checkIn = $heartbeat->start();
             $startedAt = microtime(true);
             $ok = true;
 

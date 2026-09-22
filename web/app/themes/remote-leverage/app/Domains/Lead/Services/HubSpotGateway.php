@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Lead\Services;
 
 use App\Domains\Lead\Models\Lead;
+use App\Domains\PartnerHub\Support\PartnerLink;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -259,6 +260,16 @@ class HubSpotGateway
      */
     protected function propertiesFor(Lead $lead, bool $includeEmail = true): array
     {
+        /*
+         * `partner` carries two kinds of value: a partner code from a Partner Hub tracked link
+         * (WR-73), and the free-text campaign tag the parameter held before that. A code that
+         * resolves to an `rl_partner` post is an identifier and belongs in `partnership_id`; a
+         * value that resolves to nothing is the label it always was and stays in `partner_name`
+         * alone. See App\Domains\PartnerHub\Support\PartnerLink.
+         */
+        $partnerValue = trim((string) $lead->partner);
+        $partnerName = $partnerValue === '' ? null : PartnerLink::nameForCode($partnerValue);
+
         $properties = [
             'firstname' => $lead->first_name ?: $lead->name,
             'lastname' => $lead->last_name,
@@ -280,7 +291,17 @@ class HubSpotGateway
             'fbc' => $lead->fbc,
             'li_fat_id' => $lead->li_fat_id,
             'oppref' => $lead->oppref,
-            'partner_name' => $lead->partner,
+            /*
+             * `partnership_id` did not exist in portal 243484989 when this shipped (checked
+             * 2026-09-21 against the live schema: 488 contact properties, `partner_name` the
+             * only partner one). `dropUnknownProperties()` therefore skips it and logs, and it
+             * starts flowing the moment somebody creates it — no deploy. Create it as a
+             * single-line text property under `conversioninformation`, beside `partner_name`.
+             * The private app token cannot create it itself; see the note on
+             * `event_source_url` below.
+             */
+            'partnership_id' => $partnerName === null ? null : $partnerValue,
+            'partner_name' => $partnerName ?? ($partnerValue ?: null),
             'referrer_rewardful_id' => $lead->referral_code,
             'source' => $lead->data_source,
             /*

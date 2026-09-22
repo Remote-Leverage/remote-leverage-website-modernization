@@ -1069,6 +1069,82 @@ if (! function_exists('delete_post_meta')) {
     }
 }
 
+if (! function_exists('get_post')) {
+    /**
+     * Reader for the same `_wp_mock_posts` store `wp_update_post()` writes.
+     *
+     * Returns a WP_Post so callers can type-check against it the way production does.
+     */
+    function get_post($postId = null)
+    {
+        $attributes = $GLOBALS['_wp_mock_posts'][$postId] ?? null;
+
+        if (! is_array($attributes)) {
+            return null;
+        }
+
+        return new WP_Post($attributes + ['ID' => (int) $postId]);
+    }
+}
+
+if (! class_exists('WP_Query')) {
+    /**
+     * Enough of WP_Query for a meta lookup, and deliberately no more.
+     *
+     * Supports `post_type`, `post_status`, `posts_per_page` and a flat `meta_query` of `=`
+     * comparisons against the `_wp_mock_post_meta` store — which is the shape
+     * PartnerLink::findByCode() uses. `fields => 'ids'` is honoured because that is what the
+     * caller asks for; anything richer should grow a stub when something needs it rather than
+     * be guessed at here.
+     */
+    class WP_Query
+    {
+        /** @var array<int, int|WP_Post> */
+        public array $posts = [];
+
+        public function __construct(array $args = [])
+        {
+            $postType = $args['post_type'] ?? 'post';
+            $status = $args['post_status'] ?? 'publish';
+            $limit = (int) ($args['posts_per_page'] ?? -1);
+            $clauses = array_values(array_filter(
+                (array) ($args['meta_query'] ?? []),
+                static fn ($clause) => is_array($clause) && isset($clause['key']),
+            ));
+
+            $matches = [];
+
+            foreach (($GLOBALS['_wp_mock_posts'] ?? []) as $postId => $attributes) {
+                if (($attributes['post_type'] ?? 'post') !== $postType) {
+                    continue;
+                }
+
+                if (($attributes['post_status'] ?? 'publish') !== $status) {
+                    continue;
+                }
+
+                foreach ($clauses as $clause) {
+                    $stored = $GLOBALS['_wp_mock_post_meta'][$postId][$clause['key']] ?? null;
+
+                    if ((string) $stored !== (string) ($clause['value'] ?? '')) {
+                        continue 2;
+                    }
+                }
+
+                $matches[] = (int) $postId;
+
+                if ($limit > 0 && count($matches) >= $limit) {
+                    break;
+                }
+            }
+
+            $this->posts = ($args['fields'] ?? '') === 'ids'
+                ? $matches
+                : array_map(static fn (int $id) => get_post($id), $matches);
+        }
+    }
+}
+
 if (! function_exists('wp_update_post')) {
     function wp_update_post($postArr)
     {

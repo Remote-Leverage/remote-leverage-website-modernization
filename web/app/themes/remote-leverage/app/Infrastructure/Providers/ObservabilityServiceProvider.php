@@ -7,6 +7,7 @@ namespace App\Infrastructure\Providers;
 use App\Infrastructure\Observability\CredentialRegistry;
 use App\Infrastructure\Observability\IntegrationCall;
 use App\Infrastructure\Observability\IntegrationCallRecorder;
+use App\Infrastructure\Observability\QueueReporting;
 use App\Infrastructure\Observability\SentryReporting;
 use App\Infrastructure\WordPress\Admin\CacheHealthNotice;
 use Illuminate\Http\Client\Events\ConnectionFailed;
@@ -51,6 +52,12 @@ class ObservabilityServiceProvider extends ServiceProvider
          * broken.
          */
         (new SentryReporting)->register();
+
+        /*
+         * After SentryReporting, and deliberately: it needs the client that call installs, and
+         * returns without registering anything when there is none.
+         */
+        (new QueueReporting)->register();
 
         if (! config('observability.integration_calls.enabled', true)) {
             return;

@@ -352,10 +352,21 @@ describe('Featured posts data', function () {
         ]);
     });
 
-    test('queryCards() degrades to an empty list when WordPress is absent', function () {
-        // Guarded rather than fatal: the block is also rendered by the pattern test
-        // harness and the editor preview, neither of which has WP_Query.
-        expect(class_exists(\WP_Query::class))->toBeFalse()
+    test('queryCards() degrades to an empty list rather than fatalling', function () {
+        /*
+         * Guarded rather than fatal: the block is also rendered by the pattern test harness and
+         * the editor preview, neither of which has a real WP_Query.
+         *
+         * This asserted `class_exists(WP_Query::class)` was false until 2026-09-22, using the
+         * harness's lack of one as the stand-in for "WordPress is absent". `tests/stubs.php`
+         * then grew a minimal WP_Query for PartnerLink's meta lookup, so that proxy no longer
+         * holds. The guard in queryCards() is unchanged and still load-bearing in the editor —
+         * what is pinned here is now the behaviour itself, with the source check standing in
+         * for the branch the harness can no longer reach.
+         */
+        $source = file_get_contents(__DIR__.'/../../app/Blocks/FeaturedPostsBlock.php');
+
+        expect($source)->toContain('class_exists(\WP_Query::class)')
             ->and(block(FeaturedPostsBlock::class)->queryCards('ecommerce', 4))->toBe([]);
     });
 

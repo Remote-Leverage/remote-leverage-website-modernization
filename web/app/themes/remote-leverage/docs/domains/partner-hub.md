@@ -47,7 +47,33 @@ Around 35 per-partner meta fields are authored through an ACF tabbed field group
 
 ### Attribution
 
-`HandleLeadBookingCompletedForPartner` credits a partner when a booking arrives with a matching `source_type`/`source_id`. This is architecture the legacy plugin never had.
+`HandleLeadBookingCompletedForReferrer` credits a referrer when a booking arrives with a matching `source_type`/`source_id`. This is architecture the legacy plugin never had. (It is named `...ForReferrer`, not `...ForPartner`; several tickets and older docs use the latter, and it has never existed. Partners and referrers share the one `referrer-*` portal.)
+
+#### The partnership identifier (WR-73)
+
+A partner hub renders a **tracked link** built by `App\Domains\PartnerHub\Support\PartnerLink`, carrying the partner's `_rl_partner_code` on `?partner=`:
+
+```
+https://remoteleverage.com/hire-va-4/?partner=RL-OYSTER
+```
+
+That parameter was chosen over inventing one because it already exists end to end: `AttributionCollector::NAMED` maps `partner` to a column on `rl_leads`, and `HubSpotGateway` has always sent it. What it carried was free text — a campaign tag someone typed — which is why nothing could join on it.
+
+`HubSpotGateway::propertiesFor()` now splits the two meanings apart:
+
+| `?partner=` value | `partnership_id` | `partner_name` |
+| :--- | :--- | :--- |
+| resolves to an `rl_partner` post | the code, e.g. `RL-OYSTER` | the partner's name, e.g. `Oyster` |
+| resolves to nothing (a legacy campaign tag) | not sent | the raw value, unchanged |
+
+`PartnerLink::nameForCode()` is what distinguishes them, and null is the signal that a value is *not* an identifier.
+
+**`partnership_id` does not exist in HubSpot portal 243484989** — checked against the live schema on 2026-09-21: 488 contact properties, `partner_name` the only partner one. `dropUnknownProperties()` therefore skips it and logs a warning, and it starts flowing the moment somebody creates it, with no deploy. Create it as a single-line text property under `conversioninformation`. The private app token cannot create it itself; it reads the schema but lacks `crm.schemas.contacts.write`.
+
+Two things deliberately **not** done here:
+
+- **`?via=` was not reused.** It belongs to the Referral domain, sits in `AttributionCollector::IGNORED`, and `AttributionEngine::resolveLeadSource()` classifies a slug as `partnership` by prefix — `partner-`, `co-`, `strategic`. `RL-OYSTER` matches none, so borrowing the parameter would stamp every partner lead `referral_hub`.
+- **The `AttributionEngine` prefix heuristic was left alone.** It still decides `partnership` vs `referral_hub` by slug shape rather than by looking a partner up. That is worth replacing with a `PartnerLink::findByCode()` lookup, but it governs `source_type` on paths this ticket does not touch, and changing it silently reclassifies historical leads.
 
 ## 2. The directory
 
@@ -110,6 +136,8 @@ The gap against the legacy plugin was tracked as epic **WR-115** (subtasks WR-11
 ## Tests
 
 `tests/Unit/PartnerHubTest.php` — 34 tests covering the admin save handler, the global data library, tab resolution, the per-partner override resolver, the CPT-backed directory DTO and directory filtering.
+
+`tests/Unit/PartnershipIdentifierTest.php` — 12 tests covering the tracked link, code resolution, and the `partnership_id` / `partner_name` split in the HubSpot payload, including that the property is dropped rather than 400ing the sync while the portal lacks it.
 
 ## Known gaps
 

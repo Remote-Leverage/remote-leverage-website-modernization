@@ -16,6 +16,32 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Queue worker monitoring
+    |--------------------------------------------------------------------------
+    |
+    | WR-106. The worker reports its own failures through the exception handler
+    | already; what needs declaring is the monitor that notices when the worker
+    | itself stops, because a process that is not running raises nothing.
+    |
+    */
+
+    'queue' => [
+
+        /*
+         * Sentry Crons monitor slug for "a queue worker started".
+         *
+         * Empty switches the heartbeat off, which is the default and the right
+         * default: `QUEUE_CONNECTION` is unset in every deployed environment,
+         * so there is no worker to miss. Set this in the same change that sets
+         * `QUEUE_CONNECTION` on an environment, never before — a monitor that
+         * alerts on the absence of something deliberately switched off is a
+         * monitor people learn to ignore.
+         */
+        'sentry_monitor' => (string) env('QUEUE_SENTRY_MONITOR', ''),
+    ],
+
     'integration_calls' => [
 
         'enabled' => (bool) env('RL_RECORD_INTEGRATION_CALLS', true),

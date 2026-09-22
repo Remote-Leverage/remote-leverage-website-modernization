@@ -19,15 +19,17 @@ test('an empty monitor slug switches the heartbeat off entirely', function () {
     config(['marketing.cost_alert.sentry_monitor' => '']);
 
     // No slug, no check-in and no Sentry traffic — for environments that should not be monitored.
-    expect((new CronHeartbeat)->start())->toBeNull();
-});
+    (new CronHeartbeat)->ran(true, 1.0);
+})->throwsNoExceptions();
 
-test('finishing without a check-in id is a no-op', function () {
+test('a failed tick checks in as an error rather than staying silent', function () {
     config(['marketing.cost_alert.sentry_monitor' => 'marketing-cost-alert']);
 
-    // start() returns null whenever it could not check in. finish() must cope with that rather
-    // than assume a happy path, or a monitor outage becomes a tick outage.
-    (new CronHeartbeat)->finish(null, true, 1.0);
+    /*
+     * Silence already means "the scheduler is dead". A tick that ran and threw is a different
+     * fault and has to be distinguishable from one that never ran at all.
+     */
+    (new CronHeartbeat)->ran(false, 0.2);
 })->throwsNoExceptions();
 
 test('observing the tick never breaks the tick', function () {
@@ -38,16 +40,17 @@ test('observing the tick never breaks the tick', function () {
      * call either no-ops or throws depending on the environment — and in neither case may the
      * heartbeat propagate anything to the cron callback wrapping it.
      */
-    $heartbeat = new CronHeartbeat;
-    $heartbeat->finish($heartbeat->start(), false, 0.5);
+    (new CronHeartbeat)->ran(true, 0.5);
 })->throwsNoExceptions();
 
-test('the configured slug is what gets used', function () {
-    config(['marketing.cost_alert.sentry_monitor' => '  spaced-slug  ']);
+test('there is no open check-in left for Sentry to time out', function () {
+    /*
+     * The bug this replaced. An `in_progress` open whose close never arrived made Sentry report
+     * "a timeout check-in was detected" every hour with `Last Successful Check-In: Never` — an
+     * alert about the monitoring that looked exactly like the outage it was built to catch.
+     */
+    $src = file_get_contents(__DIR__.'/../../app/Domains/Marketing/Support/CronHeartbeat.php');
 
-    $slug = (fn () => $this->slug())->call(new CronHeartbeat);
-
-    // Trimmed, because an env var with a stray space would otherwise check in to a monitor
-    // Sentry has never heard of and alert on a schedule nobody is watching.
-    expect($slug)->toBe('spaced-slug');
+    expect($src)->not->toContain('inProgress')
+        ->and($src)->toContain('maxRuntime: null');
 });

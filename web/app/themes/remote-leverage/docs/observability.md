@@ -240,13 +240,48 @@ exposes `config('sentry.release')` as `window.APP_VERSION`, which `app.js` passe
 `Sentry.init()`. One value, one source, both sides — so an issue can be filtered to the deploy that
 introduced it instead of showing up tagged with no release at all.
 
-### Production runs a different SDK
+### ~~Production runs a different SDK~~ — no longer true since the 2026-09-19 cutover
 
-Production is still on `wp-sentry-integration`, not this stack's `@sentry/browser` +
-`sentry/sentry-laravel`. Nothing in this repo changes what production reports; an alert like
-`ReferenceError: oaiq is not defined` comes from `rl-elementor-blocks/assets/js/headless-calendly.js`
-on the legacy site and has no counterpart here. v2 replaces that stack at cutover, which is when
-these filters take effect.
+Kept because it is worth knowing this *was* the state, and because reading it as current produces
+a specific wrong conclusion: that the filters here do not apply to production, and that the
+backlog of legacy alerts is still a thing to triage.
+
+What it said, and what changed:
+
+> ~~Production is still on `wp-sentry-integration`, not this stack's `@sentry/browser` +
+> `sentry/sentry-laravel`. Nothing in this repo changes what production reports; an alert like
+> `ReferenceError: oaiq is not defined` comes from
+> `rl-elementor-blocks/assets/js/headless-calendly.js` on the legacy site and has no counterpart
+> here. v2 replaces that stack at cutover, which is when these filters take effect.~~
+
+The apex cut over on ~2026-09-19. `remoteleverage.com` serves this theme, so the filters in
+`config/sentry.php` and `resources/js/app.js` **are** production's filters now, and the legacy
+error population went with the stack that produced it — `oaiq` included. Anything still being
+triaged from before that date is a list of alerts from a site that no longer exists; re-baseline
+against what v2 actually reports rather than working through it. (This is the substance of
+WR-134, whose premise — "130 unresolved errors" — was counted on the legacy stack.)
+
+### Queue worker (WR-106)
+
+The worker's own exceptions never needed wiring: `Worker::runJob()` hands them to the
+`ExceptionHandler`, which `SentryReporting` already has a `reportable` callback on. Three things
+around them did, and `app/Infrastructure/Observability/QueueReporting.php` is all three.
+
+| Listener | What it adds | Why not elsewhere |
+| :--- | :--- | :--- |
+| `JobProcessing` | job class, queue and connection as tags; `failed_jobs` uuid and attempt count as context | Must be set **before** the job runs — the handler reports during the failure, so anything attached in `JobFailed` arrives after the event has gone |
+| `JobFailed` | flushes the Sentry client | A web request flushes when it ends; a worker sits in an hour of polling, and a buffered event waits there with it |
+| `WorkerStarting` | a Sentry Crons check-in | Fires once per worker process, and the entrypoint's `--max-time=3600` recycle makes that hourly — so "no check-in this hour" means no worker |
+
+The heartbeat is the only one that costs anything to get wrong, so it is off unless
+`QUEUE_SENTRY_MONITOR` names a monitor. Set it in the same change that sets `QUEUE_CONNECTION` on
+an environment: every deployed environment currently runs `sync`, and a monitor that alerts about
+a worker nobody asked to run is a monitor people mute.
+
+What it catches that nothing else does: the worker dying, the entrypoint's restart loop dying
+(it is a detached subshell orphaned onto PID 1, so nothing else notices), and a container running
+without a worker at all. What it does not catch: a worker alive but wedged on one job —
+`--timeout=60` bounds that, and a job killed by it throws, which is the first row above.
 
 ---
 
@@ -260,7 +295,8 @@ these filters take effect.
 | Icons | `app/Infrastructure/WordPress/Admin/IntegrationIcons.php` |
 | Table | `rl_integration_calls` (migration `2026_09_16_000006`) |
 | Prune command | `wp acorn rl:prune-integration-calls` |
-| Tests | `tests/Unit/IntegrationCallRecordingTest.php`, `tests/Unit/SentryNoiseTest.php` |
+| Queue reporting | `app/Infrastructure/Observability/QueueReporting.php` |
+| Tests | `tests/Unit/IntegrationCallRecordingTest.php`, `tests/Unit/SentryNoiseTest.php`, `tests/Unit/QueueReportingTest.php` |
 
 ### Environment variables
 
@@ -270,3 +306,4 @@ these filters take effect.
 | `RL_RECORD_UNKNOWN_HOSTS` | `false` | record hosts not in the allowlist, as `other` |
 | `RL_RECORD_WP_HTTP` | `true` | capture the outgoing webhook via `http_api_debug` |
 | `RL_INTEGRATION_CALL_RETENTION_DAYS` | `30` | prune window |
+| `QUEUE_SENTRY_MONITOR` | `''` | Sentry Crons slug for "a worker started"; empty switches the heartbeat off |

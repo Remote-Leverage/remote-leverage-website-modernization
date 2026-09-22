@@ -11,92 +11,53 @@ use Sentry\MonitorSchedule;
 /**
  * Tell Sentry the hourly cron tick happened, so Sentry can say when it stops.
  *
- * ## Why a check-in rather than an alert we raise ourselves
+ * ## Why a check-in rather than a monitor of our own
  *
- * On 2026-09-21 the scheduler stopped at 16:25 UTC and nothing said so for ten hours. Not Sentry,
- * not Slack, not the dashboard. The outage was discovered because a Slack card failed to arrive,
- * and the day after went into working out why.
+ * On 2026-09-21 the scheduler stopped at 16:25 UTC and nothing reported it for ten hours. Any
+ * monitor written here shares one hole: it is code, and code has to run to complain, so anything
+ * riding on the cron tick is as dead as the tick. Sentry Crons inverts that — we say "this ran",
+ * and Sentry raises the alarm when the saying stops. Nothing of ours needs to be alive at the
+ * moment of failure, which matters because the failure mode is that nothing of ours is alive.
  *
- * Every monitor we could have written has the same hole: it is code, and code has to be *run* to
- * complain. A check that rides on the cron tick cannot report that the cron tick stopped, and one
- * that rides on web traffic is a second scheduler to get wrong — which is exactly the fallback that
- * was tried and removed the same night for double-posting.
+ * ## One check-in, sent after the work
  *
- * Sentry Crons inverts it. We say "this ran" each time it runs, and Sentry raises the alert when a
- * check-in fails to arrive inside the window. Nothing of ours has to be alive at the moment of
- * failure, which is the whole point: the failure mode is that nothing of ours is alive.
+ * The first version opened an `in_progress` check-in and closed it with `ok`. That produced a
+ * "timeout check-in was detected" failure every hour with `Last Successful Check-In: Never` — the
+ * open arrived, the close did not, and Sentry correctly reported a run that never finished. The
+ * alert it raised was about the monitoring, not about cron, which is the worst kind of false alarm:
+ * it looks exactly like the outage it was built to catch.
  *
- * ## Why it wraps the tick, not the send
+ * So there is no open/close pair any more. One terminal check-in goes out once the tick has done
+ * its work. A tick that never happens sends nothing and Sentry reports a missed check-in, which is
+ * the whole requirement. A tick that throws sends `error`.
  *
- * The question being monitored is "is the scheduler running", not "did a card post". The alert
- * legitimately posts nothing outside its window or on an environment it is switched off in, and a
- * monitor that treated those as failures would cry wolf nightly. So the check-in is `ok` whenever
- * the tick *ran*, whatever the send decided, and `error` only when the tick threw.
+ * The cost of dropping the pair is `max_runtime` — Sentry can no longer notice a run that hangs
+ * forever, because a hung run and a dead scheduler now look the same from outside. That is an
+ * acceptable trade for a monitor that does not cry wolf hourly, and the hung case is covered
+ * anyway: the next tick is an hour later and will check in on its own.
  *
- * It is attached to the WP-Cron callback specifically, and not to the console command or the
- * dashboard's "send now" button: a human firing a card by hand must not silence a monitor that
- * exists to notice the scheduler is dead, which is precisely the state somebody firing cards by
- * hand is in.
+ * ## What it measures
  *
- * ## Configuration
+ * The tick, not the send. The alert legitimately posts nothing outside its window, and a monitor
+ * treating that as failure would page nightly. It is attached to the WP-Cron callback alone — a
+ * human firing a card by hand must not silence a monitor whose job is noticing the scheduler is
+ * dead, which is exactly the state somebody firing cards by hand is in.
  *
- * `marketing.cost_alert.sentry_monitor` is the monitor slug, and an empty value switches this off
- * entirely — no check-in, no Sentry traffic — for environments that should not be monitored. The
- * schedule is declared here rather than in Sentry's UI so that the window Sentry judges against
- * and the schedule WordPress actually runs on are changed in the same commit.
+ * `marketing.cost_alert.sentry_monitor` is the slug; empty switches it off with no Sentry traffic.
  */
 class CronHeartbeat
 {
     /**
-     * Let Sentry know a tick has begun; returns the id to close it with, or null when disabled.
+     * Record that a tick ran. `$ok` is about the tick, never about whether a card posted.
      *
-     * Failing to check in must never break the tick — the monitor is there to observe the work,
-     * not to be a new way for it to die.
+     * Swallows everything: the monitor observes the work, it does not become a new way for the
+     * work to die.
      */
-    public function start(): ?string
+    public function ran(bool $ok = true, ?float $seconds = null): void
     {
-        $slug = $this->slug();
+        $slug = trim((string) config('marketing.cost_alert.sentry_monitor', ''));
 
         if ($slug === '' || ! function_exists('Sentry\captureCheckIn')) {
-            return null;
-        }
-
-        try {
-            return \Sentry\captureCheckIn(
-                slug: $slug,
-                status: CheckInStatus::inProgress(),
-                monitorConfig: new MonitorConfig(
-                    MonitorSchedule::crontab('0 * * * *'),
-
-                    /*
-                     * Twenty minutes of grace. WP-Cron fires on the tick that follows the hour
-                     * rather than on the hour itself, a rolling deploy can delay one, and the
-                     * send itself took 13.5s on the last healthy run. Ten hours of silence is
-                     * the thing worth paging about; ninety seconds of lateness is not.
-                     */
-                    checkinMargin: 20,
-
-                    /*
-                     * The snapshot is roughly twenty-five queries and two or three warehouse
-                     * round trips. Five minutes is far beyond its worst observed run and still
-                     * well short of the next tick, so a hung run is reported before the one
-                     * after it starts.
-                     */
-                    maxRuntime: 5,
-                    timezone: (string) config('marketing.cost_alert.timezone', 'UTC'),
-                ),
-            );
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    /** Close the tick. `$ok` is about the tick running, never about whether a card posted. */
-    public function finish(?string $checkInId, bool $ok, ?float $seconds = null): void
-    {
-        $slug = $this->slug();
-
-        if ($checkInId === null || $slug === '' || ! function_exists('Sentry\captureCheckIn')) {
             return;
         }
 
@@ -105,15 +66,24 @@ class CronHeartbeat
                 slug: $slug,
                 status: $ok ? CheckInStatus::ok() : CheckInStatus::error(),
                 duration: $seconds,
-                checkInId: $checkInId,
+                monitorConfig: new MonitorConfig(
+                    MonitorSchedule::crontab('0 * * * *'),
+
+                    /*
+                     * Twenty minutes of grace. WP-Cron fires on the tick following the hour rather
+                     * than on the hour itself, and a rolling deploy can delay one. Ten hours of
+                     * silence is what is worth paging about; ninety seconds of lateness is not.
+                     */
+                    checkinMargin: 20,
+
+                    // No max_runtime: without an in_progress open there is no run for Sentry to
+                    // time out, which is the point of the rewrite.
+                    maxRuntime: null,
+                    timezone: (string) config('marketing.cost_alert.timezone', 'UTC'),
+                ),
             );
         } catch (\Throwable) {
-            // Same reasoning as start(): observing the work must not endanger it.
+            // Deliberately silent — see the class docblock.
         }
-    }
-
-    private function slug(): string
-    {
-        return trim((string) config('marketing.cost_alert.sentry_monitor', ''));
     }
 }

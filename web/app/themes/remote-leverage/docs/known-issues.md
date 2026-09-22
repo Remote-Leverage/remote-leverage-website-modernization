@@ -847,6 +847,48 @@ path it was supposed to protect measures 6.75 ms, and the path that *was* slow w
 preflight bug, now fixed. Revisit WR-106 on concurrency grounds — booking-funnel traffic causing
 `pm.max_children` saturation — or the first time a dropped integration call actually costs a lead.
 
+#### Superseded (2026-09-22) — the worker exists; switching it on is now the only step left
+
+Three of the four claims above and in [`adr-status.md`](adr-status.md) were overtaken by the
+2026-09-19 queue work (`6e66a6e`) and are no longer true:
+
+- **"No listener implements `ShouldQueue`."** `App\Infrastructure\Queue\CallHandlerJob` does. It
+  is the only one — a single generic handler-method job that `App\Infrastructure\Queue\Deferred`
+  dispatches — and exactly one call site is converted so far
+  (`MultistepBookingWizard::probe`). The dozen other integrations are still raw
+  `dispatch(…)->afterResponse()`, so they get no `failed_jobs` row and no retry *even with a
+  worker running*. Conversion is per call site and deliberately partial.
+- **"No Supervisor/systemd config."** Correct as written and staying that way — see below.
+- **"No queue worker deployed."** The provisioning exists: `docker/entrypoint.sh` starts and
+  restarts one. What is missing is an environment that asks for it, because `QUEUE_CONNECTION` is
+  unset everywhere but `docker-compose.yml`. That was the design — "switching the queue on is an
+  environment change rather than a deploy" — not an oversight.
+
+**Supervisor/systemd is resolved as "not needed", not as "still to do".** The acceptance criterion
+is a restart inside five seconds; the entrypoint's `while true` loop restarts in two, and ECS
+restarts the task on reboot. Adding supervisord to a single-purpose container would duplicate the
+orchestrator. The residual risk is honest and recorded rather than fixed: the loop is a detached
+subshell orphaned onto PID 1 by `exec nginx`, so if the *loop* is reaped — a cgroup OOM kill, say —
+nothing restarts it and the container keeps serving traffic and passing its health check. That is
+what the heartbeat below exists to catch, and catching it is cheaper than supervising it.
+
+**What shipped instead (2026-09-22):**
+
+- `--memory=192` on the worker, under php.ini's 256M. It had no memory ceiling before, so a
+  leaking job was OOM-killed by the container rather than exiting cleanly between jobs.
+- `App\Infrastructure\Observability\QueueReporting` — the job's class, queue, connection and
+  `failed_jobs` uuid on the Sentry scope *before* the job runs, so the exception the handler
+  already reports arrives identifiable and with the handle `queue:retry` takes. Queue exceptions
+  were reaching Sentry before this; they were indistinguishable from web ones.
+- A Sentry Crons check-in on `WorkerStarting`, which the hourly `--max-time` recycle turns into an
+  hourly heartbeat. Off until `QUEUE_SENTRY_MONITOR` is set, which belongs in the same change that
+  sets `QUEUE_CONNECTION` on an environment.
+
+`--tries=1` stays, against the ticket's `--tries=3`: `CallHandlerJob` documents why (a retried
+Slack post or lead webhook is a duplicate someone else has to reconcile), so "automated retry" is
+answered as *deliberately none* rather than left unimplemented. Turning it on means making those
+handlers idempotent first.
+
 ### ~~Livewire components are registered under two names each~~ — ✅ **FIXED 2026-09-15**
 
 `LivewireServiceProvider` registered all seven components twice — `booking.multistep-booking-wizard` and `multistep-booking-wizard`, and so on — so there was no canonical name and a grep for usage found only half the call sites.

@@ -20,6 +20,10 @@
   $partnerCover = get_field('_rl_partner_cover_url', $postId);
   $partnerWebsite = get_post_meta($postId, '_rl_partner_website', true);
 
+  // WR-73: the link that identifies this partnership on every lead it sends. Built rather than
+  // authored, so it cannot drift from the code above it or point at a retired landing page.
+  $partnerTrackedLink = \App\Domains\PartnerHub\Support\PartnerLink::for($partnerCode);
+
   // Terms & Agreement Specs
   $partnershipType = get_post_meta($postId, '_rl_partnership_type', true) ?: 'Strategic Referral Partner';
   $territory = get_post_meta($postId, '_rl_territory', true) ?: 'Worldwide';
@@ -360,8 +364,37 @@
                     </span>
                   </div>
                   <p class="text-xs sm:text-sm text-text-muted">
-                    Submit a candidate search introduction with referral code <code class="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-brand-purple">{{ $partnerCode }}</code> or send a warm email intro.
+                    Share the tracked link below, or send a warm email intro quoting <code class="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-brand-purple">{{ $partnerCode }}</code>.
                   </p>
+
+                  {{--
+                    WR-73. The link carries `?partner={{ $partnerCode }}`, which AttributionCollector
+                    already stamps onto the lead and HubSpotGateway now sends as `partnership_id` —
+                    so a lead is attributed to this partnership without anyone quoting a code by
+                    hand. PartnerLink::for() builds it; do not hand-write this URL.
+                  --}}
+                  <div x-data="{ copied: false }" class="space-y-1.5 pt-1">
+                    <div class="text-2xs font-bold uppercase tracking-wider text-text-slate">Tracked referral link</div>
+                    <div class="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readonly
+                        value="{{ esc_attr($partnerTrackedLink) }}"
+                        class="w-full min-w-0 text-2xs sm:text-xs font-mono py-2 px-3 rounded-card bg-slate-50 border border-slate-200 text-text-body select-all"
+                      />
+                      <button
+                        type="button"
+                        @click="navigator.clipboard.writeText(@js($partnerTrackedLink)); copied = true; setTimeout(() => copied = false, 2500);"
+                        class="px-3.5 py-2 rounded-cta bg-brand-purple hover:bg-brand-purple-deep text-white text-xs font-bold shrink-0 transition cursor-pointer"
+                      >
+                        <span x-show="!copied">Copy</span>
+                        <span x-show="copied" x-cloak>Copied!</span>
+                      </button>
+                    </div>
+                    <p class="text-2xs text-text-muted">
+                      Every lead from this link is attributed to {{ $partnerName }} automatically.
+                    </p>
+                  </div>
                   <div class="flex flex-wrap gap-2 pt-1">
                     @if ($referralFormUrl)
                       <a href="{{ esc_url($referralFormUrl) }}" target="_blank" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-cta bg-brand-purple hover:bg-brand-purple-deep text-white text-xs font-bold transition">
