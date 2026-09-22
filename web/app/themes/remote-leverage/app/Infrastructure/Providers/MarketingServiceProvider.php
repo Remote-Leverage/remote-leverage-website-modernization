@@ -11,6 +11,7 @@ use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Services\AlertReconciler;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use App\Domains\Marketing\Support\AlertWindow;
+use App\Domains\Marketing\Support\CronHeartbeat;
 use App\Infrastructure\Slack\SlackTransport;
 use App\Infrastructure\WordPress\Admin\MarketingCostAlertWidget;
 use Illuminate\Support\Facades\Log;
@@ -262,16 +263,34 @@ class MarketingServiceProvider extends ServiceProvider
             try {
                 $this->app->make(FunnelMetricsService::class)->warmCache();
             } catch (\Throwable $e) {
+                $ok = false;
+
                 Log::error('MarketingServiceProvider: could not warm the cost alert snapshot', [
                     'error' => $e->getMessage(),
                 ]);
             }
+
+            $heartbeat->finish($checkIn, $ok, microtime(true) - $startedAt);
         });
 
         \add_action(self::CRON_HOOK, function () {
+            /*
+             * Tell Sentry the tick happened, so Sentry can tell us when it stops.
+             *
+             * This wraps the whole tick rather than the send: the question is whether the
+             * scheduler is alive, and the alert legitimately posts nothing outside its window.
+             * See CronHeartbeat for why the alerting has to come from a missing check-in rather
+             * than from anything of ours noticing.
+             */
+            $heartbeat = $this->app->make(CronHeartbeat::class);
+            $checkIn = $heartbeat->start();
+            $startedAt = microtime(true);
+            $ok = true;
+
             try {
                 $this->app->make(SendCostAlertAction::class)->execute();
             } catch (\Throwable $e) {
+                $ok = false;
                 /*
                  * Swallowed deliberately. This runs on a visitor's request through WP-Cron, and
                  * an uncaught throw from a reporting job would surface as a 500 on a page someone

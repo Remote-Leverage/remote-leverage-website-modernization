@@ -76,6 +76,17 @@ return [
         })(),
 
         /*
+         * The Sentry Cron monitor this tick checks in to, or empty to switch monitoring off.
+         *
+         * Declared here rather than only in Sentry's UI so the schedule Sentry judges against and
+         * the schedule WordPress runs on move in the same commit. See CronHeartbeat: the alert has
+         * to come from a check-in that fails to arrive, because on 2026-09-21 the scheduler
+         * stopped for ten hours and every monitor we could have written would have been just as
+         * dead as the thing it was watching.
+         */
+        'sentry_monitor' => trim((string) env('MARKETING_COST_ALERT_SENTRY_MONITOR', 'marketing-cost-alert')),
+
+        /*
          * Where it posts.
          *
          * A committed default rather than an empty one, for the same reason the Sentry DSN and
