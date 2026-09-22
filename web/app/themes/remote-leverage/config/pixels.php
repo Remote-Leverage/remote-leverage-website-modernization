@@ -69,7 +69,7 @@ return [
     'meta' => [
         'pixel_ids' => array_values(array_filter(array_map(
             'trim',
-            explode(',', trim((string) env('META_PIXEL_IDS', '')) ?: '1430907207548734,1482937899395718'),
+            explode(',', trim((string) env('META_PIXEL_IDS', '')) ?: '1482937899395718'),
         ))),
         'track_page_view' => filter_var(env('META_TRACK_PAGE_VIEW', true), FILTER_VALIDATE_BOOLEAN),
 
