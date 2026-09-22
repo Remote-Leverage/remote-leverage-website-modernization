@@ -68,7 +68,7 @@ class ErrorLogAbility extends Ability
      */
     public function execute(array $input): mixed
     {
-        $path = $this->logPath();
+        $path = $this->logPath((string) ($input['log'] ?? 'app'));
 
         if ($path === null) {
             return [
@@ -113,8 +113,23 @@ class ErrorLogAbility extends Ability
      * `laravel-YYYY-MM-DD.log`, and a hard-coded `laravel.log` would read an empty file on every
      * environment configured that way and report "nothing was logged".
      */
-    private function logPath(): ?string
+    private function logPath(string $which = 'app'): ?string
     {
+        /*
+         * WordPress's own debug.log, asked for explicitly.
+         *
+         * These are two different logs and only one of them was ever reachable. Acorn's channel
+         * carries what this application logs; `WP_DEBUG_LOG` carries what WordPress and PHP do —
+         * core warnings, fatals, and anything a plugin emits. The fallback below only reads
+         * debug.log when no Acorn log exists at all, which on a live container is never, so this
+         * one had been invisible the whole time. WP-Cron is core, so its complaints land there.
+         */
+        if ($which === 'wordpress') {
+            $debug = defined('WP_CONTENT_DIR') ? rtrim((string) WP_CONTENT_DIR, '/').'/debug.log' : null;
+
+            return $debug !== null && is_readable($debug) ? $debug : null;
+        }
+
         $candidates = [];
 
         if (function_exists('storage_path')) {
@@ -215,6 +230,10 @@ class ErrorLogAbility extends Ability
         return [
             'type' => 'object',
             'properties' => [
+                'log' => [
+                    'type' => 'string',
+                    'description' => "Which log: 'app' for this application's channel (default), 'wordpress' for WP_DEBUG_LOG.",
+                ],
                 'lines' => [
                     'type' => 'integer',
                     'description' => 'How many of the most recent lines to return. Default 200.',

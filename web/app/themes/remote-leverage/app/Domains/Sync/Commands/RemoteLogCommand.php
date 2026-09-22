@@ -34,7 +34,8 @@ class RemoteLogCommand extends Command
         {--contains= : Only show lines containing this text}
         {--clear : Truncate the log once it has been read}
         {--keep-bytes=0 : With --clear, leave this many bytes of the tail behind}
-        {--status : Report why the hourly cost alert will or will not post there, instead of reading the log}';
+        {--status : Report why the hourly cost alert will or will not post there, instead of reading the log}
+        {--wp : Read WordPress\'s own debug.log instead of this application\'s channel}';
 
     /**
      * @var string
@@ -54,6 +55,7 @@ class RemoteLogCommand extends Command
             'contains' => trim((string) $this->option('contains')),
             'clear' => (bool) $this->option('clear'),
             'keep_bytes' => (int) $this->option('keep-bytes'),
+            'log' => $this->option('wp') ? 'wordpress' : '',
         ], static fn ($value): bool => $value !== '' && $value !== false && $value !== 0);
 
         if ($this->option('clear')) {

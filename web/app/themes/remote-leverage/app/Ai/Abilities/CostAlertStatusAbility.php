@@ -87,9 +87,103 @@ class CostAlertStatusAbility extends Ability
              * event was dropped while the alert was switched off and has not been re-added yet;
              * false with `will_post` false is the state that persists on its own forever.
              */
+            /*
+             * The `doing_cron` lock, raw.
+             *
+             * wp-cron.php returns early — HTTP 200, nothing run — while this value plus
+             * WP_CRON_LOCK_TIMEOUT is still ahead of now. A value written by a container with a
+             * skewed clock therefore blocks every subsequent run forever, which is the one
+             * documented way to get exactly what production showed on 2026-09-21: the caller
+             * hitting wp-cron.php every five minutes, 200 every time, and not a single scheduled
+             * hook running for nine hours.
+             */
+            'doing_cron' => $this->doingCron(),
+
+            /*
+             * What WordPress reads, against what the database actually holds.
+             *
+             * `get_option()` goes through the object cache; this reads the row directly. If the
+             * two disagree, the cron array WordPress is acting on is stale and the fix is the
+             * cache layer, not the scheduler. If they agree, the array really is frozen and the
+             * lock above is the remaining explanation. Nothing else distinguishes those two, and
+             * they need opposite fixes.
+             */
+            'cron_from_cache' => $this->cronEntry(get_option('cron')),
+            'cron_from_database' => $this->cronEntry($this->cronFromDatabase()),
+
             'cron_scheduled' => $next !== false,
             'cron_next_run' => $next === false ? null : gmdate('c', (int) $next),
             'warm_scheduled' => $warm !== false,
+        ];
+    }
+
+    /** The raw lock value, and whether it is holding cron off. */
+    private function doingCron(): array
+    {
+        $value = function_exists('get_transient') ? get_transient('doing_cron') : null;
+        $timeout = defined('WP_CRON_LOCK_TIMEOUT') ? (int) WP_CRON_LOCK_TIMEOUT : 60;
+
+        return [
+            'value' => $value === false ? 'not set' : (string) $value,
+            'blocks_cron_until' => $value === false
+                ? null
+                : gmdate('c', (int) ((float) $value + $timeout)),
+            'is_blocking_now' => $value !== false && ((float) $value + $timeout) > microtime(true),
+        ];
+    }
+
+    /** The `cron` row read past the object cache. */
+    private function cronFromDatabase(): mixed
+    {
+        global $wpdb;
+
+        if (! isset($wpdb) || ! is_object($wpdb)) {
+            return null;
+        }
+
+        $raw = $wpdb->get_var(
+            $wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", 'cron')
+        );
+
+        return $raw === null ? null : maybe_unserialize($raw);
+    }
+
+    /**
+     * When this cron array says the alert next runs, and how many hooks it holds in total.
+     *
+     * The count matters as much as the timestamp: an array that has stopped growing or shrinking
+     * across every hook is a frozen array, not an alert problem.
+     *
+     * @param  mixed  $cron
+     * @return array<string, mixed>
+     */
+    private function cronEntry($cron): array
+    {
+        if (! is_array($cron)) {
+            return ['readable' => false];
+        }
+
+        $hook = MarketingServiceProvider::CRON_HOOK;
+        $found = null;
+        $events = 0;
+
+        foreach ($cron as $timestamp => $hooks) {
+            if (! is_array($hooks)) {
+                continue;
+            }
+
+            $events += count($hooks);
+
+            if (isset($hooks[$hook]) && $found === null && is_numeric($timestamp)) {
+                $found = gmdate('c', (int) $timestamp);
+            }
+        }
+
+        return [
+            'readable' => true,
+            'alert_next_run' => $found,
+            'timestamps' => count($cron),
+            'events' => $events,
         ];
     }
 
