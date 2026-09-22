@@ -62,11 +62,13 @@ test('font preloads stay self-hosted, manifest-resolved, and limited to the two 
         ->toContain('inter-latin-wght-normal.woff2')
         ->not->toContain('fetchpriority');
 
-    // Homepage LCP is the Inter Display <h1>. A preload after wp_head() loses the
-    // network race to Meta and the Google tag, which is the 1.2 s FCP / 5.4 s LCP
-    // gap a 2026-09-22 PSI mobile run measured.
+    // Homepage LCP is the Inter Display <h1>. A preload after `@php(wp_head())` loses
+    // the network race to Meta and the Google tag, which is the 1.2 s FCP / 5.4 s LCP
+    // gap a 2026-09-22 PSI mobile run measured. Match the Blade call, not the bare
+    // `wp_head()` substring — that also appears in the comments that explain why
+    // these tags have to sit above it.
     expect(strpos($layout, 'rel="preload" as="font"'))
-        ->toBeLessThan(strpos($layout, 'wp_head()'));
+        ->toBeLessThan(strpos($layout, '@php(wp_head())'));
 });
 
 test('app.css does not eagerly fetch intl-tel-input flag sprites', function () {
