@@ -180,19 +180,31 @@ would attach every anonymous visitor's IP address to their errors along with it.
    non-zero — a guest's request never gets tagged as "user 0", because a logged-out
    `wp_get_current_user()` still returns a `WP_User`, just with empty/zero fields, not `null`.
 2. **Otherwise, the visitor's own attribution** — nearly all traffic on a public site, since almost
-   none of it is logged in. `identifyByAttribution()` reads the request through the same
-   `AttributionCollector` `CaptureLeadAction` uses for `rl_leads`, so "who is this" in Sentry means
-   the same thing it does on a lead row: `device_id` (the first-party `rl_vid` cookie, set
-   client-side by `TrackingHooks::injectVisitorCookie()`) becomes the `id`, and
-   `utm_source`/`utm_medium`/`utm_campaign` ride along as plain fields on that same user. An issue
-   then reads as "this campaign's traffic is crashing" directly, without cross-referencing leads.
-   `device_id` is absent on a visitor's very first request — the JS that sets it hasn't run yet on
-   that request, and that first request is exactly when a fresh `utm_source` is most likely to be
-   present — so identification falls back to UTM alone rather than requiring both; only a request
-   carrying neither is left unidentified.
+   none of it is logged in. `identifyByAttribution()` (via the shared `attributionIdentity()`)
+   reads the request through the same `AttributionCollector` `CaptureLeadAction` uses for
+   `rl_leads`, so "who is this" in Sentry means the same thing it does on a lead row: `device_id`
+   (the first-party `rl_vid` cookie, set client-side by `TrackingHooks::injectVisitorCookie()`)
+   becomes the `id` — hashed, not raw, see below — and `utm_source`/`utm_medium`/`utm_campaign`
+   ride along as plain fields on that same user. An issue then reads as "this campaign's traffic is
+   crashing" directly, without cross-referencing leads. `device_id` is absent on a visitor's very
+   first request — the JS that sets it hasn't run yet on that request, and that first request is
+   exactly when a fresh `utm_source` is most likely to be present — so identification falls back to
+   UTM alone rather than requiring both.
 
 Either way, this gets the thing an id is actually for — attributing an error to who or what brought
-the visitor here — without turning on IP capture for the whole site.
+the visitor here. Both branches also carry `ip_address`, resolved by `visitorIp()` (a thin wrapper
+over `AttributionCollector::ipAddress()`, which already prefers `X-Forwarded-For` over
+`REMOTE_ADDR` — behind CloudFront/Cloudflare the latter is the edge node, the same address for
+thousands of visitors) — including on a request that carries neither a `device_id` cookie nor a
+UTM parameter, which previously went entirely unidentified. `identifyByAttribution()` only skips
+`configureScope()` once `id`, every `utm_*` field, *and* the IP have all come back empty.
+
+`hashDeviceId()` sends Sentry a hash of `rl_vid`, never the cookie itself — same shape as
+`IntegrationCallRecorder::fingerprint()`, salted with `config('app.key')` so the value is not a
+lookup table back to the cookie. It keeps 16 hex characters rather than that method's 8: this hash
+*is* the Sentry user id, used to count and group distinct visitors, where a collision silently
+merges two people's errors into one — not just a display string a human eyeballs, where a rarer
+collision is tolerable.
 
 ### Browser side — `resources/js/app.js`
 
@@ -226,6 +238,38 @@ third-party noise the rest of it exists to drop.
 planned, cites PHP's single-threaded request model as the blocker that Ruby and Python solve with
 a background flush thread. `config/sentry.php` has nothing equivalent, and nothing here changes
 that.
+
+### Crash Free Users
+
+Crash Free *Sessions* needs no identity at all — `autoSessionTracking` alone gives it a session per
+page load. Crash Free *Users* is a different Release Health metric: it groups by user, and the
+browser SDK starts with none. Without a user, the panel is empty — not zero, absent — regardless of
+how much error data Sentry is actually receiving, which is exactly what an empty "Users" tab means
+if this wiring is missing.
+
+`app.blade.php` renders `SentryReporting::browserIdentity()` into `window.SENTRY_USER`, and
+`resources/js/app.js` calls `Sentry.setUser(window.SENTRY_USER)` right after `Sentry.init()`, once.
+
+`browserIdentity()` mirrors `identifyUser()`'s logged-in-first, then-attribution precedence, but
+is not simply a call to it — whatever it returns is serialised straight into the page's HTML source
+(`@js(...)`, which is what makes it safe against `</script>` breakout — plain `json_encode` is not),
+so it tracks a logged-in WordPress user by **id only**. That id is already public (an author
+archive URL, the REST API and the admin bar all show it), but the email `identifyLoggedInUser()`
+also sets server-side is not something to additionally embed in the page just because that person
+happened to be logged in while viewing the public site. Anonymous traffic gets
+`attributionIdentity()` as before: a hashed device id plus whatever UTM value is already sitting in
+the URL bar.
+
+Every branch also carries `ip_address` set to the literal string `{{auto}}` — Sentry's own
+sentinel for "resolve this from whatever request actually sends the event", not a real IP. That
+three-word string is all that ever reaches the HTML; Sentry's ingest endpoint fills in the true
+value from the browser's own connecting request when the event arrives, which correctly is the
+visitor's IP here, because unlike the PHP-side scope, the browser sends its own events directly —
+the equivalent server-sent event's connecting IP would just be this server's own egress address,
+which is why `identifyByAttribution()` resolves a real IP via `visitorIp()` instead. Practically,
+this also means `browserIdentity()` never returns `[]` any more: a first-time visitor with neither
+a `device_id` cookie nor a UTM parameter still becomes a countable "user" by IP alone, where
+before Crash Free Users would have no data for them at all.
 
 ### Release tagging
 
