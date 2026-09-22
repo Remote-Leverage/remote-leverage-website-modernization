@@ -46,6 +46,11 @@ afterEach(function () {
         $GLOBALS['wp_current_user_email'],
     );
     SentryReporting::forgetRegistration();
+
+    // The container in tests/stubs.php is built once for the whole run, not refreshed per test,
+    // so a request bound with app()->instance('request', ...) otherwise leaks into every test
+    // that runs after it — including ones that assert there is *no* request to read one from.
+    app()->forgetInstance('request');
 });
 
 it('routes error logs to Sentry on a deployed environment', function () {
