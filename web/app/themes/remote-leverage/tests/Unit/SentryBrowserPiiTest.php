@@ -35,6 +35,19 @@ test('the layout mirrors the PHP send_default_pii flag into window, gated on the
         ->toContain('window.SENTRY_USER');
 });
 
+test('the layout tags the browser SDK with sentry.environment, falling back to WP_ENV not APP_ENV', function () {
+    $layout = file_get_contents(dirname(__DIR__, 2).'/resources/views/layouts/app.blade.php');
+    $sentry = file_get_contents(dirname(__DIR__, 2).'/config/sentry.php');
+
+    expect($layout)
+        ->toContain("window.APP_ENV = '{{ config('sentry.environment') ?: env('WP_ENV', 'production') }}';")
+        ->not->toContain("env('SENTRY_ENVIRONMENT') ?: env('APP_ENV', 'production')");
+
+    expect($sentry)
+        ->toContain("env('SENTRY_ENVIRONMENT') ?: env('WP_ENV') ?: env('APP_ENV')")
+        ->not->toContain("env('SENTRY_ENVIRONMENT') ?: env('APP_ENV')");
+});
+
 test('app.js forwards window.SENTRY_SEND_DEFAULT_PII into Sentry.init()', function () {
     $js = file_get_contents(dirname(__DIR__, 2).'/resources/js/app.js');
 

@@ -42,8 +42,9 @@ return [
     // browser SDK (see app.blade.php) — one env var, not a Sentry-specific one.
     'release' => env('APP_VERSION'),
 
-    // When left empty or `null` the Laravel environment will be used (usually discovered from `APP_ENV` in your `.env`)
-    'environment' => env('SENTRY_ENVIRONMENT') ?: env('APP_ENV'),
+    // Bedrock does not set APP_ENV. WP_ENV is the task-definition source of truth
+    // (staging / production). SENTRY_ENVIRONMENT wins when it is set explicitly.
+    'environment' => env('SENTRY_ENVIRONMENT') ?: env('WP_ENV') ?: env('APP_ENV'),
 
     // Override the organization ID used for trace continuation checks.
     'org_id' => env('SENTRY_ORG_ID') === null ? null : (int) env('SENTRY_ORG_ID'),

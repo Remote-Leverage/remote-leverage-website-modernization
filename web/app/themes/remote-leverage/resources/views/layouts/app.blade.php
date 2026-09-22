@@ -95,7 +95,7 @@
     @livewireStyles
 
     <script>
-      window.APP_ENV = '{{ env('SENTRY_ENVIRONMENT') ?: env('APP_ENV', 'production') }}';
+      window.APP_ENV = '{{ config('sentry.environment') ?: env('WP_ENV', 'production') }}';
       @if (config('sentry.dsn'))
         window.SENTRY_DSN = '{{ config('sentry.dsn') }}';
         {{-- Mirrors config/sentry.php's PHP-side flag so app.js can pass the same value to the
