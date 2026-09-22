@@ -192,8 +192,15 @@ case "${QUEUE_CONNECTION:-sync}" in
         # and it only comes round once an hour.
         chown -R www-data:www-data /var/www/html/web/app/cache 2>/dev/null || true
 
-        # --max-time recycles the process hourly. That bounds memory and means a deploy's new
-        # code is picked up without anything having to signal the worker.
+        # --max-time recycles the process hourly, so a deploy's new code is picked up without
+        # anything having to signal the worker.
+        #
+        # --memory is the hard bound, and it is separate from that recycle: a single job that
+        # leaks or loads a large result set can exhaust the process long before the hour is up,
+        # and without this the worker would be OOM-killed by the container rather than exiting
+        # cleanly between jobs. 192M against php.ini's 256M limit leaves room for the request
+        # that trips it to unwind and for the check to be *reached* — Laravel tests memory
+        # after each job, so the ceiling has to sit below the point PHP itself gives up.
         #
         # --timeout must stay below the connection's retry_after (90s in Acorn's config): a job
         # killed for running long while the queue still considers it reserved would be handed to
@@ -206,6 +213,7 @@ case "${QUEUE_CONNECTION:-sync}" in
           --timeout=60 \
           --sleep=3 \
           --max-time=3600 \
+          --memory=192 \
           --allow-root || true
 
         # A crash loop should not become a busy loop against the database.
