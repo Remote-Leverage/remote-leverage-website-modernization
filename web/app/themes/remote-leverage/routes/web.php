@@ -98,6 +98,28 @@ Route::get('referrer-register', function () {
     return view('pages.referrer-register');
 })->name('referrer.register');
 
+/*
+ * Internal: the sales team records a referral while the referrer is on the phone (WR-126).
+ *
+ * Route-only and deliberately not a WP page — nothing links to it, it is not in the nav, and
+ * it is not indexable. `forceNoindex()` is what does that: a route has no post and no pattern,
+ * so the `rl:noindex` marker PageRobots normally looks for cannot be declared anywhere, and
+ * without this call the page would be silently indexable.
+ *
+ * Deliberately NOT added to `SiteRobotsTxt::DISALLOW`, for the reason that class documents: a
+ * crawler told not to fetch a URL never reads the `noindex` on it, which is how a URL ends up
+ * stranded in the index with no content. `noindex` is the mechanism that does this job, and
+ * `live-transfer-contact-creation` above is noindexed the same way and for the same reason.
+ *
+ * Unindexed is not access control, and the form does not rely on it being one — see
+ * SalesReferralForm for what actually bounds an unauthenticated submission.
+ */
+Route::get('sales-referral', function () {
+    PageRobots::forceNoindex();
+
+    return view('pages.sales-referral');
+})->name('sales.referral');
+
 // Legacy URL compatibility: rl-referral-program served login/signup as tabs of a single
 // "/referral-dashboard/" page. Preserved here so old bookmarks/emails/backlinks to that URL
 // keep working without a redirect rule.

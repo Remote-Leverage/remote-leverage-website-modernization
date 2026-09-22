@@ -9,6 +9,7 @@ use App\Application\Livewire\Booking\MultistepBookingWizard;
 use App\Application\Livewire\Partner\PartnerDirectoryGrid;
 use App\Application\Livewire\Referrer\ReferrerPortalDashboard;
 use App\Application\Livewire\Referrer\ReferrerRegistrationForm;
+use App\Application\Livewire\Referrer\SalesReferralForm;
 use App\Application\Livewire\Scheduling\InstantLiveCallButton;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
@@ -46,6 +47,7 @@ class LivewireServiceProvider extends ServiceProvider
             Livewire::component('scheduling.instant-live-call-button', InstantLiveCallButton::class);
             Livewire::component('referrer.referrer-portal-dashboard', ReferrerPortalDashboard::class);
             Livewire::component('referrer.referrer-registration-form', ReferrerRegistrationForm::class);
+            Livewire::component('referrer.sales-referral-form', SalesReferralForm::class);
             Livewire::component('partner.partner-directory-grid', PartnerDirectoryGrid::class);
             Livewire::component('blog.guide-index-filter', GuideIndexFilter::class);
         }

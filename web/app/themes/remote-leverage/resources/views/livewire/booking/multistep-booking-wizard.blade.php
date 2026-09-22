@@ -125,13 +125,7 @@
                 What is your company's current monthly revenue? <span class="text-[#EF4444]">*</span>
               </label>
               <div class="space-y-2">
-                @foreach ([
-                  '$0 to $5k Per Month',
-                  '$5k to $10k Per Month',
-                  '$10k to $50k Per Month',
-                  '$50k-$100k Per Month',
-                  '$100k+ Per Month',
-                ] as $revOption)
+                @foreach (\App\Domains\Lead\Services\LeadQualification::REVENUE_BANDS as $revOption)
                   <label class="flex items-center gap-2.5 cursor-pointer text-xs sm:text-[13px] text-white font-medium select-none group">
                     <input 
                       type="radio" 

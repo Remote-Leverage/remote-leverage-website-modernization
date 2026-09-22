@@ -118,6 +118,94 @@ flowchart TB
 | `ReferrerRegistrationForm` | `/referrer-register` |
 | `ReferrerPortalDashboard` | `/referrer-portal` — referral links, KPIs, commissions, and a per-referral status timeline with staleness flags |
 
+#### Submitting a lead directly (the portal modal)
+
+`ReferrerPortalDashboard::submitDirectLead()` requires **exactly what `MultistepBookingWizard`
+step 1 requires** — first name, last name, email, phone and a monthly revenue band from
+`LeadQualification::REVENUE_BANDS`. Changed 2026-09-22; it previously asked for a full name plus
+*either* an email or a phone.
+
+Two reasons, and the second is the one that mattered:
+
+1. A referred lead reached sales missing fields the self-served funnel has always made
+   mandatory. With no revenue band, `LeadQualification::isT10()` reports the lead unqualified
+   whatever it actually earns — the question was simply never asked.
+2. **The self-referral guard is keyed on email, so a phone-only submission skipped it.** The
+   check short-circuited on `&& $this->leadModalEmail`, and the synthesised
+   `…@remoteleverage.internal` address such a lead was then given matched nothing in
+   `HandleLeadBookingCompletedForReferrer`'s guard either. A referrer could submit themselves,
+   and since fulfilment is automatic (see *Deal fulfillment* below) and `send_payout` sweeps
+   every `due` reward into one transfer showing only a count and a total, nothing surfaced it
+   before the money left.
+
+Validation is hand-rolled in `validateDirectLead()` rather than `$this->validate()`. This
+component reports every other problem through its single `$leadModalError` banner, and Livewire's
+`validate()` resolves the `livewire` container binding on its failure path — which the test
+harness does not provide, so the rules could not be tested at the point they reject. (The booking
+wizard's rules are only ever exercised with valid input, which is why nothing noticed.)
+
+The revenue bands live on `LeadQualification::REVENUE_BANDS`, read by both this modal and the
+booking wizard's view. They were inline in the wizard's Blade until 2026-09-22.
+
+#### The sales-rep form at `/sales-referral` (WR-126)
+
+The same referral, typed by a Remote Leverage sales rep while the referrer is on the phone,
+instead of asking them to hang up and log into the portal. `SalesReferralForm`, rendered by a
+route rather than a WP page.
+
+Everything below the referrer lookup is `SubmitReferredLeadAction`, shared verbatim with the
+portal modal above — the field rules and the self-referral guard are one implementation, not
+two. That sharing is the point: the self-referral guard had already shipped twice and one copy
+silently stopped working, so a third hand-written copy was not an option.
+
+**It is unauthenticated**, because a rep mid-call should not be stopped by a login. Four things
+bound that, and none of them is the URL being secret:
+
+| Bound | What it stops |
+| :--- | :--- |
+| Referrer resolved by **code only**, never email | Can't mint credit for a non-existent account, and can't be used to ask "does this address have a referrer account?" |
+| Referral is always written `pending` | Can't create a reward. Only a completed booking promotes a referral; only a closed HubSpot deal fulfils it |
+| Per-IP throttle, counting **failed** attempts too | Can't be used to bulk-inject leads or enumerate referral codes |
+| `source` is `sales_rep_submission` | These are distinguishable from referrer-filed ones in the data, afterwards |
+| Registration creates **unclaimed** accounts only | A rep can't set anyone's password, and can't take over an account that already has one |
+
+`rl_referrals.source` values: `referrer_direct_submission` (portal modal),
+`sales_rep_submission` (this form), `booking_completed` (the listener), `manual_submission`
+(the column default).
+
+**When the referrer has no account yet.** The same page registers them — a second URL to find
+mid-call is a referral lost while the rep looks for it, so the panel is on this one and opens by
+itself when a code does not resolve. `RegisterReferrerAction::createUnclaimed()` creates a real
+referrer with a real code, which is credited from the moment it exists, but with **no password
+and status `pending`**: the rep cannot choose someone's password on a call, and there is no way
+to send them one — there is no password-reset flow anywhere in this domain, and the welcome email
+carries the referral link but no credentials.
+
+The person claims the account later by signing up at `/referrer-register` with the same address,
+which sets their password and flips them to `active`, keeping the code and every referral already
+attached.
+
+That claim path was broken until 2026-09-22 and the fix ships with this: `RegisterReferrerAction`
+returned an existing row *before* checking the password, so anyone signing up with an address that
+already existed had their chosen password silently discarded — locked out of the one account
+holding their referrals, with no reset to recover through. It now sets the password when the
+existing account has none, and never touches one that does (otherwise it is account takeover by
+knowing an email).
+
+**Keeping it out of search.** The route calls `PageRobots::forceNoindex()` — a route has no post
+and no pattern, so the `rl:noindex` marker cannot be declared for one, and without that call the
+page is silently indexable. It is deliberately **not** added to `SiteRobotsTxt::DISALLOW`: a
+crawler told not to fetch a URL never reads the `noindex` on it, which strands the URL in the
+index rather than keeping it out. `live-transfer-contact-creation` is noindexed the same way.
+
+Note that a local render proves nothing here — Bedrock's `bedrock-disallow-indexing` mu-plugin
+noindexes every non-production environment, so the page looks correctly excluded whether or not
+`forceNoindex()` ran. `SalesReferralFormTest` asserts the filter output directly for that reason.
+
+**No-cache parity**, the other half of WR-126, needs nothing: `docker/nginx.conf` keys
+cache-skipping off `Set-Cookie` on the *response*, so any route that opens a session is covered
+without a path list — which is what the legacy per-path no-cache headers were doing by hand.
+
 `/referral-dashboard` is kept as a legacy route: the old plugin served signup and login as tabs of one URL, so `?tab=login`, `?logged_out` and `?action=login` route to the portal and everything else to registration. Old bookmarks and email links keep working without a redirect.
 
 ## The shared link and the welcome offer
@@ -274,7 +362,7 @@ curl -X POST https://remoteleverage-v2.test/api/webhooks/stripe \
 
 ## Tests
 
-`AttributionEngineTest`, `ReferralAttributionReferrerTest`, `ReferralAnalyticsTest`, `ReferralRewardAutomationTest`, `ReferralSettingsTest`, `ReferrerAuthenticationTest`, `ReferrerPortalLoginTest`, `ReferralLeadLinkageTest`, `HubSpotLifecycleSyncTest`, `ReferrerDashboardTest`, `StripeConnectDisabledTest`, `ReferralWelcomeOfferTest`, `tests/Feature/StripeWebhookTest.php`.
+`AttributionEngineTest`, `ReferralAttributionReferrerTest`, `ReferralAnalyticsTest`, `ReferralRewardAutomationTest`, `ReferralSettingsTest`, `ReferrerAuthenticationTest`, `ReferrerPortalLoginTest`, `ReferralLeadLinkageTest`, `HubSpotLifecycleSyncTest`, `ReferrerDashboardTest`, `StripeConnectDisabledTest`, `ReferralWelcomeOfferTest`, `ReferrerDirectLeadRequirementsTest`, `SalesReferralFormTest`, `tests/Feature/StripeWebhookTest.php`.
 
 ## Known issues
 

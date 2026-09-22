@@ -36,7 +36,9 @@ describe('Application Routes', function () {
             ->and(Route::has('live-call.connect'))->toBeTrue()
             ->and(Route::has('referrer.portal'))->toBeTrue()
             ->and(Route::has('referrer.register'))->toBeTrue()
-            ->and(Route::has('referrer.dashboard.legacy'))->toBeTrue();
+            ->and(Route::has('referrer.dashboard.legacy'))->toBeTrue()
+            // Internal, unlisted and unindexed, but still a route that must exist (WR-126).
+            ->and(Route::has('sales.referral'))->toBeTrue();
     });
 
     test('health check route returns healthy json response', function () {

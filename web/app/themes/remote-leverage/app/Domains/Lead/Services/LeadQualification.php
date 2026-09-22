@@ -58,6 +58,34 @@ final class LeadQualification
      *
      * @var array<int, string>
      */
+    /**
+     * Every monthly-revenue band a lead can report, in display order.
+     *
+     * Hoisted out of `multistep-booking-wizard.blade.php` on 2026-09-22, when the referrer
+     * portal's direct-submission modal was brought up to the main form's requirements and
+     * needed the same list. Two copies of a question's answers is how one form starts
+     * offering a band the other cannot qualify.
+     *
+     * The wizard's two short-label maps (`'$0 to $5k Per Month' => '$0k to $5k'`, around lines
+     * 634 and 676 of that view) are keyed on these strings and must keep matching. They map a
+     * band to a compact label rather than defining which bands exist, so they are left where
+     * they are.
+     *
+     * The values are user-visible copy *and* stored data — `monthly_revenue` on `rl_leads`
+     * holds them verbatim, `isT10()` compares against them, and `SUB_T10_BANDS` below carries
+     * the legacy Gravity Forms spellings for the same reason. Editing one is a data migration,
+     * not a copy change.
+     *
+     * @var array<int, string>
+     */
+    public const REVENUE_BANDS = [
+        '$0 to $5k Per Month',
+        '$5k to $10k Per Month',
+        '$10k to $50k Per Month',
+        '$50k-$100k Per Month',
+        '$100k+ Per Month',
+    ];
+
     public const SUB_T10_BANDS = [
         '$0 to $5k Per Month',
         '$5k to $10k Per Month',
