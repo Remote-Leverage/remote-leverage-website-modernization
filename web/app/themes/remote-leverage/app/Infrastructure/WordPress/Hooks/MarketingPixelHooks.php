@@ -277,6 +277,11 @@ HTML;
      *
      * `_linkedin_data_partner_ids` is an array by design, so this and the container's tag
      * coexist on one SDK load and each id is reported. That is already how production behaves.
+     *
+     * **Switched off by default since 2026-09-21** — `linkedInPartnerIds()` returns nothing
+     * unless `pixels.linkedin.enabled` is true, and this emits nothing at all rather than a
+     * dormant `lintrk` stub. The noscript pixel below reads the same list, so both go quiet
+     * together.
      */
     public function injectLinkedIn(): void
     {
@@ -338,6 +343,14 @@ HTML;
      * one. The loader guards itself with `if (w.oaiq) return`, so whichever runs first installs
      * the SDK and every `init` afterwards still registers — which is how production ends up
      * reporting to both.
+     *
+     * **Switched off by default since 2026-09-21** — `openAiPixelIds()` returns nothing unless
+     * `pixels.openai.enabled` is true, and this emits nothing at all rather than a dormant `oaiq`
+     * stub. `injectOpenAiConversion()` reads the same list, so the conversion cannot fire into a
+     * pixel that never loaded.
+     *
+     * Unrelated to the `OPENAI_API_KEY` behind `/wp-json/jobwidget/v1/*` — see
+     * `config/job-widget.php`.
      */
     public function injectOpenAi(): void
     {
@@ -585,22 +598,38 @@ HTML;
     }
 
     /**
-     * Valid LinkedIn partner ids from config, de-duplicated.
+     * Valid LinkedIn partner ids from config, de-duplicated, or none while the tag is off.
+     *
+     * The `enabled` check lives here for the same reason it does in `tikTokPixelIds()`: one
+     * answer to "does LinkedIn fire", which both the head tag and the noscript pixel read. The
+     * ids stay in config either way — see `pixels.linkedin.enabled`.
      *
      * @return array<int, string>
      */
     public function linkedInPartnerIds(): array
     {
+        if (! (bool) config('pixels.linkedin.enabled', false)) {
+            return [];
+        }
+
         return $this->validIds((array) config('pixels.linkedin.partner_ids', []), '/^\d{5,}$/');
     }
 
     /**
-     * Valid OpenAI pixel ids from config, de-duplicated.
+     * Valid OpenAI pixel ids from config, de-duplicated, or none while the pixel is off.
+     *
+     * Also what switches off `injectOpenAiConversion()`, which already returns early on an empty
+     * list — so the conversion cannot outlive the pixel it measures into. See
+     * `pixels.openai.enabled`.
      *
      * @return array<int, string>
      */
     public function openAiPixelIds(): array
     {
+        if (! (bool) config('pixels.openai.enabled', false)) {
+            return [];
+        }
+
         return $this->validIds((array) config('pixels.openai.pixel_ids', []), '/^[A-Za-z0-9]{10,}$/');
     }
 

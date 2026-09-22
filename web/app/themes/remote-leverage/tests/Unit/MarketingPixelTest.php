@@ -20,11 +20,14 @@ beforeEach(function () {
         'pixels.meta.pixel_ids' => ['1430907207548734', '1482937899395718'],
         'pixels.meta.track_page_view' => true,
         'pixels.bing_uet.tag_id' => '97187250',
+        // LinkedIn and OpenAI are switched off in the shipped config since 2026-09-21, TikTok
+        // since 2026-09-19. All three are on here so the emission stays covered for whenever one
+        // goes back on; the shipped defaults are asserted separately, per vendor.
+        'pixels.linkedin.enabled' => true,
         'pixels.linkedin.partner_ids' => ['6411876'],
+        'pixels.openai.enabled' => true,
         'pixels.openai.pixel_ids' => ['7QY9HDVocGyeNvMMW1gLWb'],
         'pixels.openai.debug' => false,
-        // Switched off in the shipped config since 2026-09-19; on here so the emission below
-        // stays covered for whenever it goes back on.
         'pixels.tiktok.enabled' => true,
         'pixels.tiktok.pixel_ids' => ['CPMB51BC77U75I0QMMAG'],
         'pixels.tiktok.track_page_view' => true,
@@ -252,6 +255,79 @@ describe('LinkedIn and OpenAI, ported from the page', function () {
 
         expect($h->linkedInPartnerIds())->toBe(['6411876'])
             ->and($h->openAiPixelIds())->toBe(['7QY9HDVocGyeNvMMW1gLWb']);
+    });
+
+    test('the LinkedIn switch emits nothing at all, head tag and noscript alike', function () {
+        /*
+         * Off has to mean no bytes. A `lintrk` stub with no SDK would still ship the snippet, and
+         * the noscript image is a request of its own that no amount of JavaScript gating stops —
+         * so both read the same id list rather than each testing the flag.
+         */
+        config(['pixels.linkedin.enabled' => false]);
+
+        $hooks = new MarketingPixelHooks;
+
+        expect($hooks->linkedInPartnerIds())->toBe([])
+            ->and(renderPixel(fn ($h) => $h->injectLinkedIn()))->toBe('')
+            ->and(renderPixel(fn ($h) => $h->injectLinkedInNoscript()))->toBe('');
+    });
+
+    test('the OpenAI switch takes the conversion with it', function () {
+        /*
+         * The conversion runs at priority 5 and pushes onto the stub priority 4 installs. If the
+         * flag only gated the pixel, a thank-you page would emit an `oaiq("measure", ...)` with
+         * no `oaiq` to receive it — harmless but dishonest, and it would look like the pixel was
+         * still live to anyone reading the page source.
+         */
+        config([
+            'pixels.openai.enabled' => false,
+            'pixels.openai.conversions' => ['vathankyou' => 'appointment_scheduled'],
+        ]);
+
+        $_SERVER['REQUEST_URI'] = '/VAThankYou/';
+
+        $hooks = new MarketingPixelHooks;
+
+        expect($hooks->openAiPixelIds())->toBe([])
+            ->and(renderPixel(fn ($h) => $h->injectOpenAi()))->toBe('')
+            ->and(renderPixel(fn ($h) => $h->injectOpenAiConversion()))->toBe('');
+    });
+
+    test('the shipped config has both off, with the ids kept for switching back on', function () {
+        /*
+         * Reads the real config rather than the fixture: the point is what the site serves.
+         * `LINKEDIN_PIXEL_ENABLED` / `OPENAI_PIXEL_ENABLED` are the only levers — if this starts
+         * failing, somebody either set one of those or flipped a default, and both are decisions
+         * worth noticing.
+         */
+        $config = require __DIR__.'/../../config/pixels.php';
+
+        expect($config['linkedin']['enabled'])->toBeFalse()
+            ->and($config['linkedin']['partner_ids'])->toBe(['6411876', '9514236'])
+            ->and($config['openai']['enabled'])->toBeFalse()
+            ->and($config['openai']['pixel_ids'])->toBe(['7QY9HDVocGyeNvMMW1gLWb', 'GtXTy8ihLz5qrMUanZ3fqf'])
+            // The conversion map outlives the switch, so it is still right when one goes back on.
+            ->and($config['openai']['conversions'])->toBe(['vathankyou' => 'appointment_scheduled']);
+    });
+
+    test('each vendor env var switches only its own pixel back on', function () {
+        foreach (['LINKEDIN_PIXEL_ENABLED' => 'linkedin', 'OPENAI_PIXEL_ENABLED' => 'openai'] as $var => $vendor) {
+            $_ENV[$var] = 'true';
+            $_SERVER[$var] = 'true';
+            putenv("{$var}=true");
+
+            try {
+                $config = require __DIR__.'/../../config/pixels.php';
+
+                $other = $vendor === 'linkedin' ? 'openai' : 'linkedin';
+
+                expect($config[$vendor]['enabled'])->toBeTrue()
+                    ->and($config[$other]['enabled'])->toBeFalse();
+            } finally {
+                unset($_ENV[$var], $_SERVER[$var]);
+                putenv($var);
+            }
+        }
     });
 
     test('nothing this file emits is also delivered by the GTM container', function () {
@@ -688,7 +764,8 @@ describe('an empty environment variable falls through to the default', function 
         try {
             $config = require __DIR__.'/../../config/pixels.php';
 
-            expect($config['meta']['pixel_ids'])->toBe(['1430907207548734', '1482937899395718'])
+            // One id since 3075368 dropped the obsolete second account from the default.
+            expect($config['meta']['pixel_ids'])->toBe(['1482937899395718'])
                 ->and($config['bing_uet']['tag_id'])->toBe('97187250')
                 // Both accounts are emitted here since GTM-53JDTQCZ was retired.
                 ->and($config['linkedin']['partner_ids'])->toBe(['6411876', '9514236'])

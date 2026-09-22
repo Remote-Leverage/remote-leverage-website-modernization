@@ -116,6 +116,35 @@ return [
     | container -- see `delivered_by_gtm` below, which is enforced by a test.
     */
     'linkedin' => [
+        /*
+         * **Off by default since 2026-09-21.** Set `LINKEDIN_PIXEL_ENABLED=true` to switch it
+         * back on; nothing else has to change, because the ids below stay configured either way.
+         *
+         * Same shape as `tiktok.enabled` below, and for the same reason: nothing is currently
+         * spending against the account, and the deferred SDK fetch still costs a request and a
+         * parse on every page. `linkedInPartnerIds()` is where this is read, so there is one
+         * answer to "does LinkedIn fire" and the injectors cannot disagree with it.
+         *
+         * **`li_fat_id` capture is not lost.** `AttributionCollector` reads it query-string
+         * first, and LinkedIn puts it on the ad click itself, so a paid LinkedIn visit still
+         * lands its click id and `LeadChannel` still resolves the lead to `linkedin`. The
+         * collector's cookie fallback is the part that goes quiet, and it was never carrying
+         * anything: none of the 3,969 imported leads has an `li_fat_id` at all.
+         *
+         * What is lost is the conversion signal *inside* LinkedIn -- `lintrk` reports nothing, so
+         * Campaign Manager sees clicks and no conversions. That is the trade being made here, and
+         * it only costs nothing while the account is not spending.
+         *
+         * A plain boolean, so it does **not** follow the `?:` fallthrough the ids use: for an id,
+         * empty means "not configured" and the default underneath is right; for a switch, empty
+         * means off, and off is already the default.
+         *
+         * Both partner ids are still listed because which of the two is the live ad account was
+         * never established -- see the note above. If it goes back on, that question is still
+         * open and the answer is in Campaign Manager, not here.
+         */
+        'enabled' => filter_var(env('LINKEDIN_PIXEL_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+
         'partner_ids' => array_values(array_filter(array_map(
             'trim',
             explode(',', trim((string) env('LINKEDIN_PARTNER_IDS', '')) ?: '6411876,9514236'),
@@ -136,6 +165,22 @@ return [
     | certainly a paste that was never cleaned up rather than a decision.
     */
     'openai' => [
+        /*
+         * **Off by default since 2026-09-21.** Set `OPENAI_PIXEL_ENABLED=true` to switch it back
+         * on; the ids and the conversion map below stay configured either way.
+         *
+         * Read in `openAiPixelIds()`, which means the conversion at priority 5 switches off with
+         * it for free -- `injectOpenAiConversion()` already returns early when there is no pixel
+         * id, so there is no way to end up measuring a conversion into a pixel that never loaded.
+         *
+         * Note this is **not** the `OPENAI_API_KEY` that backs `/wp-json/jobwidget/v1/*` -- that
+         * is the legacy tool pages calling the API on our credential, configured in
+         * `config/job-widget.php`, and it is untouched by this.
+         *
+         * A plain boolean, not the `?:` fallthrough -- see the `linkedin` note above.
+         */
+        'enabled' => filter_var(env('OPENAI_PIXEL_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+
         'pixel_ids' => array_values(array_filter(array_map(
             'trim',
             explode(',', trim((string) env('OPENAI_PIXEL_IDS', '')) ?: '7QY9HDVocGyeNvMMW1gLWb,GtXTy8ihLz5qrMUanZ3fqf'),
@@ -391,9 +436,10 @@ return [
     | Which pixels wait before fetching their SDK. Script *evaluation* is the
     | expensive part of this page -- 4,959ms of main-thread work in the
     | 2026-09-18 Lighthouse run -- and six pixels all fetching at `wp_head`
-    | priority 4 contend for it during the load. Three of those six are now gone
-    | (HubSpot and Rewardful removed, TikTok switched off), so the figure above
-    | is the before, not the current state.
+    | priority 4 contend for it during the load. Five of those six are now gone
+    | (HubSpot and Rewardful removed; TikTok, LinkedIn and OpenAI switched off),
+    | so the figure above is the before, not the current state. What is left
+    | firing is Meta, UET and the Google tag.
     |
     | **No event is lost by deferring.** Every vendor here installs a queueing
     | stub and drains it when the SDK arrives, so the stub and the `init` /
@@ -416,9 +462,12 @@ return [
     | The flush also pushes `rl_idle` onto `dataLayer`, which is the intended
     | way to defer a tag that lives in the container rather than here: retrigger
     | it on that custom event instead of on `gtm.js`. TikTok (162KB, the largest
-    | single non-Google third party) is the reason that hook exists. It stays in
-    | the default vendor list while switched off, so that the deferral is already
-    | in place on the day it goes back on rather than something to remember.
+    | single non-Google third party) is the reason that hook exists.
+    |
+    | All three of the switched-off vendors stay in the default list below, so
+    | that the deferral is already in place on the day one goes back on rather
+    | than something to remember. Listing a vendor that emits nothing costs
+    | nothing: `deferWrap()` is only reached from an injector that has ids.
     */
     'defer' => [
         'vendors' => array_values(array_filter(array_map(

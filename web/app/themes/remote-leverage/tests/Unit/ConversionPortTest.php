@@ -164,18 +164,31 @@ describe('consent defaults', function () {
 });
 
 describe('the second LinkedIn and OpenAI accounts came home', function () {
-    test('both ids are emitted now that the container is gone', function () {
+    /*
+     * Both pixels were **switched off on 2026-09-21** — see `pixels.linkedin.enabled` and
+     * `pixels.openai.enabled`. The port itself is still what is covered here: which ids the
+     * config carries, and that one SDK load serves both when they go back on. Off is a spend
+     * decision and reversible with one variable; the wiring underneath it is not, and a
+     * regression in it would only surface on the day somebody flips the switch.
+     */
+    test('both account ids stay configured, and nothing waits in a container', function () {
         $config = require __DIR__.'/../../config/pixels.php';
 
         expect($config['linkedin']['partner_ids'])->toBe(['6411876', '9514236'])
             ->and($config['openai']['pixel_ids'])->toBe(['7QY9HDVocGyeNvMMW1gLWb', 'GtXTy8ihLz5qrMUanZ3fqf'])
             // Nothing is delivered by a container any more.
-            ->and(array_merge(...array_values($config['delivered_by_gtm'] ?: [[]])))->toBe([]);
+            ->and(array_merge(...array_values($config['delivered_by_gtm'] ?: [[]])))->toBe([])
+            // Which is why switching them off here takes them off the site entirely, rather
+            // than leaving a container tag firing into one of the two accounts.
+            ->and($config['linkedin']['enabled'])->toBeFalse()
+            ->and($config['openai']['enabled'])->toBeFalse();
     });
 
     test('one SDK load serves both ids', function () {
         config([
+            'pixels.linkedin.enabled' => true,
             'pixels.linkedin.partner_ids' => ['6411876', '9514236'],
+            'pixels.openai.enabled' => true,
             'pixels.openai.pixel_ids' => ['7QY9HDVocGyeNvMMW1gLWb', 'GtXTy8ihLz5qrMUanZ3fqf'],
         ]);
 
