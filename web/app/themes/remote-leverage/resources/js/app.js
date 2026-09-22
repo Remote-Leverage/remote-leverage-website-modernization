@@ -1187,6 +1187,11 @@ if (sentryDsn && !isAutomated()) {
       environment: window.APP_ENV || 'production',
       release: window.APP_VERSION || undefined,
 
+      // Mirrors config/sentry.php's `send_default_pii` (SENTRY_SEND_DEFAULT_PII), rendered into
+      // window.SENTRY_SEND_DEFAULT_PII by app.blade.php. Separate from the `{{auto}}` IP sentinel
+      // on window.SENTRY_USER below, which Relay resolves regardless of this flag.
+      sendDefaultPii: window.SENTRY_SEND_DEFAULT_PII === true,
+
       // Performance sampling is separate from error sampling and much cheaper to lose.
       tracesSampleRate: 0.1,
 
