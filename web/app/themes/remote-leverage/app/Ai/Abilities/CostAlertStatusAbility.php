@@ -57,6 +57,8 @@ class CostAlertStatusAbility extends Ability
      */
     public function execute(array $input): mixed
     {
+        $repaired = ($input['repair_cron'] ?? false) === true ? $this->repairCron() : null;
+
         $raw = env('MARKETING_COST_ALERT_ENABLED');
         $next = function_exists('wp_next_scheduled')
             ? \wp_next_scheduled(MarketingServiceProvider::CRON_HOOK)
@@ -66,6 +68,7 @@ class CostAlertStatusAbility extends Ability
             : false;
 
         return [
+            'repaired' => $repaired,
             'will_post' => AlertWindow::enabledHere(),
 
             'environment_type' => function_exists('wp_get_environment_type') ? \wp_get_environment_type() : null,
@@ -114,6 +117,60 @@ class CostAlertStatusAbility extends Ability
             'cron_scheduled' => $next !== false,
             'cron_next_run' => $next === false ? null : gmdate('c', (int) $next),
             'warm_scheduled' => $warm !== false,
+        ];
+    }
+
+    /**
+     * Put the cron array back in order, and drop keys that are not timestamps.
+     *
+     * Exactly what `wp_schedule_event()` does on every call — `uksort($crons, 'strnatcasecmp')`
+     * then save — applied to an array that has lost that ordering. Nothing is added or removed
+     * except keys that cannot be timestamps and therefore cannot name a run time.
+     *
+     * Opt-in, never automatic: this writes the option every scheduled job on the site depends on,
+     * and it should be a decision somebody made after reading the keys above rather than a side
+     * effect of asking for status.
+     *
+     * @return array<string, mixed>
+     */
+    private function repairCron(): array
+    {
+        $cron = get_option('cron');
+
+        if (! is_array($cron)) {
+            return ['done' => false, 'reason' => 'the cron option is not an array'];
+        }
+
+        $version = $cron['version'] ?? null;
+        $dropped = [];
+        $clean = [];
+
+        foreach ($cron as $key => $value) {
+            if ($key === 'version') {
+                continue;
+            }
+
+            if (! is_numeric($key) || ! is_array($value)) {
+                $dropped[] = var_export($key, true);
+
+                continue;
+            }
+
+            $clean[(int) $key] = $value;
+        }
+
+        ksort($clean, SORT_NUMERIC);
+
+        if ($version !== null) {
+            $clean['version'] = $version;
+        }
+
+        $ok = update_option('cron', $clean);
+
+        return [
+            'done' => $ok,
+            'dropped_keys' => $dropped,
+            'timestamps_after' => count($clean) - ($version !== null ? 1 : 0),
         ];
     }
 
@@ -179,11 +236,33 @@ class CostAlertStatusAbility extends Ability
             }
         }
 
+        /*
+         * The first few keys, and whether they are in order.
+         *
+         * `wp_get_ready_cron_jobs()` reads only `array_keys($crons)[0]`: if that one key is in the
+         * future it returns an empty array and wp-cron.php does nothing at all, however many
+         * overdue events sit behind it. So an array that is out of order — or that has picked up a
+         * key which is not a timestamp — stops every scheduled job on the site while answering 200
+         * to every cron request. That is indistinguishable from a healthy site from outside, and it
+         * is the state this reports on.
+         */
+        $keys = array_keys($cron);
+        $numeric = array_values(array_filter($keys, 'is_numeric'));
+        $sorted = $numeric;
+        sort($sorted, SORT_NUMERIC);
+
         return [
             'readable' => true,
             'alert_next_run' => $found,
             'timestamps' => count($cron),
             'events' => $events,
+            'first_keys' => array_slice(array_map(
+                static fn ($k): string => is_numeric($k) ? $k.' ('.gmdate('c', (int) $k).')' : 'NON-NUMERIC: '.var_export($k, true),
+                $keys,
+            ), 0, 4),
+            'first_key_in_future' => isset($keys[0]) && is_numeric($keys[0]) && (int) $keys[0] > time(),
+            'non_numeric_keys' => array_values(array_filter($keys, static fn ($k): bool => ! is_numeric($k))),
+            'out_of_order' => $numeric !== $sorted,
         ];
     }
 
