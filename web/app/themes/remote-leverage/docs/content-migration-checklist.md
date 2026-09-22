@@ -151,6 +151,11 @@ built — confirm it's the winner), `hire-va-6`, `hire-va-email`,
 
 - [ ] Get sign-off from whoever owns paid-traffic campaigns before killing any of these — several are likely live ad landing pages with active spend pointed at them
 
+> **Future experiments will not add pages to this list.** A page per variant was forced by
+> Elementor; v2 runs the test inside one URL and one pattern, with PostHog choosing a variant in
+> the browser — see [ab-testing.md](ab-testing.md), shipped 2026-09-22. It does not change what to
+> do with the ~43 pages above, which are still a keep-or-301 call per page.
+
 ## 6. Thank-you / confirmation pages
 
 - [x] `/thank-you/`, `page-vathankyou.blade.php` already built

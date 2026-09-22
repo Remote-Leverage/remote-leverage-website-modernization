@@ -86,7 +86,7 @@ Acorn routes (`routes/web.php`) are genuinely separate application pages: `/book
 Application/            ← delivery: what a user or an external system touches
 ├── Livewire/           6 components — hold UI state, call domain actions
 ├── Http/Controllers/   4 — Calendly + Stripe webhooks, PaymentIntent, GatedDownload
-└── Http/Middleware/    attribution, legacy redirects, PostHog redirects, missing-path 404
+└── Http/Middleware/    attribution, legacy redirects, missing-path 404
 
 Domains/<Context>/      ← the business logic, framework-light
                         8 contexts: ContentAudit · Lead · PartnerHub · Payment ·

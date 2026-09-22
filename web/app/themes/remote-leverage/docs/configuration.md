@@ -63,6 +63,9 @@ why. Nothing reads them now; they are safe to drop from `.env` and from Secrets 
 | Variable | Read by |
 | :--- | :--- |
 | `POSTHOG_API_KEY`, `POSTHOG_HOST` | `PostHogClient`, front-end snippet. Host defaults to `https://us.i.posthog.com`. |
+| `POSTHOG_ENVIRONMENTS` | Which environments **capture**. Defaults to `production` (falling back through `PIXEL_ENVIRONMENTS` to `GTM_ENVIRONMENTS`). |
+| `POSTHOG_FLAG_ENVIRONMENTS` | Which environments load PostHog for **flags only** — flags evaluate, a `before_send` hook drops every event, recording and autocapture are off. Defaults to `local,development,staging`, which is what makes an A/B test rehearsable before production. See [ab-testing.md](ab-testing.md). |
+| `POSTHOG_EXPERIMENT_TIMEOUT_MS` | How long the experiment reveal waits for a flag before painting the default variant. Default 1500. A visible budget, not a network one. |
 | `CUSTOMERIO_SITE_ID`, `CUSTOMERIO_API_KEY` | `CustomerIOClient` (Track API v1). `CUSTOMERIO_APP_API_KEY` was **removed 2026-09-16** — only `config/services.php` ever referenced it, nothing read it. The App API is a different Customer.io product (broadcasts, segments) that this codebase does not use. |
 | `CUSTOMERIO_CDP_WRITE_KEY` | `TrackingHooks` — the browser CDP snippet (`window.cioanalytics`), added 2026-09-15 when v2 switched from the classic `_cio` tracker to match production. **Not the site id**: CDP takes a write key, a different Customer.io product, and a site id here 404s the asset URL and silently queues every event forever. Blank → no snippet, every client call site no-ops. Server-side Track API v1 still uses `SITE_ID`/`API_KEY`. |
 

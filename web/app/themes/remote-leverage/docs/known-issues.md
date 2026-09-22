@@ -444,6 +444,32 @@ So when checking a remote environment's state after a write:
 Not to be confused with #17: that is about markup which is *correctly* absent on staging. This is
 about reads that are silently, invisibly out of date.
 
+### ~~27. The whole A/B testing path is dead, and its test passes by faking the cookie~~ — ✅ **FIXED 2026-09-22** (all three files deleted)
+
+Found 2026-09-22 while scoping [ab-testing.md](ab-testing.md). Three separate problems in one
+small surface, none of which would surface as an error:
+
+| Thing | State |
+| :--- | :--- |
+| `PostHogRedirectMiddleware` | Registered in no provider, route file, config or kernel. It has never executed |
+| `EvaluateVariantAction` | Referenced only by `tests/Unit/ActionsTest.php` |
+| `$_COOKIE['ph_distinct_id']` | The action's distinct-id fallback. **PostHog has never set this cookie** — posthog-js persists to `ph_<project_token>_posthog`, a JSON blob with `distinct_id` inside it |
+
+The test is the interesting part: it writes `$_COOKIE['ph_distinct_id']` itself and then asserts the
+action reads it back, so it proves the fallback works against a value nothing in production would
+ever supply. A green test on a code path that cannot run.
+
+`docs/domains/tracking.md` also described the fallback as *"a cookie fallback when PostHog is
+unreachable"*, which is wrong twice over — it is a fallback for the **distinct id**, not for the
+flag, and an unreachable PostHog makes `isFeatureEnabled()` return `false`, not consult a cookie.
+**Corrected 2026-09-22.**
+
+**Fixed 2026-09-22.** `EvaluateVariantAction`, `PostHogRedirectMiddleware` and
+`tests/Unit/ActionsTest.php` were deleted outright when client-side experiments shipped
+([ab-testing.md](ab-testing.md)). A PHP-decided variant could not have worked behind the
+FastCGI/CloudFront HTML cache anyway — see #19 for the same cache biting from the other direction.
+`PostHogClient::isFeatureEnabled()` was kept: it is still correct on the cache-excluded routes.
+
 ## ~~Dead configuration~~ — ✅ **FIXED 2026-09-15**
 
 Eight keys were listed here as read by nothing. **Seven were; the eighth was not.**

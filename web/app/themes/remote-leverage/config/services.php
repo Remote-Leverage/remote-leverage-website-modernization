@@ -173,6 +173,43 @@ return [
         ))),
 
         /*
+         * How long the experiment reveal waits for a flag before falling back to the default
+         * variant, in milliseconds. Also passed to posthog-js as `feature_flag_request_timeout_ms`
+         * so the two cannot disagree.
+         *
+         * 1500, against posthog-js's own 3000 default. This bounds how long a visitor assigned to
+         * a non-default variant can be looking at the default one, so it is a *visible* budget,
+         * not a network one — 3s of the wrong hero is worse than never running the test on that
+         * visitor. A timeout is not a failure: the default variant is a correct page.
+         */
+        'experiment_timeout_ms' => max(0, (int) (trim((string) env('POSTHOG_EXPERIMENT_TIMEOUT_MS', '')) ?: 1500)),
+
+        /*
+         * Environments that load the snippet in **flags-only** mode: feature flags evaluate, but
+         * `opt_out_capturing` is set, so no event, no pageview and no session recording reaches
+         * the project.
+         *
+         * This exists so an experiment can be rehearsed before it goes live. `environments` above
+         * is production-only by design, which until now meant the snippet was simply absent
+         * everywhere else and a variant could not be looked at until it was already in front of
+         * customers.
+         *
+         * Flags-only is safe against the *production* project, which is what these environments
+         * point at: evaluating a flag is a read. The one thing it costs is that
+         * `$feature_flag_called` is not sent either, so an experiment's exposure numbers cannot be
+         * checked from staging — only the rendering. That is the intended trade; see
+         * `docs/ab-testing.md`.
+         *
+         * An environment listed in BOTH this and `environments` captures normally: the capture
+         * gate wins, because it is the more permissive of the two and listing production here
+         * should never silence it.
+         */
+        'flag_environments' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('POSTHOG_FLAG_ENVIRONMENTS', 'local,development,staging')),
+        ))),
+
+        /*
          * Numeric project id — the one in the dashboard URL, NOT the `phc_` key. Used only to
          * build session-replay links for the lead timeline; nothing authenticates with it.
          */

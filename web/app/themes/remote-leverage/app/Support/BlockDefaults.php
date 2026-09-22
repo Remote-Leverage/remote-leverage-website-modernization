@@ -871,6 +871,33 @@ class BlockDefaults
         return '<!-- wp:acf/'.$slug.' '.json_encode($blockAttrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE).' /-->';
     }
 
+    /**
+     * One arm of an A/B test, wrapping the blocks that arm should show.
+     *
+     * Unlike every other helper here this one nests: `acf/experiment` is the theme's only
+     * InnerBlocks block, so the markup is an open/close pair rather than a self-closing comment,
+     * and `$inner` is the output of the ordinary `render*` helpers for that arm.
+     *
+     * A test is two calls with the same `$flag` and different `$variant`, exactly one of which
+     * passes `$isDefault: true`. See docs/ab-testing.md.
+     */
+    public static function renderExperiment(string $flag, string $variant, string $inner, bool $isDefault = false): string
+    {
+        $data = self::withFieldKeys('experiment_block', [
+            'flag' => $flag,
+            'variant' => $variant,
+            'is_default' => $isDefault ? 1 : 0,
+        ]);
+
+        $attrs = json_encode([
+            'name' => 'acf/experiment',
+            'data' => $data,
+            'mode' => 'preview',
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        return '<!-- wp:acf/experiment '.$attrs.' -->'.$inner.'<!-- /wp:acf/experiment -->';
+    }
+
     // --- PROCESS STEPS ---
     public static function steps(): array
     {

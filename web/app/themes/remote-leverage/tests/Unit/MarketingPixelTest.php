@@ -702,12 +702,32 @@ describe('defaults that used to depend on an unset variable', function () {
             'services.posthog.api_key' => 'phc_3PbasnDYndH8YVEky0ksHrB3SFwBZKmzkf5bl37o8u0',
             'services.posthog.host' => 'https://us.i.posthog.com',
             'services.posthog.environments' => ['production'],
+            'services.posthog.flag_environments' => ['local', 'development', 'staging'],
         ]);
 
         $hooks = new TrackingHooks;
 
+        /*
+         * `development` is in `flag_environments` by default since 2026-09-22, so it now emits a
+         * flags-only snippet rather than nothing at all — see docs/ab-testing.md. The guarantee
+         * this test exists to protect is unchanged and asserted below: nothing outside
+         * `environments` may write into the PostHog project.
+         */
         $GLOBALS['wp_environment_type'] = 'development';
-        expect($hooks->postHogEnvironmentAllowed())->toBeFalse();
+        expect($hooks->postHogEnvironmentAllowed())->toBeFalse()
+            ->and($hooks->postHogFlagsOnly())->toBeTrue();
+
+        ob_start();
+        $hooks->injectPostHogSnippet();
+        $devOut = (string) ob_get_clean();
+
+        expect($devOut)->toContain('before_send = function () { return null; }')
+            ->and($devOut)->toContain('"disable_session_recording":true')
+            ->and($devOut)->toContain('"autocapture":false');
+
+        // An environment in neither list still emits nothing whatsoever.
+        $GLOBALS['wp_environment_type'] = 'qa-sandbox';
+        expect($hooks->postHogSnippetAllowed())->toBeFalse();
 
         ob_start();
         $hooks->injectPostHogSnippet();
@@ -722,10 +742,17 @@ describe('defaults that used to depend on an unset variable', function () {
 
         expect($out)->toContain('posthog.init(')
             // Surveys are the 33KB nothing in this codebase asks for.
-            ->and($out)->toContain('disable_surveys:true')
-            // Stub and init stay synchronous; only array.js waits for idle/load.
+            ->and($out)->toContain('"disable_surveys":true')
+            // Production captures for real: the flags-only suppression must not leak into it.
+            ->and($out)->not->toContain('before_send')
             ->and($out)->toContain('/static/array.js')
-            ->and($out)->toContain('requestIdleCallback')
+            /*
+             * array.js is no longer deferred. It was held back to interaction/idle/load until
+             * 2026-09-22, which made feature flags unreadable during render and so made a
+             * client-side A/B test impossible. If `requestIdleCallback` comes back here, the
+             * experiments in docs/ab-testing.md stop deciding before paint.
+             */
+            ->and($out)->not->toContain('requestIdleCallback')
             ->and($out)->not->toContain('parentNode.insertBefore');
 
         expect(strpos($out, 'posthog.init('))

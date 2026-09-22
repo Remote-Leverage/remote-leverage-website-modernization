@@ -1,6 +1,9 @@
 # Tracking domain
 
-`app/Domains/Tracking` — behavioural analytics and server-side feature flags.
+`app/Domains/Tracking` — behavioural analytics and PostHog feature flags.
+
+> **A/B tests and experiments have their own document:** [../ab-testing.md](../ab-testing.md).
+> Variants are decided in the browser, because the HTML cache makes a PHP decision unsafe.
 
 Replaces the `rl-customer-io` and `rl-posthog-feature-flags` plugins.
 
@@ -24,8 +27,8 @@ flowchart LR
     AED --> PH
     AED --> CIO
 
-    FLAG["EvaluateVariantAction"] --> PHF["PostHogClient::isFeatureEnabled"]
-    PHF -->|"API unreachable"| CK["cookie fallback"]
+    UNCACHED["Livewire / wp-json only"] --> PHF["PostHogClient::isFeatureEnabled"]
+    PHF -->|"unreachable, or no such flag"| OFF["false"]
 ```
 
 Both destinations receive the same DTO. `RecordBehaviorEventAction` is the only sanctioned way to emit an analytics event — calling a gateway directly bypasses the dual dispatch and the audit log.
@@ -35,12 +38,11 @@ Both destinations receive the same DTO. `RecordBehaviorEventAction` is the only 
 | Class | Does |
 | :--- | :--- |
 | `RecordBehaviorEventAction` | Takes `AnalyticsEventData`, dispatches to PostHog and Customer.io |
-| `EvaluateVariantAction` | `execute($flagKey, $distinctId = null, $properties = [])` — server-side flag evaluation with a cookie fallback when PostHog is unreachable |
 | `PostHogClient` | `capture()`, `isFeatureEnabled()` |
 | `CustomerIOClient` | `identify()`, `track()` |
 | `HandleLeadCreatedForTracking` | Listener — identifies the person on both platforms the moment a lead is captured |
 | `AnalyticsEventData`, `UserProfileData` | The DTOs |
-| `TrackingHooks` (`app/Infrastructure/WordPress/Hooks`) | Injects the PostHog snippet in `<head>` (priority 2) and the Customer.io **CDP** snippet (`window.cioanalytics`) in the footer. **This is the only place PostHog is initialised** — see the warning below |
+| `TrackingHooks` (`app/Infrastructure/WordPress/Hooks`) | Injects the PostHog snippet in `<head>` (priority 2), the experiment runtime (priority 3) and the Customer.io **CDP** snippet (`window.cioanalytics`) in the footer. **This is the only place PostHog is initialised** — see the warning below |
 
 ## Configuration
 
@@ -156,6 +158,13 @@ loaded two copies of the SDK and captured every pageview twice. Removed 2026-09-
 `window.posthog` is the snippet's queueing stub until `array.js` lands, so client callers such as
 `resources/js/payment-gateway.js` can call `capture()` immediately regardless of load order.
 
+**That works for captures and not for flags**, which is why `array.js` is no longer deferred. A
+queued `capture()` is replayed when the real library arrives; a queued `getFeatureFlag()` returns
+`undefined` to a caller that needed an answer *now*. Between 2026-09-18 and 2026-09-22 the fetch
+waited for interaction, `load`, idle or 6s, so no flag was readable during render. It is now
+requested immediately from `<head>` — see [ab-testing.md](../ab-testing.md) for what that costs and
+why it was worth it. `MarketingPixelTest` fails if the deferral reappears.
+
 > **Production initialises PostHog from GTM, not from the theme.** Its HTML carries
 > `posthog.capture` but no `posthog.init`. Since v2 inherits both production GTM containers
 > ([cutover-decisions.md §32](../cutover-decisions.md)), a PostHog init tag in either one loads a
@@ -170,6 +179,22 @@ loaded two copies of the SDK and captured every pageview twice. Removed 2026-09-
 > no deploy, so the theme is the side that can be reasoned about. GTM tags that *call*
 > `posthog.capture()` are fine and need no change — the snippet's queueing stub accepts calls
 > before the SDK lands.
+
+## Where a flag may be evaluated
+
+**Not in PHP, for anything that renders a cached page.** Logged-out HTML is FastCGI-cached and
+served with `s-maxage=60` to CloudFront with no invalidation, so a variant chosen server-side is
+handed to every visitor who hits that cache entry. A/B tests are decided in the browser instead —
+[ab-testing.md](../ab-testing.md) has the design.
+
+`PostHogClient::isFeatureEnabled()` remains correct on the requests nginx excludes from the cache:
+`/livewire-*`, `/wp-json`, non-GET methods, logged-in sessions, `/referrer-*`, `vathankyou`. That is
+where a flag on an internal tool or a form branch belongs.
+
+`EvaluateVariantAction` and `PostHogRedirectMiddleware` — the legacy redirect-per-variant model in
+PHP — were **deleted on 2026-09-22**. They were registered nowhere, had never executed, and read a
+`ph_distinct_id` cookie posthog-js has never set (it persists to `ph_<project_token>_posthog`). See
+[known-issues.md §27](../known-issues.md).
 
 ## Booking funnel events
 
@@ -258,9 +283,10 @@ Network tab, filtered to `posthog` or `customer.io`: PostHog `/e/`, the CDP bund
 
 ## Tests
 
-`tests/Unit/ActionsTest.php` (flag evaluation with cookie fallback) and `tests/Feature/TrackingSubscribersTest.php` (auto-identify on `LeadCreated`).
+`tests/Feature/TrackingSubscribersTest.php` (auto-identify on `LeadCreated`),
+`tests/Unit/ExperimentRenderingTest.php` (the snippet's eager load, flags-only mode, the experiment
+runtime) and the PostHog section of `tests/Unit/MarketingPixelTest.php` (environment gating).
 
 ## Notes
 
-- `PostHogRedirectMiddleware` (`app/Application/Http/Middleware`) exists for flag-driven redirects on Acorn-routed requests. It does not apply to WordPress page requests — see [architecture.md §2](../architecture.md#2-two-request-paths).
 - Both gateways are called synchronously inside the request that captured the lead. See [architecture.md §4](../architecture.md#listeners-are-synchronous).
