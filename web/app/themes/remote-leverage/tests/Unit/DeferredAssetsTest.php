@@ -57,18 +57,27 @@ test('font preloads stay self-hosted, manifest-resolved, and limited to the two 
 
     expect($preloads[0])
         ->toContain('inter-display-latin.woff2')
-        ->toContain('fetchpriority="high"');
+        ->not->toContain('fetchpriority');
     expect($preloads[1])
         ->toContain('inter-latin-wght-normal.woff2')
         ->not->toContain('fetchpriority');
 
-    // Homepage LCP is the Inter Display <h1>. A preload after `@php(wp_head())` loses
-    // the network race to Meta and the Google tag, which is the 1.2 s FCP / 5.4 s LCP
-    // gap a 2026-09-22 PSI mobile run measured. Match the Blade call, not the bare
-    // `wp_head()` substring — that also appears in the comments that explain why
-    // these tags have to sit above it.
-    expect(strpos($layout, 'rel="preload" as="font"'))
-        ->toBeLessThan(strpos($layout, '@php(wp_head())'));
+    // CSS first (FCP), then fonts (text LCP), then `@php(wp_head())` (pixels). A 2026-09-22
+    // staging PSI run that preloaded Inter Display at fetchpriority=high *above* the
+    // stylesheet scored Speed Index 4.5 s with a blank filmstrip. Match the Blade call,
+    // not the bare `wp_head()` substring — that also appears in comments.
+    $cssAt = strpos($layout, '@vite(\\App\\Support\\BlogStyles::styleEntryPoints())');
+    $fontAt = strpos($layout, 'rel="preload" as="font"');
+    $headAt = strpos($layout, '@php(wp_head())');
+    $jsAt = strpos($layout, '@vite(\\App\\Support\\BlogStyles::scriptEntryPoints())');
+
+    expect($cssAt)->not->toBeFalse()
+        ->and($fontAt)->not->toBeFalse()
+        ->and($headAt)->not->toBeFalse()
+        ->and($jsAt)->not->toBeFalse()
+        ->and($cssAt)->toBeLessThan($fontAt)
+        ->and($fontAt)->toBeLessThan($headAt)
+        ->and($jsAt)->toBeGreaterThan($headAt);
 });
 
 test('app.css does not eagerly fetch intl-tel-input flag sprites', function () {

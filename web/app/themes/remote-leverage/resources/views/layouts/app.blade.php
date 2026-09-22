@@ -6,6 +6,16 @@
     <meta name="theme-color" content="#8A2BE2">
     <meta name="description" content="Hire pre-vetted bilingual virtual assistants and remote professionals across Latin America and Europe. No contracts, zero salary markup, and a 12-month replacement guarantee.">
 
+    {{-- Stylesheet before anything that competes for bandwidth. A 2026-09-22 PSI run on
+         staging scored Speed Index 4.5 s / LCP 6.3 s with a blank filmstrip: the Inter
+         Display preload sat at fetchpriority=high *above* this tag, so ~117 KB of fonts
+         won the network and the render-blocking CSS waited behind wp_head(). CSS first
+         restores Highest to the stylesheet; fonts and the hire-va image follow as High.
+
+         blog.css is only emitted on the pages that render its markup, and when it is, it
+         has to come before app.css. App\Support\BlogStyles owns both decisions. --}}
+    @vite(\App\Support\BlogStyles::styleEntryPoints())
+
     {{-- LCP preload for acf/hire-va-hero. Must sit above wp_head(): production
          pixels also land there, and a preload after those scripts loses the
          race the preload exists to win.
@@ -26,12 +36,10 @@
          first and reflows when the real font arrives; the faces below are only discovered
          after app.css has downloaded and parsed, so that reflow is guaranteed on a cold visit.
 
-         Same placement rule as the hire-va image above: these have to beat wp_head().
-         Homepage LCP is the Inter Display <h1>; a PSI mobile run on 2026-09-22 painted
-         FCP at 1.2 s and LCP at 5.4 s because the webfont lost the network race to Meta
-         and the Google tag (both emitted from wp_head at priority 4). fetchpriority=high
-         on the display face is because that one *is* LCP; the body face stays a normal
-         preload so the two do not contend at the same priority.
+         After the stylesheet, before wp_head(). Homepage LCP is the Inter Display <h1>.
+         No fetchpriority=high: that attribute put these at Highest with the CSS and is
+         what blanked the staging filmstrip. `rel=preload` is already High, which is the
+         right rung once the stylesheet has claimed Highest.
 
          Exactly these two, and no more. Measured on 2026-09-15 across `/`, `/hire-va-4/`,
          `/case-study/`, `/blog/`, `/about-us/` and a blog article: every one of them requests
@@ -47,7 +55,7 @@
          Resolved through the Vite manifest rather than hardcoded: these filenames are
          content-hashed build output and change on every font rebuild. A hardcoded hash would
          silently 404 and, worse, still look correct in the markup. --}}
-    <link rel="preload" as="font" type="font/woff2" crossorigin fetchpriority="high"
+    <link rel="preload" as="font" type="font/woff2" crossorigin
           href="{{ Vite::asset('resources/fonts/inter-display-latin.woff2') }}">
     <link rel="preload" as="font" type="font/woff2" crossorigin
           href="{{ Vite::asset('resources/fonts/inter-latin-wght-normal.woff2') }}">
@@ -95,10 +103,6 @@
         window.APP_VERSION = '{{ config('sentry.release') }}';
       @endif
     </script>
-
-    {{-- blog.css is only emitted on the pages that render its markup, and when it is, it has
-         to come before app.css. App\Support\BlogStyles owns both decisions. --}}
-    @vite(\App\Support\BlogStyles::entryPoints())
   </head>
 
   <body @php(body_class('min-h-full flex flex-col bg-bg-light text-text-body font-sans antialiased selection:bg-brand-purple selection:text-white'))>
@@ -150,5 +154,9 @@
     <template id="rl-livewire-scripts">
       @livewireScripts
     </template>
+    {{-- Module at the end of the body so it does not get a head modulepreload next
+         to the stylesheet. type=module is deferred either way; placing it here means
+         the download starts after the LCP path, not in parallel with app.css. --}}
+    @vite(\App\Support\BlogStyles::scriptEntryPoints())
   </body>
 </html>

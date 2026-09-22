@@ -56,7 +56,7 @@ class BlogStyles
     }
 
     /**
-     * The Vite entry points for this request.
+     * Stylesheets this request needs, in cascade order.
      *
      * blog.css comes first, and that is load-bearing rather than cosmetic. It declares no
      * `@layer`, so its rules beat every Tailwind layer wherever they collide — and app.css's
@@ -66,11 +66,32 @@ class BlogStyles
      *
      * @return array<int, string>
      */
-    public static function entryPoints(): array
+    public static function styleEntryPoints(): array
     {
         return array_merge(
             self::isNeeded() ? ['resources/css/blog.css'] : [],
-            ['resources/css/app.css', 'resources/js/app.js'],
+            ['resources/css/app.css'],
         );
+    }
+
+    /**
+     * Theme JS. Kept off the stylesheet list so the layout can put CSS in `<head>` (FCP)
+     * and the module at the end of `<body>` (so it does not contend with LCP).
+     *
+     * @return array<int, string>
+     */
+    public static function scriptEntryPoints(): array
+    {
+        return ['resources/js/app.js'];
+    }
+
+    /**
+     * The Vite entry points for this request.
+     *
+     * @return array<int, string>
+     */
+    public static function entryPoints(): array
+    {
+        return array_merge(self::styleEntryPoints(), self::scriptEntryPoints());
     }
 }
