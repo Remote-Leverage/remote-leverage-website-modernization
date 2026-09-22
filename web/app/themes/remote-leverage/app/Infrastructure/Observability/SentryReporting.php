@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Observability;
 
+use App\Domains\Lead\Services\AttributionCollector;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Sentry\Laravel\Integration;
 use Sentry\SentrySdk;
@@ -41,6 +42,12 @@ use function Sentry\configureScope;
  * 3. `Log::error()` and above, through a Sentry log channel. The booking wizard's own docblock
  *    notes that swallowed-but-logged failures went "to CloudWatch and nowhere else"; that was the
  *    gap that hid a dead funnel until someone happened to read the logs.
+ * 4. An identity on the scope: the logged-in WordPress user (`id` + `email`) when there is one,
+ *    otherwise the visitor's own attribution — nearly every request on a public marketing site.
+ *    `config/sentry.php` keeps `send_default_pii` off deliberately, since that flag would start
+ *    attaching every anonymous visitor's IP to their errors; setting an identity explicitly, from
+ *    data this site already collects for the same visitor's lead record, gets the attribution
+ *    value without that trade.
  *
  * ## Not in local
  *
@@ -67,6 +74,7 @@ final class SentryReporting
         self::$registered = true;
 
         $this->tagEnvironment();
+        $this->identifyUser();
         $this->captureUnhandledExceptions();
         $this->captureFatalErrors();
         $this->captureErrorLogs();
@@ -113,6 +121,101 @@ final class SentryReporting
             });
         } catch (Throwable) {
             // A tag is a nicety. Never let it be the reason reporting fails to install.
+        }
+    }
+
+    /**
+     * Attach an identity to the scope: a logged-in WordPress user first, otherwise whatever
+     * attribution the visitor arrived with.
+     */
+    private function identifyUser(): void
+    {
+        if ($this->identifyLoggedInUser()) {
+            return;
+        }
+
+        $this->identifyByAttribution();
+    }
+
+    /**
+     * Attach the logged-in WordPress user to the scope, guest visitors excluded.
+     *
+     * Guarded on `get_current_user_id()` rather than just `is_user_logged_in()` — a logged-out
+     * visitor's `wp_get_current_user()` still returns a `WP_User` with id `0` and empty fields,
+     * and setting that as the Sentry user would tag every anonymous error as "user 0" instead of
+     * leaving it correctly unidentified.
+     *
+     * @return bool Whether a user was actually identified, so `identifyUser()` knows not to also
+     *              fall back to attribution — a staff member testing via a campaign link is
+     *              identified by who they are, not by the link.
+     */
+    private function identifyLoggedInUser(): bool
+    {
+        if (! function_exists('is_user_logged_in') || ! \is_user_logged_in()) {
+            return false;
+        }
+
+        $id = function_exists('get_current_user_id') ? (int) \get_current_user_id() : 0;
+
+        if ($id < 1) {
+            return false;
+        }
+
+        $email = function_exists('wp_get_current_user') ? (string) \wp_get_current_user()->user_email : '';
+
+        try {
+            configureScope(static function (Scope $scope) use ($id, $email): void {
+                $scope->setUser([
+                    'id' => $id,
+                    'email' => $email,
+                ]);
+            });
+        } catch (Throwable) {
+            // Identifying the user is a nicety. Never let it be the reason reporting fails to install.
+        }
+
+        return true;
+    }
+
+    /**
+     * Fall back to identifying the visitor by their own attribution — the case for nearly all
+     * traffic on a public marketing site, which is never logged in at all.
+     *
+     * `AttributionCollector` is the same class `CaptureLeadAction` reads for `rl_leads`, so "who
+     * is this" means the same thing here as it does on a lead row. `device_id` (the first-party
+     * `rl_vid` cookie) is the only thing that can recognise a returning visitor, so it becomes the
+     * `id`; `utm_source`/`utm_medium`/`utm_campaign` ride along as plain fields on that same user
+     * so an issue reads as "this campaign's traffic is crashing" without cross-referencing leads.
+     *
+     * `device_id` is set client-side (`TrackingHooks::injectVisitorCookie()`) and so is absent on
+     * a visitor's very first request — exactly the request a fresh `utm_source` is most likely to
+     * be on, which is why this still identifies by UTM alone rather than requiring both.
+     */
+    private function identifyByAttribution(): void
+    {
+        try {
+            $named = (new AttributionCollector)->collect()['named'] ?? [];
+        } catch (Throwable) {
+            return;
+        }
+
+        $user = array_filter([
+            'id' => $named['device_id'] ?? null,
+            'utm_source' => $named['utm_source'] ?? null,
+            'utm_medium' => $named['utm_medium'] ?? null,
+            'utm_campaign' => $named['utm_campaign'] ?? null,
+        ], static fn (mixed $value): bool => $value !== null);
+
+        if ($user === []) {
+            return;
+        }
+
+        try {
+            configureScope(static function (Scope $scope) use ($user): void {
+                $scope->setUser($user);
+            });
+        } catch (Throwable) {
+            // Identifying the visitor is a nicety. Never let it be the reason reporting fails to install.
         }
     }
 

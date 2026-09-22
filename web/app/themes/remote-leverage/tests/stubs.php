@@ -859,6 +859,34 @@ if (! function_exists('wp_get_environment_type')) {
     }
 }
 
+/*
+ * The logged-in user, for SentryReporting::identifyUser(). Defaults to logged-out so every other
+ * test suite — none of which sets these — keeps exercising the guest path unchanged.
+ */
+if (! function_exists('is_user_logged_in')) {
+    function is_user_logged_in()
+    {
+        return (bool) ($GLOBALS['wp_current_user_logged_in'] ?? false);
+    }
+}
+
+if (! function_exists('get_current_user_id')) {
+    function get_current_user_id()
+    {
+        return (int) ($GLOBALS['wp_current_user_id'] ?? 0);
+    }
+}
+
+if (! function_exists('wp_get_current_user')) {
+    function wp_get_current_user()
+    {
+        $user = new stdClass;
+        $user->user_email = $GLOBALS['wp_current_user_email'] ?? '';
+
+        return $user;
+    }
+}
+
 if (! function_exists('esc_textarea')) {
     function esc_textarea($text)
     {

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Infrastructure\Observability\SentryReporting;
+use Illuminate\Http\Request;
 
 /*
  * Sentry was installed, configured with a live DSN, and receiving nothing.
@@ -38,7 +39,12 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    unset($GLOBALS['wp_environment_type']);
+    unset(
+        $GLOBALS['wp_environment_type'],
+        $GLOBALS['wp_current_user_logged_in'],
+        $GLOBALS['wp_current_user_id'],
+        $GLOBALS['wp_current_user_email'],
+    );
     SentryReporting::forgetRegistration();
 });
 
@@ -91,4 +97,65 @@ it('does nothing at all without a DSN', function () {
     registerSentryReporting('production');
 
     expect(config('logging.channels.stack.channels'))->not->toContain('sentry');
+});
+
+/*
+ * There's no vendor-exposed way to read the applied scope back out in a unit test, so this
+ * asserts the thing that's actually load-bearing: identifying a real logged-in user must not be
+ * the reason registration fails.
+ */
+it('identifies a logged-in WordPress user without throwing', function () {
+    $GLOBALS['wp_current_user_logged_in'] = true;
+    $GLOBALS['wp_current_user_id'] = 42;
+    $GLOBALS['wp_current_user_email'] = 'admin@remoteleverage.com';
+
+    registerSentryReporting('production');
+
+    expect(config('logging.channels.stack.channels'))->toContain('sentry');
+});
+
+it('does not identify a guest visitor with no attribution at all', function () {
+    $GLOBALS['wp_current_user_logged_in'] = false;
+
+    // Would resolve to id 0 if identifyUser() ignored the is_user_logged_in() guard — asserting
+    // no exception here is what would catch that regression, since a guest WP_User's id and
+    // email are always present, just empty/zero, not absent.
+    registerSentryReporting('production');
+
+    expect(config('logging.channels.stack.channels'))->toContain('sentry');
+});
+
+/*
+ * Same "no vendor-exposed way to read the scope back out" limitation as the logged-in case above
+ * — this asserts identifying a guest by UTM must not be the reason registration fails, covering
+ * both the code path (AttributionCollector wired correctly) and the guard (array_filter surviving
+ * a request with none of these parameters, exercised by the test above).
+ */
+it('identifies a guest by UTM attribution when there is no logged-in user', function () {
+    $GLOBALS['wp_current_user_logged_in'] = false;
+
+    app()->instance('request', Request::create('https://remoteleverage.com/hire-va-4/', 'GET', [
+        'utm_source' => 'google',
+        'utm_medium' => 'cpc',
+        'utm_campaign' => 'q4-va',
+    ]));
+
+    registerSentryReporting('production');
+
+    expect(config('logging.channels.stack.channels'))->toContain('sentry');
+});
+
+it('identifies a returning visitor by device id even without UTM parameters', function () {
+    $GLOBALS['wp_current_user_logged_in'] = false;
+
+    app()->instance('request', Request::create(
+        'https://remoteleverage.com/',
+        'GET',
+        [],
+        ['rl_vid' => 'abc-123'],
+    ));
+
+    registerSentryReporting('production');
+
+    expect(config('logging.channels.stack.channels'))->toContain('sentry');
 });
