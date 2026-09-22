@@ -52,11 +52,13 @@ class MarketingPixelHooks
     /**
      * Pixels whose SDK fetch can be deferred.
      *
-     * Meta and the Google tag are absent on purpose rather than by omission — see the `defer`
-     * block in `config/pixels.php`. Intersecting against this list means a stray
-     * `PIXEL_DEFER_VENDORS=meta` is ignored rather than half-honoured.
+     * Intersecting against this list means a stray `PIXEL_DEFER_VENDORS=something-else` is
+     * ignored rather than half-honoured. Meta and the Google tag were excluded until 2026-09-22:
+     * browser conversions already travel server-side (CAPI / GoogleEnhancedConversion), and
+     * leaving the SDKs on the critical path is what a PSI mobile run measured as 5.4 s LCP
+     * against a 1.2 s FCP. See the `defer` block in `config/pixels.php`.
      */
-    private const DEFERRABLE = ['linkedin', 'openai', 'bing_uet', 'tiktok'];
+    private const DEFERRABLE = ['linkedin', 'openai', 'bing_uet', 'tiktok', 'meta', 'google_tag'];
 
     /**
      * The vendors actually being deferred, in a stable order.
@@ -98,10 +100,13 @@ class MarketingPixelHooks
      *
      * Flushes on the earliest of: the first real user interaction, `window` load,
      * browser idle, or `pixels.defer.timeout_ms`. Interaction is included because
-     * an engaged visitor should not wait out the timeout to be tracked. Load is
-     * included so a visit that already painted does not sit on the Lighthouse
-     * ceiling. Idle alone never arrives on a page that stays busy — which is
-     * the page this exists for.
+     * an engaged visitor should not wait out the timeout to be tracked — but the
+     * interaction listener only *schedules* the flush (setTimeout 0), it does not
+     * run the loaders inside the event. Flushing synchronously on pointerdown is
+     * how deferred pixels become an INP regression: field INP on the homepage was
+     * 500 ms on 2026-09-22 with this running inline. Load is included so a visit
+     * that already painted does not sit on the Lighthouse ceiling. Idle alone
+     * never arrives on a page that stays busy — which is the page this exists for.
      *
      * The flush also pushes `rl_idle` onto `dataLayer`. That is the hook for deferring a tag
      * that lives in the container rather than here: retrigger it on `rl_idle` instead of
@@ -135,7 +140,7 @@ class MarketingPixelHooks
     if (timer) w.clearTimeout(timer);
 
     for (var i = 0; i < EVENTS.length; i++) {
-      w.removeEventListener(EVENTS[i], flush, true);
+      w.removeEventListener(EVENTS[i], scheduleFlush, true);
     }
 
     w.removeEventListener('load', flush);
@@ -151,8 +156,15 @@ class MarketingPixelHooks
     w.dataLayer.push({ event: 'rl_idle' });
   }
 
+  // Off the INP event. The loaders are the expensive part; running them inside
+  // pointerdown is what a 500 ms field INP looks like.
+  function scheduleFlush() {
+    if (flushed) return;
+    w.setTimeout(flush, 0);
+  }
+
   for (var k = 0; k < EVENTS.length; k++) {
-    w.addEventListener(EVENTS[k], flush, { once: true, passive: true, capture: true });
+    w.addEventListener(EVENTS[k], scheduleFlush, { once: true, passive: true, capture: true });
   }
 
   w.addEventListener('load', flush);
@@ -198,18 +210,32 @@ HTML;
             $inits .= "fbq('track', 'PageView');\n";
         }
 
+        [$defer, $endDefer] = $this->deferWrap('meta');
+
+        /*
+         * Stub and init stay synchronous — `fbq`'s own queue drains when fbevents.js arrives,
+         * so a PageView queued here is not lost. Only the SDK insertion waits. The original
+         * IIFE returned early when `fbq` already existed (GTM, a second copy of this snippet)
+         * and skipped the insert; the flag below preserves that so we do not fetch the SDK
+         * twice.
+         */
         echo <<<HTML
 
 <!-- Meta Pixel (config/pixels.php) -->
 <script>
-!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+!function(f,n){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
 n.callMethod.apply(n,arguments):n.queue.push(arguments)};
 if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-n.queue=[];t=b.createElement(e);t.async=!0;
-t.src=v;s=b.getElementsByTagName(e)[0];
-s.parentNode.insertBefore(t,s)}(window,document,'script',
-'https://connect.facebook.net/en_US/fbevents.js');
-{$inits}</script>
+n.queue=[];f.__rlMetaNeedsSdk=1}(window);
+{$inits}{$defer}(function(){
+  if (!window.__rlMetaNeedsSdk) return;
+  window.__rlMetaNeedsSdk=0;
+  var t=document.createElement('script');t.async=!0;
+  t.src='https://connect.facebook.net/en_US/fbevents.js';
+  var s=document.getElementsByTagName('script')[0];
+  s.parentNode.insertBefore(t,s);
+})();{$endDefer}
+</script>
 <!-- End Meta Pixel -->
 
 HTML;
@@ -530,14 +556,27 @@ HTML;
             $configs .= 'gtag("config", "'.esc_js($id).'", {"url_passthrough": true});'."\n";
         }
 
+        [$defer, $endDefer] = $this->deferWrap('google_tag');
+
+        /*
+         * `dataLayer` / `gtag()` stay inline so a conversion queued before the SDK arrives is
+         * not lost. Only the gtag/js fetch waits — `async` never meant "free": it defers
+         * *fetch*, not evaluation, and GT-NCNQ6N2 was measured at 749 ms blocking.
+         */
         echo <<<HTML
 <!-- Google tag (config/pixels.php) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id={$primary}"></script>
 <script>
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 {$linker}gtag("js", new Date());
-{$configs}</script>
+{$configs}{$defer}(function(){
+  var s=document.createElement('script');
+  s.async=true;
+  s.src='https://www.googletagmanager.com/gtag/js?id={$primary}';
+  var f=document.getElementsByTagName('script')[0];
+  f.parentNode.insertBefore(s,f);
+})();{$endDefer}
+</script>
 <!-- End Google tag -->
 
 HTML;

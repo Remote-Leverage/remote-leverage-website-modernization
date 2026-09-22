@@ -439,25 +439,29 @@ return [
     | priority 4 contend for it during the load. Five of those six are now gone
     | (HubSpot and Rewardful removed; TikTok, LinkedIn and OpenAI switched off),
     | so the figure above is the before, not the current state. What is left
-    | firing is Meta, UET and the Google tag.
+    | firing is Meta, UET and the Google tag, and all three of those now wait.
     |
     | **No event is lost by deferring.** Every vendor here installs a queueing
     | stub and drains it when the SDK arrives, so the stub and the `init` /
     | `track` calls still run immediately and only the network fetch waits. See
     | `MarketingPixelHooks::injectDeferBootstrap()` for the flush conditions:
     | the earliest of first user interaction, `window` load, browser idle, or
-    | `timeout_ms`. Load is included so a real visit that paints in ~2s does
-    | not wait out the Lighthouse-oriented ceiling; the timeout is the floor
-    | for a lab run that never goes idle and never fires `load` before LCP.
+    | `timeout_ms`. Interaction only *schedules* the flush (it does not run the
+    | loaders inside the INP event). Load is included so a real visit that
+    | paints in ~2s does not wait out the Lighthouse-oriented ceiling; the
+    | timeout is the floor for a lab run that never goes idle and never fires
+    | `load` before LCP.
     |
-    | Two are deliberately NOT deferrable, and adding them here does nothing:
+    | Meta and `google_tag` joined the list on 2026-09-22. They were held back
+    | because Meta is 67% of paid acquisition and because the Google tag comment
+    | claimed `async` made it free. Neither reason survives measurement:
     |
-    |  - **meta** -- Facebook is 67% of paid acquisition. A PageView that lands
-    |    late is still counted, but this is not the pixel to experiment on.
-    |  - **google_tag** -- GA4 and Google Ads conversions should not wait behind
-    |    an idle callback, and the tag is already `async` so it costs no parse
-    |    time. See the Google tag block above for how it overlaps the
-    |    container's own Google tag.
+    |  - Conversions already travel server-side (`MetaConversionsApiClient` /
+    |    `GoogleEnhancedConversion`) with event_id dedup, so a late PageView is
+    |    the risk, not a lost Lead.
+    |  - `async` defers *fetch*, not evaluation. GT-NCNQ6N2 was measured at
+    |    749 ms blocking / 926 ms main thread. See
+    |    `docs/performance-homepage-plan.md` Phase 3.
     |
     | The flush also pushes `rl_idle` onto `dataLayer`, which is the intended
     | way to defer a tag that lives in the container rather than here: retrigger
@@ -472,7 +476,7 @@ return [
     'defer' => [
         'vendors' => array_values(array_filter(array_map(
             'trim',
-            explode(',', trim((string) env('PIXEL_DEFER_VENDORS', '')) ?: 'linkedin,openai,bing_uet,tiktok'),
+            explode(',', trim((string) env('PIXEL_DEFER_VENDORS', '')) ?: 'linkedin,openai,bing_uet,tiktok,meta,google_tag'),
         ))),
 
         /*

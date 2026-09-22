@@ -119,7 +119,7 @@ posthog.init('{$apiKey}',{api_host:'{$host}',person_profiles:'identified_only',d
     flushed = true;
     w.__rlPosthogRequested = true;
     for (var i = 0; i < EVENTS.length; i++) {
-      w.removeEventListener(EVENTS[i], load, true);
+      w.removeEventListener(EVENTS[i], scheduleLoad, true);
     }
     w.removeEventListener('load', load);
     var p = d.createElement('script');
@@ -129,8 +129,12 @@ posthog.init('{$apiKey}',{api_host:'{$host}',person_profiles:'identified_only',d
     p.src = '{$host}'.replace('.i.posthog.com', '-assets.i.posthog.com') + '/static/array.js';
     d.head.appendChild(p);
   }
+  function scheduleLoad() {
+    if (flushed) return;
+    w.setTimeout(load, 0);
+  }
   for (var k = 0; k < EVENTS.length; k++) {
-    w.addEventListener(EVENTS[k], load, { once: true, passive: true, capture: true });
+    w.addEventListener(EVENTS[k], scheduleLoad, { once: true, passive: true, capture: true });
   }
   w.addEventListener('load', load);
   w.setTimeout(load, timeout);

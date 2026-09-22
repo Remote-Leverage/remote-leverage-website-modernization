@@ -54,6 +54,19 @@ test('font preloads stay self-hosted, manifest-resolved, and limited to the two 
             ->not->toContain('http://')
             ->not->toContain('https://');
     }
+
+    expect($preloads[0])
+        ->toContain('inter-display-latin.woff2')
+        ->toContain('fetchpriority="high"');
+    expect($preloads[1])
+        ->toContain('inter-latin-wght-normal.woff2')
+        ->not->toContain('fetchpriority');
+
+    // Homepage LCP is the Inter Display <h1>. A preload after wp_head() loses the
+    // network race to Meta and the Google tag, which is the 1.2 s FCP / 5.4 s LCP
+    // gap a 2026-09-22 PSI mobile run measured.
+    expect(strpos($layout, 'rel="preload" as="font"'))
+        ->toBeLessThan(strpos($layout, 'wp_head()'));
 });
 
 test('app.css does not eagerly fetch intl-tel-input flag sprites', function () {

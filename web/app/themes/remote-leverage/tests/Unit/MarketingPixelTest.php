@@ -512,26 +512,45 @@ describe('deferred SDK loading', function () {
             ->and($out)->toContain('requestIdleCallback')
             ->and($out)->toContain('w.setTimeout(flush, 1800)')
             ->and($out)->toContain("w.addEventListener('load', flush)")
+            // Interaction only schedules the flush; running Meta/gtag inside pointerdown
+            // is how deferred pixels become a 500 ms field INP.
+            ->and($out)->toContain('function scheduleFlush')
+            ->and($out)->toContain('w.setTimeout(flush, 0)')
             // The hook a container tag retriggers on, so TikTok can be deferred without
             // leaving GTM. A tag would point at this event name.
             ->and($out)->toContain("event: 'rl_idle'");
     });
 
-    test('Meta and the Google tag are not deferrable, however they are configured', function () {
+    test('Meta and the Google tag defer the SDK fetch and keep the stub synchronous', function () {
         /*
-         * Meta carries 67% of paid acquisition and the Google tag is the site's only gtag
-         * loader — the container has none of its own, so its GA4 tags piggyback on this one.
-         * Both are excluded in code rather than by convention.
+         * Phase 3 of docs/performance-homepage-plan.md. Conversions already travel
+         * server-side; what these two uniquely cost on the critical path is PageView
+         * collection, and a PSI mobile run on 2026-09-22 measured that as 5.4 s LCP.
+         * The stub still has to be synchronous — a `fbq('track')` / `gtag('event')`
+         * before the SDK arrives has to queue.
          */
-        config(['pixels.defer.vendors' => ['meta', 'google_tag', 'linkedin']]);
+        config(['pixels.defer.vendors' => ['meta', 'google_tag']]);
 
         $hooks = new MarketingPixelHooks;
 
-        expect($hooks->deferredVendors())->toBe(['linkedin'])
-            ->and($hooks->isDeferred('meta'))->toBeFalse()
-            ->and($hooks->isDeferred('google_tag'))->toBeFalse()
-            ->and(renderPixel(fn (MarketingPixelHooks $h) => $h->injectMetaPixel()))->not->toContain('rlDefer')
-            ->and(renderPixel(fn (MarketingPixelHooks $h) => $h->injectGoogleTag()))->not->toContain('rlDefer');
+        expect($hooks->deferredVendors())->toBe(['meta', 'google_tag'])
+            ->and($hooks->isDeferred('meta'))->toBeTrue()
+            ->and($hooks->isDeferred('google_tag'))->toBeTrue();
+
+        $meta = renderPixel(fn (MarketingPixelHooks $h) => $h->injectMetaPixel());
+
+        expect($meta)->toContain('rlDefer')
+            ->and(strpos($meta, "fbq('init', '1430907207548734')"))->toBeLessThan(strpos($meta, 'rlDefer'))
+            ->and(strpos($meta, "fbq('track', 'PageView')"))->toBeLessThan(strpos($meta, 'rlDefer'))
+            ->and(strpos($meta, 'connect.facebook.net'))->toBeGreaterThan(strpos($meta, 'rlDefer'));
+
+        $gtag = renderPixel(fn (MarketingPixelHooks $h) => $h->injectGoogleTag());
+
+        expect($gtag)->toContain('rlDefer')
+            ->and(strpos($gtag, 'function gtag()'))->toBeLessThan(strpos($gtag, 'rlDefer'))
+            ->and(strpos($gtag, 'gtag("config", "GT-NCNQ6N2"'))->toBeLessThan(strpos($gtag, 'rlDefer'))
+            ->and(strpos($gtag, 'googletagmanager.com/gtag/js?id=GT-NCNQ6N2'))->toBeGreaterThan(strpos($gtag, 'rlDefer'))
+            ->and($gtag)->not->toContain('<script async src="https://www.googletagmanager.com/gtag/js');
     });
 
     test('LinkedIn queues its ids and stub before the wrapper, not inside it', function () {
@@ -573,7 +592,7 @@ describe('deferred SDK loading', function () {
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/config/pixels.php');
 
         expect($src)
-            ->toContain("'linkedin,openai,bing_uet,tiktok'")
+            ->toContain("'linkedin,openai,bing_uet,tiktok,meta,google_tag'")
             ->toContain('?: 6000');
     });
 });

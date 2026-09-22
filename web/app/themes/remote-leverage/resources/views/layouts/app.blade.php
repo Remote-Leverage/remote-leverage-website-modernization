@@ -22,6 +22,36 @@
             href="{{ $hireVaLcp['mobile'] }}">
     @endif
 
+    {{-- Font preload. `font-display: swap` means an un-preloaded face paints a fallback
+         first and reflows when the real font arrives; the faces below are only discovered
+         after app.css has downloaded and parsed, so that reflow is guaranteed on a cold visit.
+
+         Same placement rule as the hire-va image above: these have to beat wp_head().
+         Homepage LCP is the Inter Display <h1>; a PSI mobile run on 2026-09-22 painted
+         FCP at 1.2 s and LCP at 5.4 s because the webfont lost the network race to Meta
+         and the Google tag (both emitted from wp_head at priority 4). fetchpriority=high
+         on the display face is because that one *is* LCP; the body face stays a normal
+         preload so the two do not contend at the same priority.
+
+         Exactly these two, and no more. Measured on 2026-09-15 across `/`, `/hire-va-4/`,
+         `/case-study/`, `/blog/`, `/about-us/` and a blog article: every one of them requests
+         these two faces and only these two. The other three in app.css are deliberately left
+         alone —
+           - `inter-display-latin-ext.woff2` (125 KB) and `inter-latin-ext-wght-normal.woff2`
+             cover U+0100+ and were not requested by any page measured;
+           - `inter-latin-wght-italic.woff2` is requested on `/about-us/` only, and nothing
+             above the fold there is italic.
+         Preloading those would push ~125 KB of never-parsed bytes onto the critical path of
+         every visit, which is a bigger regression than the swap this fixes.
+
+         Resolved through the Vite manifest rather than hardcoded: these filenames are
+         content-hashed build output and change on every font rebuild. A hardcoded hash would
+         silently 404 and, worse, still look correct in the markup. --}}
+    <link rel="preload" as="font" type="font/woff2" crossorigin fetchpriority="high"
+          href="{{ Vite::asset('resources/fonts/inter-display-latin.woff2') }}">
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+          href="{{ Vite::asset('resources/fonts/inter-latin-wght-normal.woff2') }}">
+
     <link rel="icon" type="image/svg+xml" href="{{ Vite::asset('resources/images/logo-icon-black.svg') }}">
 
     <script type="application/ld+json">
@@ -65,29 +95,6 @@
         window.APP_VERSION = '{{ config('sentry.release') }}';
       @endif
     </script>
-
-    {{-- Font preload. `font-display: swap` means an un-preloaded face paints a fallback
-         first and reflows when the real font arrives; the faces below are only discovered
-         after app.css has downloaded and parsed, so that reflow is guaranteed on a cold visit.
-
-         Exactly these two, and no more. Measured on 2026-09-15 across `/`, `/hire-va-4/`,
-         `/case-study/`, `/blog/`, `/about-us/` and a blog article: every one of them requests
-         these two faces and only these two. The other three in app.css are deliberately left
-         alone —
-           - `inter-display-latin-ext.woff2` (125 KB) and `inter-latin-ext-wght-normal.woff2`
-             cover U+0100+ and were not requested by any page measured;
-           - `inter-latin-wght-italic.woff2` is requested on `/about-us/` only, and nothing
-             above the fold there is italic.
-         Preloading those would push ~125 KB of never-parsed bytes onto the critical path of
-         every visit, which is a bigger regression than the swap this fixes.
-
-         Resolved through the Vite manifest rather than hardcoded: these filenames are
-         content-hashed build output and change on every font rebuild. A hardcoded hash would
-         silently 404 and, worse, still look correct in the markup. --}}
-    <link rel="preload" as="font" type="font/woff2" crossorigin
-          href="{{ Vite::asset('resources/fonts/inter-display-latin.woff2') }}">
-    <link rel="preload" as="font" type="font/woff2" crossorigin
-          href="{{ Vite::asset('resources/fonts/inter-latin-wght-normal.woff2') }}">
 
     {{-- blog.css is only emitted on the pages that render its markup, and when it is, it has
          to come before app.css. App\Support\BlogStyles owns both decisions. --}}
