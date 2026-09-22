@@ -1234,6 +1234,17 @@ if (sentryDsn && !isAutomated()) {
         return event;
       },
     });
+
+    /*
+     * `window.SENTRY_USER` is `SentryReporting::browserIdentity()`, rendered by app.blade.php: a
+     * logged-in WordPress user's id, or else the visitor's hashed device id plus UTM fields —
+     * never an email, which never belongs in page HTML. Without this the JS SDK has no user at
+     * all, so Release Health can report Crash Free Sessions but never Crash Free Users — that
+     * metric groups by user.
+     */
+    if (window.SENTRY_USER && Object.keys(window.SENTRY_USER).length > 0) {
+      Sentry.setUser(window.SENTRY_USER);
+    }
   }).catch((err) => console.error('Sentry initialization failed:', err));
 }
 
