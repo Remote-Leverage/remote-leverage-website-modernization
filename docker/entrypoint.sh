@@ -133,15 +133,35 @@ fi
 # definition can still override it, since config/application.php reads the environment and the
 # entrypoint never overwrites a variable that is already set.
 # ---------------------------------------------------------------------------
-if [ "${DISABLE_WP_CRON:-}" = "true" ]; then
-  # Already switched off by the task definition. Starting cron anyway would mean no scheduled
-  # work at all, so this honours the setting and warns rather than quietly contradicting it.
-  echo "entrypoint: DISABLE_WP_CRON is already true in the environment; not starting cron." >&2
-elif command -v cron >/dev/null 2>&1 && cron; then
+#
+# `DISABLE_WP_CRON=true` is NOT a reason to skip starting cron, and treating it as one cost a
+# full day on 2026-09-21.
+#
+# The two settings do different jobs. `DISABLE_WP_CRON` stops WordPress spawning cron from a
+# visitor's request; it does nothing to `wp-cron.php` itself, which still runs the queue when
+# something asks it to. Real cron asking it to is the whole design — that is why the variable is
+# set in the first place.
+#
+# The old branch read the variable as "somebody else is driving cron, stand down". Nobody was.
+# The last container that had been started before this block existed was replaced at 16:25 UTC,
+# its WP-CLI runner went with it, and every container since booted straight into the skip. From
+# then until 02:00 the next morning not one scheduled event ran on the site: 34 of them queued up,
+# the hourly cost alert among them, while the alert's own gates, the cron array and wp-cron.php
+# were all provably healthy. Nothing logged a thing, because nothing had failed — cron had simply
+# never been started.
+#
+# So: start cron whenever it is available, and keep the variable set either way.
+if command -v cron >/dev/null 2>&1 && cron; then
   export DISABLE_WP_CRON=true
-  echo "entrypoint: cron started; WP-Cron no longer piggybacks on visitor requests."
+  echo "entrypoint: cron started; wp-cron.php is driven by the container's crontab."
 else
-  echo "entrypoint: WARNING - cron failed to start; leaving WP-Cron on request spawning." >&2
+  # Only now does the variable decide anything, and it decides between two bad outcomes: leave
+  # WP-Cron on request spawning, or have no scheduled work at all. Say which one loudly.
+  if [ "${DISABLE_WP_CRON:-}" = "true" ]; then
+    echo "entrypoint: ERROR - cron failed to start and DISABLE_WP_CRON is true; NO scheduled work will run." >&2
+  else
+    echo "entrypoint: WARNING - cron failed to start; leaving WP-Cron on request spawning." >&2
+  fi
 fi
 
 # ---------------------------------------------------------------------------
