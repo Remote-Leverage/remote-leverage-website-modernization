@@ -98,6 +98,10 @@
       window.APP_ENV = '{{ env('SENTRY_ENVIRONMENT') ?: env('APP_ENV', 'production') }}';
       @if (config('sentry.dsn'))
         window.SENTRY_DSN = '{{ config('sentry.dsn') }}';
+        {{-- Mirrors config/sentry.php's PHP-side flag so app.js can pass the same value to the
+             browser SDK's Sentry.init(). Independent of window.SENTRY_USER's `{{auto}}` IP
+             sentinel below, which Relay honours regardless of this flag. --}}
+        window.SENTRY_SEND_DEFAULT_PII = @js((bool) config('sentry.send_default_pii'));
         {{-- A logged-in WP user's id, or else the visitor's attribution — never an email, see
              SentryReporting::browserIdentity(). app.js calls Sentry.setUser() with this so
              Release Health can report Crash Free Users, not just Crash Free Sessions. --}}
