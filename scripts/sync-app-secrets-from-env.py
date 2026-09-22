@@ -113,6 +113,11 @@ ALLOWLIST = [
     "REFERRAL_WEBHOOK_URL",
     # Monitoring
     "SENTRY_LARAVEL_DSN",
+    "SENTRY_ENVIRONMENT",
+    # Not a secret — same reason as MARKETING_COST_ALERT_ENABLED: this script is the
+    # only path an environment variable has into a running task. Staging is true;
+    # production stays false so anonymous visitor IPs are not attached to errors.
+    "SENTRY_SEND_DEFAULT_PII",
     # AI
     "GEMINI_API_KEY",
     # Legacy browser tools (config/job-widget.php) — the OpenAI proxy behind the vastore5 job

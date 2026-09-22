@@ -173,7 +173,8 @@ anywhere to explain it.
 
 `send_default_pii` stays `false` in production — this is a public marketing site, and that flag
 would attach every anonymous visitor's IP address to their errors along with it. Staging sets
-`SENTRY_SEND_DEFAULT_PII=true` on the task definition so events there include that context.
+`SENTRY_SEND_DEFAULT_PII=true` as a GitHub Environment secret, synced into Secrets Manager and
+mapped on the ECS task definition, so events there include that context.
 `SentryReporting::identifyUser()` still sets the Sentry user explicitly, choosing one of two identities:
 
 1. **A logged-in WordPress user** (`id` + `email`), and only once `get_current_user_id()` is

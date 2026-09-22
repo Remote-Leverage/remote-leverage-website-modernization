@@ -95,7 +95,7 @@
     @livewireStyles
 
     <script>
-      window.APP_ENV = '{{ env('APP_ENV', 'production') }}';
+      window.APP_ENV = '{{ env('SENTRY_ENVIRONMENT') ?: env('APP_ENV', 'production') }}';
       @if (config('sentry.dsn'))
         window.SENTRY_DSN = '{{ config('sentry.dsn') }}';
         {{-- A logged-in WP user's id, or else the visitor's attribution — never an email, see
