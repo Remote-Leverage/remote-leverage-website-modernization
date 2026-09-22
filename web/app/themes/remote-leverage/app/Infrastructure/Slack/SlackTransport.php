@@ -56,8 +56,9 @@ class SlackTransport
      * @param  string|null  $color  Non-null boxes the message in a coloured attachment.
      * @param  string|null  $threadTs  Reply under this parent rather than posting at top level.
      * @param  bool  $broadcast  Also surface a threaded reply in the channel. For the replies
-     *                           that people must not miss — a booking, a block — where burying
-     *                           it in a collapsed thread would be worse than not threading.
+     *                           that people must not miss — a booking, a live call — where
+     *                           burying it in a collapsed thread would be worse than not
+     *                           threading.
      * @param  string|null  $channel  Post here instead of the configured default. See the class
      *                                docblock for what the webhook path does with it.
      * @return array{ts: ?string, channel: ?string}|null Null when nothing was sent.

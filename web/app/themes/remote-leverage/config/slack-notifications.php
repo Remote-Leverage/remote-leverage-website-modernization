@@ -23,10 +23,6 @@
  *   landing_url       full URL                         landing_display  host+path, trimmed
  *   replay_url        PostHog session replay           admin_url     wp-admin lead detail
  *   submission_type   Partial | Final
- *   lead_id           what an action button carries; the handler reads everything else from
- *                     the database, which is what stops a payload asserting facts about a lead
- *   interactive       a flag, not a fact: non-empty only once SLACK_SIGNING_SECRET is set.
- *                     `_when` on it is how the action buttons stay hidden until they work
  *
  * The live-call and referral templates carry their own sets — see the listeners that build
  * them, and docs/slack-app.md for which template each event renders.
@@ -45,14 +41,15 @@
  * family of templates below has a test asserting it, because the Block Kit Builder emoji picker
  * is one click away from the JSON you are about to paste in here.
  *
+ * **Link buttons only.** Every button in every template here is a `url` button, which needs no
+ * signing secret and no handler — it works the moment the card posts. An interactive button
+ * would need an app configured to receive it, and Slack prints "not configured to handle
+ * interactive responses" beside every one it cannot deliver, under every card, forever.
+ *
  * **No `style` on a message button.** Slack renders `primary` and `danger` as filled buttons
  * and everything else as outlined, so a single styled button in a row makes the row look
  * misaligned even though every button is the same height. Leaving them all unstyled is what
  * keeps an action row reading as one control group.
- *
- * The one exception is the `style` inside a `confirm` dialog, which colours the dialog's own
- * confirm button rather than anything in the channel. Block keeps it: the modal is where the
- * warning actually belongs, and it is the last moment before an irreversible action.
  */
 return [
 
@@ -83,10 +80,9 @@ return [
          * Verified against chat.postMessage on 2026-09-16 rather than assumed — card is a newer
          * block type and not every Block Kit element is accepted on every surface.
          *
-         * Buttons stay in their own `actions` block after the card. Until the app has an
-         * interactivity request URL, Slack renders a "not configured to handle interactive
-         * responses" notice beside them; `links_line` is the placeholder to swap in if the
-         * buttons are ever traded for plain links.
+         * The buttons stay in their own `actions` block after the card, and they are links —
+         * they take you to the portal, the replay or HubSpot rather than changing anything from
+         * inside Slack.
          */
         'blocks' => [
             /*
@@ -161,60 +157,6 @@ return [
                         '_when' => ['hubspot_url'],
                         'text' => ['type' => 'plain_text', 'text' => 'Open in HubSpot', 'emoji' => false],
                         'url' => '{{ hubspot_url }}',
-                    ],
-                ],
-            ],
-
-            /*
-             * The buttons that do something here rather than send you somewhere.
-             *
-             * A separate row from the links above because they are a different kind of thing:
-             * one row leaves Slack, the other changes a lead without leaving it. Six buttons on
-             * one line wrap into an unreadable block at any sensible window width anyway.
-             *
-             * `_when: interactive` is the feature flag. It resolves empty until
-             * SLACK_SIGNING_SECRET is set, and an unconfigured app must not render these —
-             * Slack answers a button it cannot deliver with "not configured to handle
-             * interactive responses" printed in the channel, under every lead, forever.
-             */
-            [
-                'type' => 'actions',
-                '_when' => ['interactive'],
-                'elements' => [
-                    [
-                        'type' => 'button',
-                        'action_id' => 'lead_claim',
-                        'text' => ['type' => 'plain_text', 'text' => 'Claim', 'emoji' => false],
-                        'value' => '{{ lead_id }}',
-                    ],
-                    [
-                        'type' => 'button',
-                        'action_id' => 'lead_contacted',
-                        'text' => ['type' => 'plain_text', 'text' => 'Mark contacted', 'emoji' => false],
-                        'value' => '{{ lead_id }}',
-                    ],
-                    [
-                        'type' => 'button',
-                        'action_id' => 'lead_block',
-                        'text' => ['type' => 'plain_text', 'text' => 'Block', 'emoji' => false],
-                        'value' => '{{ lead_id }}',
-
-                        /*
-                         * Blocking is silent and covers every identifier the person has ever
-                         * used, so it is both the most destructive button here and the one whose
-                         * effect is hardest to see afterwards. Slack's own confirm dialog is the
-                         * cheapest guard against a mis-tap on a phone.
-                         */
-                        'confirm' => [
-                            'title' => ['type' => 'plain_text', 'text' => 'Block this person?', 'emoji' => false],
-                            'text' => [
-                                'type' => 'mrkdwn',
-                                'text' => 'Blocks every email, phone and device already linked to *{{ name }}*, and any identifier linked later. Their forms keep working and nothing reaches sales, the CRM or this channel again.',
-                            ],
-                            'confirm' => ['type' => 'plain_text', 'text' => 'Block', 'emoji' => false],
-                            'deny' => ['type' => 'plain_text', 'text' => 'Cancel', 'emoji' => false],
-                            'style' => 'danger',
-                        ],
                     ],
                 ],
             ],
@@ -293,71 +235,6 @@ return [
                 'type' => 'context',
                 'elements' => [
                     ['type' => 'mrkdwn', 'text' => "Amended before booking\n{{ changes }}"],
-                ],
-            ],
-        ],
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Action confirmations
-    |--------------------------------------------------------------------------
-    |
-    | Posted by SlackInteractionController when somebody presses a button, as a reply under
-    | that lead's own alert. Context blocks rather than sections: this is a margin note on a
-    | message that is already there, and rendering it at the same weight as the lead itself
-    | would make a busy channel read as twice as busy.
-    |
-    | The block confirmation is the exception. It broadcasts to the channel, because a
-    | moderation decision taken silently by one person is the kind of thing the rest of the
-    | team should be able to see and question.
-    */
-    'lead_claimed' => [
-        'color' => null,
-        'fallback' => '{{ actor }} claimed {{ name }}',
-        'blocks' => [
-            [
-                'type' => 'context',
-                'elements' => [
-                    ['type' => 'mrkdwn', 'text' => 'Claimed by {{ actor }}'],
-                ],
-            ],
-        ],
-    ],
-
-    'lead_contacted' => [
-        'color' => null,
-        'fallback' => '{{ actor }} marked {{ name }} contacted',
-        'blocks' => [
-            [
-                'type' => 'context',
-                'elements' => [
-                    ['type' => 'mrkdwn', 'text' => 'Marked contacted by {{ actor }}'],
-                ],
-            ],
-        ],
-    ],
-
-    'lead_blocked' => [
-        'color' => null,
-        'fallback' => '{{ actor }} blocked {{ name }}',
-        'blocks' => [
-            [
-                'type' => 'section',
-                'text' => [
-                    'type' => 'mrkdwn',
-                    'text' => "*Blocked by {{ actor }}*\n{{ name }} and every identifier linked to them. Nothing from this person reaches sales, the CRM or this channel again.",
-                ],
-            ],
-            [
-                'type' => 'actions',
-                '_when' => ['admin_url'],
-                'elements' => [
-                    [
-                        'type' => 'button',
-                        'text' => ['type' => 'plain_text', 'text' => 'Review in portal', 'emoji' => false],
-                        'url' => '{{ admin_url }}',
-                    ],
                 ],
             ],
         ],

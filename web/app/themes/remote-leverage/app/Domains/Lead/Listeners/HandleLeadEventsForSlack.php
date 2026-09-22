@@ -29,8 +29,8 @@ use Illuminate\Support\Facades\Log;
  *
  * Transport: {@see SlackTransport}, shared with the referral and live-call alerts — bot token
  * where one is configured, incoming webhook otherwise. The app is now this site's own ("Remote
- * Leverage Website") rather than the Gravity Forms add-on's, which is what made threading and
- * the action buttons possible. See docs/slack-app.md.
+ * Leverage Website") rather than the Gravity Forms add-on's, which is what made threading
+ * possible. See docs/slack-app.md.
  */
 class HandleLeadEventsForSlack
 {
@@ -504,35 +504,7 @@ class HandleLeadEventsForSlack
             'submission_type' => (string) $lead->submission_type,
             'meeting_time' => (string) ($context['start_time'] ?? ''),
             'meeting_url' => (string) ($context['meet_url'] ?? ''),
-
-            /*
-             * What an action button needs to name the lead it acts on. A Block Kit button
-             * carries a single opaque `value` string, so the lead id is the whole payload —
-             * everything else the handler needs it reads from the database, which is also what
-             * stops a crafted interaction from asserting facts about a lead.
-             */
-            'lead_id' => (string) ($lead->id ?? ''),
-
-            /*
-             * Gates the action buttons. Until the app has a signing secret there is no
-             * interactivity request URL either, and Slack renders "not configured to handle
-             * interactive responses" beside every button — so an unconfigured environment gets
-             * the link buttons it always had and none of the broken ones.
-             *
-             * The value is a flag, not a fact, which is why it renders as the empty string when
-             * off: `_when` drops a block whose named value is empty, and that is the whole
-             * mechanism.
-             */
-            'interactive' => $this->interactionsEnabled() && $lead->id ? 'yes' : '',
         ];
-    }
-
-    /**
-     * Is there anywhere for a button press to go?
-     */
-    protected function interactionsEnabled(): bool
-    {
-        return SlackCredentials::signingSecret() !== '';
     }
 
     /**

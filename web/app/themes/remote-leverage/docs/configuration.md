@@ -55,7 +55,6 @@ why. Nothing reads them now; they are safe to drop from `.env` and from Secrets 
 | :--- | :--- |
 | `HUBSPOT_ACCESS_TOKEN`, `HUBSPOT_PORTAL_ID` | `HubSpotGateway`, as the fallback behind the admin-configured token. **Neither is in `.env` or `.env.example`** — without one or the other, HubSpot sync silently no-ops. |
 | `SLACK_WEBHOOK_URL` | `HandleLeadEventsForSlack` (option `rl_slack_webhook_url` wins) |
-| `SLACK_SIGNING_SECRET` | `SlackInteractionController`, and the on switch for the lead alert's action buttons. Falls back to the admin setting (Leads → Settings), which is how it reaches staging via environment sync. Unset in both → the endpoint refuses every request **and** the buttons are not rendered. See [slack-app.md](slack-app.md). |
 | `LEAD_WEBHOOK_URL` | `HandleLeadEventsForWebhook`. **Defaulted in `config/services.php`** to the n8n endpoint `…/webhook/gravityforms-leads`, so an environment that sets nothing still posts. This var overrides the default; the admin setting (`rl_lead_webhook_url`) is the last resort behind both. An explicit empty value is the off switch. |
 | *(no variable)* | The other two n8n flows — `services.webhooks.lead_form_url` (`…/webhook/lead-form`) and `services.webhooks.hubspot_lead_url` (`…/webhook/hubspot-lead-creation`) — are **literals in `config/services.php` with no `env()` and no admin setting**, by request. They are destinations rather than credentials and are the same in every environment; moving one is an edit to that file and a deploy. Both fire on the partial capture only. |
 

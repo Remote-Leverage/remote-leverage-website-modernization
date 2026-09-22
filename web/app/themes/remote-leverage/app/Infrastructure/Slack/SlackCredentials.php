@@ -16,10 +16,9 @@ use App\Domains\Lead\Services\LeadSettingsService;
  * sync whitelist (`config/rl-sync.php`) for this exact reason, which is what lets a credential
  * be set locally and pushed to staging without a deploy.
  *
- * This class exists because the rule was about to be written a third and fourth time. The
- * transport needed it for the bot token and channel; the interaction endpoint and the button
- * gating both need it for the signing secret, and three copies of a precedence rule is three
- * chances for one of them to disagree about which environment is configured.
+ * This class exists because the rule was about to be written a third and fourth time, and three
+ * copies of a precedence rule is three chances for one of them to disagree about which
+ * environment is configured.
  */
 final class SlackCredentials
 {
@@ -31,19 +30,6 @@ final class SlackCredentials
     public static function channel(): string
     {
         return self::resolve('services.slack.channel', 'slack_channel');
-    }
-
-    /**
-     * Verifies inbound interactions, and gates whether the action buttons render at all.
-     *
-     * Read by `SlackInteractionController` and by the lead alert's button gating. Named in prose
-     * rather than an `@see` tag on purpose: a tag here becomes a real `use` statement under this
-     * codebase's Pint rules, and infrastructure importing a controller is a dependency pointing
-     * the wrong way for the sake of a comment.
-     */
-    public static function signingSecret(): string
-    {
-        return self::resolve('services.slack.signing_secret', 'slack_signing_secret');
     }
 
     /**

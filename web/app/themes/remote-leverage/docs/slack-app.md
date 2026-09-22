@@ -2,9 +2,9 @@
 
 Everything this site says in Slack goes through one app and one transport,
 [`SlackTransport`](../app/Infrastructure/Slack/SlackTransport.php). The app began life as a
-lead-alert pipe ported from the Gravity Forms Slack feed; it now carries leads, live calls, the
-referral programme and the action buttons, which is why it was renamed from **Remote Leverage
-Leads Application** to **Remote Leverage Website**.
+lead-alert pipe ported from the Gravity Forms Slack feed; it now carries leads, live calls and
+the referral programme, which is why it was renamed from **Remote Leverage Leads Application**
+to **Remote Leverage Website**.
 
 ## Identity
 
@@ -41,7 +41,6 @@ values for `{{ placeholders }}`.
 | `new_lead` | `LeadCreated`, partial only | Opens the thread. Suppressed for blocked profiles and for `submission_type: Final`. |
 | `lead_amended` | `LeadCreated`, partial, for a lead already announced | The visitor changed an answer and submitted step 1 again. Replies in-thread and edits the card above it. Silent when nothing changed. |
 | `booked` | `LeadBookingCompleted` | On by default since 2026-09-17; `SLACK_NOTIFY_ON_BOOKING=false` silences it. Replies in-thread only. |
-| `lead_claimed`, `lead_contacted`, `lead_blocked` | A button press | Replies in-thread. Only the block broadcasts. |
 | `live_call_routed` | `LiveCallRequested`, routed | Always on — a live call starts within 15 minutes. |
 | `live_call_declined` | `LiveCallRequested`, declined | The reason this event exists; see below. |
 | `referrer_registered`, `referral_recorded`, `payout_completed` | The referral domain | Top level, not threaded — no lead thread to hang them on. |
@@ -140,28 +139,26 @@ before the deploy.
 A completed form is never resumed: someone who books and then opens the form again is starting
 something new, and threading that onto the booked lead's card would bury it.
 
-## Turning the buttons on
+## Every button is a link
 
-The lead alert's link buttons have always worked. The **action** buttons — Claim, Mark
-contacted, Block — need an interactivity request URL, and until one exists Slack prints "this app
-is not configured to handle interactive responses" beside every button it cannot deliver. So they
-are not rendered at all until the app is wired:
+The lead alert's buttons — Open in portal, Watch session, Open in HubSpot — take you somewhere.
+None of them changes a lead from inside Slack, so the app needs no signing secret, no
+interactivity request URL and no handler: a card works the moment it posts, in every environment,
+without a Slack app setting.
 
-1. **Basic Information → App Credentials → Signing Secret** → set it, either as
-   `SLACK_SIGNING_SECRET` or in **Leads → Settings → Slack signing secret** (see below).
-2. **[Interactivity & Shortcuts](https://api.slack.com/apps/A0C2296E7U3/interactive-messages)** →
-   toggle **Interactivity** on → **Request URL** →
-   `https://<host>/api/webhooks/slack/interactions` → **Save Changes**.
+That was not always true. Claim, Mark contacted and Block were interactive buttons handled by a
+`SlackInteractionController` at `/api/webhooks/slack/interactions`, gated behind
+`SLACK_SIGNING_SECRET`; they were removed on 2026-09-21 along with the endpoint, the secret and
+the in-thread confirmations they posted (`lead_claimed`, `lead_contacted`, `lead_blocked`).
+Acting on a lead is done in the portal.
 
-Both, or neither: the signing secret doubles as the feature flag, so setting it without the
-request URL renders buttons that go nowhere.
+**If they ever come back**, the trap that made them awkward is still there: the interactivity
+request URL is a property of the **app**, not of an environment, and every environment shares one
+app and one bot token — so whichever host is in that box receives *every* button press, no matter
+which environment posted the alert. Two environments with working buttons need two Slack apps,
+and separate channels, or the alerts become impossible to tell apart.
 
-Slack verifies the URL by POSTing to it when you save, so it has to be publicly reachable over
-HTTPS at that moment. `https://remoteleverage-v2.test` is not — for local work, run a tunnel
-(`cloudflared tunnel --url https://remoteleverage-v2.test`) and paste the tunnel's hostname
-instead, remembering that it changes every restart.
-
-### Environment variable or admin setting
+### Credentials as admin settings
 
 Environment wins where it is set; the setting is the fallback, and `SlackCredentials` is the one
 place that decides. The setting is not a convenience — ECS maps Secrets Manager keys to
@@ -172,39 +169,12 @@ environment-sync whitelist (`config/rl-sync.php`), so the intended route to stag
 1. Set it locally in **Leads → Settings**.
 2. Push it with environment sync — it rides along inside `rl_lead_settings`, no new sync config.
 
-The same is true of the bot token and channel, which have never been on the settings form at
-all. They now survive a save of that screen: `save()` replaces the whole blob, and until
-2026-09-16 any key the form did not post was written back as an empty string — so saving the
-Leads settings screen for an unrelated reason silently unwired Slack, after which alerts fell
-back to the incoming webhook with nothing anywhere to say why. A credential is now only cleared
-by submitting it empty, never by omitting it.
-
-### One app, one request URL
-
-This is the trap. The URL is a property of the **app**, not of an environment, and every
-environment shares this one app and one bot token — so whichever host is in that box receives
-*every* button press, no matter which environment posted the alert.
-
-Point it at staging and a button on a production lead alert arrives at staging, where that lead
-id belongs to somebody else or to nobody. The handler answers "that lead no longer exists" and
-the press is lost, which looks like a broken button rather than a misdirected one.
-
-So: while v2 is pre-cutover, point it at **staging** and treat the buttons as a staging feature.
-At cutover, move it to production in the same edit that moves the traffic. If both environments
-ever need working buttons at once, they need separate Slack apps — and separate channels, or the
-alerts become impossible to tell apart.
-
-[`SlackInteractionController`](../app/Application/Http/Controllers/SlackInteractionController.php)
-fails closed like the Stripe and Calendly endpoints — 503 with no secret, 403 on a bad or
-replayed signature. It can block a person and change a lead's status, so an unsigned payload is
-enough to do real damage.
-
-**Authorisation is channel membership.** Anyone who can see the message can press the button.
-That is deliberate: the channel is already the list of people trusted with every lead's name,
-phone number and session replay, and a second permission system would be a second place to
-forget someone. The button's `value` carries a lead id and nothing else — every other fact is
-read from the database, so a replayed interaction can repeat an action but cannot assert
-anything.
+That is how the bot token and channel reach staging, and neither has ever been on the settings
+form. They survive a save of that screen: `save()` replaces the whole blob, and until 2026-09-16
+any key the form did not post was written back as an empty string — so saving the Leads settings
+screen for an unrelated reason silently unwired Slack, after which alerts fell back to the
+incoming webhook with nothing anywhere to say why. A credential is now only cleared by submitting
+it empty, never by omitting it.
 
 ## Live calls, and the refusals nobody could see
 

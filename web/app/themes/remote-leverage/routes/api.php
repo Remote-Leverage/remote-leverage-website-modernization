@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Application\Http\Controllers\CalendlyWebhookController;
 use App\Application\Http\Controllers\GatedDownloadController;
 use App\Application\Http\Controllers\PaymentIntentController;
-use App\Application\Http\Controllers\SlackInteractionController;
 use App\Application\Http\Controllers\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,15 +22,6 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('webhooks')->group(function () {
     Route::post('stripe', [StripeWebhookController::class, 'handle'])->name('api.webhooks.stripe');
     Route::post('calendly', [CalendlyWebhookController::class, 'handle'])->name('api.webhooks.calendly');
-
-    /*
-     * The Slack app's Interactivity request URL — the action buttons on a lead alert post here.
-     * Set it to https://<host>/api/webhooks/slack/interactions in the app's Interactivity &
-     * Shortcuts settings; until SLACK_SIGNING_SECRET is also set, this endpoint refuses
-     * everything and the buttons are not rendered at all. See docs/slack-app.md.
-     */
-    Route::post('slack/interactions', [SlackInteractionController::class, 'handle'])
-        ->name('api.webhooks.slack.interactions');
 });
 
 /*

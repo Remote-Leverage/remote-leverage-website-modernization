@@ -242,7 +242,6 @@ class LeadsAdminDashboard
                 'blacklisted_emails' => $_POST['blacklisted_emails'] ?? '',
                 'email_validation_message' => $_POST['email_validation_message'] ?? '',
                 'slack_webhook_url' => $_POST['slack_webhook_url'] ?? '',
-                'slack_signing_secret' => $_POST['slack_signing_secret'] ?? '',
                 'lead_webhook_url' => $_POST['lead_webhook_url'] ?? '',
                 'bigquery_credentials_json' => trim((string) wp_unslash($_POST['bigquery_credentials_json'] ?? '')),
                 'bigquery_client_id' => sanitize_text_field(wp_unslash((string) ($_POST['bigquery_client_id'] ?? ''))),
@@ -2624,22 +2623,6 @@ class LeadsAdminDashboard
                             <th scope="row"><label for="slack_webhook_url">Slack webhook URL</label></th>
                             <td><input type="url" id="slack_webhook_url" name="slack_webhook_url" class="regular-text"
                                     value="<?php echo esc_attr($settings['slack_webhook_url']); ?>" placeholder="https://hooks.slack.com/services/..." /></td>
-                        </tr>
-                        <tr>
-                            <th scope="row"><label for="slack_signing_secret">Slack signing secret</label></th>
-                            <td>
-                                <input type="password" id="slack_signing_secret" name="slack_signing_secret" class="regular-text"
-                                       value="<?php echo esc_attr($settings['slack_signing_secret']); ?>"
-                                       autocomplete="off" placeholder="32 hex characters" />
-                                <p class="description">
-                                    From the Slack app's Basic Information &rarr; App Credentials. Verifies that a button
-                                    press really came from Slack, and is what makes the Claim / Mark contacted / Block
-                                    buttons appear on a lead alert at all. <code>SLACK_SIGNING_SECRET</code> wins where it
-                                    is set. Set the app's Interactivity request URL to
-                                    <code><?php echo esc_html(home_url('/api/webhooks/slack/interactions')); ?></code> as
-                                    well, or the buttons will render and go nowhere.
-                                </p>
-                            </td>
                         </tr>
                         <tr>
                             <th scope="row"><label for="lead_webhook_url">Outgoing lead webhook URL</label></th>

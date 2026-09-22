@@ -134,9 +134,9 @@ describe('Lead Settings (WR-102)', function () {
 });
 
 /*
- * The Slack signing secret as an admin setting.
+ * The Slack credentials as admin settings.
  *
- * It is here rather than only in the environment because ECS maps Secrets Manager keys to
+ * They are here rather than only in the environment because ECS maps Secrets Manager keys to
  * environment variables one at a time in the task definition, so a newly added credential cannot
  * reach staging any other way today — and the Lead settings blob is in the environment-sync
  * whitelist precisely so a value set locally can be pushed there without a deploy.
@@ -145,33 +145,32 @@ describe('Slack credentials as settings', function () {
     beforeEach(function () {
         $GLOBALS['_wp_mock_options'] = [];
         config([
-            'services.slack.signing_secret' => '',
             'services.slack.bot_token' => '',
             'services.slack.channel' => '',
         ]);
     });
 
-    test('the signing secret round-trips through the settings blob', function () {
+    test('the bot token round-trips through the settings blob', function () {
         (new LeadSettingsService)->save([
             'retention_days' => '30',
             'notification_emails' => '',
-            'slack_signing_secret' => '  5967cd4ef0bdc5666653580e8dd8d8f4  ',
+            'slack_bot_token' => '  xoxb-5967cd4ef0bd  ',
         ]);
 
-        expect((new LeadSettingsService)->get()['slack_signing_secret'])
-            ->toBe('5967cd4ef0bdc5666653580e8dd8d8f4');
+        expect((new LeadSettingsService)->get()['slack_bot_token'])
+            ->toBe('xoxb-5967cd4ef0bd');
     });
 
     test('the environment wins over the setting', function () {
         (new LeadSettingsService)->save([
             'retention_days' => '30',
             'notification_emails' => '',
-            'slack_signing_secret' => 'from_the_database',
+            'slack_bot_token' => 'from_the_database',
         ]);
 
-        config(['services.slack.signing_secret' => 'from_the_environment']);
+        config(['services.slack.bot_token' => 'from_the_environment']);
 
-        expect(SlackCredentials::signingSecret())->toBe('from_the_environment');
+        expect(SlackCredentials::botToken())->toBe('from_the_environment');
     });
 
     test('the setting is used when the environment is blank', function () {
@@ -179,10 +178,10 @@ describe('Slack credentials as settings', function () {
         (new LeadSettingsService)->save([
             'retention_days' => '30',
             'notification_emails' => '',
-            'slack_signing_secret' => 'from_the_database',
+            'slack_bot_token' => 'from_the_database',
         ]);
 
-        expect(SlackCredentials::signingSecret())->toBe('from_the_database');
+        expect(SlackCredentials::botToken())->toBe('from_the_database');
     });
 
     test('saving the settings screen does not wipe a credential it never rendered', function () {
@@ -200,10 +199,9 @@ describe('Slack credentials as settings', function () {
             'notification_emails' => '',
             'slack_bot_token' => 'xoxb-synced-from-local',
             'slack_channel' => 'C086BBKUXL5',
-            'slack_signing_secret' => 'synced-secret',
         ]);
 
-        // A later save from the settings screen, which posts neither of those three.
+        // A later save from the settings screen, which posts neither of those two.
         $service->save([
             'retention_days' => '45',
             'notification_emails' => 'ops@remoteleverage.com',
@@ -214,7 +212,6 @@ describe('Slack credentials as settings', function () {
 
         expect($settings['slack_bot_token'])->toBe('xoxb-synced-from-local')
             ->and($settings['slack_channel'])->toBe('C086BBKUXL5')
-            ->and($settings['slack_signing_secret'])->toBe('synced-secret')
             ->and($settings['retention_days'])->toBe(45);
     });
 
@@ -226,16 +223,16 @@ describe('Slack credentials as settings', function () {
         $service->save([
             'retention_days' => '30',
             'notification_emails' => '',
-            'slack_signing_secret' => 'synced-secret',
+            'slack_bot_token' => 'xoxb-synced-from-local',
         ]);
 
         $service->save([
             'retention_days' => '30',
             'notification_emails' => '',
-            'slack_signing_secret' => '',
+            'slack_bot_token' => '',
         ]);
 
-        expect($service->get()['slack_signing_secret'])->toBe('');
+        expect($service->get()['slack_bot_token'])->toBe('');
     });
 });
 

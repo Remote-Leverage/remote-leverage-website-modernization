@@ -11,10 +11,8 @@ use App\Domains\Marketing\Gateways\BigQueryClient;
 use App\Domains\Marketing\Services\AlertReconciler;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use App\Domains\Marketing\Support\AlertWindow;
-use App\Domains\Marketing\Support\TrafficTrigger;
 use App\Infrastructure\Slack\SlackTransport;
 use App\Infrastructure\WordPress\Admin\MarketingCostAlertWidget;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 
@@ -258,27 +256,6 @@ class MarketingServiceProvider extends ServiceProvider
                     'was_scheduled_for' => gmdate('c', (int) $scheduled),
                 ]);
             }
-        });
-
-        /*
-         * The safety net under WP-Cron. See TrafficTrigger for why it exists.
-         *
-         * `afterResponse` for the same reason the live-call Slack notice uses it: the visitor is
-         * waiting for a page, not a cost report. The guard in front of it is one option read, and
-         * every request but the first of an hour returns on it.
-         */
-        \add_action('init', static function () {
-            if (\is_admin() || (\defined('DOING_CRON') && DOING_CRON) || (\function_exists('wp_doing_ajax') && \wp_doing_ajax())) {
-                return;
-            }
-
-            $now = CarbonImmutable::now((string) config('marketing.cost_alert.timezone', 'UTC'));
-
-            if (app(TrafficTrigger::class)->pendingHour($now) === null) {
-                return;
-            }
-
-            dispatch(static fn () => app(TrafficTrigger::class)->fire())->afterResponse();
         });
 
         \add_action(self::WARM_HOOK, function () {

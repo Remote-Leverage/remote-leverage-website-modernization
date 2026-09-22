@@ -207,9 +207,9 @@ return [
     'slack' => [
         /*
          * The site's own Slack app, "Remote Leverage Website" — renamed from "Remote Leverage
-         * Leads Application" once it carried live calls, referrals and the action buttons as
-         * well as leads. `webhook_url` is the fallback for an environment with no token, and it
-         * cannot thread. See docs/slack-app.md.
+         * Leads Application" once it carried live calls and referrals as well as leads.
+         * `webhook_url` is the fallback for an environment with no token, and it cannot thread.
+         * See docs/slack-app.md.
          */
         'bot_token' => env('SLACK_BOT_TOKEN'),
         // #new-appts (C086BBKUXL5) — the channel the Gravity Forms lead feed posts to. Held as
@@ -218,17 +218,6 @@ return [
         // option points at for live-call alerts — a different notification entirely.
         'channel' => env('SLACK_CHANNEL', 'C086BBKUXL5'),
         'webhook_url' => env('SLACK_WEBHOOK_URL'),
-
-        /*
-         * Slack's app signing secret, which verifies that an inbound interaction really came
-         * from Slack. Doing double duty as the feature flag for the action buttons: without it
-         * `SlackInteractionController` refuses every request, so rendering buttons that post to
-         * it would only produce Slack's "not configured to handle interactive responses" notice.
-         * See `HandleLeadEventsForSlack::interactionsEnabled()`.
-         *
-         * Basic Information -> App Credentials -> Signing Secret, on api.slack.com/apps.
-         */
-        'signing_secret' => env('SLACK_SIGNING_SECRET'),
 
         /*
          * The legacy Gravity Forms feed alerted on the **partial** submission only

@@ -52,14 +52,6 @@ class LeadSettingsService
             'slack_channel' => '',
             'slack_webhook_url' => '',
 
-            /*
-             * Verifies inbound Slack interactions, and doubles as the on switch for the lead
-             * alert's action buttons — see SlackInteractionController. Here for the same reason
-             * as the bot token above, and more urgently: the buttons are useless in an
-             * environment that cannot receive a button press, and a task-definition change is
-             * the slowest way to get a secret to one.
-             */
-            'slack_signing_secret' => '',
             'lead_webhook_url' => '',
 
             /*
@@ -229,7 +221,6 @@ class LeadSettingsService
             'email_validation_message' => trim((string) ($input['email_validation_message'] ?? '')),
             'slack_bot_token' => $keep('slack_bot_token'),
             'slack_channel' => $keep('slack_channel'),
-            'slack_signing_secret' => $keep('slack_signing_secret'),
             'slack_webhook_url' => $this->sanitizeUrl($keep('slack_webhook_url')),
             'lead_webhook_url' => $this->sanitizeUrl($keep('lead_webhook_url')),
             'bigquery_credentials_json' => $keep('bigquery_credentials_json'),
