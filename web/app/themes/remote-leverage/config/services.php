@@ -295,7 +295,7 @@ return [
     ],
 
     'referral' => [
-        'default_reward_amount' => env('REFERRAL_DEFAULT_REWARD_AMOUNT', 14.00),
+        'default_reward_amount' => env('REFERRAL_DEFAULT_REWARD_AMOUNT', 1000.00),
         'webhook_url' => env('REFERRAL_WEBHOOK_URL'),
     ],
 ];

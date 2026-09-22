@@ -45,7 +45,7 @@ class ReferralSettingsService
     public static function defaults(): array
     {
         return [
-            'default_reward_amount' => (float) config('services.referral.default_reward_amount', 14.00),
+            'default_reward_amount' => (float) config('services.referral.default_reward_amount', 1000.00),
             'default_reward_currency' => self::DEFAULT_REWARD_CURRENCY,
             'default_reward_type' => self::DEFAULT_REWARD_TYPE,
             'cookie_days' => self::DEFAULT_COOKIE_DAYS,
