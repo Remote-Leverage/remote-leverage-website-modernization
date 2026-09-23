@@ -85,4 +85,69 @@ class PartnerHubContentResolver
 
         return $lines === [] ? $default : $lines;
     }
+
+    /**
+     * Resolve the page's fixed strings against their defaults, then replace the `{partner}` /
+     * `{code}` style tokens in whichever text won.
+     *
+     * @param  array<string, string>  $defaults  key => default (PartnerHubGlobalData::getCopyDefaults())
+     * @param  array<string, mixed>  $overrides  key => raw meta value
+     * @param  array<string, string>  $tokens  e.g. ['{partner}' => 'Oyster']
+     * @return array<string, string>
+     */
+    public static function resolveCopy(array $defaults, array $overrides, array $tokens = []): array
+    {
+        $copy = [];
+        foreach ($defaults as $key => $default) {
+            $copy[$key] = self::interpolate(self::resolveText($overrides[$key] ?? null, $default), $tokens);
+        }
+
+        return $copy;
+    }
+
+    /**
+     * Replace `{token}` placeholders in an editor- or code-authored string.
+     *
+     * @param  array<string, string>  $tokens
+     */
+    public static function interpolate(string $text, array $tokens): string
+    {
+        return $tokens === [] ? $text : strtr($text, $tokens);
+    }
+
+    /**
+     * Resolve the case-study repeater. Its challenge / solution / outcome sub-fields are
+     * textareas holding one bullet per line, while the defaults hold arrays, so a custom row is
+     * normalised to the default's shape. A row with neither an industry nor a client is dropped.
+     *
+     * @param  mixed  $override  raw `get_field()` value
+     * @param  array<int, array<string, mixed>>  $default
+     * @return array<int, array{industry: string, client: string, challenge: array<int, string>, solution: array<int, string>, outcome: array<int, string>}>
+     */
+    public static function resolveCaseStudies(mixed $override, array $default): array
+    {
+        $rows = self::resolveRows($override, []);
+        if ($rows === []) {
+            return $default;
+        }
+
+        $studies = [];
+        foreach ($rows as $row) {
+            $industry = trim((string) ($row['industry'] ?? ''));
+            $client = trim((string) ($row['client'] ?? ''));
+            if ($industry === '' && $client === '') {
+                continue;
+            }
+
+            $studies[] = [
+                'industry' => $industry,
+                'client' => $client,
+                'challenge' => self::resolveList($row['challenge'] ?? null, []),
+                'solution' => self::resolveList($row['solution'] ?? null, []),
+                'outcome' => self::resolveList($row['outcome'] ?? null, []),
+            ];
+        }
+
+        return $studies === [] ? $default : $studies;
+    }
 }

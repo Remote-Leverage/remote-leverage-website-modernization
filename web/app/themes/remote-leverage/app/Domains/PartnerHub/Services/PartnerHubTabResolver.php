@@ -25,9 +25,13 @@ class PartnerHubTabResolver
     /**
      * Build the ordered tab map for a partner hub page.
      *
+     * A blank or missing entry in `$labels` keeps the default label; the keys (and so the tab
+     * URLs) are fixed.
+     *
+     * @param  array<string, string>  $labels  tab key => per-partner label override
      * @return array<string, string> tab key => label
      */
-    public static function resolveTabs(bool $hasComarketing): array
+    public static function resolveTabs(bool $hasComarketing, array $labels = []): array
     {
         $tabs = [
             'overview' => 'Overview & Actions',
@@ -45,7 +49,29 @@ class PartnerHubTabResolver
         $tabs['faq'] = 'Partner FAQ';
         $tabs['contact'] = 'Contact Team';
 
+        foreach ($labels as $key => $label) {
+            if (isset($tabs[$key]) && is_string($label) && trim($label) !== '') {
+                $tabs[$key] = trim($label);
+            }
+        }
+
         return $tabs;
+    }
+
+    /**
+     * The desktop sidebar's groups, in order, with the tabs each one holds. A tab missing from
+     * the resolved map (co-marketing when disabled) is simply skipped by the template.
+     *
+     * @return array<string, array{label: string, tabs: array<int, string>}>
+     */
+    public static function navGroups(): array
+    {
+        return [
+            'getting_started' => ['label' => 'Getting Started', 'tabs' => ['overview']],
+            'playbook' => ['label' => 'Partnership Playbook', 'tabs' => ['icp', 'services', 'why-rl']],
+            'program' => ['label' => 'Program & Collaboration', 'tabs' => ['referral-program', 'comarketing', 'case-studies']],
+            'support' => ['label' => 'Help & Support', 'tabs' => ['faq', 'contact']],
+        ];
     }
 
     /**
