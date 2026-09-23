@@ -87,6 +87,20 @@ add_filter('theme_file_path', function ($path, $file) {
 add_filter('should_load_separate_core_block_assets', '__return_false');
 
 /**
+ * Drop WordPress's emoji shim from the front end.
+ *
+ * It rewrites emoji into s.w.org images for browsers without native emoji fonts, which every
+ * browser this site supports has had for years. What it cost on every page: an inline style
+ * block, an inline loader, and a 23KB `wp-emoji-release.min.js` fetched on load. Feeds and
+ * email keep their static-image conversion, which is not a page-weight concern.
+ */
+remove_action('wp_head', 'print_emoji_detection_script', 7);
+remove_action('wp_enqueue_scripts', 'wp_enqueue_emoji_styles');
+remove_action('wp_print_styles', 'print_emoji_styles');
+remove_action('embed_head', 'print_emoji_detection_script');
+remove_action('enqueue_embed_scripts', 'wp_enqueue_emoji_styles');
+
+/**
  * Register the initial theme setup.
  *
  * @return void
