@@ -5,6 +5,17 @@ declare(strict_types=1);
 namespace App\Infrastructure\Providers;
 
 use App\Infrastructure\Observability\CredentialRegistry;
+use App\Infrastructure\Observability\Health\Checks\CalendlyHealthCheck;
+use App\Infrastructure\Observability\Health\Checks\CustomerIoHealthCheck;
+use App\Infrastructure\Observability\Health\Checks\DatabaseHealthCheck;
+use App\Infrastructure\Observability\Health\Checks\GoogleHealthCheck;
+use App\Infrastructure\Observability\Health\Checks\HubSpotHealthCheck;
+use App\Infrastructure\Observability\Health\Checks\MetaHealthCheck;
+use App\Infrastructure\Observability\Health\Checks\PostHogHealthCheck;
+use App\Infrastructure\Observability\Health\Checks\SlackHealthCheck;
+use App\Infrastructure\Observability\Health\Checks\StripeHealthCheck;
+use App\Infrastructure\Observability\Health\Checks\ZeroBounceHealthCheck;
+use App\Infrastructure\Observability\Health\IntegrationHealthChecker;
 use App\Infrastructure\Observability\IntegrationCall;
 use App\Infrastructure\Observability\IntegrationCallRecorder;
 use App\Infrastructure\Observability\QueueReporting;
@@ -35,6 +46,26 @@ class ObservabilityServiceProvider extends ServiceProvider
             IntegrationCallRecorder::class,
             fn ($app) => new IntegrationCallRecorder($app->make(CredentialRegistry::class)),
         );
+
+        /*
+         * One entry per host mapping in `observability.integration_calls.hosts`, plus
+         * `DatabaseHealthCheck` — the one check that is not a host in that config, because it
+         * is not an outbound call `IntegrationCallRecorder` logs at all. Every other entry here
+         * reports on an integration that recorder also records traffic for, so the two lists
+         * cannot drift into reporting a status for calls nobody logs.
+         */
+        $this->app->singleton(IntegrationHealthChecker::class, fn ($app) => new IntegrationHealthChecker([
+            $app->make(DatabaseHealthCheck::class),
+            $app->make(CalendlyHealthCheck::class),
+            $app->make(HubSpotHealthCheck::class),
+            $app->make(SlackHealthCheck::class),
+            $app->make(StripeHealthCheck::class),
+            $app->make(GoogleHealthCheck::class),
+            $app->make(ZeroBounceHealthCheck::class),
+            $app->make(PostHogHealthCheck::class),
+            $app->make(CustomerIoHealthCheck::class),
+            $app->make(MetaHealthCheck::class),
+        ]));
     }
 
     public function boot(): void

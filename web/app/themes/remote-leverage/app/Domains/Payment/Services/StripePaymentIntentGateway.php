@@ -55,6 +55,14 @@ class StripePaymentIntentGateway
     }
 
     /**
+     * Whether the secret key for the active mode is present, without exposing it.
+     */
+    public function isConfigured(): bool
+    {
+        return $this->secretKey() !== '';
+    }
+
+    /**
      * Create a PaymentIntent.
      *
      * @param  int  $amount  Amount in the currency's minor unit (e.g. 10000 for $100.00).

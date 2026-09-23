@@ -46,6 +46,14 @@ class HubSpotGateway
     }
 
     /**
+     * Whether an access token is present, without exposing it.
+     */
+    public function isConfigured(): bool
+    {
+        return (bool) $this->accessToken;
+    }
+
+    /**
      * Sync or create a contact in HubSpot CRM.
      * Replaces the legacy gravityformshubspot (GF_HubSpot) integration.
      *

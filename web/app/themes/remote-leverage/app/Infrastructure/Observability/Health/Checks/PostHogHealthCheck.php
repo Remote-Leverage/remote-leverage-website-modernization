@@ -1,0 +1,25 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Infrastructure\Observability\Health\Checks;
+
+use App\Infrastructure\Observability\Health\IntegrationHealthCheck;
+
+class PostHogHealthCheck implements IntegrationHealthCheck
+{
+    public function integration(): string
+    {
+        return 'posthog';
+    }
+
+    public function label(): string
+    {
+        return 'PostHog';
+    }
+
+    public function isConfigured(): bool
+    {
+        return trim((string) config('services.posthog.api_key', '')) !== '';
+    }
+}
