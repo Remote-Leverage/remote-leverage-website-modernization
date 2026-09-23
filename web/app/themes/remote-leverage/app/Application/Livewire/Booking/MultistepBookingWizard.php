@@ -11,6 +11,7 @@ use App\Domains\Lead\Data\LeadCaptureData;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\AttributionCollector;
 use App\Domains\Lead\Services\EmailValidationService;
+use App\Domains\Lead\Services\LeadGeoSignals;
 use App\Domains\Lead\Services\LeadQualification;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Scheduling\Actions\FetchAvailableSlotsAction;
@@ -1944,6 +1945,12 @@ class MultistepBookingWizard extends Component
     protected function attributionNamedFor(string $submissionType): array
     {
         return array_filter(array_merge($this->attributionNamed, [
+            /*
+             * Read live, from this submit's own Livewire request, not frozen in mount() like
+             * the rest: mount() runs on a page render the HTML cache can serve to someone
+             * else, and the edge's country header on it would be theirs.
+             */
+            ...app(LeadGeoSignals::class)->collect(),
             'ip_address' => $this->ipAddress,
             'posthog_session_id' => $this->posthogSessionId,
             'timezone' => $this->timezone,

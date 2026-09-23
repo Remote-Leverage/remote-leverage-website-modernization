@@ -73,6 +73,12 @@ class Lead extends Model
         'data_source',
         'intake_form',
         'ip_address',
+        // Inferred location. See App\Domains\Lead\Services\LeadGeoSignals.
+        'ip_country',
+        'browser_timezone',
+        'browser_language',
+        'country',
+        'country_source',
         'scheduler_link',
         'landing_page_base',
         'timezone',

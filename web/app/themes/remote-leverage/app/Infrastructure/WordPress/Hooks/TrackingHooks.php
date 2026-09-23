@@ -69,6 +69,15 @@ class TrackingHooks
       + '; path=/; max-age=' + (60 * 60 * 24 * {$days})
       + '; SameSite=Lax'
       + (location.protocol === 'https:' ? '; Secure' : '');
+
+    // Where the browser thinks it is, for LeadGeoSignals. Session cookies, rewritten on every
+    // load, so a visitor who travels is read at their current location.
+    var tz = '', lang = '';
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+    lang = navigator.language || '';
+    var tail = '; path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
+    if (tz) document.cookie = 'rl_tz=' + encodeURIComponent(tz) + tail;
+    if (lang) document.cookie = 'rl_lang=' + encodeURIComponent(lang) + tail;
   } catch (e) {
     // Cookies disabled. The visitor stays unrecognised, which is the correct outcome.
   }

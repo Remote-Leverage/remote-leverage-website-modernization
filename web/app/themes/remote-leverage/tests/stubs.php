@@ -338,6 +338,11 @@ if (! Capsule::schema()->hasTable('rl_leads')) {
         $table->string('data_source', 100)->nullable();
         $table->string('intake_form', 50)->nullable();
         $table->string('ip_address', 45)->nullable();
+        $table->string('ip_country', 2)->nullable();
+        $table->string('browser_timezone', 64)->nullable();
+        $table->string('browser_language', 35)->nullable();
+        $table->string('country', 2)->nullable();
+        $table->string('country_source', 20)->nullable();
         $table->text('scheduler_link')->nullable();
         $table->text('landing_page_base')->nullable();
         $table->string('timezone', 64)->nullable();
