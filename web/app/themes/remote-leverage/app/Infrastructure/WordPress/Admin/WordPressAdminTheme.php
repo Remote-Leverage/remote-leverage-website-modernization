@@ -2817,40 +2817,43 @@ class WordPressAdminTheme
             }
 
             /* --- 10. Global Link & Text Neutralization (Zero Hideous WP Blue) --- */
-            #wpbody-content a,
-            .wrap a,
-            #dashboard-widgets a,
-            .postbox a,
-            .notice a,
-            .wp-list-table a,
-            #activity-widget a,
-            #dashboard_right_now a,
-            #dashboard_quick_press a,
-            #dashboard_site_health a,
-            .community-events a,
-            .welcome-panel a,
-            #footer-thankyou a,
-            #footer-upgrade a {
+            /* Anchors styled as buttons are excluded: the ID outranks `.wp-core-ui .button-primary`
+               even at !important, so the ACF Add Row anchor rendered as dark underlined text on a
+               dark button. */
+            #wpbody-content a:not(.button, .components-button, .page-title-action),
+            .wrap a:not(.button, .components-button, .page-title-action),
+            #dashboard-widgets a:not(.button, .components-button, .page-title-action),
+            .postbox a:not(.button, .components-button, .page-title-action),
+            .notice a:not(.button, .components-button, .page-title-action),
+            .wp-list-table a:not(.button, .components-button, .page-title-action),
+            #activity-widget a:not(.button, .components-button, .page-title-action),
+            #dashboard_right_now a:not(.button, .components-button, .page-title-action),
+            #dashboard_quick_press a:not(.button, .components-button, .page-title-action),
+            #dashboard_site_health a:not(.button, .components-button, .page-title-action),
+            .community-events a:not(.button, .components-button, .page-title-action),
+            .welcome-panel a:not(.button, .components-button, .page-title-action),
+            #footer-thankyou a:not(.button, .components-button, .page-title-action),
+            #footer-upgrade a:not(.button, .components-button, .page-title-action) {
                 color: #09090b !important;
                 text-decoration: underline !important;
                 text-decoration-color: #e4e4e7 !important;
                 text-underline-offset: 2px !important;
                 transition: color 0.15s ease, text-decoration-color 0.15s ease !important;
             }
-            #wpbody-content a:hover,
-            .wrap a:hover,
-            #dashboard-widgets a:hover,
-            .postbox a:hover,
-            .notice a:hover,
-            .wp-list-table a:hover,
-            #activity-widget a:hover,
-            #dashboard_right_now a:hover,
-            #dashboard_quick_press a:hover,
-            #dashboard_site_health a:hover,
-            .community-events a:hover,
-            .welcome-panel a:hover,
-            #footer-thankyou a:hover,
-            #footer-upgrade a:hover {
+            #wpbody-content a:not(.button, .components-button, .page-title-action):hover,
+            .wrap a:not(.button, .components-button, .page-title-action):hover,
+            #dashboard-widgets a:not(.button, .components-button, .page-title-action):hover,
+            .postbox a:not(.button, .components-button, .page-title-action):hover,
+            .notice a:not(.button, .components-button, .page-title-action):hover,
+            .wp-list-table a:not(.button, .components-button, .page-title-action):hover,
+            #activity-widget a:not(.button, .components-button, .page-title-action):hover,
+            #dashboard_right_now a:not(.button, .components-button, .page-title-action):hover,
+            #dashboard_quick_press a:not(.button, .components-button, .page-title-action):hover,
+            #dashboard_site_health a:not(.button, .components-button, .page-title-action):hover,
+            .community-events a:not(.button, .components-button, .page-title-action):hover,
+            .welcome-panel a:not(.button, .components-button, .page-title-action):hover,
+            #footer-thankyou a:not(.button, .components-button, .page-title-action):hover,
+            #footer-upgrade a:not(.button, .components-button, .page-title-action):hover {
                 color: #18181b !important;
                 text-decoration-color: #09090b !important;
             }

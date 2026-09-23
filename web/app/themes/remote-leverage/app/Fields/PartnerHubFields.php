@@ -21,6 +21,13 @@ use Log1x\AcfComposer\Field;
 class PartnerHubFields extends Field
 {
     /**
+     * Meta key prefix for the Page Copy fields; the rest of the key is a PartnerHubGlobalData::getCopy() key.
+     */
+    public const COPY_PREFIX = '_rl_copy_';
+
+    private const REPLACES_ALL = 'Adding any row replaces the whole default list for this partner; it does not append to it.';
+
+    /**
      * The field group.
      */
     public function fields(): array
@@ -29,7 +36,8 @@ class PartnerHubFields extends Field
 
         $fields->setLocation('post_type', '==', 'rl_partner');
 
-        $fields->addTab('Branding');
+        // Left placement: the group has outgrown a single row of top tabs.
+        $fields->addTab('Branding', ['placement' => 'left']);
         $fields->addText('_rl_partner_name', [
             'label' => 'Partner Name',
             'placeholder' => 'e.g. Oyster',
@@ -122,6 +130,8 @@ class PartnerHubFields extends Field
         ]);
         $fields->addTextarea('_rl_partner_to_rl_fee', [
             'label' => 'Partner Referral Fee Structure (Partner &rarr; RL)',
+            'instructions' => 'Leave blank to show the default below. {partner} is replaced with the partner name.',
+            'placeholder' => PartnerHubGlobalData::getDefaultFees()['partner_to_rl'],
             'rows' => 3,
         ]);
         $fields->addMessage(
@@ -141,6 +151,8 @@ class PartnerHubFields extends Field
         ]);
         $fields->addTextarea('_rl_rl_to_partner_fee', [
             'label' => 'RL Referral Fee Structure (RL &rarr; Partner)',
+            'instructions' => 'Leave blank to show the default below. {partner} is replaced with the partner name.',
+            'placeholder' => PartnerHubGlobalData::getDefaultFees()['rl_to_partner'],
             'rows' => 3,
         ]);
 
@@ -203,6 +215,100 @@ class PartnerHubFields extends Field
             ])
             ->endRepeater();
 
+        $fields->addTab('Core Values');
+        $fields->addMessage(
+            'core_values_note',
+            'Leave empty to show the five standard Remote Leverage values on the Overview tab.'
+        );
+        $fields->addRepeater('_rl_core_values', [
+            'label' => 'Custom Core Values',
+            'instructions' => self::REPLACES_ALL,
+            'layout' => 'block',
+            'collapsed' => 'value',
+            'button_label' => 'Add Value',
+        ])
+            ->addText('value', ['label' => 'Value', 'required' => 1])
+            ->addTextarea('meaning', ['label' => 'Meaning', 'rows' => 2])
+            ->endRepeater();
+
+        $fields->addTab('Geography');
+        $fields->addMessage(
+            'geo_note',
+            'Leave empty to show the five standard markets under Geographic Coverage on the Ideal Client Profile tab.'
+        );
+        $fields->addRepeater('_rl_geographic_markets', [
+            'label' => 'Custom Geographic Markets',
+            'instructions' => self::REPLACES_ALL,
+            'layout' => 'block',
+            'collapsed' => 'region',
+            'button_label' => 'Add Market',
+        ])
+            ->addText('region', ['label' => 'Region', 'required' => 1])
+            ->addTextarea('desc', ['label' => 'Description', 'rows' => 2])
+            ->endRepeater();
+
+        $fields->addTab('Why Remote Leverage');
+        $fields->addMessage(
+            'why_note',
+            'Leave either list empty to show its standard content on the Why Remote Leverage tab.'
+        );
+        $fields->addRepeater('_rl_why_rl', [
+            'label' => 'Custom Differentiator Cards',
+            'instructions' => self::REPLACES_ALL,
+            'layout' => 'block',
+            'collapsed' => 'title',
+            'button_label' => 'Add Card',
+        ])
+            ->addText('title', ['label' => 'Title', 'required' => 1])
+            ->addTextarea('desc', ['label' => 'Description', 'rows' => 2])
+            ->endRepeater();
+        $fields->addRepeater('_rl_comparison_matrix', [
+            'label' => 'Custom Comparison Table',
+            'instructions' => self::REPLACES_ALL.' Column headings are under Page Copy.',
+            'layout' => 'table',
+            'button_label' => 'Add Row',
+        ])
+            ->addText('feature', ['label' => 'Criteria', 'required' => 1])
+            ->addText('rl', ['label' => 'Remote Leverage'])
+            ->addText('inhouse', ['label' => 'In-House / Job Boards'])
+            ->addText('agency', ['label' => 'Traditional Staffing'])
+            ->endRepeater();
+
+        $fields->addTab('Case Studies');
+        $fields->addMessage(
+            'case_studies_note',
+            'Leave empty to show the six standard case studies.'
+        );
+        $fields->addRepeater('_rl_case_studies', [
+            'label' => 'Custom Case Studies',
+            'instructions' => self::REPLACES_ALL,
+            'layout' => 'block',
+            'collapsed' => 'client',
+            'button_label' => 'Add Case Study',
+        ])
+            ->addText('industry', ['label' => 'Industry', 'required' => 1])
+            ->addText('client', ['label' => 'Client', 'required' => 1])
+            ->addTextarea('challenge', ['label' => 'Challenge', 'instructions' => 'One bullet per line.', 'rows' => 3])
+            ->addTextarea('solution', ['label' => 'Solution', 'instructions' => 'One bullet per line.', 'rows' => 3])
+            ->addTextarea('outcome', ['label' => 'Key Outcomes', 'instructions' => 'One bullet per line.', 'rows' => 3])
+            ->endRepeater();
+
+        $fields->addTab('FAQ');
+        $fields->addMessage(
+            'faq_note',
+            'Leave empty to show the '.count(PartnerHubGlobalData::getFaqs()).' standard partner FAQs.'
+        );
+        $fields->addRepeater('_rl_faqs', [
+            'label' => 'Custom FAQs',
+            'instructions' => self::REPLACES_ALL,
+            'layout' => 'block',
+            'collapsed' => 'q',
+            'button_label' => 'Add FAQ',
+        ])
+            ->addText('q', ['label' => 'Question', 'required' => 1])
+            ->addTextarea('a', ['label' => 'Answer', 'rows' => 3])
+            ->endRepeater();
+
         $fields->addTab('Resources');
         $fields->addText('_rl_rl_resource_title', [
             'label' => 'Remote Leverage Resource Title',
@@ -228,7 +334,7 @@ class PartnerHubFields extends Field
 
         $fields->addRepeater('_rl_section_attachments', [
             'label' => 'Per-Section PDF Attachments',
-            'instructions' => 'Attach downloadable PDFs per tab. Files appear on the matching tab and in the right sidebar.',
+            'instructions' => 'Attach downloadable PDFs per tab. Files appear at the bottom of the matching tab.',
             'layout' => 'block',
             'button_label' => 'Add Attachment',
         ])
@@ -255,11 +361,23 @@ class PartnerHubFields extends Field
         ]);
         $fields->addTextarea('_rl_comarketing_text', [
             'label' => 'Co-Marketing Opportunities Description',
+            'placeholder' => PartnerHubGlobalData::getDefaultComarketing()['lead_text'],
             'rows' => 3,
         ]);
         $fields->addText('_rl_comarketing_approval_note', [
             'label' => 'Mutual Approval Requirement Notice',
+            'placeholder' => PartnerHubGlobalData::getDefaultComarketing()['approval_note'],
         ]);
+        $fields->addRepeater('_rl_comarketing_opportunities', [
+            'label' => 'Custom Co-Marketing Opportunities',
+            'instructions' => 'Leave empty to show the four standard opportunity cards. '.self::REPLACES_ALL,
+            'layout' => 'block',
+            'collapsed' => 'title',
+            'button_label' => 'Add Opportunity',
+        ])
+            ->addText('title', ['label' => 'Title', 'required' => 1])
+            ->addTextarea('desc', ['label' => 'Description', 'rows' => 2])
+            ->endRepeater();
 
         $fields->addTab('Manager');
         $fields->addText('_rl_manager_name', [
@@ -282,16 +400,19 @@ class PartnerHubFields extends Field
         );
         $fields->addTextarea('_rl_override_welcome_text', [
             'label' => 'Custom Welcome Message (Hero Section)',
+            'placeholder' => PartnerHubGlobalData::getWelcomeText(),
             'rows' => 3,
         ]);
         $fields->addTextarea('_rl_override_company_desc', [
             'label' => 'Custom Remote Leverage Description (Overview Section)',
+            'placeholder' => PartnerHubGlobalData::getCompanyDescription(),
             'rows' => 3,
         ]);
         $fields->addTextarea('_rl_override_referral_rules', [
             'label' => 'Custom Referral Eligibility Rules',
             'instructions' => 'One rule per line. If empty, the standard default rules are used.',
-            'rows' => 5,
+            'placeholder' => implode("\n", PartnerHubGlobalData::getDefaultReferralRules()),
+            'rows' => 6,
         ]);
         $fields->addTextarea('_rl_override_commission_terms', [
             'label' => 'Additional Commission Terms & Notes',
@@ -310,8 +431,26 @@ class PartnerHubFields extends Field
         $fields->addTextarea('_rl_target_industries', [
             'label' => 'Custom Target Industries (ICP)',
             'instructions' => 'One industry per line. If empty, the 16 default industries are used.',
+            'placeholder' => implode("\n", PartnerHubGlobalData::getTargetIndustries()),
             'rows' => 5,
         ]);
+
+        $fields->addTab('Page Copy');
+        $fields->addMessage(
+            'copy_note',
+            'Every heading, label and button on the hub. Leave a field blank to keep the default shown in grey. '
+            .'<code>{partner}</code> is replaced with the partner name and <code>{code}</code> with the referral code.'
+        );
+        foreach (PartnerHubGlobalData::getCopy() as $section => $copyFields) {
+            $fields->addAccordion($section);
+            foreach ($copyFields as $key => $field) {
+                $fields->addText(self::COPY_PREFIX.$key, [
+                    'label' => $field['label'],
+                    'placeholder' => $field['default'],
+                ]);
+            }
+        }
+        $fields->addAccordion('copy_end')->endpoint();
 
         return $fields->build();
     }

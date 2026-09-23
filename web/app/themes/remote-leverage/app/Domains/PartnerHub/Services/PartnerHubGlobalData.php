@@ -369,4 +369,182 @@ class PartnerHubGlobalData
             ['q' => 'Are the candidates you place English-proficient?', 'a' => 'Yes. All candidates undergo rigorous English verbal and written assessments aligned with North American and European business standards.'],
         ];
     }
+
+    /**
+     * Hero subtitle, overridable per partner via `_rl_override_welcome_text`.
+     */
+    public static function getWelcomeText(): string
+    {
+        return 'Co-Branded Partnership Knowledge Hub & Operational Directory';
+    }
+
+    /**
+     * Overview tab lead paragraph, overridable per partner via `_rl_override_company_desc`.
+     */
+    public static function getCompanyDescription(): string
+    {
+        return 'Remote Leverage is a global recruitment and talent acquisition firm that connects growth-oriented companies with thoroughly vetted, top-tier international professionals. Under our direct-hire model, Remote Leverage sources and screens candidates, presents a curated shortlist, the client interviews and selects the candidate, and the client hires directly. Remote Leverage receives a one-time placement fee when a client hires.';
+    }
+
+    /**
+     * Fee structures for each referral direction, overridable per partner via
+     * `_rl_partner_to_rl_fee` and `_rl_rl_to_partner_fee`. `{partner}` is replaced with the
+     * partner's name at render time.
+     *
+     * @return array{partner_to_rl: string, rl_to_partner: string}
+     */
+    public static function getDefaultFees(): array
+    {
+        return [
+            'partner_to_rl' => '{partner} receives 10% of the net Remote Leverage placement fee actually collected from an eligible referred customer. One-time referral fee, not recurring.',
+            'rl_to_partner' => 'Remote Leverage receives 10% of eligible net subscription fees actually collected by {partner} from an eligible referred customer, up to 12 months.',
+        ];
+    }
+
+    /**
+     * Every fixed string on a partner hub page, grouped by the section it appears in.
+     *
+     * Single source for both the "Page Copy" ACF fields (label + placeholder) and the template's
+     * fallbacks, so the placeholder an editor sees is always the text that renders. Each key is
+     * stored as `_rl_copy_<key>`. `{partner}` and `{code}` are replaced at render time.
+     *
+     * @return array<string, array<string, array{label: string, default: string}>>
+     */
+    public static function getCopy(): array
+    {
+        $tabs = [];
+        foreach (PartnerHubTabResolver::resolveTabs(true) as $key => $label) {
+            $tabs['tab_'.str_replace('-', '_', $key)] = ['label' => "Tab: {$label}", 'default' => $label];
+        }
+
+        $groups = [];
+        foreach (PartnerHubTabResolver::navGroups() as $key => $group) {
+            $groups['nav_group_'.$key] = ['label' => "Sidebar group: {$group['label']}", 'default' => $group['label']];
+        }
+
+        return [
+            'Hero' => [
+                'hero_wordmark' => ['label' => 'Wordmark', 'default' => 'Remote Leverage'],
+                'hero_code_label' => ['label' => 'Partner code label', 'default' => 'PARTNER CODE:'],
+                'hero_visit_cta' => ['label' => 'Website button', 'default' => 'Visit {partner}'],
+            ],
+            'Navigation' => [
+                'nav_mobile_label' => ['label' => 'Mobile section picker label', 'default' => 'Select Hub Section'],
+                ...$groups,
+                ...$tabs,
+            ],
+            'Overview tab' => [
+                'overview_badge' => ['label' => 'Badge', 'default' => 'Partnership Brief'],
+                'overview_heading' => ['label' => 'Heading', 'default' => 'Remote Leverage × {partner} Alliance'],
+                'value_prop_title' => ['label' => 'Callout title', 'default' => self::getValueProposition()['title']],
+                'spec_type_label' => ['label' => 'Terms: Partnership Type label', 'default' => 'Partnership Type'],
+                'spec_territory_label' => ['label' => 'Terms: Territory label', 'default' => 'Territory'],
+                'spec_reporting_label' => ['label' => 'Terms: Reporting label', 'default' => 'Reporting'],
+                'spec_term_label' => ['label' => 'Terms: Initial Term label', 'default' => 'Initial Term'],
+                'spec_renewal_label' => ['label' => 'Terms: Renewal Terms label', 'default' => 'Renewal Terms'],
+                'referral_actions_heading' => ['label' => 'Referral actions heading', 'default' => 'Two-Way Referral Actions'],
+                'direction_a_label' => ['label' => 'Direction A label', 'default' => '{partner} → Remote Leverage'],
+                'direction_a_intro' => ['label' => 'Direction A intro', 'default' => 'Share the tracked link below, or send a warm email intro quoting {code}.'],
+                'tracked_link_label' => ['label' => 'Tracked link label', 'default' => 'Tracked referral link'],
+                'copy_button' => ['label' => 'Copy button', 'default' => 'Copy'],
+                'copied_button' => ['label' => 'Copy button (after copying)', 'default' => 'Copied!'],
+                'tracked_link_note' => ['label' => 'Tracked link note', 'default' => 'Every lead from this link is attributed to {partner} automatically.'],
+                'cta_submit_form' => ['label' => 'Form button', 'default' => 'Submit via Form'],
+                'cta_intro_email' => ['label' => 'Intro email button', 'default' => 'Intro Email'],
+                'intro_email_subject' => ['label' => 'Intro email subject', 'default' => 'Client Referral from {partner}'],
+                'cta_tracking_sheet' => ['label' => 'Tracking sheet button', 'default' => 'Tracking Sheet'],
+                'direction_b_label' => ['label' => 'Direction B label', 'default' => 'Remote Leverage → {partner}'],
+                'cta_partner_portal' => ['label' => 'Partner portal button', 'default' => 'Open {partner} Portal'],
+                'cta_partner_email' => ['label' => 'Partner email button', 'default' => 'Email {partner} Team'],
+                'partner_email_subject' => ['label' => 'Partner email subject', 'default' => 'Client Referral from Remote Leverage'],
+                'pending_badge' => ['label' => 'Pending referral destination badge', 'default' => 'Referral destination: pending setup'],
+                'core_values_heading' => ['label' => 'Core values heading', 'default' => 'Core Operating Values'],
+            ],
+            'Ideal Client Profile tab' => [
+                'icp_badge' => ['label' => 'Badge', 'default' => 'Target Audience'],
+                'icp_heading' => ['label' => 'Heading', 'default' => 'Ideal Client Profile (ICP)'],
+                'icp_subtitle' => ['label' => 'Subtitle', 'default' => 'Qualification criteria and target market guidelines to identify strong referral opportunities.'],
+                'target_fit_title' => ['label' => 'Callout title', 'default' => self::getTargetFit()['title']],
+                'industries_heading' => ['label' => 'Industries heading', 'default' => 'Target Industries'],
+                'geo_heading' => ['label' => 'Geographic coverage heading', 'default' => 'Geographic Coverage'],
+            ],
+            'Services tab' => [
+                'services_badge' => ['label' => 'Badge', 'default' => 'Capabilities'],
+                'services_heading' => ['label' => 'Heading', 'default' => 'Services Overview'],
+                'services_best_for_label' => ['label' => '"Best for" label', 'default' => 'Best for'],
+            ],
+            'Why Remote Leverage tab' => [
+                'why_badge' => ['label' => 'Badge', 'default' => 'Competitive Edge'],
+                'why_heading' => ['label' => 'Heading', 'default' => 'Why Remote Leverage'],
+                'why_subtitle' => ['label' => 'Subtitle', 'default' => 'Comparative analysis of Remote Leverage vs. traditional staffing agencies and in-house hiring.'],
+                'matrix_col_criteria' => ['label' => 'Table column: criteria', 'default' => 'Criteria'],
+                'matrix_col_rl' => ['label' => 'Table column: Remote Leverage', 'default' => 'Remote Leverage'],
+                'matrix_col_inhouse' => ['label' => 'Table column: in-house', 'default' => 'In-House / Job Boards'],
+                'matrix_col_agency' => ['label' => 'Table column: agency', 'default' => 'Traditional Staffing'],
+            ],
+            'Referral Program tab' => [
+                'referral_badge' => ['label' => 'Badge', 'default' => 'Economics'],
+                'referral_heading' => ['label' => 'Heading', 'default' => 'Referral Program & Commission Terms'],
+                'referral_subtitle' => ['label' => 'Subtitle', 'default' => 'Transparent, bidirectional revenue-sharing terms for {partner}.'],
+                'fee_a_label' => ['label' => 'Direction A fee label', 'default' => 'Direction A: {partner} → RL'],
+                'fee_b_label' => ['label' => 'Direction B fee label', 'default' => 'Direction B: RL → {partner}'],
+                'rules_heading' => ['label' => 'Eligibility rules heading', 'default' => 'Referral Eligibility Rules'],
+                'lifecycle_heading' => ['label' => 'Lifecycle heading', 'default' => 'Referral Lifecycle Stages'],
+                'special_terms_heading' => ['label' => 'Special terms heading', 'default' => 'Special Partnership Terms'],
+            ],
+            'Co-Marketing tab' => [
+                'comarketing_badge' => ['label' => 'Badge', 'default' => 'Collaborative Growth'],
+                'comarketing_heading' => ['label' => 'Heading', 'default' => 'Co-Marketing Opportunities & Guidelines'],
+                'comarketing_cta_text' => ['label' => 'Contact banner text', 'default' => 'To propose a joint webinar, case study, or co-branded piece, email your dedicated manager.'],
+            ],
+            'Case Studies tab' => [
+                'cs_badge' => ['label' => 'Badge', 'default' => 'Track Record'],
+                'cs_heading' => ['label' => 'Heading', 'default' => 'Industry Case Studies'],
+                'cs_subtitle' => ['label' => 'Subtitle', 'default' => 'Real candidate placement results across key business sectors.'],
+                'cs_challenge_label' => ['label' => 'Challenge column label', 'default' => 'Challenge'],
+                'cs_solution_label' => ['label' => 'Solution column label', 'default' => 'Solution'],
+                'cs_outcome_label' => ['label' => 'Outcomes column label', 'default' => 'Key Outcomes'],
+            ],
+            'FAQ tab' => [
+                'faq_badge' => ['label' => 'Badge', 'default' => 'FAQ'],
+                'faq_heading' => ['label' => 'Heading', 'default' => 'Partner Frequently Asked Questions'],
+            ],
+            'Contact tab' => [
+                'contact_badge' => ['label' => 'Badge', 'default' => 'Partner Support'],
+                'contact_heading' => ['label' => 'Heading', 'default' => 'Dedicated Partnerships Contact'],
+                'contact_subtitle' => ['label' => 'Subtitle', 'default' => 'Direct access to our team for custom client inquiries, co-marketing requests, or billing questions.'],
+            ],
+            'Attachments and sidebar' => [
+                'attachments_heading' => ['label' => 'Attachments heading ({tab} is the tab name)', 'default' => '{tab} — Attachments & PDFs'],
+                'resources_heading' => ['label' => 'Resources heading', 'default' => 'Partnership Resources'],
+                'rl_resource_caption' => ['label' => 'Remote Leverage resource caption', 'default' => 'Remote Leverage Assets'],
+                'partner_resource_caption' => ['label' => 'Partner resource caption', 'default' => 'Partner Workspace'],
+                'one_pager_title' => ['label' => 'One-pager title', 'default' => 'Overview One-Pager'],
+                'agreement_title' => ['label' => 'Agreement title', 'default' => 'Partner Agreement'],
+                'pdf_caption' => ['label' => 'PDF caption', 'default' => 'PDF Document'],
+                'resources_empty' => ['label' => 'No resources message', 'default' => 'No dedicated resources configured yet.'],
+                'quick_actions_heading' => ['label' => 'Quick actions heading', 'default' => 'Quick Actions'],
+                'qa_refer' => ['label' => 'Quick action: refer', 'default' => 'Refer to Remote Leverage'],
+                'qa_tracking' => ['label' => 'Quick action: tracking sheet', 'default' => 'View Tracking Sheet'],
+                'qa_email' => ['label' => 'Quick action: email', 'default' => 'Direct Email'],
+            ],
+        ];
+    }
+
+    /**
+     * getCopy() flattened to key => default.
+     *
+     * @return array<string, string>
+     */
+    public static function getCopyDefaults(): array
+    {
+        $defaults = [];
+        foreach (self::getCopy() as $fields) {
+            foreach ($fields as $key => $field) {
+                $defaults[$key] = $field['default'];
+            }
+        }
+
+        return $defaults;
+    }
 }

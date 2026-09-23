@@ -213,6 +213,98 @@ describe('PartnerHubContentResolver per-partner overrides', function () {
     });
 });
 
+describe('Per-hub editable content', function () {
+    test('resolveTabs applies label overrides but never adds or renames a tab key', function () {
+        $tabs = PartnerHubTabResolver::resolveTabs(false, ['faq' => '  Questions ', 'contact' => '', 'comarketing' => 'Hidden', 'bogus' => 'X']);
+
+        expect($tabs['faq'])->toBe('Questions')
+            ->and($tabs['contact'])->toBe('Contact Team')
+            ->and($tabs)->not->toHaveKey('comarketing')
+            ->and($tabs)->not->toHaveKey('bogus');
+    });
+
+    test('the sidebar groups hold every tab exactly once', function () {
+        $grouped = array_merge(...array_column(PartnerHubTabResolver::navGroups(), 'tabs'));
+
+        expect($grouped)->toEqualCanonicalizing(array_keys(PartnerHubTabResolver::resolveTabs(true)))
+            ->and(count($grouped))->toBe(count(array_unique($grouped)));
+    });
+
+    test('every tab label and sidebar group has a Page Copy entry', function () {
+        $defaults = PartnerHubGlobalData::getCopyDefaults();
+
+        foreach (PartnerHubTabResolver::resolveTabs(true) as $key => $label) {
+            expect($defaults['tab_'.str_replace('-', '_', $key)])->toBe($label);
+        }
+        foreach (PartnerHubTabResolver::navGroups() as $key => $group) {
+            expect($defaults['nav_group_'.$key])->toBe($group['label']);
+        }
+    });
+
+    test('Page Copy keys are unique across sections', function () {
+        $keys = array_merge(...array_map('array_keys', array_values(PartnerHubGlobalData::getCopy())));
+
+        expect(count($keys))->toBe(count(array_unique($keys)))
+            ->and(count($keys))->toBe(count(PartnerHubGlobalData::getCopyDefaults()));
+    });
+
+    test('resolveCopy falls back per key and replaces tokens in both overrides and defaults', function () {
+        $copy = PartnerHubContentResolver::resolveCopy(
+            ['heading' => 'Remote Leverage × {partner}', 'note' => 'Quote {code}', 'tab' => '{tab} files'],
+            ['heading' => '  ', 'note' => 'Use {code} with {partner}'],
+            ['{partner}' => 'Oyster', '{code}' => 'RL-OYSTER'],
+        );
+
+        expect($copy)->toBe([
+            'heading' => 'Remote Leverage × Oyster',
+            'note' => 'Use RL-OYSTER with Oyster',
+            'tab' => '{tab} files',
+        ]);
+    });
+
+    test('resolveCaseStudies splits bullet textareas and keeps the default shape', function () {
+        $studies = PartnerHubContentResolver::resolveCaseStudies([
+            ['industry' => 'Fintech', 'client' => 'Test Co', 'challenge' => "One\n\n Two ", 'solution' => 'Fix', 'outcome' => ''],
+            ['industry' => '', 'client' => '  ', 'challenge' => 'Dropped'],
+        ], PartnerHubGlobalData::getCaseStudies());
+
+        expect($studies)->toBe([[
+            'industry' => 'Fintech',
+            'client' => 'Test Co',
+            'challenge' => ['One', 'Two'],
+            'solution' => ['Fix'],
+            'outcome' => [],
+        ]]);
+    });
+
+    test('resolveCaseStudies falls back when no usable row is left', function () {
+        $default = PartnerHubGlobalData::getCaseStudies();
+
+        expect(PartnerHubContentResolver::resolveCaseStudies(false, $default))->toBe($default)
+            ->and(PartnerHubContentResolver::resolveCaseStudies([['industry' => '', 'client' => '']], $default))->toBe($default);
+    });
+
+    test('the field group builds without key collisions', function () {
+        $group = (new ReflectionClass(PartnerHubFields::class))->newInstanceWithoutConstructor()->fields();
+
+        $keys = [];
+        $walk = function (array $fields) use (&$walk, &$keys) {
+            foreach ($fields as $field) {
+                $keys[] = $field['key'];
+                $walk($field['sub_fields'] ?? []);
+            }
+        };
+        $walk($group['fields']);
+
+        expect(count($keys))->toBe(count(array_unique($keys)));
+
+        $names = array_column($group['fields'], 'name');
+        foreach (array_keys(PartnerHubGlobalData::getCopyDefaults()) as $key) {
+            expect($names)->toContain(PartnerHubFields::COPY_PREFIX.$key);
+        }
+    });
+});
+
 describe('PartnerHubGlobalData callouts ported from the legacy plugin', function () {
     test('getValueProposition and getTargetFit expose a title and body', function () {
         expect(PartnerHubGlobalData::getValueProposition())->toHaveKeys(['title', 'desc'])
