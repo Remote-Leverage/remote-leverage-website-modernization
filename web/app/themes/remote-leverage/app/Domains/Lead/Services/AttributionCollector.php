@@ -173,9 +173,19 @@ class AttributionCollector
          * here rather than only at send time means the `fbc` column is populated for every
          * consumer (the CAPI client, the admin, and any downstream automation), not just for the
          * one that happened to know how to reconstruct it.
+         *
+         * Flagged in `attribution['fbc_synthetic']` either way. `CaptureLeadAction::resolveFbc()`
+         * reads this to decide what is safe to overwrite later: a synthetic value is a stand-in
+         * and gets replaced the moment something better shows up (a live cookie, a real value
+         * from a later mount); a real one, once stored, is never replaced by anything.
          */
-        if (($named['fbc'] ?? '') === '' && ($named['fbclid'] ?? '') !== '') {
-            $named['fbc'] = sprintf('fb.1.%d.%s', (int) round(microtime(true) * 1000), $named['fbclid']);
+        if (($named['fbc'] ?? '') === '') {
+            if (($named['fbclid'] ?? '') !== '') {
+                $named['fbc'] = sprintf('fb.1.%d.%s', (int) round(microtime(true) * 1000), $named['fbclid']);
+                $attribution['fbc_synthetic'] = true;
+            }
+        } else {
+            $attribution['fbc_synthetic'] = false;
         }
 
         return ['named' => $named, 'attribution' => $attribution];
