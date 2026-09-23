@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\WordPress\Hooks;
 
 use App\Domains\Tracking\Support\GoogleEnhancedConversion;
+use App\Support\PixelDeferral;
 
 /**
  * The conversion and event tags that used to live in `GTM-53JDTQCZ`.
@@ -400,12 +401,7 @@ HTML;
      */
     private function deferWrap(string $vendor): array
     {
-        $configured = array_map(
-            static fn ($v): string => strtolower(trim((string) $v)),
-            (array) config('pixels.defer.vendors', []),
-        );
-
-        return in_array($vendor, $configured, true)
+        return PixelDeferral::isDeferred($vendor)
             ? ['window.rlDefer(function(){', '});']
             : ['', ''];
     }

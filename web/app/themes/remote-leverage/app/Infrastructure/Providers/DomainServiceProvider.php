@@ -17,6 +17,7 @@ use App\Infrastructure\WordPress\Admin\LeadExportPanel;
 use App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
 use App\Infrastructure\WordPress\Admin\MarketingDashboard;
 use App\Infrastructure\WordPress\Admin\PartnerHubAdmin;
+use App\Infrastructure\WordPress\Admin\PixelDeferralAdmin;
 use App\Infrastructure\WordPress\Admin\ReferralAdminDashboard;
 use App\Infrastructure\WordPress\Admin\SecurityAdmin;
 use App\Infrastructure\WordPress\Admin\Seo\SeoAdmin;
@@ -75,6 +76,7 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(SecurityAdmin::class, fn () => new SecurityAdmin);
         $this->app->singleton(SocialKitAssets::class, fn () => new SocialKitAssets);
         $this->app->singleton(SocialKitAdmin::class, fn () => new SocialKitAdmin);
+        $this->app->singleton(PixelDeferralAdmin::class, fn () => new PixelDeferralAdmin);
         $this->app->singleton(SeoAdmin::class, fn () => new SeoAdmin);
         $this->app->singleton(DuplicatePostAdmin::class, fn ($app) => new DuplicatePostAdmin(
             $app->make(PostDuplicator::class),
@@ -109,6 +111,7 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->make(SecurityAdmin::class)->register();
         $this->app->make(SocialKitAssets::class)->register();
         $this->app->make(SocialKitAdmin::class)->register();
+        $this->app->make(PixelDeferralAdmin::class)->register();
         $this->app->make(SeoAdmin::class)->register();
         $this->app->make(DuplicatePostAdmin::class)->register();
     }
