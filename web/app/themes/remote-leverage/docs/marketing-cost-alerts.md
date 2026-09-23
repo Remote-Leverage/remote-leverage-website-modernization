@@ -570,8 +570,21 @@ from a paid channel" rather than as a gap.
 
 **Two booking counts, one reported.** This site still counts its own bookings and leads; they are
 no longer printed. `AlertReconciler` compares them against the warehouse's and raises a finding when
-they diverge by more than 25% (floored at 3). Keeping a second opinion and never showing it is the
-point — it is a check, not a figure.
+they diverge by more than 25% (floored at 3). The card itself still prints only the warehouse's.
+Since 2026-09-23 a threaded **Website vs warehouse** reply puts the two side by side per platform,
+with the difference, so the ordinary small gap is visible without anyone asking. Site platform rows
+count paid-proven bookings only (organic Instagram lands in "Everything else"), because the
+warehouse's channel rows are paid channels.
+
+**Per-channel counts come from our supplement, not their query.** `marketing-home-daily.sql`
+publishes each channel's spend, CPB and CPQB but not the bookings behind them, so
+`marketing-day-supplement.sql` sums `leads`, `bookings` and `qualified_bookings` per channel from
+the same view for the same date, and `withChannelCounts()` merges them onto the day. Overnight the
+closed day gets its own supplement read. Every platform card and the boxed closed-day card print
+the counts; when the supplement did not answer they are omitted, not zeroed.
+
+**A second reply breaks today's bookings down by landing page and `utm_campaign`**, from this
+site's own lead rows — the warehouse is by channel and day only. Top ten each, the rest summed.
 
 ### Getting it running
 

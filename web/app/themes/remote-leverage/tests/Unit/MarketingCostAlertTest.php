@@ -55,12 +55,49 @@ function cardsAmong(array $posted): array
 /**
  * The findings replies, in the order they were posted.
  *
+ * Picked out by their fallback text, because a card now carries other replies too — the
+ * website-vs-warehouse table and the landing page breakdown — and those are not findings.
+ *
  * @param  array<int, array<string, mixed>>  $posted
  * @return array<int, array<string, mixed>>
  */
 function findingsAmong(array $posted): array
 {
-    return array_values(array_filter($posted, static fn (array $p): bool => ($p['thread_ts'] ?? null) !== null));
+    return array_values(array_filter(
+        $posted,
+        static fn (array $p): bool => ($p['thread_ts'] ?? null) !== null
+            && ($p['text'] ?? '') === 'Check before trusting these numbers',
+    ));
+}
+
+/**
+ * The first reply under a card whose fallback text is `$text`, as JSON, or '' when none was posted.
+ *
+ * @param  array<int, array<string, mixed>>  $posted
+ */
+function replyAmong(array $posted, string $text): string
+{
+    foreach ($posted as $p) {
+        if (($p['thread_ts'] ?? null) !== null && ($p['text'] ?? '') === $text) {
+            return (string) json_encode($p['blocks'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
+
+    return '';
+}
+
+/**
+ * The per-platform cards only, as JSON — not the closed-day card, which is also a card block.
+ *
+ * @param  array<int, array<string, mixed>>  $blocks
+ */
+function platformCardsIn(array $blocks): string
+{
+    return (string) json_encode(array_values(array_filter(
+        $blocks,
+        static fn (array $b): bool => ($b['type'] ?? '') === 'card'
+            && ! str_contains((string) ($b['title']['text'] ?? ''), '— closed'),
+    )), JSON_UNESCAPED_UNICODE);
 }
 
 function costAlertConfig(array $overrides = []): void
@@ -1718,16 +1755,25 @@ function costAlertDay(array $overrides = []): MarketingDay
  * @param  array<string, int>|null  $consultations  YYYY-MM-DD => count, or null for a warehouse
  *                                                  that could not answer for the calendar at all.
  */
-function warehouseStub(?MarketingDay $day, ?PartialDay $today = null, ?array $consultations = null): BigQueryClient
+function warehouseStub(?MarketingDay $day, ?PartialDay $today = null, ?array $consultations = null, array $supplements = []): BigQueryClient
 {
-    return new class($day, $today, $consultations) extends BigQueryClient
+    return new class($day, $today, $consultations, $supplements) extends BigQueryClient
     {
-        /** @param  array<string, int>|null  $consultations */
+        /**
+         * @param  array<string, int>|null  $consultations
+         * @param  array<string, DaySupplement>  $supplements  Keyed by YYYY-MM-DD.
+         */
         public function __construct(
             private ?MarketingDay $day,
             private ?PartialDay $today,
             private ?array $consultations = null,
+            private array $supplements = [],
         ) {}
+
+        public function supplement(string $date): ?DaySupplement
+        {
+            return $this->supplements[$date] ?? null;
+        }
 
         public function isConfigured(): bool
         {
@@ -2026,7 +2072,10 @@ describe('today so far', function () {
             ->and($blocks)->toContain('- Bookings: 7 (64% of leads)')
             ->and($blocks)->toContain('- CPB: $67.40')
             // Eight overnight cards repeating a finished day as a block is what this replaced.
-            ->and($blocks)->toContain('Sat 19 Sep closed: 314 leads, 16 bookings, $3,732.24 spend, CPB $287.10')
+            // Boxed, because the italic line it replaced was the one thing on the card nobody saw.
+            ->and($blocks)->toContain('"type":"card","title":{"type":"mrkdwn","text":"Sat 19 Sep — closed"')
+            ->and($blocks)->toContain('314 leads · 16 bookings · 10 qualified · $3,732.24 spend')
+            ->and($blocks)->toContain('*CPB* $287.10')
             ->and($blocks)->not->toContain('*Closing — Sat 19 Sep*');
     });
 
@@ -2185,9 +2234,11 @@ describe('the platform breakdown', function () {
         ]), $todayWithChannels())->execute(CarbonImmutable::parse('2026-09-20 03:00:00', 'UTC'), force: true);
 
         $blocks = json_encode($transport->posted[0]['blocks'], JSON_UNESCAPED_UNICODE);
+        $platforms = platformCardsIn($transport->posted[0]['blocks']);
 
-        expect($blocks)->toContain('$546.54 spend')
-            ->and($blocks)->not->toContain('$19,106.75 spend')
+        // The closed day keeps its own figures, in its own box; the platform cards are today's.
+        expect($platforms)->toContain('$546.54 spend')
+            ->and($platforms)->not->toContain('$19,106.75 spend')
             // And it says which day it means, so the question cannot be asked again.
             ->and($blocks)->toContain('By platform — today so far, as of 05:59 ET');
     });
@@ -2200,7 +2251,7 @@ describe('the platform breakdown', function () {
         ]), $todayWithChannels())->execute(CarbonImmutable::parse('2026-09-20 03:00:00', 'UTC'), force: true);
 
         // Bing spent nothing today; a row of dashes teaches people to skip the section.
-        expect(json_encode($transport->posted[0]['blocks'], JSON_UNESCAPED_UNICODE))
+        expect(platformCardsIn($transport->posted[0]['blocks']))
             ->not->toContain('Microsoft');
     });
 
@@ -2228,5 +2279,180 @@ describe('the platform breakdown', function () {
 
         expect(round($today->channels['meta']->cpb, 2))->toBe(308.17)
             ->and(round($today->channels['meta']->cpqb, 2))->toBe(406.53);
+    });
+});
+
+/*
+ * Counts beside the costs, the closed day in a box, and the two replies under every card.
+ *
+ * The data team's query publishes each channel's spend and costs but not the counts behind them,
+ * so a CPB of $32.95 could be one booking or thirty. The supplement sums them from the same view.
+ */
+describe('channel counts and the card replies', function () {
+    beforeEach(function () {
+        costAlertConfig();
+        Lead::truncate();
+        LeadActivityLog::truncate();
+        update_option(SendCostAlertAction::STATE_OPTION, []);
+    });
+
+    $counts = fn (string $date, array $row = []): DaySupplement => DaySupplement::fromRow(array_merge([
+        'date' => $date,
+        'facebook_leads' => 70, 'facebook_bookings' => 56, 'facebook_qualified' => 41,
+        'google_leads' => 4, 'google_bookings' => 2, 'google_qualified' => 2,
+        'bing_leads' => 1, 'bing_bookings' => 1, 'bing_qualified' => 1,
+    ], $row));
+
+    $run = function (MarketingDay $day, ?PartialDay $today, array $supplements, string $at): object {
+        $transport = recordingCostTransport();
+
+        (new SendCostAlertAction(
+            new FunnelMetricsService(null, warehouseStub($day, $today, null, $supplements)),
+            $transport,
+            new SlackMessageRenderer,
+        ))->execute(CarbonImmutable::parse($at, 'UTC'), force: true);
+
+        return $transport;
+    };
+
+    test('every platform card carries its bookings and qualified bookings', function () use ($counts, $run) {
+        $transport = $run(
+            costAlertDay(['Date' => '2026-09-20', 'report_kind' => 'DAY-TO-DATE']),
+            null,
+            ['2026-09-20' => $counts('2026-09-20')],
+            '2026-09-20 15:00:00',
+        );
+
+        $platforms = platformCardsIn($transport->posted[0]['blocks']);
+
+        expect($platforms)->toContain('*Bookings* 56   *Qualified* 41\n*CPB* $321.43')
+            ->and($platforms)->toContain('*Bookings* 2   *Qualified* 2');
+    });
+
+    test('a card with no counts keeps its costs rather than printing zeroes', function () use ($run) {
+        $transport = $run(costAlertDay(['Date' => '2026-09-20']), null, [], '2026-09-20 15:00:00');
+
+        $platforms = platformCardsIn($transport->posted[0]['blocks']);
+
+        expect($platforms)->toContain('*CPB* $321.43')
+            ->and($platforms)->not->toContain('*Bookings*');
+    });
+
+    test('a supplement for another day is refused', function () use ($counts) {
+        // A count from Monday beside a cost from Tuesday is not a figure.
+        $day = costAlertDay(['Date' => '2026-09-20'])->withChannelCounts($counts('2026-09-19'));
+
+        expect($day->channels['meta']->bookings)->toBeNull();
+    });
+
+    test('the closed day is boxed with its own per-platform figures', function () use ($counts, $run) {
+        $transport = $run(
+            costAlertDay(['Date' => '2026-09-19', 'report_kind' => 'CLOSING']),
+            PartialDay::fromRow(['date' => '2026-09-20', 'as_of_et' => '03:00', 'total_leads' => 2]),
+            ['2026-09-19' => $counts('2026-09-19'), '2026-09-20' => $counts('2026-09-20', ['facebook_bookings' => 1])],
+            '2026-09-20 03:00:00',
+        );
+
+        $closed = json_encode(array_values(array_filter(
+            $transport->posted[0]['blocks'],
+            static fn (array $b): bool => str_contains((string) ($b['title']['text'] ?? ''), '— closed'),
+        )), JSON_UNESCAPED_UNICODE);
+
+        expect($closed)->toContain('Sat 19 Sep — closed')
+            ->and($closed)->toContain('Meta — $2,892.84 spend · 56 bookings · 41 qualified · CPB $321.43')
+            ->and($closed)->toContain('Microsoft — $101.94 spend · 1 booking · 1 qualified');
+    });
+
+    test('there is no closed box once the report is day-to-date', function () use ($run) {
+        $transport = $run(costAlertDay(['Date' => '2026-09-20']), null, [], '2026-09-20 15:00:00');
+
+        expect(json_encode($transport->posted[0]['blocks'], JSON_UNESCAPED_UNICODE))->not->toContain('— closed');
+    });
+
+    test('channel counts survive the snapshot cache', function () use ($counts) {
+        $day = costAlertDay(['Date' => '2026-09-20'])->withChannelCounts($counts('2026-09-20'));
+
+        $restored = MarketingDay::fromRow($day->toRow());
+        $supplement = DaySupplement::fromRow($counts('2026-09-20')->toArray());
+
+        expect($restored->channels['meta']->bookings)->toBe(56)
+            ->and($restored->channels['meta']->qualified)->toBe(41)
+            ->and($supplement->channelCounts['bing_bookings'])->toBe(1);
+    });
+
+    test('the website reply puts site counts beside the warehouse, with the difference', function () use ($counts, $run) {
+        $at = CarbonImmutable::parse('2026-09-20 10:00:00', 'UTC');
+
+        // Two paid Meta bookings, one organic Instagram one, one direct.
+        foreach ([
+            ['utm_source' => 'facebook', 'utm_medium' => 'paid'],
+            ['utm_source' => 'facebook', 'utm_medium' => 'paid'],
+            ['utm_source' => 'instagram', 'utm_medium' => 'social'],
+            [],
+        ] as $attributes) {
+            costAlertBooking(costAlertLead(['created_at' => $at, ...$attributes]), $at);
+        }
+
+        $transport = $run(
+            costAlertDay([
+                'Date' => '2026-09-20', 'total_appointments' => '5', 'total_qualified' => '4', 'total_leads' => '6',
+            ]),
+            null,
+            ['2026-09-20' => $counts('2026-09-20', [
+                'facebook_bookings' => 3, 'facebook_qualified' => 3,
+                'google_bookings' => 0, 'google_qualified' => 0,
+                'bing_bookings' => 0, 'bing_qualified' => 0,
+            ])],
+            '2026-09-20 15:00:00',
+        );
+
+        $reply = replyAmong($transport->posted, 'Website vs warehouse');
+
+        expect($reply)->toContain('Website vs warehouse — Sun 20 Sep, as of 15:00 ET')
+            ->and($reply)->toContain('Leads: warehouse 6, site 4 (-2)')
+            // Organic Instagram is not a Meta booking the warehouse lost; it is "everything else".
+            ->and($reply)->toContain('Meta                3     2    -1     3     2    -1')
+            ->and($reply)->toContain('Everything else     2     2     0     1     2    +1')
+            ->and($reply)->toContain('Total               5     4    -1     4     4     0')
+            ->and($reply)->not->toContain('Google ');
+    });
+
+    test('the website reply is skipped when the warehouse did not answer', function () {
+        $transport = recordingCostTransport();
+
+        costAlertAction($transport)->execute(CarbonImmutable::parse('2026-09-20 15:00:00', 'UTC'), force: true);
+
+        expect(replyAmong($transport->posted, 'Website vs warehouse'))->toBe('');
+    });
+
+    test('the breakdown reply groups bookings by landing page and campaign', function () use ($run) {
+        $at = CarbonImmutable::parse('2026-09-20 10:00:00', 'UTC');
+
+        foreach ([
+            ['landing_url' => 'https://remoteleverage.com/hire-va/?utm_source=facebook&fbclid=abc', 'utm_campaign' => 'VA-Broad'],
+            ['landing_url' => 'https://www.remoteleverage.com/hire-va', 'utm_campaign' => 'VA-Broad', 'monthly_revenue' => '$5k to $10k Per Month'],
+            ['landing_url' => 'https://remoteleverage.com/', 'utm_campaign' => 'Brand'],
+            ['landing_url' => null, 'utm_campaign' => null],
+        ] as $attributes) {
+            costAlertBooking(costAlertLead(['created_at' => $at, ...$attributes]), $at);
+        }
+
+        $transport = $run(costAlertDay(['Date' => '2026-09-20']), null, [], '2026-09-20 15:00:00');
+
+        $reply = replyAmong($transport->posted, 'Bookings by landing page and campaign');
+
+        // Query strings and hosts dropped, so one page is one row however it was reached.
+        expect($reply)->toMatch('#/hire-va/ +2 +1#')
+            ->and($reply)->toMatch('#VA-Broad +2 +1#')
+            ->and($reply)->toMatch('#Brand +1 +1#')
+            ->and($reply)->toContain('(not recorded)')
+            ->and($reply)->toContain('(no campaign)')
+            ->and(strpos($reply, '/hire-va/'))->toBeLessThan(strpos($reply, '(not recorded)'));
+    });
+
+    test('there is no breakdown reply on a day with no bookings', function () use ($run) {
+        $transport = $run(costAlertDay(['Date' => '2026-09-20']), null, [], '2026-09-20 15:00:00');
+
+        expect(replyAmong($transport->posted, 'Bookings by landing page and campaign'))->toBe('');
     });
 });

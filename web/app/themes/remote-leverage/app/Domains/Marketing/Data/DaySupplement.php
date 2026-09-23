@@ -26,6 +26,15 @@ readonly class DaySupplement
         public int $impressions,
         public int $clicks,
         public int $landingPageViews,
+
+        /**
+         * Per-channel leads, bookings and qualified bookings in the view's column shape —
+         * `facebook_bookings` and so on — ready to merge into a day's row. Empty when the query
+         * predates the columns, which leaves the channels' counts null rather than zero.
+         *
+         * @var array<string, int>
+         */
+        public array $channelCounts = [],
     ) {}
 
     /**
@@ -43,7 +52,29 @@ readonly class DaySupplement
             impressions: (int) (float) ($row['impressions'] ?? 0),
             clicks: (int) (float) ($row['clicks'] ?? 0),
             landingPageViews: (int) (float) ($row['landing_page_views'] ?? 0),
+            channelCounts: self::channelCounts($row),
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, int>
+     */
+    private static function channelCounts(array $row): array
+    {
+        $counts = [];
+
+        foreach (array_keys(ChannelDay::COLUMNS) as $column) {
+            foreach (['leads', 'bookings', 'qualified'] as $metric) {
+                $key = $column.'_'.$metric;
+
+                if (isset($row[$key]) && $row[$key] !== '') {
+                    $counts[$key] = (int) (float) $row[$key];
+                }
+            }
+        }
+
+        return $counts;
     }
 
     /**
@@ -112,6 +143,7 @@ readonly class DaySupplement
             'impressions' => $this->impressions,
             'clicks' => $this->clicks,
             'landing_page_views' => $this->landingPageViews,
+            ...$this->channelCounts,
         ];
     }
 }

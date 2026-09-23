@@ -111,6 +111,18 @@ readonly class FunnelSnapshot
 
         /** Freshness, per-platform staleness and the funnel above the lead. Null when unreadable. */
         public ?DaySupplement $supplement = null,
+
+        /**
+         * Today's bookings from this site's own records, grouped by the page the lead landed on
+         * and by `utm_campaign`, busiest first. The warehouse is by channel and day only, so this
+         * is the one place either breakdown exists.
+         *
+         * @var array<string, array{bookings: int, qualified: int}>
+         */
+        public array $bookingsByLandingPage = [],
+
+        /** @var array<string, array{bookings: int, qualified: int}> */
+        public array $bookingsByCampaign = [],
     ) {}
 
     /**
@@ -185,6 +197,8 @@ readonly class FunnelSnapshot
             'findings' => $this->findings,
             'dismissed_findings' => $this->dismissedFindings,
             'unattributed_by_channel' => $this->unattributedByChannel,
+            'bookings_by_landing_page' => $this->bookingsByLandingPage,
+            'bookings_by_campaign' => $this->bookingsByCampaign,
         ];
     }
 
@@ -243,6 +257,8 @@ readonly class FunnelSnapshot
             findings: (array) ($data['findings'] ?? []),
             dismissedFindings: (array) ($data['dismissed_findings'] ?? []),
             unattributedByChannel: (array) ($data['unattributed_by_channel'] ?? []),
+            bookingsByLandingPage: (array) ($data['bookings_by_landing_page'] ?? []),
+            bookingsByCampaign: (array) ($data['bookings_by_campaign'] ?? []),
         );
     }
 }
