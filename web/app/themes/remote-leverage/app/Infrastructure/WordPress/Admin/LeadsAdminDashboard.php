@@ -2607,7 +2607,7 @@ class LeadsAdminDashboard
                                 <p><input type="password" id="zerobounce_api_key" name="zerobounce_api_key" class="regular-text"
                                           value="<?php echo esc_attr($settings['zerobounce_api_key']); ?>" autocomplete="off"
                                           placeholder="Falls back to ZEROBOUNCE_API_KEY" /></p>
-                                <p class="description">Rejects <code>invalid</code>, <code>spamtrap</code>, <code>abuse</code> and <code>do_not_mail</code>. <code>catch-all</code> and <code>unknown</code> pass — they mean undetermined, not bad.</p>
+                                <p class="description">Rejects <code>invalid</code>, <code>spamtrap</code> and <code>abuse</code>. <code>catch-all</code>, <code>unknown</code> and <code>do_not_mail</code> pass.</p>
                             </td>
                         </tr>
                         <tr>

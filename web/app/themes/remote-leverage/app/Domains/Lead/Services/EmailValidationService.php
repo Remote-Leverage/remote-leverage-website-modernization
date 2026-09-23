@@ -32,7 +32,7 @@ use Illuminate\Support\Facades\Log;
 class EmailValidationService
 {
     /** Validation outcomes ZeroBounce reports that we treat as undeliverable. */
-    public const REJECTED_STATUSES = ['invalid', 'spamtrap', 'abuse', 'do_not_mail'];
+    public const REJECTED_STATUSES = ['invalid', 'spamtrap', 'abuse'];
 
     public function __construct(
         protected ?LeadSettingsService $settings = null,
@@ -156,8 +156,10 @@ class EmailValidationService
                 return $this->reject('zerobounce_'.$status, $this->message($settings), 'zerobounce');
             }
 
-            // `valid`, `catch-all` and `unknown` all pass. catch-all and unknown mean ZeroBounce
-            // could not determine the answer, which is not evidence against the address.
+            // `valid`, `catch-all`, `unknown` and `do_not_mail` all pass. catch-all and unknown
+            // mean ZeroBounce could not determine the answer, which is not evidence against the
+            // address; do_not_mail covers role accounts and complainers, which is a deliverable
+            // mailbox we choose not to turn away at the form.
             return $this->accept('zerobounce');
         } catch (\Throwable $e) {
             Log::warning('EmailValidationService: ZeroBounce call failed; accepting the address. '.$e->getMessage());
