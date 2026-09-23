@@ -1868,6 +1868,9 @@ class LeadsAdminDashboard
                             <?php if ($lead->ip_address) { ?>
                                 <tr><td>IP Address:</td><td><code><?php echo esc_html($lead->ip_address); ?></code></td></tr>
                             <?php } ?>
+                            <?php if ($lead->country) { ?>
+                                <tr><td>Country:</td><td><?php echo esc_html($lead->country); ?> <span style="color: #6b7280; font-size: 11px;">(<?php echo esc_html(implode(' / ', array_filter(['IP '.($lead->ip_country ?: '?'), $lead->browser_timezone, $lead->browser_language]))); ?>)</span><?php if ($lead->country_source === 'timezone_over_ip') { ?> <span style="color: #b45309; font-size: 11px;">IP disagrees, likely VPN</span><?php } ?></td></tr>
+                            <?php } ?>
                             <?php if ($lead->landing_url) { ?>
                                 <tr><td>Landing URL:</td><td style="word-break: break-all; font-size: 11px;"><?php echo esc_html($lead->landing_url); ?></td></tr>
                             <?php } ?>

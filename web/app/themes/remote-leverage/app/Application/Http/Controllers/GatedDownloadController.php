@@ -7,6 +7,7 @@ namespace App\Application\Http\Controllers;
 use App\Domains\Lead\Actions\CaptureLeadAction;
 use App\Domains\Lead\Data\LeadCaptureData;
 use App\Domains\Lead\Services\GatedAssetResolver;
+use App\Domains\Lead\Services\LeadGeoSignals;
 use App\Domains\Lead\Services\LeadSubmission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -124,6 +125,7 @@ class GatedDownloadController
                 'referrer_url' => (string) $request->headers->get('referer', '') ?: null,
                 'session_id' => $this->text($request->input('session_id', '')) ?: null,
                 'attribution_named' => [
+                    ...app(LeadGeoSignals::class)->collect($request),
                     'submission_type' => LeadSubmission::stored(LeadSubmission::GATED_DOWNLOAD),
                 ],
                 'extra_data' => [

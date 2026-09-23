@@ -6,6 +6,7 @@ namespace App\Application\Livewire\Scheduling;
 
 use App\Domains\Lead\Actions\CaptureLeadAction;
 use App\Domains\Lead\Data\LeadCaptureData;
+use App\Domains\Lead\Services\LeadGeoSignals;
 use App\Domains\Scheduling\Actions\RouteInstantCallAction;
 use App\Domains\Scheduling\Services\LiveCallAvailabilityRouter;
 use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
@@ -113,7 +114,8 @@ class InstantLiveCallButton extends Component
                     name: $this->visitorName,
                     email: $this->visitorEmail,
                     phone: $this->visitorPhone ?: null,
-                    extraData: ['source' => 'instant_live_call']
+                    extraData: ['source' => 'instant_live_call'],
+                    attributionNamed: app(LeadGeoSignals::class)->collect(),
                 ));
             } catch (\Throwable $e) {
                 Log::warning('Lead capture non-fatal failure during instant call: '.$e->getMessage());
