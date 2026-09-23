@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\WordPress\Hooks;
 
+use App\Support\PixelDeferral;
+
 /**
  * Emits the marketing pixels that production loads outside GTM.
  *
@@ -50,29 +52,18 @@ class MarketingPixelHooks
     }
 
     /**
-     * Pixels whose SDK fetch can be deferred.
-     *
-     * Intersecting against this list means a stray `PIXEL_DEFER_VENDORS=something-else` is
-     * ignored rather than half-honoured. Meta and the Google tag were excluded until 2026-09-22:
-     * browser conversions already travel server-side (CAPI / GoogleEnhancedConversion), and
-     * leaving the SDKs on the critical path is what a PSI mobile run measured as 5.4 s LCP
-     * against a 1.2 s FCP. See the `defer` block in `config/pixels.php`.
-     */
-    private const DEFERRABLE = ['linkedin', 'openai', 'bing_uet', 'tiktok', 'meta', 'google_tag'];
-
-    /**
      * The vendors actually being deferred, in a stable order.
+     *
+     * Set on Settings → Marketing Pixels; see `PixelDeferral` for the precedence. Meta and the
+     * Google tag were excluded until 2026-09-22: browser conversions already travel server-side
+     * (CAPI / GoogleEnhancedConversion), and leaving the SDKs on the critical path is what a PSI
+     * mobile run measured as 5.4 s LCP against a 1.2 s FCP.
      *
      * @return array<int, string>
      */
     public function deferredVendors(): array
     {
-        $configured = array_map(
-            static fn ($v): string => strtolower(trim((string) $v)),
-            (array) config('pixels.defer.vendors', []),
-        );
-
-        return array_values(array_intersect(self::DEFERRABLE, $configured));
+        return PixelDeferral::vendors();
     }
 
     /**
@@ -99,7 +90,7 @@ class MarketingPixelHooks
      * Defines `window.rlDefer`, which holds a callback until the page is done being busy.
      *
      * Flushes on the earliest of: the first real user interaction, `window` load,
-     * browser idle, or `pixels.defer.timeout_ms`. Interaction is included because
+     * browser idle, or `PixelDeferral::timeoutMs()`. Interaction is included because
      * an engaged visitor should not wait out the timeout to be tracked — but the
      * interaction listener only *schedules* the flush (setTimeout 0), it does not
      * run the loaders inside the event. Flushing synchronously on pointerdown is
@@ -122,7 +113,7 @@ class MarketingPixelHooks
             return;
         }
 
-        $timeout = (int) config('pixels.defer.timeout_ms', 6000);
+        $timeout = PixelDeferral::timeoutMs();
 
         echo <<<HTML
 <!-- Deferred pixel loading (config/pixels.php) -->

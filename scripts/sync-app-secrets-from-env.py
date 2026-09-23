@@ -117,9 +117,6 @@ ALLOWLIST = [
     # only path an environment variable has into a running task. True on staging and
     # production so anonymous visitor IPs are attached to errors.
     "SENTRY_SEND_DEFAULT_PII",
-    # Which marketing pixels wait for interaction/load/idle (config/pixels.php `defer`). Not a
-    # secret — same reason again: tuning it per environment should not need a deploy.
-    "PIXEL_DEFER_VENDORS",
     # AI
     "GEMINI_API_KEY",
     # Legacy browser tools (config/job-widget.php) — the OpenAI proxy behind the vastore5 job

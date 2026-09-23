@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Application\Livewire\Booking\MultistepBookingWizard;
+use App\Infrastructure\WordPress\Admin\PixelDeferralAdmin;
 use App\Infrastructure\WordPress\Hooks\MarketingPixelHooks;
 use App\Infrastructure\WordPress\Hooks\TrackingHooks;
+use App\Support\PixelDeferral;
 
 /**
  * Covers the pixels production loads outside GTM, and the `dataLayer` bridge.
@@ -588,12 +590,62 @@ describe('deferred SDK loading', function () {
         expect($out)->toContain('ti:"97187250"');
     });
 
-    test('the shipped defaults defer nothing and keep the timeout past LCP', function () {
+    test('the shipped defaults defer UET and the Google tag, keep Meta immediate, and wait past LCP', function () {
+        $config = require dirname(__DIR__, 2).'/config/pixels.php';
+
+        expect($config['defer']['vendors'])->toBe(['bing_uet', 'google_tag'])
+            ->and($config['defer']['timeout_ms'])->toBe(6000);
+    });
+
+    test('no environment variable can reach the deferral any more', function () {
+        /*
+         * PIXEL_DEFER_VENDORS crossed four hops to reach PHP and silently dropped unknown
+         * names; production shipped with nothing deferred while the secret said otherwise.
+         * Settings → Marketing Pixels owns it now.
+         */
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/config/pixels.php');
 
-        expect($src)
-            ->toContain("env('PIXEL_DEFER_VENDORS', '')) ?: ''")
-            ->toContain('?: 6000');
+        expect($src)->not->toContain("env('PIXEL_DEFER");
+    });
+});
+
+describe('Settings → Marketing Pixels', function () {
+    afterEach(function () {
+        delete_option(PixelDeferral::VENDORS_OPTION);
+        delete_option(PixelDeferral::TIMEOUT_OPTION);
+    });
+
+    test('config supplies the defaults until the screen is saved', function () {
+        config(['pixels.defer.vendors' => ['bing_uet', 'google_tag'], 'pixels.defer.timeout_ms' => 6000]);
+
+        expect(PixelDeferral::vendors())->toBe(['google_tag', 'bing_uet'])
+            ->and(PixelDeferral::timeoutMs())->toBe(6000);
+    });
+
+    test('a saved selection wins over config, and reaches the emitted markup', function () {
+        config(['pixels.defer.vendors' => ['bing_uet', 'google_tag']]);
+        update_option(PixelDeferral::VENDORS_OPTION, ['meta']);
+        update_option(PixelDeferral::TIMEOUT_OPTION, 2500);
+
+        expect((new MarketingPixelHooks)->deferredVendors())->toBe(['meta'])
+            ->and(renderPixel(fn (MarketingPixelHooks $h) => $h->injectDeferBootstrap()))->toContain('w.setTimeout(flush, 2500)')
+            ->and(renderPixel(fn (MarketingPixelHooks $h) => $h->injectMetaPixel()))->toContain('rlDefer')
+            ->and(renderPixel(fn (MarketingPixelHooks $h) => $h->injectGoogleTag()))->not->toContain('rlDefer');
+    });
+
+    test('saving with every box unticked defers nothing, rather than falling back to config', function () {
+        config(['pixels.defer.vendors' => ['bing_uet', 'google_tag']]);
+        update_option(PixelDeferral::VENDORS_OPTION, PixelDeferralAdmin::sanitizeVendors(null));
+
+        expect(PixelDeferral::vendors())->toBe([])
+            ->and(renderPixel(fn (MarketingPixelHooks $h) => $h->injectDeferBootstrap()))->toBe('');
+    });
+
+    test('the sanitizers drop unknown vendors and clamp the timeout', function () {
+        expect(PixelDeferralAdmin::sanitizeVendors(['google_tag', 'uet', 'meta', '<script>']))->toBe(['meta', 'google_tag'])
+            ->and(PixelDeferralAdmin::sanitizeTimeout('-5'))->toBe(0)
+            ->and(PixelDeferralAdmin::sanitizeTimeout('999999'))->toBe(30000)
+            ->and(PixelDeferralAdmin::sanitizeTimeout('abc'))->toBe(6000);
     });
 });
 

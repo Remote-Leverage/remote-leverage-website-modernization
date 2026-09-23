@@ -439,8 +439,8 @@ return [
     | priority 4 contend for it during the load. Five of those six are now gone
     | (HubSpot and Rewardful removed; TikTok, LinkedIn and OpenAI switched off),
     | so the figure above is the before, not the current state. What is left
-    | firing is Meta, UET and the Google tag, and none of them waits by
-    | default any more (see below).
+    | firing is Meta, UET and the Google tag; by default the last two wait and
+    | Meta does not (see below).
     |
     | **No event is lost by deferring.** Every vendor here installs a queueing
     | stub and drains it when the SDK arrives, so the stub and the `init` /
@@ -470,39 +470,33 @@ return [
     | Meta traffic is mostly in-app mobile browsers on slow connections, which
     | is exactly who leaves early. Reported at 1,872 clicks to 1,093 landing
     | page views. The ad platform optimises on that signal, so it is worth more
-    | than the main-thread time the deferral saved. Add `meta` back through
-    | `PIXEL_DEFER_VENDORS` to trial it again.
+    | than the main-thread time the deferral saved.
     |
-    | **Nothing is deferred by default since 2026-09-23**, to measure every
-    | ad platform's click-to-page-view ratio without the deferral in the way.
-    | The mechanism is intact: name vendors in `PIXEL_DEFER_VENDORS` (the
-    | previous default was `linkedin,openai,bing_uet,tiktok,meta,google_tag`)
-    | to switch it back on. With the list empty, no bootstrap is emitted.
+    | **Settings → Marketing Pixels owns this since 2026-09-23**, not the
+    | environment. `PIXEL_DEFER_VENDORS` / `PIXEL_DEFER_TIMEOUT_MS` are gone:
+    | the value had to cross four hops (GitHub secret, Secrets Manager,
+    | entrypoint, config cache), unknown names were dropped silently, and
+    | production ran with nothing deferred while the secret said otherwise.
+    | The values below are only the defaults until that screen is first saved
+    | (`App\Support\PixelDeferral`). The default defers UET and the Google
+    | tag and keeps Meta immediate.
     |
     | The flush also pushes `rl_idle` onto `dataLayer`, which is the intended
     | way to defer a tag that lives in the container rather than here: retrigger
     | it on that custom event instead of on `gtm.js`. TikTok (162KB, the largest
     | single non-Google third party) is the reason that hook exists.
     |
-    | All three of the switched-off vendors stay in the default list below, so
-    | that the deferral is already in place on the day one goes back on rather
-    | than something to remember. Listing a vendor that emits nothing costs
-    | nothing: `deferWrap()` is only reached from an injector that has ids.
     */
     'defer' => [
-        'vendors' => array_values(array_filter(array_map(
-            'trim',
-            explode(',', trim((string) env('PIXEL_DEFER_VENDORS', '')) ?: ''),
-        ))),
+        'vendors' => ['bing_uet', 'google_tag'],
 
         /*
          * Upper bound on the wait, in milliseconds. 6000 is past the hire-va
          * LCP window on Slow 4G (5.7s staging, 13s production on 2026-09-18).
          * The previous 2500ms ceiling flushed during LCP, so deferred pixels
-         * still fought the hero image. `?:` so an empty PIXEL_DEFER_TIMEOUT_MS
-         * falls through the same way the pixel ids do.
+         * still fought the hero image.
          */
-        'timeout_ms' => max(0, (int) (trim((string) env('PIXEL_DEFER_TIMEOUT_MS', '')) ?: 6000)),
+        'timeout_ms' => 6000,
     ],
 
     /*
