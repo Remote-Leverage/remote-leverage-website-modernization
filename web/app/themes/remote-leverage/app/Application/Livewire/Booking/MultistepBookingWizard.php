@@ -600,6 +600,25 @@ class MultistepBookingWizard extends Component
                         'referral_code' => $this->referralCode,
                         'role_needed' => $this->roleNeeded,
                         'monthly_revenue' => $this->monthlyRevenue,
+
+                        /*
+                         * The ad identifiers, and the collected attribution the `fbc` rules need.
+                         *
+                         * Passing `attributionNamed`/`attribution` rather than a bare `fbc` is the
+                         * point: the wizard's copy was frozen in `mount()`, before Meta's pixel JS
+                         * ran, so a visitor who arrived on a bare `fbclid` is holding a *synthetic*
+                         * `fbc` here. RecordBouncedLeadAction runs it through the same FbcResolver
+                         * CaptureLeadAction uses, which prefers the live `_fbc` cookie that has
+                         * almost certainly landed by now and rejects one from a different click.
+                         * Recording the frozen value instead would file a paid click under a
+                         * fabricated identifier and call it real.
+                         */
+                        'gclid' => $this->gclid,
+                        'fbclid' => $this->fbclid,
+                        'msclkid' => $this->attributionNamed['msclkid'] ?? '',
+                        'landing_url' => $this->landingUrl,
+                        'attribution_named' => $this->attributionNamed,
+                        'attribution' => $this->attribution,
                     ]);
 
                     $this->addError('email', (string) $emailCheck['message']);

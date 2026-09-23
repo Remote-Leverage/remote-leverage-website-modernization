@@ -428,6 +428,12 @@ if (! Capsule::schema()->hasTable('rl_bounced_leads')) {
         $table->string('utm_medium')->nullable();
         $table->string('utm_campaign')->nullable();
         $table->string('referral_code')->nullable();
+        $table->string('gclid', 512)->nullable();
+        $table->string('fbclid', 512)->nullable();
+        $table->string('msclkid', 150)->nullable();
+        $table->string('fbc', 512)->nullable();
+        $table->boolean('fbc_synthetic')->nullable();
+        $table->text('landing_url')->nullable();
         $table->text('context')->nullable();
         $table->integer('attempts')->default(1);
         $table->timestamp('created_at')->nullable();

@@ -44,6 +44,28 @@ return new class extends Migration
             $table->string('utm_medium')->nullable();
             $table->string('utm_campaign')->nullable();
             $table->string('referral_code')->nullable();
+
+            /*
+             * Click identifiers, as columns rather than JSON for the same reason `msclkid` was
+             * promoted on `rl_leads`: "which campaign is buying leads we then refuse" is a
+             * query, and a value inside a JSON blob cannot be queried the same way on MySQL and
+             * on the SQLite the tests run.
+             *
+             * Widths match `rl_leads` exactly (512 for the click ids after the 2026-09-17
+             * widening, 150 for `msclkid`) so a value that fits one table fits the other.
+             *
+             * `fbc_synthetic` records whether the `fbc` is Meta's own cookie or a stand-in this
+             * codebase built from a bare `fbclid`: an unmarked synthetic value read back later
+             * is indistinguishable from a real one, and the Conversions API treats them very
+             * differently. `_fbp` stays in `context`, exactly as it has no column on `rl_leads`.
+             */
+            $table->string('gclid', 512)->nullable();
+            $table->string('fbclid', 512)->nullable();
+            $table->string('msclkid', 150)->nullable();
+            $table->string('fbc', 512)->nullable();
+            $table->boolean('fbc_synthetic')->nullable();
+            $table->text('landing_url')->nullable();
+
             $table->json('context')->nullable();
 
             /*

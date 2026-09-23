@@ -123,6 +123,12 @@ runs, so they have no `rl_leads` row, no `lead_id` and therefore no activity log
 table existed, a rejection added a form error and vanished, and "the booking form is broken" could
 not be told apart from "their address was blocked" — which is the report it actually was.
 
+Click identifiers (`gclid`, `fbclid`, `msclkid`, `fbc`, `fbc_synthetic`, `landing_url`) are columns
+at the same widths `rl_leads` uses, because "which campaign is buying leads we then refuse" is a
+query. `fbc` is resolved through `FbcResolver`, not copied from the wizard's frozen attribution —
+that copy is usually a synthetic stand-in built from a bare `fbclid` before Meta's pixel JS ran.
+`_fbp` has no column here, exactly as it has none on `rl_leads`, and rides in `context`.
+
 Written only by `RecordBouncedLeadAction`, read only by the **Bounced Leads** admin screen
 (`admin.php?page=rl-leads-bounced`). Nothing else may consume it: these addresses were refused, so
 they must stay out of exports, KPIs and CRM sync. Retention follows the lead window —
@@ -183,6 +189,7 @@ flowchart TB
 
 | Class | Does |
 | :--- | :--- |
+| `FbcResolver` | The `fbc` rules, extracted from `CaptureLeadAction` when a second write path needed them. Upgrade-only, never replaces a confirmed-real value, only accepts a cookie whose embedded click id matches the lead's, and stays silent for callers that collected no attribution of their own. **One copy on purpose**: the booking wizard freezes attribution in `mount()` before Meta's pixel JS runs, so its `fbc` is routinely synthetic, and both `CaptureLeadAction` and `RecordBouncedLeadAction` need the live-cookie upgrade the Conversions API depends on. |
 | `EmailValidationService` | Three gates over one field, cheapest first: address blacklist, domain block/allow list, then ZeroBounce. **Fails open** — an outage, a missing key or a slow response accepts the address. Which ZeroBounce verdicts block is an admin setting (`zerobounce_blocked_statuses`), read through the static `rejectedStatusesFor()` so the screen and the form cannot drift; `valid` can never be on it. Rejections are recorded by `RecordBouncedLeadAction`; any new caller that can refuse a visitor should call it too, or the refusal is invisible again. |
 | `PhoneValidationService` | `libphonenumber-for-php`. Parses against a country code, returns a validity flag plus the E.164 string. Every stored phone is normalised. |
 | `AttributionEngine` | Lives in the Referral domain but is central here — resolves `source_type`/`source_id` from query params (`utm_*`, `gclid`, `fbclid`, `via`, `ref`, `r`) and the `rl_referrer` cookie. See [referral.md](referral.md). |

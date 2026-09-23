@@ -182,3 +182,95 @@ describe('recording a bounce', function () {
         }
     });
 });
+
+describe('ad attribution on a bounced submission', function () {
+    /*
+     * Hyller's review catch: the first cut of this recorded no Meta or Google identifiers at
+     * all, so a refused *paid* click was indistinguishable from a refused organic one, and the
+     * question "which campaign is buying leads we then turn away" had no answer.
+     */
+    beforeEach(function () {
+        BouncedLead::query()->delete();
+        unset($_COOKIE['_fbc'], $_COOKIE['fbc']);
+    });
+
+    afterEach(function () {
+        unset($_COOKIE['_fbc'], $_COOKIE['fbc']);
+    });
+
+    $refused = ['valid' => false, 'reason' => 'zerobounce_invalid', 'message' => 'x', 'checked_by' => 'zerobounce'];
+
+    test('click identifiers are promoted to columns, not buried in the JSON blob', function () use ($refused) {
+        $payload = RecordBouncedLeadAction::payloadFor('refused@example.com', $refused, [
+            'gclid' => 'g-123', 'fbclid' => 'f-456', 'msclkid' => 'm-789', 'landing_url' => 'https://example.com/lp',
+        ]);
+
+        expect($payload['gclid'])->toBe('g-123')
+            ->and($payload['fbclid'])->toBe('f-456')
+            ->and($payload['msclkid'])->toBe('m-789')
+            ->and($payload['landing_url'])->toBe('https://example.com/lp')
+            ->and($payload['context'])->toBeNull();   // nothing left over to hide in
+    });
+
+    test('_fbp survives in the blob, because Meta matches on it and it has no column', function () use ($refused) {
+        $payload = RecordBouncedLeadAction::payloadFor('refused@example.com', $refused, [
+            'attribution_named' => ['fbc' => null],
+            'attribution' => ['_fbp' => 'fb.1.1699.999', 'wbraid' => 'w-1', 'fbc_synthetic' => true],
+        ]);
+
+        // fbc_synthetic is dropped from the blob — it is a column now, and two copies drift.
+        expect($payload['context']['attribution'])->toBe(['_fbp' => 'fb.1.1699.999', 'wbraid' => 'w-1']);
+    });
+
+    test('the live cookie wins over the wizard\'s mount-time synthetic fbc', function () use ($refused) {
+        // The whole point of routing through FbcResolver rather than reading $context['fbc']:
+        // by the time somebody is refused at step one, Meta's real cookie has landed.
+        $_COOKIE['_fbc'] = 'fb.1.1700000000000.f-456';
+
+        $payload = RecordBouncedLeadAction::payloadFor('refused@example.com', $refused, [
+            'fbclid' => 'f-456',
+            'attribution_named' => ['fbc' => 'fb.1.1699999999999.f-456'],
+            'attribution' => ['fbc_synthetic' => true],
+        ]);
+
+        expect($payload['fbc'])->toBe('fb.1.1700000000000.f-456')
+            ->and($payload['fbc_synthetic'])->toBeFalse();
+    });
+
+    test('a synthetic fbc is recorded as synthetic, never as Meta\'s own', function () use ($refused) {
+        $payload = RecordBouncedLeadAction::payloadFor('refused@example.com', $refused, [
+            'fbclid' => 'f-456',
+            'attribution_named' => ['fbc' => 'fb.1.1699999999999.f-456'],
+            'attribution' => ['fbc_synthetic' => true],
+        ]);
+
+        expect($payload['fbc'])->toBe('fb.1.1699999999999.f-456')
+            ->and($payload['fbc_synthetic'])->toBeTrue();
+    });
+
+    test('a stray cookie is not attached to a submission that collected no attribution', function () use ($refused) {
+        $_COOKIE['_fbc'] = 'fb.1.1700000000000.someoneelse';
+
+        $payload = RecordBouncedLeadAction::payloadFor('refused@example.com', $refused, ['name' => 'Ada']);
+
+        expect($payload['fbc'])->toBeNull()
+            ->and($payload['fbc_synthetic'])->toBeNull();
+    });
+
+    test('the identifiers survive the round trip to the database', function () use ($refused) {
+        $_COOKIE['_fbc'] = 'fb.1.1700000000000.f-456';
+
+        (new RecordBouncedLeadAction)->execute('refused@example.com', $refused, [
+            'gclid' => 'g-123',
+            'fbclid' => 'f-456',
+            'attribution_named' => ['fbc' => 'fb.1.1699999999999.f-456'],
+            'attribution' => ['fbc_synthetic' => true],
+        ]);
+
+        $row = BouncedLead::query()->where('email', 'refused@example.com')->first();
+
+        expect($row->gclid)->toBe('g-123')
+            ->and($row->fbc)->toBe('fb.1.1700000000000.f-456')
+            ->and($row->fbc_synthetic)->toBeFalse();
+    });
+});

@@ -6,6 +6,7 @@ namespace App\Domains\Lead\Actions;
 
 use App\Domains\Lead\Models\BouncedLead;
 use App\Domains\Lead\Services\EmailValidationService;
+use App\Domains\Lead\Services\FbcResolver;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -80,6 +81,36 @@ class RecordBouncedLeadAction
     }
 
     /**
+     * The Meta click cookie for this submission, through the same rules a real lead gets.
+     *
+     * Not `$context['fbc']` taken at face value. The wizard collects attribution once in
+     * `mount()`, before Meta's pixel JS has run, so a visitor arriving on a bare `fbclid` has a
+     * *synthetic* `fbc` frozen into that array; by the time they are refused at step one the
+     * genuine cookie usually exists. {@see FbcResolver} prefers the live cookie, rejects one
+     * belonging to a different click, and reports which kind it returned. `CaptureLeadAction`
+     * asks it the same question for leads that are not refused.
+     *
+     * @param  array<string, mixed>  $context
+     * @return array{value: string, synthetic: bool}|null
+     */
+    protected static function resolveFbc(array $context): ?array
+    {
+        $named = is_array($context['attribution_named'] ?? null) ? $context['attribution_named'] : [];
+        $blob = is_array($context['attribution'] ?? null) ? $context['attribution'] : [];
+
+        // A caller that passed a bare `fbc` and no collected attribution still gets the rules
+        // applied rather than ignored — `resolve()` keys off the presence of the `fbc` key.
+        if (! array_key_exists('fbc', $named) && array_key_exists('fbc', $context)) {
+            $named['fbc'] = $context['fbc'];
+            $blob['fbc_synthetic'] = (bool) ($context['fbc_synthetic'] ?? false);
+        }
+
+        $fbclid = trim((string) ($context['fbclid'] ?? ''));
+
+        return (new FbcResolver)->resolve($named, $blob, $fbclid !== '' ? $fbclid : null);
+    }
+
+    /**
      * Shape a verdict plus caller context into a row.
      *
      * Pure and static so the mapping is testable without a database — the write above is the
@@ -108,7 +139,12 @@ class RecordBouncedLeadAction
         };
 
         $known = ['name', 'phone', 'company', 'ip_address', 'posthog_session_id',
-            'utm_source', 'utm_medium', 'utm_campaign', 'referral_code'];
+            'utm_source', 'utm_medium', 'utm_campaign', 'referral_code',
+            'gclid', 'fbclid', 'msclkid', 'landing_url',
+            // Consumed by resolveFbc() below rather than copied through.
+            'fbc', 'fbc_synthetic', 'attribution_named', 'attribution'];
+
+        $fbc = self::resolveFbc($context);
 
         $now = Carbon::now();
 
@@ -126,10 +162,35 @@ class RecordBouncedLeadAction
             'utm_campaign' => $string($context['utm_campaign'] ?? null, 255),
             'referral_code' => $string($context['referral_code'] ?? null, 255),
 
-            // Whatever else the caller passed — page URL, role needed, hours — kept whole so a
-            // question nobody has asked yet does not need a migration to answer.
+            /*
+             * Click identifiers, so a refused submission can be tied back to the ad that paid
+             * for it. Widths match `rl_leads`. Without these the screen could say somebody was
+             * turned away but not that a paid click was.
+             */
+            'gclid' => $string($context['gclid'] ?? null, 512),
+            'fbclid' => $string($context['fbclid'] ?? null, 512),
+            'msclkid' => $string($context['msclkid'] ?? null, 150),
+            'fbc' => $fbc === null ? null : mb_substr($fbc['value'], 0, 512),
+            'fbc_synthetic' => $fbc === null ? null : $fbc['synthetic'],
+            'landing_url' => $string($context['landing_url'] ?? null, 2000),
+
+            /*
+             * Whatever else the caller passed — role needed, hours — plus the attribution blob
+             * itself, kept whole so a question nobody has asked yet does not need a migration.
+             *
+             * The blob is not optional cargo: `_fbp` has no column here (exactly as it has none
+             * on `rl_leads`) and the Conversions API reads it, as do `wbraid`/`gbraid`. Dropping
+             * it because `attribution` happens to be consumed by resolveFbc() would quietly cost
+             * the identifiers Meta matches on.
+             */
             'context' => array_filter(
-                array_diff_key($context, array_flip($known)),
+                array_merge(
+                    array_diff_key($context, array_flip($known)),
+                    array_filter(['attribution' => array_diff_key(
+                        is_array($context['attribution'] ?? null) ? $context['attribution'] : [],
+                        array_flip(['fbc_synthetic']),   // bookkeeping, now a column of its own
+                    )]),
+                ),
                 static fn ($value) => $value !== null && $value !== '' && $value !== [],
             ) ?: null,
 

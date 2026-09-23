@@ -33,6 +33,12 @@ class BouncedLead extends Model
         'utm_medium',
         'utm_campaign',
         'referral_code',
+        'gclid',
+        'fbclid',
+        'msclkid',
+        'fbc',
+        'fbc_synthetic',
+        'landing_url',
         'context',
         'attempts',
         'created_at',
@@ -41,6 +47,7 @@ class BouncedLead extends Model
 
     protected $casts = [
         'context' => 'array',
+        'fbc_synthetic' => 'boolean',
         'attempts' => 'integer',
         'created_at' => 'datetime',
         'last_seen_at' => 'datetime',
