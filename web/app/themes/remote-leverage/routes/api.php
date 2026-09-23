@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Application\Http\Controllers\CalendlyWebhookController;
 use App\Application\Http\Controllers\GatedDownloadController;
+use App\Application\Http\Controllers\IntegrationHealthController;
 use App\Application\Http\Controllers\PaymentIntentController;
 use App\Application\Http\Controllers\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -49,3 +50,9 @@ Route::get('health', function () {
         'timestamp' => date('c'),
     ]);
 })->name('api.health');
+
+/*
+ * Per-integration status — see IntegrationHealthController for why this is a separate route
+ * from the bare liveness check above.
+ */
+Route::get('health/integrations', [IntegrationHealthController::class, 'index'])->name('api.health.integrations');

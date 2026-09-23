@@ -7,6 +7,7 @@ namespace App\Infrastructure\Providers;
 use App\Domains\Lead\Export\LeadExportJobStore;
 use App\Domains\Lead\Export\LeadExportRunner;
 use App\Infrastructure\Console\Commands\ApplyWordfenceConfigCommand;
+use App\Infrastructure\Console\Commands\IntegrationsHealthCommand;
 use App\Infrastructure\Console\Commands\PartnerSeedCommand;
 use App\Infrastructure\Console\Commands\PruneIntegrationCallsCommand;
 use App\Infrastructure\Console\Commands\RunDeployTasksCommand;
@@ -81,6 +82,7 @@ class DomainServiceProvider extends ServiceProvider
                 PartnerSeedCommand::class,
                 ApplyWordfenceConfigCommand::class,
                 PruneIntegrationCallsCommand::class,
+                IntegrationsHealthCommand::class,
             ]);
         }
     }
