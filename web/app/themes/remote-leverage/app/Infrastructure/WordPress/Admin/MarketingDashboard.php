@@ -11,6 +11,7 @@ use App\Domains\Lead\Services\LeadQualification;
 use App\Domains\Referral\Models\Payout;
 use App\Domains\Referral\Models\Referral;
 use App\Domains\Referral\Models\Referrer;
+use App\Infrastructure\Observability\Health\IntegrationHealthChecker;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -610,10 +611,19 @@ class MarketingDashboard
 
     /**
      * Render Platform & Infrastructure Health widget.
+     *
+     * Bedrock Environment, ADR-0008 Retention Guard, PHP Runtime and Livewire stay
+     * informational — none of them are a third-party integration `IntegrationHealthChecker`
+     * has an opinion about. Database, Stripe Webhooks, Calendly API, Google, ZeroBounce, PostHog,
+     * Customer.io and Slack render their real status from it instead of the hardcoded
+     * "Operational"/"Compliant"/"Connected" badges this widget shipped with, which could not
+     * have shown anything else. Livewire is deliberately last: every other row above it now
+     * means something a person can act on, and it is the one row that still cannot.
      */
     public function renderSiteHealthWidget(): void
     {
         $health = $this->getPlatformHealth();
+        $integrations = $this->getIntegrationHealth();
 
         ?>
         <div class="rl-dash-health-wrap">
@@ -630,40 +640,9 @@ class MarketingDashboard
                 </span>
             </div>
 
-            <div class="rl-dash-health-item">
-                <div class="rl-dash-health-left">
-                    <span class="rl-dash-indicator-green"></span>
-                    <div>
-                        <div class="rl-dash-health-name">Database Engine</div>
-                        <div class="rl-dash-health-desc">MySQL / MariaDB transactional connection</div>
-                    </div>
-                </div>
-                <span class="rl-badge-emerald">
-                    Connected (<?php echo esc_html($health['db_latency']); ?>ms)
-                </span>
-            </div>
+            <?php $this->renderIntegrationHealthRow('Database Engine', 'MySQL / MariaDB transactional connection', $integrations['database'] ?? null); ?>
 
-            <div class="rl-dash-health-item">
-                <div class="rl-dash-health-left">
-                    <span class="rl-dash-indicator-green"></span>
-                    <div>
-                        <div class="rl-dash-health-name">Livewire 3 Engine</div>
-                        <div class="rl-dash-health-desc">Multistep booking wizard reactive state</div>
-                    </div>
-                </div>
-                <span class="rl-badge-emerald">Operational</span>
-            </div>
-
-            <div class="rl-dash-health-item">
-                <div class="rl-dash-health-left">
-                    <span class="rl-dash-indicator-green"></span>
-                    <div>
-                        <div class="rl-dash-health-name">Stripe Webhooks</div>
-                        <div class="rl-dash-health-desc">Referrer payout & account events listener</div>
-                    </div>
-                </div>
-                <span class="rl-badge-zinc">/api/webhooks/stripe</span>
-            </div>
+            <?php $this->renderIntegrationHealthRow('Stripe Webhooks', 'Referrer payouts & checkout — /api/webhooks/stripe', $integrations['stripe'] ?? null); ?>
 
             <div class="rl-dash-health-item">
                 <div class="rl-dash-health-left">
@@ -675,6 +654,18 @@ class MarketingDashboard
                 </div>
                 <span class="rl-badge-zinc">/api/webhooks/calendly</span>
             </div>
+
+            <?php $this->renderIntegrationHealthRow('Calendly API', 'Direct API — token pool & event type sync', $integrations['calendly'] ?? null); ?>
+
+            <?php $this->renderIntegrationHealthRow('Google (BigQuery)', 'Marketing warehouse queries', $integrations['google'] ?? null); ?>
+
+            <?php $this->renderIntegrationHealthRow('ZeroBounce', 'Lead email deliverability verification', $integrations['zerobounce'] ?? null); ?>
+
+            <?php $this->renderIntegrationHealthRow('PostHog', 'Product analytics & feature flags', $integrations['posthog'] ?? null); ?>
+
+            <?php $this->renderIntegrationHealthRow('Customer.io', 'Lifecycle email & CDP', $integrations['customerio'] ?? null); ?>
+
+            <?php $this->renderIntegrationHealthRow('Slack', 'Lead & booking alert channel', $integrations['slack'] ?? null); ?>
 
             <div class="rl-dash-health-item">
                 <div class="rl-dash-health-left">
@@ -699,8 +690,86 @@ class MarketingDashboard
                     PHP <?php echo esc_html(PHP_VERSION); ?>
                 </span>
             </div>
+
+            <div class="rl-dash-health-item">
+                <div class="rl-dash-health-left">
+                    <span class="rl-dash-indicator-green"></span>
+                    <div>
+                        <div class="rl-dash-health-name">Livewire 3 Engine</div>
+                        <div class="rl-dash-health-desc">Multistep booking wizard reactive state</div>
+                    </div>
+                </div>
+                <span class="rl-badge-emerald">Operational</span>
+            </div>
         </div>
         <?php
+    }
+
+    /**
+     * One row backed by a real `IntegrationHealthChecker` result, in the same
+     * `rl-dash-health-item` shape as every hand-written row around it.
+     *
+     * `$health` is the integration's `IntegrationHealth::toArray()`, or null when
+     * `IntegrationHealthChecker` has no check registered for that key at all — rendered as
+     * `down` rather than silently omitted, because a row that vanishes instead of reporting
+     * red is the harder failure to notice.
+     *
+     * @param  array<string, mixed>|null  $health
+     */
+    protected function renderIntegrationHealthRow(string $name, string $description, ?array $health): void
+    {
+        $status = (string) ($health['status'] ?? 'down');
+        $style = $this->healthBadgeStyle($status);
+        $desc = (string) ($health['reason'] ?? $description);
+        ?>
+        <div class="rl-dash-health-item">
+            <div class="rl-dash-health-left">
+                <span class="<?php echo esc_attr($style['indicator']); ?>"></span>
+                <div>
+                    <div class="rl-dash-health-name"><?php echo esc_html($name); ?></div>
+                    <div class="rl-dash-health-desc"><?php echo esc_html($desc); ?></div>
+                </div>
+            </div>
+            <span class="<?php echo esc_attr($style['badge']); ?>"><?php echo esc_html(ucfirst($status)); ?></span>
+        </div>
+        <?php
+    }
+
+    /**
+     * Indicator dot and badge classes for a `HealthStatus` value.
+     *
+     * @return array{indicator: string, badge: string}
+     */
+    protected function healthBadgeStyle(string $status): array
+    {
+        return match ($status) {
+            'healthy' => ['indicator' => 'rl-dash-indicator-green', 'badge' => 'rl-badge-emerald'],
+            'degraded' => ['indicator' => 'rl-dash-indicator-amber', 'badge' => 'rl-badge-amber'],
+            default => ['indicator' => 'rl-dash-indicator-red', 'badge' => 'rl-badge-rose'],
+        };
+    }
+
+    /**
+     * Real per-integration status for this widget, cached briefly.
+     *
+     * The main wp-admin Dashboard renders on every admin page load, not just when an operator
+     * navigates here on purpose — unlike `IntegrationCallRecorder`, `IntegrationHealthChecker`
+     * itself, that cost is real to this widget specifically. `checkAll()` reads
+     * `rl_integration_calls` once per integration plus a live database probe, so this caches
+     * the result rather than paying that on every request.
+     *
+     * Cached as the plain arrays `IntegrationHealth::toArray()` returns, not the objects
+     * themselves, matching how every other cached value in this class is stored.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    protected function getIntegrationHealth(): array
+    {
+        return Cache::remember('rl_admin_dashboard_integration_health', 60, function () {
+            $results = app(IntegrationHealthChecker::class)->checkAll();
+
+            return array_map(static fn ($health) => $health->toArray(), $results);
+        });
     }
 
     /**
@@ -925,21 +994,16 @@ class MarketingDashboard
      */
     protected function getPlatformHealth(): array
     {
-        $start = microtime(true);
-        $dbLatency = 1.2;
-
-        try {
-            DB::connection()->getPdo();
-            $dbLatency = round((microtime(true) - $start) * 1000, 1);
-        } catch (\Throwable) {
-            $dbLatency = 0.0;
-        }
-
+        // Database latency used to be measured here with its own ad-hoc `getPdo()` ping — one
+        // that, unlike DatabaseHealthCheck, had no degraded threshold and rendered "Connected"
+        // even in its own catch block. Removed rather than fixed twice: `getIntegrationHealth()`
+        // now reads the same live probe `IntegrationHealthChecker` uses everywhere else this
+        // theme reports on the database, so there is one measurement instead of two that could
+        // disagree.
         $env = env('WP_ENV') ?: (defined('WP_ENV') ? WP_ENV : 'production');
 
         return [
             'env' => ucfirst((string) $env),
-            'db_latency' => $dbLatency,
             'memory_limit' => ini_get('memory_limit') ?: '256M',
         ];
     }

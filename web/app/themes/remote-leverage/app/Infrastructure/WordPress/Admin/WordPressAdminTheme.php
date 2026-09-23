@@ -2403,6 +2403,16 @@ class WordPressAdminTheme
                 font-weight: 600 !important;
                 display: inline-block !important;
             }
+            .rl-badge-rose {
+                background: #fef2f2 !important;
+                color: #dc2626 !important;
+                border: 1px solid #fecaca !important;
+                padding: 2px 8px !important;
+                border-radius: 9999px !important;
+                font-size: 11px !important;
+                font-weight: 600 !important;
+                display: inline-block !important;
+            }
 
             /* Dashboard Platform Health */
             .rl-dash-health-wrap {
@@ -2431,6 +2441,22 @@ class WordPressAdminTheme
                 border-radius: 50% !important;
                 background: #10b981 !important;
                 box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important;
+                flex-shrink: 0 !important;
+            }
+            .rl-dash-indicator-amber {
+                width: 8px !important;
+                height: 8px !important;
+                border-radius: 50% !important;
+                background: #d97706 !important;
+                box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2) !important;
+                flex-shrink: 0 !important;
+            }
+            .rl-dash-indicator-red {
+                width: 8px !important;
+                height: 8px !important;
+                border-radius: 50% !important;
+                background: #dc2626 !important;
+                box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2) !important;
                 flex-shrink: 0 !important;
             }
             .rl-dash-health-name {
