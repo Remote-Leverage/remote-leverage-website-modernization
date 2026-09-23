@@ -83,6 +83,107 @@ class CaptureLeadAction
     }
 
     /**
+     * A live `_fbc` cookie, read directly off the request/superglobal at write time.
+     *
+     * The booking wizard collects attribution once, in Livewire's `mount()` — the initial
+     * full-page render, which happens before the browser has had any chance to run Meta's pixel
+     * JS. A visitor who lands with a bare `fbclid` gets a synthetic `fbc` stamped into the
+     * wizard's frozen `attributionNamed` at that instant, and every later write in the same
+     * wizard session (each field blur, each step) reuses that same stale value even after the
+     * genuine cookie lands in the browser a few milliseconds later. Re-reading the cookie here,
+     * on every persist, lets the real value overwrite the synthetic one as soon as it exists.
+     *
+     * Cookie-only, deliberately: unlike `AttributionCollector`, this never checks the query
+     * string. A Livewire round trip posts to `/livewire/update`, not back to the landing URL, so
+     * there is no fresher query-string value to prefer over what `attributionNamed` already
+     * carries — only the cookie can have changed since `mount()`.
+     */
+    private function liveFbc(): ?string
+    {
+        $request = function_exists('request') ? request() : null;
+
+        $value = $request?->cookie('_fbc')
+            ?? $request?->cookie('fbc')
+            ?? $_COOKIE['_fbc'] ?? $_COOKIE['fbc'] ?? null;
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * What to store for `fbc` on this write, or null to leave the column exactly as it is.
+     *
+     * A real `_fbc` — Meta's own cookie, or anything already confirmed real on a previous
+     * write — is never replaced by anything once stored: not a fresher cookie, not a
+     * mount-time value, nothing this action computes outranks Meta's own click record. Until
+     * then, `fbc` is upgrade-only: prefer a live cookie over whatever the caller is holding
+     * (the wizard's `mount()`-frozen value, a hand-typed referral form's silence, …), but only
+     * when it actually agrees with the click this lead carries — see `fbcMatchesClick()`.
+     *
+     * Does nothing at all — does not even read the live cookie — unless `attributionNamed`
+     * itself carries an `fbc` key. Only `AttributionCollector` sets that key, and only the
+     * booking wizard runs it; every other caller (a referral typed in by hand, a gated-download
+     * form, the instant-call widget) has no `fbc` of its own to speak of. Reading the live
+     * cookie anyway there would attribute whoever is currently in that browser — a sales rep on
+     * the phone, someone downloading a PDF with no ad click involved — to a stray `_fbc` that
+     * has nothing to do with the lead being captured.
+     *
+     * @return array{value: string, synthetic: bool}|null
+     */
+    private function resolveFbc(?Lead $lead, array $existingAttribution, LeadCaptureData $data): ?array
+    {
+        if (! array_key_exists('fbc', $data->attributionNamed)) {
+            return null;
+        }
+
+        $storedIsReal = (string) ($lead?->fbc ?? '') !== '' && ! ($existingAttribution['fbc_synthetic'] ?? true);
+
+        if ($storedIsReal) {
+            return null;
+        }
+
+        $fbclid = $data->fbclid ?: $lead?->fbclid;
+
+        $candidates = [
+            ['value' => $this->liveFbc(), 'synthetic' => false],
+            ['value' => $data->attributionNamed['fbc'] ?? null, 'synthetic' => (bool) ($data->attribution['fbc_synthetic'] ?? false)],
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! is_string($candidate['value']) || $candidate['value'] === '') {
+                continue;
+            }
+
+            if ($this->fbcMatchesClick($candidate['value'], $fbclid)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether `fbc`'s embedded click id agrees with the click this lead actually carries.
+     *
+     * Meta's format is `fb.<subdomainIndex>.<creationTimeMs>.<fbclid>` — everything from the
+     * third dot onward is the click id verbatim, so a mismatch means this `fbc` belongs to a
+     * different click than the one this lead is being attributed to (a stale cookie left over
+     * from an old ad click, or one written by a different tab/campaign sharing the same
+     * browser). Absence of a `fbclid` to compare against is not a mismatch: `AttributionCollector`
+     * already relies on `_fbc` outliving the landing page for a visitor who browses a few pages
+     * before converting, and rejecting the cookie there would break exactly that case.
+     */
+    private function fbcMatchesClick(string $fbc, ?string $fbclid): bool
+    {
+        if ($fbclid === null || $fbclid === '') {
+            return true;
+        }
+
+        $parts = explode('.', $fbc, 4);
+
+        return count($parts) === 4 && $parts[3] === $fbclid;
+    }
+
+    /**
      * Capture, validate, attribute, and persist a new prospective lead.
      */
     public function execute(LeadCaptureData $data): Lead
@@ -162,8 +263,15 @@ class CaptureLeadAction
          * fields above: a later submission that arrives without a click id must not erase the
          * one the first touch carried. `AttributionCollector` decides which columns exist here,
          * so a new parameter needs no change in this action.
+         *
+         * `fbc` is excluded — it does not follow first-write-wins at all, and gets its own
+         * resolution below instead. See `resolveFbc()`.
          */
         foreach ($data->attributionNamed as $column => $value) {
+            if ($column === 'fbc') {
+                continue;
+            }
+
             if (! array_key_exists($column, $leadAttributes)) {
                 $leadAttributes[$column] = ($value !== '' && $value !== null)
                     ? $value
@@ -177,6 +285,21 @@ class CaptureLeadAction
 
         if ($data->attribution !== [] || $existingAttribution !== []) {
             $leadAttributes['attribution'] = array_replace($data->attribution, $existingAttribution);
+        }
+
+        /*
+         * `fbc` gets its own rule, upgrade-only: a synthetic value is a stand-in and is
+         * replaced the moment something that actually agrees with the click shows up, but a
+         * confirmed real one is never touched again. See resolveFbc().
+         */
+        $fbcResolution = $this->resolveFbc($lead, $existingAttribution, $data);
+
+        if ($fbcResolution !== null) {
+            $leadAttributes['fbc'] = $fbcResolution['value'];
+            $leadAttributes['attribution'] = array_merge(
+                $leadAttributes['attribution'] ?? $existingAttribution,
+                ['fbc_synthetic' => $fbcResolution['synthetic']],
+            );
         }
 
         /*
