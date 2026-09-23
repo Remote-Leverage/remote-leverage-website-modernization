@@ -93,13 +93,8 @@ readonly class MarketingDay
          * `LeadPlatform`'s vocabulary means the card, the leads filter and the CSV export all
          * still say "Microsoft" for the same thing.
          */
-        foreach (['facebook' => 'meta', 'google' => 'google', 'bing' => 'microsoft'] as $column => $slug) {
-            $channels[$slug] = new ChannelDay(
-                slug: $slug,
-                spend: self::float($row[$column.'_spend'] ?? null),
-                cpb: self::float($row[$column.'_cpb'] ?? null),
-                cpqb: self::float($row[$column.'_cpqb'] ?? null),
-            );
+        foreach (ChannelDay::COLUMNS as $column => $slug) {
+            $channels[$slug] = ChannelDay::fromRow($column, $slug, $row);
         }
 
         return new self(
@@ -164,15 +159,27 @@ readonly class MarketingDay
             'prev_cpqb' => $this->previousCpqb,
         ];
 
-        foreach (['facebook' => 'meta', 'google' => 'google', 'bing' => 'microsoft'] as $column => $slug) {
-            $channel = $this->channels[$slug] ?? null;
-
-            $row[$column.'_spend'] = $channel?->spend;
-            $row[$column.'_cpb'] = $channel?->cpb;
-            $row[$column.'_cpqb'] = $channel?->cpqb;
+        foreach (ChannelDay::COLUMNS as $column => $slug) {
+            $row += ($this->channels[$slug] ?? new ChannelDay($slug, null, null, null))->toRow($column);
         }
 
         return $row;
+    }
+
+    /**
+     * The same day with each channel's counts filled in from our supplement read.
+     *
+     * The data team's query publishes per-channel spend and costs but not the counts; the
+     * supplement sums them from the same view for the same date. Refuses a supplement for a
+     * different day, because a count from Monday beside a cost from Tuesday is not a figure.
+     */
+    public function withChannelCounts(?DaySupplement $supplement): self
+    {
+        if ($supplement === null || $supplement->date !== $this->date || $supplement->channelCounts === []) {
+            return $this;
+        }
+
+        return self::fromRow(array_merge($this->toRow(), $supplement->channelCounts));
     }
 
     /**

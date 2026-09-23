@@ -247,6 +247,23 @@ class FunnelMetricsService
             : null;
 
         /*
+         * Each channel's counts, onto the day they belong to.
+         *
+         * The data team's query publishes a channel's spend and costs but not how many bookings
+         * those costs were divided by, so the supplement sums them from the same view. Overnight
+         * the closed day needs its own read — the supplement above is about this morning — which
+         * is one extra query for the hours the card carries two days.
+         */
+        if ($marketingDay?->isClosing() === true) {
+            $marketingDay = $marketingDay->withChannelCounts(
+                ($this->warehouse ?? new BigQueryClient)->supplement($marketingDay->date),
+            );
+            $todaySoFar = $todaySoFar?->withChannelCounts($supplement);
+        } else {
+            $marketingDay = $marketingDay?->withChannelCounts($supplement);
+        }
+
+        /*
                  * Today, at every hour.
                  *
                  * This followed the warehouse's reported day for a while, so that an overnight card whose
@@ -415,6 +432,11 @@ class FunnelMetricsService
             supplement: $supplement,
 
             unattributedByChannel: $this->unattributedByChannel($bookedLeads),
+            bookingsByLandingPage: $this->bookingsBy($bookedLeads, fn (Lead $lead): string => $this->landingPath($lead)),
+            bookingsByCampaign: $this->bookingsBy(
+                $bookedLeads,
+                static fn (Lead $lead): string => trim((string) $lead->utm_campaign) ?: '(no campaign)',
+            ),
         );
     }
 
@@ -599,6 +621,58 @@ class FunnelMetricsService
         }
 
         return $ordered;
+    }
+
+    /**
+     * Today's bookings and qualified bookings, grouped by whatever `$key` says, busiest first.
+     *
+     * Every booking, paid or not: the question this answers is which pages and campaigns the
+     * bookings came through, and dropping the organic ones would make a page look quieter than it
+     * is. Qualified is this site's own definition, the same one the rest of the card names.
+     *
+     * @param  Collection<int, Lead>  $bookedLeads
+     * @param  callable(Lead): string  $key
+     * @return array<string, array{bookings: int, qualified: int}>
+     */
+    private function bookingsBy(Collection $bookedLeads, callable $key): array
+    {
+        $groups = [];
+
+        foreach ($bookedLeads as $lead) {
+            $group = $key($lead);
+
+            $groups[$group] ??= ['bookings' => 0, 'qualified' => 0];
+            $groups[$group]['bookings']++;
+
+            if (LeadQualification::isT10($lead)) {
+                $groups[$group]['qualified']++;
+            }
+        }
+
+        uksort($groups, static fn (string $a, string $b): int => [$groups[$b]['bookings'], $groups[$b]['qualified'], $a]
+            <=> [$groups[$a]['bookings'], $groups[$a]['qualified'], $b]);
+
+        return $groups;
+    }
+
+    /**
+     * The path a lead landed on, without host or query string.
+     *
+     * The query string is mostly UTM and click IDs, which would give every paid visit its own
+     * row. The host is dropped because the apex and `www.` are the same page.
+     */
+    private function landingPath(Lead $lead): string
+    {
+        $url = trim((string) $lead->landing_url);
+
+        if ($url === '') {
+            return '(not recorded)';
+        }
+
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+        $path = '/'.trim($path, '/');
+
+        return $path === '/' ? '/' : $path.'/';
     }
 
     /**
@@ -1011,9 +1085,9 @@ class FunnelMetricsService
     /**
      * The columns classification needs, and no more.
      *
-     * Named explicitly because this pulls rows into PHP. `notes` and `landing_url` are the large
-     * columns that are deliberately absent; `attribution` and `referrer_url` are large too but
-     * `LeadChannel` reads both, so they are the price of knowing whether a booking was paid for.
+     * Named explicitly because this pulls rows into PHP. `notes` is the large column that is
+     * deliberately absent; `attribution`, `referrer_url` and `landing_url` are large too but
+     * `LeadChannel` reads the first two and the landing-page breakdown the third.
      *
      * @return array<int, string>
      */
@@ -1040,6 +1114,10 @@ class FunnelMetricsService
             // paid/organic distinction exists for a lead that arrived with no UTM.
             'attribution',
             'referrer_url',
+
+            // The per-landing-page and per-campaign breakdown.
+            'landing_url',
+            'utm_campaign',
         ];
     }
 }

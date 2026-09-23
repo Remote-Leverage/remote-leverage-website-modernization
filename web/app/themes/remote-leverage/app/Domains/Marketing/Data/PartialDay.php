@@ -40,13 +40,8 @@ readonly class PartialDay
 
         // Same column-to-slug mapping MarketingDay uses, so the card says "Microsoft" for the
         // same thing whichever day it is describing.
-        foreach (['facebook' => 'meta', 'google' => 'google', 'bing' => 'microsoft'] as $column => $slug) {
-            $channels[$slug] = new ChannelDay(
-                slug: $slug,
-                spend: self::float($row[$column.'_spend'] ?? null),
-                cpb: self::float($row[$column.'_cpb'] ?? null),
-                cpqb: self::float($row[$column.'_cpqb'] ?? null),
-            );
+        foreach (ChannelDay::COLUMNS as $column => $slug) {
+            $channels[$slug] = ChannelDay::fromRow($column, $slug, $row);
         }
 
         return new self(
@@ -85,14 +80,21 @@ readonly class PartialDay
             'cpqb' => $this->cpqb,
         ];
 
-        foreach (['facebook' => 'meta', 'google' => 'google', 'bing' => 'microsoft'] as $column => $slug) {
-            $channel = $this->channels[$slug] ?? null;
-            $row[$column.'_spend'] = $channel?->spend;
-            $row[$column.'_cpb'] = $channel?->cpb;
-            $row[$column.'_cpqb'] = $channel?->cpqb;
+        foreach (ChannelDay::COLUMNS as $column => $slug) {
+            $row += ($this->channels[$slug] ?? new ChannelDay($slug, null, null, null))->toRow($column);
         }
 
         return $row;
+    }
+
+    /** The same day with each channel's counts filled in. See MarketingDay::withChannelCounts(). */
+    public function withChannelCounts(?DaySupplement $supplement): self
+    {
+        if ($supplement === null || $supplement->date !== $this->date || $supplement->channelCounts === []) {
+            return $this;
+        }
+
+        return self::fromRow(array_merge($this->toArray(), $supplement->channelCounts));
     }
 
     /**

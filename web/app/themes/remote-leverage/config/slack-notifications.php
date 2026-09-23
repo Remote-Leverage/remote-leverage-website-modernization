@@ -650,6 +650,17 @@ return [
                 'text' => ['type' => 'mrkdwn', 'text' => '{{ today_block }}'],
             ],
             /*
+             * Yesterday, closed — overnight only, boxed so it reads as a separate thing from the
+             * running day above it. It was an italic line under today and nobody saw it.
+             */
+            [
+                'type' => 'card',
+                '_when' => ['closed_title'],
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ closed_title }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ closed_subtitle }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ closed_body }}', 'verbatim' => false],
+            ],
+            /*
              * The platforms stay boxed, but stacked rather than in a carousel.
              *
              * A carousel scrolls sideways, which on a phone is the one gesture people do not
