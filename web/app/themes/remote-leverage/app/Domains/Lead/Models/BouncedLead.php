@@ -60,6 +60,7 @@ class BouncedLead extends Model
      */
     public const GATE_LABELS = [
         'format' => 'Malformed address',
+        'phone' => 'Phone number',
         'blacklist' => 'Address blacklist',
         'domain_validator' => 'Domain list',
         'zerobounce' => 'ZeroBounce',
@@ -75,6 +76,7 @@ class BouncedLead extends Model
      */
     public const REASON_LABELS = [
         'malformed' => 'Not a valid address',
+        'invalid_phone' => 'Not a valid phone number',
         'blacklisted_email' => 'Blacklisted address',
         'blocked_domain' => 'Blocked domain',
         'domain_not_allowed' => 'Domain not on allow list',

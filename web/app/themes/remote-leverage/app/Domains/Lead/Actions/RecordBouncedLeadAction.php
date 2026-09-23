@@ -58,16 +58,21 @@ class RecordBouncedLeadAction
                 ->first();
 
             if ($existing !== null) {
-                $existing->forceFill([
+                $existing->forceFill(array_merge([
                     'attempts' => $existing->attempts + 1,
                     'last_seen_at' => Carbon::now(),
 
                     // A retry often carries fields the first attempt did not — somebody fills
-                    // the phone in after being bounced. Keep whatever is now known.
+                    // the phone in after being bounced, or the click ids arrive late. Keep
+                    // whatever is now known, never blanking what was already there.
                     'name' => $payload['name'] ?: $existing->name,
                     'phone' => $payload['phone'] ?: $existing->phone,
                     'company' => $payload['company'] ?: $existing->company,
-                ])->save();
+                    'gclid' => $existing->gclid ?: $payload['gclid'],
+                    'fbclid' => $existing->fbclid ?: $payload['fbclid'],
+                    'msclkid' => $existing->msclkid ?: $payload['msclkid'],
+                    'landing_url' => $existing->landing_url ?: $payload['landing_url'],
+                ], self::fbcUpgrade($existing, $payload)))->save();
 
                 return $existing;
             }
@@ -78,6 +83,37 @@ class RecordBouncedLeadAction
 
             return null;
         }
+    }
+
+    /**
+     * The `fbc` fields to overwrite on a retry, if any.
+     *
+     * A refused visitor retypes the address seconds later, and Meta's pixel JS may well have
+     * written the real `_fbc` in between. Without this, the row keeps the synthetic stand-in the
+     * first attempt saw — every other write path in this codebase upgrades on each touch, and a
+     * bounced row that did not would be the one place a fabricated identifier outlived the real
+     * one.
+     *
+     * Upgrade-only, exactly as {@see FbcResolver} applies it across writes to a lead: fill an
+     * empty value, replace a synthetic one with a real one, and never do the reverse.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    protected static function fbcUpgrade(BouncedLead $existing, array $payload): array
+    {
+        $incoming = $payload['fbc'] ?? null;
+
+        if ($incoming === null) {
+            return [];
+        }
+
+        $isUpgrade = $existing->fbc === null
+            || ($existing->fbc_synthetic === true && $payload['fbc_synthetic'] === false);
+
+        return $isUpgrade
+            ? ['fbc' => $incoming, 'fbc_synthetic' => $payload['fbc_synthetic']]
+            : [];
     }
 
     /**

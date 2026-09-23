@@ -116,10 +116,17 @@ A fulltext/search index was added in a later migration to keep the admin dashboa
 
 **`rl_lead_activity_logs`** — the dual-write audit trail, one row per dispatch and per consumption. See [the audit contract](#the-dual-write-audit-contract).
 
-**`rl_bounced_leads`** — submissions the email check refused, which are deliberately *not* leads.
+**`rl_bounced_leads`** — submissions step one refused, which are deliberately *not* leads.
 
-A visitor refused by `EmailValidationService` returns from step one before `capturePartialLead()`
-runs, so they have no `rl_leads` row, no `lead_id` and therefore no activity log either. Until this
+A visitor refused by `PhoneValidationService` or `EmailValidationService` returns from step one
+before `capturePartialLead()` runs, so they have no `rl_leads` row, no `lead_id` and therefore no
+activity log either. Both gates record; `checked_by` separates them (`phone`, `format`,
+`blacklist`, `domain_validator`, `zerobounce`).
+
+**Abandonment is not recorded here.** Somebody who fills the form in and leaves without pressing
+Continue was never refused anything, so there is nothing to write. The only signal for those is the
+gap between the `form_loaded` and `partial_form_submitted` events in PostHog, which cannot name
+anyone. Until this
 table existed, a rejection added a form error and vanished, and "the booking form is broken" could
 not be told apart from "their address was blocked" — which is the report it actually was.
 
@@ -136,7 +143,10 @@ they must stay out of exports, KPIs and CRM sync. Retention follows the lead win
 
 Repeat attempts inside `RecordBouncedLeadAction::COLLAPSE_WINDOW_MINUTES` (30) bump `attempts`
 rather than inserting, because somebody retyping a refused address is one turned-away person, not
-four. `created_at` is therefore first seen and `last_seen_at` is the latest try.
+four. `created_at` is therefore first seen and `last_seen_at` is the latest try. A retry fills in
+details the first attempt lacked and upgrades `fbc` under the same upgrade-only rule `FbcResolver`
+applies across writes to a lead — Meta's pixel JS often writes the real cookie while the visitor is
+retyping, and this is the one place a synthetic stand-in could otherwise outlive the real value.
 
 The same screen carries the **ZeroBounce blocking toggles** — one checkbox per verdict in
 `EmailValidationService::TOGGLEABLE_STATUSES`, each showing what that rule refused in the last 30

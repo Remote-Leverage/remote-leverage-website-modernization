@@ -573,6 +573,21 @@ class MultistepBookingWizard extends Component
                     $phoneValidator = app(PhoneValidationService::class);
                     $validation = $phoneValidator->validateAndFormat($this->phone, $this->phoneCountry);
                     if (! $validation['isValid']) {
+                        /*
+                         * Recorded for the same reason a refused email is: this returns before
+                         * capturePartialLead(), so an unrecorded phone rejection is a visitor
+                         * who reported the form as broken and left no trace to check it against.
+                         *
+                         * The email is already known to be present and well formed — Laravel's
+                         * step-one rules ran above — so the row is addressable even though the
+                         * email gates have not run yet.
+                         */
+                        app(RecordBouncedLeadAction::class)->execute(
+                            $this->email,
+                            ['valid' => false, 'reason' => 'invalid_phone', 'message' => 'Please enter a valid phone number.', 'checked_by' => 'phone'],
+                            $this->bouncedLeadContext(),
+                        );
+
                         $this->addError('phone', 'Please enter a valid phone number.');
 
                         return;
@@ -588,38 +603,7 @@ class MultistepBookingWizard extends Component
                      * so without this row there is no lead, no activity log and no way to tell
                      * "the booking form is broken" apart from "the email check refused them".
                      */
-                    app(RecordBouncedLeadAction::class)->execute($this->email, $emailCheck, [
-                        'name' => trim($this->name) ?: trim($this->firstName.' '.$this->lastName),
-                        'phone' => $this->phone,
-                        'company' => $this->company,
-                        'ip_address' => $this->ipAddress,
-                        'posthog_session_id' => $this->posthogSessionId,
-                        'utm_source' => $this->utmSource,
-                        'utm_medium' => $this->utmMedium,
-                        'utm_campaign' => $this->utmCampaign,
-                        'referral_code' => $this->referralCode,
-                        'role_needed' => $this->roleNeeded,
-                        'monthly_revenue' => $this->monthlyRevenue,
-
-                        /*
-                         * The ad identifiers, and the collected attribution the `fbc` rules need.
-                         *
-                         * Passing `attributionNamed`/`attribution` rather than a bare `fbc` is the
-                         * point: the wizard's copy was frozen in `mount()`, before Meta's pixel JS
-                         * ran, so a visitor who arrived on a bare `fbclid` is holding a *synthetic*
-                         * `fbc` here. RecordBouncedLeadAction runs it through the same FbcResolver
-                         * CaptureLeadAction uses, which prefers the live `_fbc` cookie that has
-                         * almost certainly landed by now and rejects one from a different click.
-                         * Recording the frozen value instead would file a paid click under a
-                         * fabricated identifier and call it real.
-                         */
-                        'gclid' => $this->gclid,
-                        'fbclid' => $this->fbclid,
-                        'msclkid' => $this->attributionNamed['msclkid'] ?? '',
-                        'landing_url' => $this->landingUrl,
-                        'attribution_named' => $this->attributionNamed,
-                        'attribution' => $this->attribution,
-                    ]);
+                    app(RecordBouncedLeadAction::class)->execute($this->email, $emailCheck, $this->bouncedLeadContext());
 
                     $this->addError('email', (string) $emailCheck['message']);
 
@@ -1513,6 +1497,51 @@ class MultistepBookingWizard extends Component
      * that belong nowhere near a browser, and because it is identified by email rather than by
      * a browser-held id, so it loses nothing by being sent from here.
      */
+    /**
+     * Everything worth keeping about a visitor the form is about to turn away.
+     *
+     * One method, two callers — the phone check and the email gates — because a detail added to
+     * one and not the other is a column that is populated for some refusals and empty for
+     * others, which is worse than not having it.
+     *
+     * @return array<string, mixed>
+     */
+    protected function bouncedLeadContext(): array
+    {
+        return [
+            'name' => trim($this->name) ?: trim($this->firstName.' '.$this->lastName),
+            'phone' => $this->phone,
+            'company' => $this->company,
+            'ip_address' => $this->ipAddress,
+            'posthog_session_id' => $this->posthogSessionId,
+            'utm_source' => $this->utmSource,
+            'utm_medium' => $this->utmMedium,
+            'utm_campaign' => $this->utmCampaign,
+            'referral_code' => $this->referralCode,
+            'role_needed' => $this->roleNeeded,
+            'monthly_revenue' => $this->monthlyRevenue,
+
+            /*
+             * The ad identifiers, and the collected attribution the `fbc` rules need.
+             *
+             * Passing `attributionNamed`/`attribution` rather than a bare `fbc` is the
+             * point: the wizard's copy was frozen in `mount()`, before Meta's pixel JS
+             * ran, so a visitor who arrived on a bare `fbclid` is holding a *synthetic*
+             * `fbc` here. RecordBouncedLeadAction runs it through the same FbcResolver
+             * CaptureLeadAction uses, which prefers the live `_fbc` cookie that has
+             * almost certainly landed by now and rejects one from a different click.
+             * Recording the frozen value instead would file a paid click under a
+             * fabricated identifier and call it real.
+             */
+            'gclid' => $this->gclid,
+            'fbclid' => $this->fbclid,
+            'msclkid' => $this->attributionNamed['msclkid'] ?? '',
+            'landing_url' => $this->landingUrl,
+            'attribution_named' => $this->attributionNamed,
+            'attribution' => $this->attribution,
+        ];
+    }
+
     protected function trackStepEvent(string $eventName, array $properties = []): void
     {
         try {
