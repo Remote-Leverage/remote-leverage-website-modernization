@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Livewire\Booking;
 
 use App\Domains\Lead\Actions\CaptureLeadAction;
+use App\Domains\Lead\Actions\RecordBouncedLeadAction;
 use App\Domains\Lead\Data\LeadAudience;
 use App\Domains\Lead\Data\LeadCaptureData;
 use App\Domains\Lead\Models\Lead;
@@ -581,6 +582,45 @@ class MultistepBookingWizard extends Component
                 $emailCheck = app(EmailValidationService::class)->validate($this->email, $this->ipAddress);
 
                 if (! $emailCheck['valid']) {
+                    /*
+                     * Record it before returning. This branch is the *only* trace a refused
+                     * visitor leaves: capturePartialLead() is a few lines below and never runs,
+                     * so without this row there is no lead, no activity log and no way to tell
+                     * "the booking form is broken" apart from "the email check refused them".
+                     */
+                    app(RecordBouncedLeadAction::class)->execute($this->email, $emailCheck, [
+                        'name' => trim($this->name) ?: trim($this->firstName.' '.$this->lastName),
+                        'phone' => $this->phone,
+                        'company' => $this->company,
+                        'ip_address' => $this->ipAddress,
+                        'posthog_session_id' => $this->posthogSessionId,
+                        'utm_source' => $this->utmSource,
+                        'utm_medium' => $this->utmMedium,
+                        'utm_campaign' => $this->utmCampaign,
+                        'referral_code' => $this->referralCode,
+                        'role_needed' => $this->roleNeeded,
+                        'monthly_revenue' => $this->monthlyRevenue,
+
+                        /*
+                         * The ad identifiers, and the collected attribution the `fbc` rules need.
+                         *
+                         * Passing `attributionNamed`/`attribution` rather than a bare `fbc` is the
+                         * point: the wizard's copy was frozen in `mount()`, before Meta's pixel JS
+                         * ran, so a visitor who arrived on a bare `fbclid` is holding a *synthetic*
+                         * `fbc` here. RecordBouncedLeadAction runs it through the same FbcResolver
+                         * CaptureLeadAction uses, which prefers the live `_fbc` cookie that has
+                         * almost certainly landed by now and rejects one from a different click.
+                         * Recording the frozen value instead would file a paid click under a
+                         * fabricated identifier and call it real.
+                         */
+                        'gclid' => $this->gclid,
+                        'fbclid' => $this->fbclid,
+                        'msclkid' => $this->attributionNamed['msclkid'] ?? '',
+                        'landing_url' => $this->landingUrl,
+                        'attribution_named' => $this->attributionNamed,
+                        'attribution' => $this->attribution,
+                    ]);
+
                     $this->addError('email', (string) $emailCheck['message']);
 
                     return;

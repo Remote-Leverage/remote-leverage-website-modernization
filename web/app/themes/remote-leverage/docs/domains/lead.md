@@ -116,6 +116,37 @@ A fulltext/search index was added in a later migration to keep the admin dashboa
 
 **`rl_lead_activity_logs`** — the dual-write audit trail, one row per dispatch and per consumption. See [the audit contract](#the-dual-write-audit-contract).
 
+**`rl_bounced_leads`** — submissions the email check refused, which are deliberately *not* leads.
+
+A visitor refused by `EmailValidationService` returns from step one before `capturePartialLead()`
+runs, so they have no `rl_leads` row, no `lead_id` and therefore no activity log either. Until this
+table existed, a rejection added a form error and vanished, and "the booking form is broken" could
+not be told apart from "their address was blocked" — which is the report it actually was.
+
+Click identifiers (`gclid`, `fbclid`, `msclkid`, `fbc`, `fbc_synthetic`, `landing_url`) are columns
+at the same widths `rl_leads` uses, because "which campaign is buying leads we then refuse" is a
+query. `fbc` is resolved through `FbcResolver`, not copied from the wizard's frozen attribution —
+that copy is usually a synthetic stand-in built from a bare `fbclid` before Meta's pixel JS ran.
+`_fbp` has no column here, exactly as it has none on `rl_leads`, and rides in `context`.
+
+Written only by `RecordBouncedLeadAction`, read only by the **Bounced Leads** admin screen
+(`admin.php?page=rl-leads-bounced`). Nothing else may consume it: these addresses were refused, so
+they must stay out of exports, KPIs and CRM sync. Retention follows the lead window —
+`PurgeOldLeadsAction` prunes both.
+
+Repeat attempts inside `RecordBouncedLeadAction::COLLAPSE_WINDOW_MINUTES` (30) bump `attempts`
+rather than inserting, because somebody retyping a refused address is one turned-away person, not
+four. `created_at` is therefore first seen and `last_seen_at` is the latest try.
+
+The same screen carries the **ZeroBounce blocking toggles** — one checkbox per verdict in
+`EmailValidationService::TOGGLEABLE_STATUSES`, each showing what that rule refused in the last 30
+days. Deliberately here rather than on Settings: the list that shows what a rule cost is the one
+that can change it. Removing `do_not_mail` took a PR, a merge and a deploy; it is now a checkbox.
+
+Saving goes through `LeadSettingsService::saveZeroBounceStatuses()`, **not** `save()`, which
+rebuilds the whole option from its input — a partial payload through `save()` would blank the
+domain list, the blacklist and the notification recipients.
+
 ## Flow
 
 ```mermaid
@@ -151,12 +182,15 @@ flowchart TB
 | :--- | :--- |
 | `CaptureLeadAction` | The ingestion orchestrator. Validates, normalises the phone, stamps attribution, persists, dispatches `LeadFormSubmitted` then `LeadCreated`. **Updates an existing lead rather than creating a duplicate** — this is what makes progressive/partial capture work. |
 | `ProcessAbandonedLeadsAction` | Finds leads with no completed booking past a timeout (default 2h), flips them to `abandoned`, dispatches `LeadAbandoned`. Runs hourly on WP-Cron and via `wp acorn lead:process-abandoned`. |
-| `PurgeOldLeadsAction` | Deletes leads past the retention window. **Enforces a 30-day floor** — `MINIMUM_RETENTION_DAYS = 30` — regardless of what an admin configures. |
+| `PurgeOldLeadsAction` | Deletes leads past the retention window. **Enforces a 30-day floor** — `MINIMUM_RETENTION_DAYS = 30` — regardless of what an admin configures. Prunes `rl_bounced_leads` on the same window. |
+| `RecordBouncedLeadAction` | Records a submission the email check refused, with the step-one contact details so a wrongly-refused buyer can be called back. Called from the form's rejection branch, not from inside the validator — the validator is pure and has no database. **Never throws**: a visitor already told their address was refused must not then meet a 500. |
 
 ### Services
 
 | Class | Does |
 | :--- | :--- |
+| `FbcResolver` | The `fbc` rules, extracted from `CaptureLeadAction` when a second write path needed them. Upgrade-only, never replaces a confirmed-real value, only accepts a cookie whose embedded click id matches the lead's, and stays silent for callers that collected no attribution of their own. **One copy on purpose**: the booking wizard freezes attribution in `mount()` before Meta's pixel JS runs, so its `fbc` is routinely synthetic, and both `CaptureLeadAction` and `RecordBouncedLeadAction` need the live-cookie upgrade the Conversions API depends on. |
+| `EmailValidationService` | Three gates over one field, cheapest first: address blacklist, domain block/allow list, then ZeroBounce. **Fails open** — an outage, a missing key or a slow response accepts the address. Which ZeroBounce verdicts block is an admin setting (`zerobounce_blocked_statuses`), read through the static `rejectedStatusesFor()` so the screen and the form cannot drift; `valid` can never be on it. Rejections are recorded by `RecordBouncedLeadAction`; any new caller that can refuse a visitor should call it too, or the refusal is invisible again. |
 | `PhoneValidationService` | `libphonenumber-for-php`. Parses against a country code, returns a validity flag plus the E.164 string. Every stored phone is normalised. |
 | `AttributionEngine` | Lives in the Referral domain but is central here — resolves `source_type`/`source_id` from query params (`utm_*`, `gclid`, `fbclid`, `via`, `ref`, `r`) and the `rl_referrer` cookie. See [referral.md](referral.md). |
 | `LeadActivityLogger` | Writes both stages of the audit contract. Also does booking deduplication lookups: `findRecentBookingForSlot()` and `findPriorBookingForDifferentSlot()` stop a double-submit from creating two Calendly invitees. |

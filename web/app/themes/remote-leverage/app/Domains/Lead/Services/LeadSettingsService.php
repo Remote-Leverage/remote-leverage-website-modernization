@@ -96,6 +96,9 @@ class LeadSettingsService
              */
             'zerobounce_enabled' => true,
             'zerobounce_api_key' => '',
+            // Which ZeroBounce verdicts actually block. Toggled from the Bounced Leads screen;
+            // see EmailValidationService::rejectedStatusesFor().
+            'zerobounce_blocked_statuses' => EmailValidationService::DEFAULT_REJECTED_STATUSES,
             'domain_validator_mode' => 'none',   // none | allow | block
             'email_domains' => '',               // one per line
             'blacklisted_emails' => '',          // comma separated
@@ -213,6 +216,14 @@ class LeadSettingsService
             'hubspot_lifecycle_fulfilled_value' => $keep('hubspot_lifecycle_fulfilled_value') ?: 'customer',
             'zerobounce_enabled' => ! empty($input['zerobounce_enabled']),
             'zerobounce_api_key' => $keep('zerobounce_api_key'),
+            /*
+             * Same absent-means-keep rule as the credentials above, and for the same reason:
+             * this list is edited on the Bounced Leads screen, not this form, so `?? default`
+             * here would reset an admin's choices every time somebody saved Settings.
+             */
+            'zerobounce_blocked_statuses' => array_key_exists('zerobounce_blocked_statuses', $input)
+                ? EmailValidationService::rejectedStatusesFor(['zerobounce_blocked_statuses' => (array) $input['zerobounce_blocked_statuses']])
+                : (array) ($current['zerobounce_blocked_statuses'] ?? EmailValidationService::DEFAULT_REJECTED_STATUSES),
             'domain_validator_mode' => $this->validatorMode($input['domain_validator_mode'] ?? null),
             // Stored as typed, normalised on read: the admin pastes a list and should get the
             // same list back, not a re-sorted, de-duplicated version of it.
@@ -256,6 +267,32 @@ class LeadSettingsService
         }
 
         return ['success' => true, 'errors' => []];
+    }
+
+    /**
+     * Write just the ZeroBounce blocking rules, leaving every other setting alone.
+     *
+     * Deliberately not `save()`. That method rebuilds the whole option from its input, so a
+     * partial payload from the Bounced Leads screen would blank the domain list, the blacklist
+     * and the notification recipients — the same class of bug as the wiped Slack token
+     * documented above, from the other direction.
+     *
+     * @param  string[]  $statuses
+     * @return string[] The list as stored, after unknown entries are dropped.
+     */
+    public function saveZeroBounceStatuses(array $statuses): array
+    {
+        $clean = EmailValidationService::rejectedStatusesFor(['zerobounce_blocked_statuses' => $statuses]);
+
+        if (function_exists('update_option') && function_exists('get_option')) {
+            $stored = get_option(self::OPTION_KEY, []);
+            $stored = is_array($stored) ? $stored : [];
+            $stored['zerobounce_blocked_statuses'] = $clean;
+
+            update_option(self::OPTION_KEY, $stored);
+        }
+
+        return $clean;
     }
 
     /**

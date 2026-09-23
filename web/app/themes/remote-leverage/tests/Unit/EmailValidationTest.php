@@ -121,7 +121,7 @@ describe('ZeroBounce', function () {
                     return $this->accept('zerobounce_unavailable');   // outage path
                 }
 
-                return in_array($this->status, self::REJECTED_STATUSES, true)
+                return in_array($this->status, self::rejectedStatusesFor($settings), true)
                     ? $this->reject('zerobounce_'.$this->status, $this->message($settings), 'zerobounce')
                     : $this->accept('zerobounce');
             }
@@ -129,7 +129,7 @@ describe('ZeroBounce', function () {
     }
 
     test('undeliverable statuses are rejected', function () {
-        foreach (EmailValidationService::REJECTED_STATUSES as $status) {
+        foreach (EmailValidationService::DEFAULT_REJECTED_STATUSES as $status) {
             expect(zeroBounceValidator($status)->validate('someone@example.com')['valid'])
                 ->toBeFalse();
         }
@@ -243,5 +243,56 @@ describe('HubSpot property value types', function () {
 
         expect($source)->toContain("'intake_form' => \$lead->intake_form ? 'true' : null")
             ->and($source)->not->toContain("'intake_form' => \$lead->intake_form,");
+    });
+});
+
+describe('which ZeroBounce verdicts block', function () {
+    test('nothing configured blocks the default three', function () {
+        expect(EmailValidationService::rejectedStatusesFor([]))
+            ->toBe(['invalid', 'spamtrap', 'abuse']);
+    });
+
+    test('an admin can switch do_not_mail back on', function () {
+        $statuses = EmailValidationService::rejectedStatusesFor([
+            'zerobounce_blocked_statuses' => ['invalid', 'do_not_mail'],
+        ]);
+
+        expect($statuses)->toBe(['invalid', 'do_not_mail']);
+    });
+
+    test('blocking nothing is a real choice, not a broken setting', function () {
+        // "Verify and record, reject nobody" is how you watch a rule before enforcing it.
+        expect(EmailValidationService::rejectedStatusesFor(['zerobounce_blocked_statuses' => []]))
+            ->toBe([]);
+    });
+
+    test('valid can never be switched on, however it is submitted', function () {
+        // A list that can block `valid` can lock every buyer out of the form.
+        $statuses = EmailValidationService::rejectedStatusesFor([
+            'zerobounce_blocked_statuses' => ['valid', 'VALID', ' invalid ', 'nonsense'],
+        ]);
+
+        expect($statuses)->toBe(['invalid']);
+    });
+
+    test('a corrupt option falls back to the default, not to blocking nothing', function () {
+        // Falling back to [] would silently open the gate while looking exactly like a pass —
+        // the failure mode this service exists to avoid.
+        expect(EmailValidationService::rejectedStatusesFor(['zerobounce_blocked_statuses' => 'invalid']))
+            ->toBe(['invalid', 'spamtrap', 'abuse']);
+    });
+
+    test('the form honours the configured list, not the default', function () {
+        $validator = zeroBounceValidator('do_not_mail', [
+            'zerobounce_blocked_statuses' => ['invalid', 'do_not_mail'],
+        ]);
+
+        expect($validator->validate('someone@example.com')['valid'])->toBeFalse();
+
+        $permissive = zeroBounceValidator('do_not_mail', [
+            'zerobounce_blocked_statuses' => ['invalid'],
+        ]);
+
+        expect($permissive->validate('someone@example.com')['valid'])->toBeTrue();
     });
 });
