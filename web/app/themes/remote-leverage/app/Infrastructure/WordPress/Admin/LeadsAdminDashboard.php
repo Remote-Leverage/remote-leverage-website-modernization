@@ -2300,18 +2300,18 @@ class LeadsAdminDashboard
                                         <details>
                                             <summary style="font-size: 11px; color: #71717a; cursor: pointer; font-weight: 500;">Details</summary>
                                             <div class="rl-json-box"><?php echo esc_html(json_encode(array_filter([
-                                        'first_seen' => (string) $row->created_at?->toDateTimeString(),
-                                        'ip_address' => $row->ip_address,
-                                        'gclid' => $row->gclid,
-                                        'fbclid' => $row->fbclid,
-                                        'msclkid' => $row->msclkid,
-                                        'fbc' => $row->fbc,
-                                        'fbc_synthetic' => $row->fbc === null ? null : ($row->fbc_synthetic ? 'yes' : 'no'),
-                                        'landing_url' => $row->landing_url,
-                                        'posthog_session_id' => $row->posthog_session_id,
-                                        'referral_code' => $row->referral_code,
-                                        'context' => $row->context,
-                                    ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></div>
+                                                'first_seen' => (string) $row->created_at?->toDateTimeString(),
+                                                'ip_address' => $row->ip_address,
+                                                'gclid' => $row->gclid,
+                                                'fbclid' => $row->fbclid,
+                                                'msclkid' => $row->msclkid,
+                                                'fbc' => $row->fbc,
+                                                'fbc_synthetic' => $row->fbc === null ? null : ($row->fbc_synthetic ? 'yes' : 'no'),
+                                                'landing_url' => $row->landing_url,
+                                                'posthog_session_id' => $row->posthog_session_id,
+                                                'referral_code' => $row->referral_code,
+                                                'context' => $row->context,
+                                            ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></div>
                                         </details>
                                     </td>
                                 </tr>
