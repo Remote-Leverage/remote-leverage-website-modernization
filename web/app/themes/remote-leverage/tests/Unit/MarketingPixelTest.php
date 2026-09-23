@@ -588,11 +588,11 @@ describe('deferred SDK loading', function () {
         expect($out)->toContain('ti:"97187250"');
     });
 
-    test('the shipped defaults defer TikTok and wait past LCP', function () {
+    test('the shipped defaults defer nothing and keep the timeout past LCP', function () {
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/config/pixels.php');
 
         expect($src)
-            ->toContain("'linkedin,openai,bing_uet,tiktok,meta,google_tag'")
+            ->toContain("env('PIXEL_DEFER_VENDORS', '')) ?: ''")
             ->toContain('?: 6000');
     });
 });
