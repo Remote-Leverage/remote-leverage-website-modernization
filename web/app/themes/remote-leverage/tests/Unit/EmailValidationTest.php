@@ -135,10 +135,12 @@ describe('ZeroBounce', function () {
         }
     });
 
-    test('catch-all and unknown pass, because they mean undetermined', function () {
-        // ZeroBounce could not decide. That is not evidence against the address, and treating
-        // it as such rejects every lead behind a catch-all corporate mail server.
-        foreach (['valid', 'catch-all', 'unknown'] as $status) {
+    test('catch-all, unknown and do_not_mail all pass', function () {
+        // catch-all/unknown: ZeroBounce could not decide. That is not evidence against the
+        // address, and treating it as such rejects every lead behind a catch-all corporate mail
+        // server. do_not_mail is a deliverable mailbox (role accounts, known complainers) that we
+        // deliberately no longer turn away at the form.
+        foreach (['valid', 'catch-all', 'unknown', 'do_not_mail'] as $status) {
             expect(zeroBounceValidator($status)->validate('someone@example.com')['valid'])
                 ->toBeTrue();
         }
