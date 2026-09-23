@@ -12,6 +12,7 @@ use App\Infrastructure\Console\Commands\PruneIntegrationCallsCommand;
 use App\Infrastructure\Console\Commands\RunDeployTasksCommand;
 use App\Infrastructure\WordPress\Admin\CalendlyAdminDashboard;
 use App\Infrastructure\WordPress\Admin\ContentAuditAdmin;
+use App\Infrastructure\WordPress\Admin\DuplicatePostAdmin;
 use App\Infrastructure\WordPress\Admin\LeadExportPanel;
 use App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
 use App\Infrastructure\WordPress\Admin\MarketingDashboard;
@@ -21,6 +22,7 @@ use App\Infrastructure\WordPress\Admin\SecurityAdmin;
 use App\Infrastructure\WordPress\Admin\Seo\SeoAdmin;
 use App\Infrastructure\WordPress\Admin\SocialKitAdmin;
 use App\Infrastructure\WordPress\Admin\WordPressAdminTheme;
+use App\Infrastructure\WordPress\PostDuplicator;
 use App\Infrastructure\WordPress\PostTypes\CaseStudyPostType;
 use App\Infrastructure\WordPress\PostTypes\PartnerPostType;
 use App\Infrastructure\WordPress\SocialKitAssets;
@@ -74,6 +76,9 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(SocialKitAssets::class, fn () => new SocialKitAssets);
         $this->app->singleton(SocialKitAdmin::class, fn () => new SocialKitAdmin);
         $this->app->singleton(SeoAdmin::class, fn () => new SeoAdmin);
+        $this->app->singleton(DuplicatePostAdmin::class, fn ($app) => new DuplicatePostAdmin(
+            $app->make(PostDuplicator::class),
+        ));
 
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -105,5 +110,6 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->make(SocialKitAssets::class)->register();
         $this->app->make(SocialKitAdmin::class)->register();
         $this->app->make(SeoAdmin::class)->register();
+        $this->app->make(DuplicatePostAdmin::class)->register();
     }
 }

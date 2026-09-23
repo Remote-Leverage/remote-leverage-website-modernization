@@ -1075,6 +1075,14 @@ if (! function_exists('wp_nonce_url')) {
 if (! function_exists('get_post_meta')) {
     function get_post_meta($postId, $key = '', $single = false)
     {
+        // No key: every row as WordPress returns it — key => [raw value], arrays serialized.
+        if ($key === '') {
+            return array_map(
+                fn ($value) => [is_array($value) || is_object($value) ? serialize($value) : $value],
+                $GLOBALS['_wp_mock_post_meta'][$postId] ?? [],
+            );
+        }
+
         return $GLOBALS['_wp_mock_post_meta'][$postId][$key] ?? ($single ? '' : []);
     }
 }
@@ -1358,6 +1366,20 @@ if (! class_exists('WP_Post')) {
 
         public $post_type = 'post';
 
+        public $post_content = '';
+
+        public $post_excerpt = '';
+
+        public $post_parent = 0;
+
+        public $menu_order = 0;
+
+        public $comment_status = 'closed';
+
+        public $ping_status = 'closed';
+
+        public $post_password = '';
+
         public function __construct(array $attributes = [])
         {
             foreach ($attributes as $key => $value) {
@@ -1571,5 +1593,112 @@ if (! function_exists('get_user_by')) {
     function get_user_by($field, $value)
     {
         return false;
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Post creation, slashing and terms (PostDuplicator)
+|--------------------------------------------------------------------------
+|
+| wp_insert_post() and add_post_meta() unslash their input the way WordPress does, so a
+| caller that forgets wp_slash() loses backslashes here too rather than only in production.
+*/
+
+if (! function_exists('rl_stub_map_strings')) {
+    function rl_stub_map_strings($value, callable $fn)
+    {
+        if (is_array($value)) {
+            return array_map(fn ($item) => rl_stub_map_strings($item, $fn), $value);
+        }
+
+        return is_string($value) ? $fn($value) : $value;
+    }
+}
+
+if (! function_exists('wp_slash')) {
+    function wp_slash($value)
+    {
+        return rl_stub_map_strings($value, 'addslashes');
+    }
+}
+
+if (! function_exists('maybe_unserialize')) {
+    function maybe_unserialize($value)
+    {
+        if (is_string($value) && preg_match('/^(a|O|s|i|b|d):/', $value)) {
+            $unserialized = @unserialize($value);
+
+            return $unserialized === false && $value !== 'b:0;' ? $value : $unserialized;
+        }
+
+        return $value;
+    }
+}
+
+if (! function_exists('wp_insert_post')) {
+    function wp_insert_post($postArr, $wpError = false)
+    {
+        $postId = max(array_merge([0], array_keys($GLOBALS['_wp_mock_posts'] ?? []))) + 1;
+        $GLOBALS['_wp_mock_posts'][$postId] = ['ID' => $postId] + rl_stub_map_strings($postArr, 'stripslashes');
+
+        return $postId;
+    }
+}
+
+if (! function_exists('add_post_meta')) {
+    function add_post_meta($postId, $key, $value, $unique = false)
+    {
+        $GLOBALS['_wp_mock_post_meta'][$postId][$key] = rl_stub_map_strings($value, 'stripslashes');
+
+        return true;
+    }
+}
+
+if (! function_exists('is_admin')) {
+    function is_admin()
+    {
+        return $GLOBALS['wp_is_admin'] ?? false;
+    }
+}
+
+if (! function_exists('get_queried_object')) {
+    function get_queried_object()
+    {
+        return $GLOBALS['wp_queried_object'] ?? null;
+    }
+}
+
+if (! function_exists('get_post_type_object')) {
+    function get_post_type_object($postType)
+    {
+        return (object) [
+            'name' => $postType,
+            'labels' => (object) ['singular_name' => ucfirst((string) $postType)],
+            'cap' => (object) ['create_posts' => 'edit_'.$postType.'s'],
+        ];
+    }
+}
+
+if (! function_exists('get_object_taxonomies')) {
+    function get_object_taxonomies($object, $output = 'names')
+    {
+        return $GLOBALS['_wp_mock_taxonomies'][$object] ?? [];
+    }
+}
+
+if (! function_exists('wp_get_object_terms')) {
+    function wp_get_object_terms($objectIds, $taxonomies, $args = [])
+    {
+        return $GLOBALS['_wp_mock_object_terms'][(int) $objectIds][$taxonomies] ?? [];
+    }
+}
+
+if (! function_exists('wp_set_object_terms')) {
+    function wp_set_object_terms($objectId, $terms, $taxonomy, $append = false)
+    {
+        $GLOBALS['_wp_mock_object_terms'][(int) $objectId][$taxonomy] = (array) $terms;
+
+        return (array) $terms;
     }
 }

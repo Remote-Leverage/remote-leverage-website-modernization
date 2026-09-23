@@ -6,6 +6,7 @@ namespace App\Ai\Abilities;
 
 use App\Ai\Support\LandingPageComposer;
 use App\Ai\Support\PageSectionEditor;
+use App\Infrastructure\WordPress\PostDuplicator;
 use Roots\AcornAi\Abilities\Ability;
 use WP_Error;
 
@@ -21,16 +22,10 @@ use WP_Error;
  */
 class ClonePageAbility extends Ability
 {
-    /**
-     * postmeta that must not follow a page to its copy. Everything else —
-     * page template, ACF page-level field data — is carried over, because a
-     * clone missing those renders differently from the page it was cloned from.
-     */
-    private const META_NOT_COPIED = ['_edit_lock', '_edit_last', '_wp_old_slug', '_wp_old_date'];
-
     public function __construct(
         private PageSectionEditor $editor,
         private LandingPageComposer $composer,
+        private PostDuplicator $duplicator,
     ) {}
 
     public function label(): string
@@ -76,7 +71,7 @@ class ClonePageAbility extends Ability
             $status,
         );
 
-        $this->copyMeta($sourceId, $postId);
+        $this->duplicator->copyMeta($sourceId, $postId);
 
         return [
             'post_id' => $postId,
@@ -89,21 +84,6 @@ class ClonePageAbility extends Ability
             'skipped' => $result['skipped'],
             'audit' => $this->composer->auditBlocks($result['content']),
         ];
-    }
-
-    private function copyMeta(int $sourceId, int $postId): void
-    {
-        foreach (get_post_meta($sourceId) as $key => $values) {
-            if (in_array($key, self::META_NOT_COPIED, true)) {
-                continue;
-            }
-
-            foreach ($values as $value) {
-                // get_post_meta() returns values already unserialized once;
-                // add_post_meta() slashes on the way in, so raw values here.
-                add_post_meta($postId, $key, maybe_unserialize($value));
-            }
-        }
     }
 
     public function permission(): bool|WP_Error
