@@ -439,7 +439,8 @@ return [
     | priority 4 contend for it during the load. Five of those six are now gone
     | (HubSpot and Rewardful removed; TikTok, LinkedIn and OpenAI switched off),
     | so the figure above is the before, not the current state. What is left
-    | firing is Meta, UET and the Google tag, and all three of those now wait.
+    | firing is Meta, UET and the Google tag, and none of them waits by
+    | default any more (see below).
     |
     | **No event is lost by deferring.** Every vendor here installs a queueing
     | stub and drains it when the SDK arrives, so the stub and the `init` /
@@ -463,6 +464,21 @@ return [
     |    749 ms blocking / 926 ms main thread. See
     |    `docs/performance-homepage-plan.md` Phase 3.
     |
+    | **Meta came back off the list on 2026-09-23.** Meta's landing page view
+    | is counted from the browser PageView, not from CAPI, so a visitor who
+    | leaves before the flush is a paid click with no landing page view — and
+    | Meta traffic is mostly in-app mobile browsers on slow connections, which
+    | is exactly who leaves early. Reported at 1,872 clicks to 1,093 landing
+    | page views. The ad platform optimises on that signal, so it is worth more
+    | than the main-thread time the deferral saved. Add `meta` back through
+    | `PIXEL_DEFER_VENDORS` to trial it again.
+    |
+    | **Nothing is deferred by default since 2026-09-23**, to measure every
+    | ad platform's click-to-page-view ratio without the deferral in the way.
+    | The mechanism is intact: name vendors in `PIXEL_DEFER_VENDORS` (the
+    | previous default was `linkedin,openai,bing_uet,tiktok,meta,google_tag`)
+    | to switch it back on. With the list empty, no bootstrap is emitted.
+    |
     | The flush also pushes `rl_idle` onto `dataLayer`, which is the intended
     | way to defer a tag that lives in the container rather than here: retrigger
     | it on that custom event instead of on `gtm.js`. TikTok (162KB, the largest
@@ -476,7 +492,7 @@ return [
     'defer' => [
         'vendors' => array_values(array_filter(array_map(
             'trim',
-            explode(',', trim((string) env('PIXEL_DEFER_VENDORS', '')) ?: 'linkedin,openai,bing_uet,tiktok,meta,google_tag'),
+            explode(',', trim((string) env('PIXEL_DEFER_VENDORS', '')) ?: ''),
         ))),
 
         /*
