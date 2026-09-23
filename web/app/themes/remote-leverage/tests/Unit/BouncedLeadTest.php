@@ -274,3 +274,92 @@ describe('ad attribution on a bounced submission', function () {
             ->and($row->fbc_synthetic)->toBeFalse();
     });
 });
+
+describe('the phone gate', function () {
+    beforeEach(function () {
+        BouncedLead::query()->delete();
+    });
+
+    $phoneRefusal = ['valid' => false, 'reason' => 'invalid_phone', 'message' => 'x', 'checked_by' => 'phone'];
+
+    test('a phone rejection is recorded, not just an email one', function () use ($phoneRefusal) {
+        // The phone check runs before the email gates and also returns before
+        // capturePartialLead(), so it left the same blind spot the email gates used to.
+        $row = (new RecordBouncedLeadAction)->execute('someone@example.com', $phoneRefusal, [
+            'name' => 'Ada', 'phone' => '123',
+        ]);
+
+        expect($row->checked_by)->toBe('phone')
+            ->and($row->reason)->toBe('invalid_phone')
+            ->and($row->gateLabel())->toBe('Phone number')
+            ->and($row->reasonLabel())->toBe('Not a valid phone number');
+    });
+
+    test('it does not count against the ZeroBounce toggles', function () use ($phoneRefusal) {
+        // Those counts filter on checked_by = zerobounce; a phone rejection must not inflate
+        // the number shown beside a verdict the admin is deciding whether to switch off.
+        (new RecordBouncedLeadAction)->execute('someone@example.com', $phoneRefusal, []);
+
+        expect(BouncedLead::query()->where('checked_by', 'zerobounce')->count())->toBe(0)
+            ->and(BouncedLead::count())->toBe(1);
+    });
+});
+
+describe('upgrading a retry', function () {
+    beforeEach(function () {
+        BouncedLead::query()->delete();
+        unset($_COOKIE['_fbc'], $_COOKIE['fbc']);
+    });
+
+    afterEach(function () {
+        unset($_COOKIE['_fbc'], $_COOKIE['fbc']);
+    });
+
+    $refused = ['valid' => false, 'reason' => 'zerobounce_invalid', 'message' => 'x', 'checked_by' => 'zerobounce'];
+
+    $context = static fn (): array => [
+        'fbclid' => 'f-456',
+        'attribution_named' => ['fbc' => 'fb.1.1699999999999.f-456'],
+        'attribution' => ['fbc_synthetic' => true],
+    ];
+
+    test('a real cookie arriving between attempts replaces the synthetic stand-in', function () use ($refused, $context) {
+        $action = new RecordBouncedLeadAction;
+
+        $first = $action->execute('refused@example.com', $refused, $context());
+        expect($first->fbc_synthetic)->toBeTrue();
+
+        // Meta's pixel JS writes the real cookie while they retype the address.
+        $_COOKIE['_fbc'] = 'fb.1.1700000000000.f-456';
+        $second = $action->execute('refused@example.com', $refused, $context());
+
+        expect($second->id)->toBe($first->id)
+            ->and($second->fbc)->toBe('fb.1.1700000000000.f-456')
+            ->and($second->fbc_synthetic)->toBeFalse();
+    });
+
+    test('a real value is never downgraded back to a synthetic one', function () use ($refused, $context) {
+        $action = new RecordBouncedLeadAction;
+
+        $_COOKIE['_fbc'] = 'fb.1.1700000000000.f-456';
+        $first = $action->execute('refused@example.com', $refused, $context());
+        expect($first->fbc_synthetic)->toBeFalse();
+
+        // Cookie gone on the retry — the mount-time synthetic value must not win.
+        unset($_COOKIE['_fbc']);
+        $second = $action->execute('refused@example.com', $refused, $context());
+
+        expect($second->fbc)->toBe('fb.1.1700000000000.f-456')
+            ->and($second->fbc_synthetic)->toBeFalse();
+    });
+
+    test('a click id absent on the first attempt is filled in by the retry', function () use ($refused) {
+        $action = new RecordBouncedLeadAction;
+
+        $action->execute('refused@example.com', $refused, ['name' => 'Ada']);
+        $row = $action->execute('refused@example.com', $refused, ['gclid' => 'g-123']);
+
+        expect($row->gclid)->toBe('g-123')
+            ->and($row->name)->toBe('Ada');   // and nothing already known is blanked
+    });
+});

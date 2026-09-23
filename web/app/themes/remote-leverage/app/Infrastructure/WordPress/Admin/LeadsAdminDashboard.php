@@ -2105,9 +2105,11 @@ class LeadsAdminDashboard
                 <div>
                     <h1 class="rl-admin-title">Bounced Leads</h1>
                     <p class="rl-admin-subtitle">
-                        Booking-form submissions refused at the email check on step one. These never became
-                        leads &mdash; they stopped before the partial submission &mdash; so they appear on no
-                        other screen. Use this to tell a real outage apart from an address being blocked.
+                        Booking-form submissions refused on step one, by the phone check or by one of the
+                        three email gates. These never became leads &mdash; they stopped before the partial
+                        submission &mdash; so they appear on no other screen. Use this to tell a real outage
+                        apart from a contact detail being refused. Visitors who simply abandoned the form are
+                        not here: nothing was refused, so there is nothing to record.
                     </p>
                 </div>
                 <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads')); ?>" class="rl-btn rl-btn-outline">
