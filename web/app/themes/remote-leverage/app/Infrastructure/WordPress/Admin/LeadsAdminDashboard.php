@@ -2718,8 +2718,19 @@ class LeadsAdminDashboard
                                             echo ' &middot; '.esc_html((string) (int) $seen['open_slots']).' of '.esc_html((string) $capacity)
                                                 .' slots free in the next '.esc_html((string) (int) ($seen['window_days'] ?? 4)).'d';
                                         }
+                                        /*
+                                         * `checked_at` comes from record() (the sell-out check) and `measured_at`
+                                         * from recordUtilization() (the fill-percentage probe) — see the class
+                                         * docblock. Either can be the only one present for a role whose other
+                                         * entry point has not run yet, so this falls back rather than assuming
+                                         * `checked_at` is always set, which threw an undefined-array-key fatal
+                                         * on 2026-09-23 for a role only recordUtilization() had touched.
+                                         */
+                                        $observedAt = $seen['checked_at'] ?? $seen['measured_at'] ?? null;
                                         ?>
-                                            &middot; checked <?php echo esc_html(Carbon::parse($seen['checked_at'])->diffForHumans()); ?>
+                                        <?php if ($observedAt !== null) { ?>
+                                            &middot; checked <?php echo esc_html(Carbon::parse($observedAt)->diffForHumans()); ?>
+                                        <?php } ?>
                                         </span>
                                     <?php } ?>
                                 </td>
