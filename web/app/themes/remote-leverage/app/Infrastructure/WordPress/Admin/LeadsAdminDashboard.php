@@ -7,9 +7,11 @@ namespace App\Infrastructure\WordPress\Admin;
 use App\Domains\Lead\Actions\BlockLeadProfileAction;
 use App\Domains\Lead\Actions\PurgeOldLeadsAction;
 use App\Domains\Lead\Data\LeadAudience;
+use App\Domains\Lead\Models\BouncedLead;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Models\LeadProfile;
+use App\Domains\Lead\Services\EmailValidationService;
 use App\Domains\Lead\Services\LeadAvatar;
 use App\Domains\Lead\Services\LeadPlatform;
 use App\Domains\Lead\Services\LeadQualification;
@@ -33,6 +35,21 @@ use Illuminate\Support\Facades\Log;
 
 class LeadsAdminDashboard
 {
+    /**
+     * Why an admin might or might not want each ZeroBounce verdict to block.
+     *
+     * Plain consequences rather than ZeroBounce's own wording: the point of the toggles is that
+     * somebody who is not steeped in this can see what turning one on costs.
+     */
+    private const STATUS_NOTES = [
+        'invalid' => 'The mailbox does not exist. Mail to it will bounce.',
+        'spamtrap' => 'A trap address. Mailing it damages sending reputation.',
+        'abuse' => 'Known to mark mail as spam.',
+        'do_not_mail' => 'Deliverable, but a role account (info@, hr@) or a complainer. Real buyers use these.',
+        'catch-all' => 'Undetermined: the server accepts everything. Blocking this refuses most enterprise buyers.',
+        'unknown' => 'Undetermined: ZeroBounce could not get an answer. Often a temporary fault at their end.',
+    ];
+
     /** What each timeline relation is called in the notice shown when it cannot be read. */
     private const TIMELINE_SOURCE_LABELS = [
         'activityLogs' => 'activity log',
@@ -86,6 +103,15 @@ class LeadsAdminDashboard
 
         add_submenu_page(
             parent_slug: 'rl-leads',
+            page_title: 'Bounced Leads',
+            menu_title: 'Bounced Leads',
+            capability: 'manage_options',
+            menu_slug: 'rl-leads-bounced',
+            callback: [$this, 'renderBouncedLeads'],
+        );
+
+        add_submenu_page(
+            parent_slug: 'rl-leads',
             page_title: 'Live Activity & Audit Logs',
             menu_title: 'Activity Logs',
             capability: 'manage_options',
@@ -135,6 +161,22 @@ class LeadsAdminDashboard
             $purgedCount = app(PurgeOldLeadsAction::class)->execute(30);
             Cache::forget(Lead::KPI_CACHE_KEY);
             wp_safe_redirect(admin_url('admin.php?page=rl-leads&purged_count='.$purgedCount));
+            exit;
+        }
+
+        if ($action === 'update_bounce_rules') {
+            check_admin_referer('rl_bounce_rules_nonce');
+
+            $submitted = array_map(
+                static fn ($status) => sanitize_text_field((string) $status),
+                (array) ($_POST['zerobounce_blocked_statuses'] ?? []),
+            );
+
+            // Unchecking everything is a legitimate choice — verify, record, reject nothing —
+            // so an empty submission is saved as an empty list rather than ignored.
+            $saved = app(LeadSettingsService::class)->saveZeroBounceStatuses($submitted);
+
+            wp_safe_redirect(admin_url('admin.php?page=rl-leads-bounced&rules_saved='.count($saved)));
             exit;
         }
 
@@ -1986,6 +2028,288 @@ class LeadsAdminDashboard
         <?php
     }
 
+    /**
+     * Everyone the email check turned away before they became a lead.
+     *
+     * The screen exists to answer one question quickly: when somebody reports that the booking
+     * form is broken, were they refused by a gate, and by which one? A visitor refused here
+     * never reaches capturePartialLead(), so they appear nowhere else in this dashboard.
+     */
+    public function renderBouncedLeads(): void
+    {
+        $search = sanitize_text_field($_GET['s'] ?? '');
+        $reasonFilter = sanitize_text_field($_GET['reason'] ?? '');
+        $gateFilter = sanitize_text_field($_GET['gate'] ?? '');
+
+        $query = BouncedLead::query()->latest('last_seen_at');
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('email', 'LIKE', "%{$search}%")
+                    ->orWhere('name', 'LIKE', "%{$search}%")
+                    ->orWhere('phone', 'LIKE', "%{$search}%")
+                    ->orWhere('company', 'LIKE', "%{$search}%");
+            });
+        }
+
+        if ($reasonFilter) {
+            $query->where('reason', $reasonFilter);
+        }
+
+        if ($gateFilter) {
+            $query->where('checked_by', $gateFilter);
+        }
+
+        $bounced = $this->paginateScreen($query, 30, 'rl-leads-bounced', [
+            's' => $search,
+            'reason' => $reasonFilter,
+            'gate' => $gateFilter,
+        ]);
+
+        $since24h = Carbon::now()->subDay();
+        $since7d = Carbon::now()->subDays(7);
+
+        $last24h = BouncedLead::query()->where('last_seen_at', '>=', $since24h)->count();
+        $last7d = BouncedLead::query()->where('last_seen_at', '>=', $since7d)->count();
+        $people7d = BouncedLead::query()->where('last_seen_at', '>=', $since7d)->distinct()->count('email');
+
+        /*
+         * Read the reason list off the table rather than hardcoding it, for the same reason the
+         * activity screen reads its actor domains that way: a hardcoded list silently loses each
+         * new reason the day it starts being written.
+         */
+        $reasons = BouncedLead::query()->select('reason')->distinct()->orderBy('reason')->pluck('reason')->filter()->all();
+
+        /*
+         * The toggles read and write the same setting the form reads, through
+         * EmailValidationService::rejectedStatusesFor() — the screen that shows what a rule did
+         * is the one that can change it, and there is no second copy of the list to drift.
+         */
+        $leadSettings = app(LeadSettingsService::class)->get();
+        $zbEnabled = (bool) filter_var($leadSettings['zerobounce_enabled'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        $blockedStatuses = EmailValidationService::rejectedStatusesFor($leadSettings);
+
+        // What each rule actually cost over the last 30 days, so a toggle is a decision with a
+        // number next to it rather than a guess.
+        $blockedCounts = BouncedLead::query()
+            ->where('checked_by', 'zerobounce')
+            ->where('last_seen_at', '>=', Carbon::now()->subDays(30))
+            ->selectRaw('reason, COUNT(*) as total')
+            ->groupBy('reason')
+            ->pluck('total', 'reason')
+            ->mapWithKeys(static fn ($total, $reason) => [str_replace('zerobounce_', '', (string) $reason) => (int) $total])
+            ->all();
+        ?>
+        <div class="wrap rl-admin-wrap">
+            <div class="rl-admin-header">
+                <div>
+                    <h1 class="rl-admin-title">Bounced Leads</h1>
+                    <p class="rl-admin-subtitle">
+                        Booking-form submissions refused at the email check on step one. These never became
+                        leads &mdash; they stopped before the partial submission &mdash; so they appear on no
+                        other screen. Use this to tell a real outage apart from an address being blocked.
+                    </p>
+                </div>
+                <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads')); ?>" class="rl-btn rl-btn-outline">
+                    <?php echo $this->iconArrowLeft(); ?> Back to All Leads
+                </a>
+            </div>
+
+            <!-- Segmented Navigation Tabs -->
+            <?php $this->renderAdminNavigation('bounced'); ?>
+
+            <?php if (isset($_GET['rules_saved'])) { ?>
+                <div class="notice notice-success is-dismissible" style="margin: 16px 0;">
+                    <p><strong>Blocking rules saved.</strong> ZeroBounce now blocks
+                    <?php echo esc_html((string) absint($_GET['rules_saved'])); ?> of its verdicts.
+                    The change applies to the next submission; it does not revisit anyone already turned away.</p>
+                </div>
+            <?php } ?>
+
+            <!-- ZeroBounce blocking rules -->
+            <div class="rl-table-container" style="padding: 16px; margin-bottom: 16px;">
+                <form method="post" action="">
+                    <?php wp_nonce_field('rl_bounce_rules_nonce'); ?>
+                    <input type="hidden" name="rl_action" value="update_bounce_rules" />
+
+                    <h2 style="margin: 0 0 4px; font-size: 14px;">What ZeroBounce is allowed to block</h2>
+                    <p style="margin: 0 0 12px; font-size: 12px; color: #71717a;">
+                        Unticked verdicts still get checked and still appear nowhere &mdash; they simply stop
+                        turning the visitor away. Counts are what each rule refused in the last 30 days.
+                        <?php if (! $zbEnabled) { ?>
+                            <br /><strong>ZeroBounce is switched off entirely</strong>, so none of these apply
+                            until it is re-enabled in <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads-settings')); ?>">Settings</a>.
+                        <?php } ?>
+                    </p>
+
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px 24px;">
+                        <?php foreach (EmailValidationService::TOGGLEABLE_STATUSES as $status) { ?>
+                            <label style="display: flex; gap: 8px; align-items: flex-start; min-width: 260px; padding: 8px 10px; border: 1px solid #e4e4e7; border-radius: 6px;">
+                                <input type="checkbox" name="zerobounce_blocked_statuses[]"
+                                       value="<?php echo esc_attr($status); ?>"
+                                       <?php checked(in_array($status, $blockedStatuses, true)); ?> />
+                                <span>
+                                    <code><?php echo esc_html($status); ?></code>
+                                    <span class="rl-badge rl-badge-<?php echo in_array($status, $blockedStatuses, true) ? 'failed' : 'pending'; ?>" style="margin-left: 6px;">
+                                        <?php echo esc_html($blockedCounts[$status] ?? 0); ?> in 30d
+                                    </span>
+                                    <span style="display: block; font-size: 11px; color: #71717a; margin-top: 3px;">
+                                        <?php echo esc_html(self::STATUS_NOTES[$status] ?? ''); ?>
+                                    </span>
+                                </span>
+                            </label>
+                        <?php } ?>
+                    </div>
+
+                    <p style="margin: 12px 0 0;">
+                        <button type="submit" class="rl-btn rl-btn-primary">Save blocking rules</button>
+                    </p>
+                </form>
+            </div>
+
+            <div class="rl-stat-row" style="display: flex; gap: 12px; margin: 16px 0;">
+                <div class="rl-count-badge">Last 24h: <strong><?php echo esc_html((string) $last24h); ?></strong></div>
+                <div class="rl-count-badge">Last 7 days: <strong><?php echo esc_html((string) $last7d); ?></strong></div>
+                <div class="rl-count-badge">Distinct people (7d): <strong><?php echo esc_html((string) $people7d); ?></strong></div>
+                <div class="rl-count-badge">All time: <strong><?php echo esc_html((string) $bounced->total()); ?></strong></div>
+            </div>
+
+            <!-- Filter Toolbar -->
+            <div class="rl-filter-bar">
+                <form method="get" action="" class="rl-filter-form">
+                    <input type="hidden" name="page" value="rl-leads-bounced" />
+
+                    <div class="rl-search-wrapper">
+                        <?php echo $this->iconSearch(); ?>
+                        <input type="search" name="s" value="<?php echo esc_attr($search); ?>" placeholder="Search name, email, phone..." class="rl-input-search" />
+                    </div>
+
+                    <select name="gate" class="rl-select">
+                        <option value="">All Gates</option>
+                        <?php foreach (BouncedLead::GATE_LABELS as $gate => $label) { ?>
+                            <option value="<?php echo esc_attr($gate); ?>" <?php selected($gateFilter, $gate); ?>>
+                                <?php echo esc_html($label); ?>
+                            </option>
+                        <?php } ?>
+                    </select>
+
+                    <select name="reason" class="rl-select">
+                        <option value="">All Reasons</option>
+                        <?php foreach ($reasons as $reason) { ?>
+                            <option value="<?php echo esc_attr($reason); ?>" <?php selected($reasonFilter, $reason); ?>>
+                                <?php echo esc_html((new BouncedLead(['reason' => $reason]))->reasonLabel()); ?>
+                            </option>
+                        <?php } ?>
+                    </select>
+
+                    <button type="submit" class="rl-btn rl-btn-primary">Filter</button>
+                    <?php if ($search || $reasonFilter || $gateFilter) { ?>
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads-bounced')); ?>" class="rl-btn rl-btn-outline">Reset</a>
+                    <?php } ?>
+                </form>
+
+                <div class="rl-count-badge">
+                    Showing: <strong><?php echo esc_html((string) $bounced->total()); ?></strong> bounced submissions
+                </div>
+            </div>
+
+            <div class="rl-table-container">
+                <table class="rl-lead-table">
+                    <thead>
+                        <tr>
+                            <th>Last Attempt</th>
+                            <th>Contact</th>
+                            <th>Reason</th>
+                            <th>Gate</th>
+                            <th>Tries</th>
+                            <th>Source</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($bounced->isEmpty()) { ?>
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 48px; color: #a1a1aa;">
+                                    No bounced submissions recorded. Nothing has been refused at the email check
+                                    since this screen started recording.
+                                </td>
+                            </tr>
+                        <?php } else { ?>
+                            <?php foreach ($bounced as $row) { ?>
+                                <tr>
+                                    <td style="white-space: nowrap;">
+                                        <div style="font-weight: 600; color: #09090b;"><?php echo esc_html($row->last_seen_at?->format('M j, Y')); ?></div>
+                                        <div style="font-size: 11px; color: #71717a;" title="<?php echo esc_attr((string) $row->last_seen_at?->toDateTimeString()); ?>">
+                                            <?php echo esc_html($row->last_seen_at?->format('H:i:s')); ?> (<?php echo esc_html($row->last_seen_at?->diffForHumans()); ?>)
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="rl-contact-cell">
+                                            <?php $this->renderAvatar($row->name, $row->email); ?>
+                                            <div class="rl-contact-info">
+                                                <span class="rl-contact-name"><?php echo esc_html($row->name ?: '(no name given)'); ?></span>
+                                                <span style="font-size: 11px; color: #71717a;"><?php echo esc_html($row->email); ?></span>
+                                                <?php if ($row->phone) { ?>
+                                                    <span style="font-size: 11px; color: #71717a;"><?php echo esc_html($row->phone); ?></span>
+                                                <?php } ?>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="rl-badge rl-badge-failed">
+                                            <span class="rl-status-dot"></span>
+                                            <?php echo esc_html($row->reasonLabel()); ?>
+                                        </span>
+                                        <div style="font-size: 11px; color: #71717a; margin-top: 2px;"><code><?php echo esc_html((string) $row->reason); ?></code></div>
+                                    </td>
+                                    <td><strong><?php echo esc_html($row->gateLabel()); ?></strong></td>
+                                    <td><?php echo esc_html((string) $row->attempts); ?></td>
+                                    <td style="font-size: 11px; color: #71717a;">
+                                        <?php
+                                            $source = array_filter([$row->utm_source, $row->utm_medium, $row->utm_campaign]);
+                                echo $source ? esc_html(implode(' / ', $source)) : '<span style="color: #a1a1aa;">&mdash;</span>';
+                                ?>
+                                        <?php if ($row->company) { ?>
+                                            <div><?php echo esc_html($row->company); ?></div>
+                                        <?php } ?>
+                                    </td>
+                                    <td>
+                                        <details>
+                                            <summary style="font-size: 11px; color: #71717a; cursor: pointer; font-weight: 500;">Details</summary>
+                                            <div class="rl-json-box"><?php echo esc_html(json_encode(array_filter([
+                                                'first_seen' => (string) $row->created_at?->toDateTimeString(),
+                                                'ip_address' => $row->ip_address,
+                                                'posthog_session_id' => $row->posthog_session_id,
+                                                'referral_code' => $row->referral_code,
+                                                'context' => $row->context,
+                                            ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></div>
+                                        </details>
+                                    </td>
+                                </tr>
+                            <?php } ?>
+                        <?php } ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 12px; color: #71717a;">
+                    Page <strong><?php echo esc_html((string) $bounced->currentPage()); ?></strong> of <strong><?php echo esc_html((string) $bounced->lastPage()); ?></strong>
+                </div>
+                <div style="display: flex; gap: 6px;">
+                    <?php if ($bounced->previousPageUrl()) { ?>
+                        <a href="<?php echo esc_url($bounced->previousPageUrl()); ?>" class="rl-btn rl-btn-outline rl-btn-sm"><?php echo $this->iconArrowLeft(); ?> Previous</a>
+                    <?php } ?>
+                    <?php if ($bounced->nextPageUrl()) { ?>
+                        <a href="<?php echo esc_url($bounced->nextPageUrl()); ?>" class="rl-btn rl-btn-outline rl-btn-sm">Next <?php echo $this->iconArrowRight(); ?></a>
+                    <?php } ?>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
     public function renderActivityLogs(): void
     {
         $search = sanitize_text_field($_GET['s'] ?? '');
@@ -2607,7 +2931,19 @@ class LeadsAdminDashboard
                                 <p><input type="password" id="zerobounce_api_key" name="zerobounce_api_key" class="regular-text"
                                           value="<?php echo esc_attr($settings['zerobounce_api_key']); ?>" autocomplete="off"
                                           placeholder="Falls back to ZEROBOUNCE_API_KEY" /></p>
-                                <p class="description">Rejects <code>invalid</code>, <code>spamtrap</code> and <code>abuse</code>. <code>catch-all</code>, <code>unknown</code> and <code>do_not_mail</code> pass.</p>
+                                <p class="description">
+                                    <?php
+                                        // Read off the setting rather than restated here. This line
+                                        // listed do_not_mail as rejected for a day after it stopped
+                                        // being, which is how a settings screen stops being trusted.
+                                        $zbBlocked = EmailValidationService::rejectedStatusesFor($settings);
+        ?>
+                                    Currently blocks
+                                    <?php echo $zbBlocked ? '<code>'.implode('</code>, <code>', array_map('esc_html', $zbBlocked)).'</code>' : '<strong>nothing</strong>'; ?>;
+                                    every other verdict passes.
+                                    <a href="<?php echo esc_url(admin_url('admin.php?page=rl-leads-bounced')); ?>">Change which verdicts block</a>
+                                    on the Bounced Leads screen, where you can see what each one has cost.
+                                </p>
                             </td>
                         </tr>
                         <tr>
@@ -2789,6 +3125,7 @@ class LeadsAdminDashboard
     {
         $tabs = [
             'leads' => ['label' => 'All Leads & Submissions', 'url' => admin_url('admin.php?page=rl-leads')],
+            'bounced' => ['label' => 'Bounced Leads', 'url' => admin_url('admin.php?page=rl-leads-bounced')],
             'activity' => ['label' => 'Live Activity & Audit Logs', 'url' => admin_url('admin.php?page=rl-leads-activity')],
             'diagnostics' => ['label' => 'Diagnostics & Health', 'url' => admin_url('admin.php?page=rl-leads-diagnostics')],
             'settings' => ['label' => 'Form & Routing Settings', 'url' => admin_url('admin.php?page=rl-leads-settings')],

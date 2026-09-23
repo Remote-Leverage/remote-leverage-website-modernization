@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Livewire\Booking;
 
 use App\Domains\Lead\Actions\CaptureLeadAction;
+use App\Domains\Lead\Actions\RecordBouncedLeadAction;
 use App\Domains\Lead\Data\LeadAudience;
 use App\Domains\Lead\Data\LeadCaptureData;
 use App\Domains\Lead\Models\Lead;
@@ -581,6 +582,26 @@ class MultistepBookingWizard extends Component
                 $emailCheck = app(EmailValidationService::class)->validate($this->email, $this->ipAddress);
 
                 if (! $emailCheck['valid']) {
+                    /*
+                     * Record it before returning. This branch is the *only* trace a refused
+                     * visitor leaves: capturePartialLead() is a few lines below and never runs,
+                     * so without this row there is no lead, no activity log and no way to tell
+                     * "the booking form is broken" apart from "the email check refused them".
+                     */
+                    app(RecordBouncedLeadAction::class)->execute($this->email, $emailCheck, [
+                        'name' => trim($this->name) ?: trim($this->firstName.' '.$this->lastName),
+                        'phone' => $this->phone,
+                        'company' => $this->company,
+                        'ip_address' => $this->ipAddress,
+                        'posthog_session_id' => $this->posthogSessionId,
+                        'utm_source' => $this->utmSource,
+                        'utm_medium' => $this->utmMedium,
+                        'utm_campaign' => $this->utmCampaign,
+                        'referral_code' => $this->referralCode,
+                        'role_needed' => $this->roleNeeded,
+                        'monthly_revenue' => $this->monthlyRevenue,
+                    ]);
+
                     $this->addError('email', (string) $emailCheck['message']);
 
                     return;

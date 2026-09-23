@@ -413,6 +413,28 @@ if (! Capsule::schema()->hasTable('rl_lead_activity_logs')) {
     });
 }
 
+if (! Capsule::schema()->hasTable('rl_bounced_leads')) {
+    Capsule::schema()->create('rl_bounced_leads', function ($table) {
+        $table->increments('id');
+        $table->string('name')->nullable();
+        $table->string('email')->index();
+        $table->string('phone', 32)->nullable();
+        $table->string('company')->nullable();
+        $table->string('reason', 64)->index();
+        $table->string('checked_by', 32)->index();
+        $table->string('ip_address', 45)->nullable();
+        $table->string('posthog_session_id')->nullable();
+        $table->string('utm_source')->nullable();
+        $table->string('utm_medium')->nullable();
+        $table->string('utm_campaign')->nullable();
+        $table->string('referral_code')->nullable();
+        $table->text('context')->nullable();
+        $table->integer('attempts')->default(1);
+        $table->timestamp('created_at')->nullable();
+        $table->timestamp('last_seen_at')->nullable();
+    });
+}
+
 if (! Capsule::schema()->hasTable('rl_integration_calls')) {
     Capsule::schema()->create('rl_integration_calls', function ($table) {
         $table->increments('id');

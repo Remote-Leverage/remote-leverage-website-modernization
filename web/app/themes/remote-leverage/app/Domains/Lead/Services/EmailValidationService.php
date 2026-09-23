@@ -31,8 +31,51 @@ use Illuminate\Support\Facades\Log;
  */
 class EmailValidationService
 {
-    /** Validation outcomes ZeroBounce reports that we treat as undeliverable. */
-    public const REJECTED_STATUSES = ['invalid', 'spamtrap', 'abuse'];
+    /**
+     * What blocking defaults to when nobody has chosen.
+     *
+     * These three mean the mail will not arrive. `do_not_mail` is deliberately absent — it is a
+     * deliverable mailbox (role accounts, known complainers) and blocking it turned real buyers
+     * away at the form.
+     */
+    public const DEFAULT_REJECTED_STATUSES = ['invalid', 'spamtrap', 'abuse'];
+
+    /**
+     * Every status an admin may switch blocking on for.
+     *
+     * `valid` is not here and must never be: a list that can block it can lock out everybody.
+     * `catch-all` and `unknown` are here but off by default and warned about on the screen —
+     * they mean ZeroBounce could not determine the answer, so blocking them rejects every lead
+     * behind a corporate catch-all mail server, which is most enterprise buyers.
+     */
+    public const TOGGLEABLE_STATUSES = ['invalid', 'spamtrap', 'abuse', 'do_not_mail', 'catch-all', 'unknown'];
+
+    /**
+     * The statuses blocking is actually on for, given a settings array.
+     *
+     * Pure and static, because the admin screen and the form must give the same answer; two
+     * readers of the same option drift. A stored value that is not a list falls back to the
+     * default rather than to "block nothing" — a corrupt option must not silently open the gate,
+     * which looks exactly like verification passing.
+     *
+     * @param  array<string, mixed>  $settings
+     * @return string[]
+     */
+    public static function rejectedStatusesFor(array $settings): array
+    {
+        $stored = $settings['zerobounce_blocked_statuses'] ?? null;
+
+        if (! is_array($stored)) {
+            return self::DEFAULT_REJECTED_STATUSES;
+        }
+
+        // An empty list is a real choice — "verify, but never reject on the result" — so it is
+        // honoured. Unknown entries are dropped rather than trusted.
+        return array_values(array_intersect(
+            array_map(static fn ($status) => strtolower(trim((string) $status)), $stored),
+            self::TOGGLEABLE_STATUSES,
+        ));
+    }
 
     public function __construct(
         protected ?LeadSettingsService $settings = null,
@@ -152,14 +195,20 @@ class EmailValidationService
 
             $status = strtolower((string) $response->json('status', ''));
 
-            if (in_array($status, self::REJECTED_STATUSES, true)) {
+            /*
+             * Which statuses block is an admin setting now, toggled on the Bounced Leads screen
+             * — the screen that shows what the rule did is the one that can change it. It was a
+             * constant until `do_not_mail` had to be removed by deploy. `valid` can never be on
+             * the list; see rejectedStatusesFor().
+             */
+            if (in_array($status, self::rejectedStatusesFor($settings), true)) {
                 return $this->reject('zerobounce_'.$status, $this->message($settings), 'zerobounce');
             }
 
-            // `valid`, `catch-all`, `unknown` and `do_not_mail` all pass. catch-all and unknown
-            // mean ZeroBounce could not determine the answer, which is not evidence against the
-            // address; do_not_mail covers role accounts and complainers, which is a deliverable
-            // mailbox we choose not to turn away at the form.
+            // Anything not on the list passes. By default that is `valid`, plus `catch-all` and
+            // `unknown` (ZeroBounce could not determine the answer, which is not evidence
+            // against the address) and `do_not_mail` (a deliverable mailbox: role accounts and
+            // known complainers).
             return $this->accept('zerobounce');
         } catch (\Throwable $e) {
             Log::warning('EmailValidationService: ZeroBounce call failed; accepting the address. '.$e->getMessage());
