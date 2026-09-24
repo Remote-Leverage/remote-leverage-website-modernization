@@ -291,8 +291,8 @@ class SendCostAlertAction
              * campaigns today's bookings came through. Threaded for the same reason the findings
              * are — they belong to this card and would bury the channel if posted into it.
              */
-            $this->reply('Website vs warehouse', $this->reconciliationBody($snapshot), $ts, $replyChannel);
-            $this->reply('Bookings by landing page and campaign', $this->breakdownBody($snapshot), $ts, $replyChannel);
+            $this->reply('Website vs warehouse', $this->reconciliationBlocks($snapshot), $ts, $replyChannel);
+            $this->reply('Bookings by landing page and campaign', $this->breakdownBlocks($snapshot), $ts, $replyChannel);
         }
 
         return true;
@@ -359,17 +359,19 @@ class SendCostAlertAction
 
     /**
      * Post one threaded reply under the card. Best effort, like the findings: the card is what
-     * matters and has already landed. An empty body posts nothing.
+     * matters and has already landed. No blocks posts nothing.
+     *
+     * @param  array<int, array<string, mixed>>  $blocks
      */
-    private function reply(string $fallback, string $body, string $threadTs, string $channel): void
+    private function reply(string $fallback, array $blocks, string $threadTs, string $channel): void
     {
-        if ($body === '') {
+        if ($blocks === []) {
             return;
         }
 
         $posted = $this->slack->post(
             $fallback,
-            [['type' => 'section', 'text' => ['type' => 'mrkdwn', 'text' => $body]]],
+            $blocks,
             null,
             $threadTs,
             false,
@@ -400,14 +402,16 @@ class SendCostAlertAction
      *
      * Today only — this site's half of the snapshot is always today, and a comparison of the
      * closed day would need a second full count.
+     *
+     * @return array<int, array<string, mixed>>
      */
-    private function reconciliationBody(FunnelSnapshot $snapshot): string
+    private function reconciliationBlocks(FunnelSnapshot $snapshot): array
     {
         $day = $snapshot->marketingDay;
         $warehouse = $snapshot->todaySoFar ?? ($day !== null && ! $day->isClosing() ? $day : null);
 
         if ($warehouse === null) {
-            return '';
+            return [];
         }
 
         $rows = [];
@@ -452,42 +456,85 @@ class SendCostAlertAction
 
         $rows[] = ['Total', $warehouse->appointments, $snapshot->bookings, $warehouse->qualified, $snapshot->qualifiedT10];
 
-        $table = [
-            sprintf('%-15s %-17s %-17s', '', 'Bookings', 'Qualified'),
-            sprintf('%-15s %5s %5s %5s %5s %5s %5s', '', 'Wh', 'Site', 'Diff', 'Wh', 'Site', 'Diff'),
-        ];
+        $table = [];
 
         foreach ($rows as [$label, $wb, $sb, $wq, $sq]) {
-            $table[] = sprintf(
-                '%-15s %5s %5s %5s %5s %5s %5s',
+            $table[] = [
                 $label,
-                $wb ?? '?',
-                $sb,
+                (string) ($wb ?? '?'),
+                (string) $sb,
                 $this->difference($sb, $wb),
-                $wq ?? '?',
-                $sq,
+                (string) ($wq ?? '?'),
+                (string) $sq,
                 $this->difference($sq, $wq),
-            );
+            ];
         }
 
         $period = $snapshot->todaySoFar !== null
             ? 'today so far, as of '.$snapshot->todaySoFar->asOfEt.' ET'
             : $this->prettyDate($warehouse->date).', as of '.$warehouse->asOfEt.' ET';
 
-        return implode("\n", [
-            sprintf('*Website vs warehouse — %s*', $period),
-            sprintf(
-                'Leads: warehouse %d, site %d (%s)',
-                $warehouse->leads,
-                $snapshot->leads,
-                $this->difference($snapshot->leads, $warehouse->leads),
+        return [
+            $this->mrkdwnSection(implode("\n", [
+                sprintf('*Website vs warehouse — %s*', $period),
+                sprintf(
+                    'Leads: warehouse %d, site %d (%s)',
+                    $warehouse->leads,
+                    $snapshot->leads,
+                    $this->difference($snapshot->leads, $warehouse->leads),
+                ),
+            ])),
+            $this->tableBlock(
+                ['Platform', 'Bookings (WH)', 'Bookings (site)', 'Diff', 'Qualified (WH)', 'Qualified (site)', 'Diff'],
+                $table,
             ),
-            '```'.implode("\n", $table).'```',
-            '_Diff is site minus warehouse. The card reports the warehouse. Site platform rows are '
+            $this->contextNote(
+                'Diff is site minus warehouse. The card reports the warehouse. Site platform rows are '
                 .'paid-proven bookings only, the rest are under Everything else; site qualified is '
                 .'self-reported $10k+ MRR, and likely VA applicants are excluded.'
-                .($countsKnown ? '' : ' "?" means the warehouse channel counts did not load.').'_',
-        ]);
+                .($countsKnown ? '' : ' "?" means the warehouse channel counts did not load.'),
+            ),
+        ];
+    }
+
+    /**
+     * A native Slack table: first column wraps and reads left, every other column is a number.
+     *
+     * These replies were monospace code blocks, which Slack wraps on a phone and every column
+     * then lands under the wrong heading. A table block keeps its columns whatever the width.
+     *
+     * @param  array<int, string>  $header
+     * @param  array<int, array<int, string>>  $rows
+     * @return array<string, mixed>
+     */
+    private function tableBlock(array $header, array $rows): array
+    {
+        // Slack refuses an empty cell, and with it the whole message.
+        $cell = static fn (string $text): array => ['type' => 'raw_text', 'text' => $text === '' ? '—' : $text];
+
+        return [
+            'type' => 'table',
+            'column_settings' => array_map(
+                static fn (int $i): array => $i === 0 ? ['is_wrapped' => true] : ['align' => 'right'],
+                array_keys($header),
+            ),
+            'rows' => array_map(
+                static fn (array $row): array => array_map($cell, array_values($row)),
+                [$header, ...$rows],
+            ),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function mrkdwnSection(string $text): array
+    {
+        return ['type' => 'section', 'text' => ['type' => 'mrkdwn', 'text' => $text]];
+    }
+
+    /** @return array<string, mixed> */
+    private function contextNote(string $text): array
+    {
+        return ['type' => 'context', 'elements' => [['type' => 'mrkdwn', 'text' => $text]]];
     }
 
     /** "+3", "-2" or "0"; "?" when the other side is unknown. */
@@ -509,68 +556,55 @@ class SendCostAlertAction
      * the landing URL and `utm_campaign` on every lead. Every booking counts, paid or not — the
      * question is which pages and campaigns bookings arrive through, and dropping organic ones
      * would make a page look quieter than it is.
+     *
+     * @return array<int, array<string, mixed>>
      */
-    private function breakdownBody(FunnelSnapshot $snapshot): string
+    private function breakdownBlocks(FunnelSnapshot $snapshot): array
     {
         if ($snapshot->bookings === 0) {
-            return '';
+            return [];
         }
 
-        return implode("\n", [
-            sprintf('*Today\'s bookings by landing page and campaign — %d bookings, %d qualified*', $snapshot->bookings, $snapshot->qualifiedT10),
-            '*Landing page*',
-            $this->groupTable($snapshot->bookingsByLandingPage, 'Page'),
-            '*Campaign*',
-            $this->groupTable($snapshot->bookingsByCampaign, 'Campaign'),
-            '_From this site\'s own records, so totals can differ from the warehouse. Qualified is self-reported $10k+ MRR; likely VA applicants are excluded._',
-        ]);
+        return [
+            $this->mrkdwnSection(sprintf('*Today\'s bookings by landing page and campaign — %d bookings, %d qualified*', $snapshot->bookings, $snapshot->qualifiedT10)),
+            ...$this->groupTable($snapshot->bookingsByLandingPage, 'Landing page'),
+            ...$this->groupTable($snapshot->bookingsByCampaign, 'Campaign'),
+            $this->contextNote('From this site\'s own records, so totals can differ from the warehouse. Qualified is self-reported $10k+ MRR; likely VA applicants are excluded.'),
+        ];
     }
 
     /**
-     * The ten busiest groups as a monospace table, and one line for the rest.
+     * The ten busiest groups as a table, and one row for the rest.
      *
      * Ten because a campaign list is long-tailed and the tail is one booking each; the remainder
-     * line keeps its bookings counted without printing it.
+     * row keeps its bookings counted without printing it.
      *
      * @param  array<string, array{bookings: int, qualified: int}>  $groups
+     * @return array<int, array<string, mixed>>
      */
-    private function groupTable(array $groups, string $heading): string
+    private function groupTable(array $groups, string $heading): array
     {
         if ($groups === []) {
-            return '_none_';
+            return [$this->mrkdwnSection(sprintf('*%s*  _none_', $heading))];
         }
 
-        $width = 34;
-        $lines = [sprintf('%-'.$width.'s %8s %9s', $heading, 'Bookings', 'Qualified')];
+        $rows = [];
 
         foreach (array_slice($groups, 0, 10, true) as $name => $counts) {
-            $name = (string) $name;
-            $label = mb_strlen($name) > $width ? mb_substr($name, 0, $width - 1).'…' : $name;
-
-            $lines[] = sprintf(
-                '%s%s %8d %9d',
-                $label,
-                str_repeat(' ', max(0, $width - mb_strlen($label))),
-                (int) ($counts['bookings'] ?? 0),
-                (int) ($counts['qualified'] ?? 0),
-            );
+            $rows[] = [(string) $name, (string) (int) ($counts['bookings'] ?? 0), (string) (int) ($counts['qualified'] ?? 0)];
         }
 
         $rest = array_slice($groups, 10, null, true);
 
         if ($rest !== []) {
-            $label = sprintf('+%d more', count($rest));
-
-            $lines[] = sprintf(
-                '%s%s %8d %9d',
-                $label,
-                str_repeat(' ', max(0, $width - mb_strlen($label))),
-                array_sum(array_column($rest, 'bookings')),
-                array_sum(array_column($rest, 'qualified')),
-            );
+            $rows[] = [
+                sprintf('+%d more', count($rest)),
+                (string) array_sum(array_column($rest, 'bookings')),
+                (string) array_sum(array_column($rest, 'qualified')),
+            ];
         }
 
-        return '```'.implode("\n", $lines).'```';
+        return [$this->tableBlock([$heading, 'Bookings', 'Qualified'], $rows)];
     }
 
     /**
@@ -804,8 +838,8 @@ class SendCostAlertAction
 
         foreach ($this->activeChannels($day->channels) as $channel) {
             $lines[] = sprintf(
-                '%s — %s spend%s · CPB %s · CPQB %s',
-                $this->channelLabel($channel->slug),
+                '*%s* — %s spend%s · CPB %s · CPQB %s',
+                $this->channelName($channel->slug),
                 $this->money($channel->spend, $currency),
                 $channel->bookings === null ? '' : sprintf(
                     ' · %s · %d qualified',
@@ -819,19 +853,23 @@ class SendCostAlertAction
 
         return [
             'closed_title' => sprintf('%s — closed', $this->prettyDate($day->date)),
+            /*
+             * The costs in the subtitle and the counts in the body, not the other way round: Slack
+             * truncates a card subtitle to one line, and the counts line is the longer of the two.
+             */
             'closed_subtitle' => sprintf(
+                '*CPL* %s   *CPB* %s   *CPQB* %s',
+                $this->money($day->cpl, $currency),
+                $this->money($day->cpbPaid, $currency),
+                $this->money($day->cpqbPaid, $currency),
+            ),
+            'closed_body' => sprintf(
                 '%d leads · %d bookings · %d qualified · %s spend%s',
                 $day->leads,
                 $day->appointments,
                 $day->qualified,
                 $this->money($day->spend, $currency),
                 $day->spendIsComplete ? '' : ' (Meta feed incomplete)',
-            ),
-            'closed_body' => sprintf(
-                '*CPL* %s   *CPB* %s   *CPQB* %s',
-                $this->money($day->cpl, $currency),
-                $this->money($day->cpbPaid, $currency),
-                $this->money($day->cpqbPaid, $currency),
             ),
             'closed_platforms' => implode("\n", $lines),
         ];

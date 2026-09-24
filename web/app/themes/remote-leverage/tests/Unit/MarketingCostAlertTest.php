@@ -87,6 +87,32 @@ function replyAmong(array $posted, string $text): string
 }
 
 /**
+ * A reply's table rows as arrays of cell text, from every table block in it.
+ *
+ * @return array<int, array<int, string>>
+ */
+function replyTableRows(array $posted, string $text): array
+{
+    foreach ($posted as $p) {
+        if (($p['thread_ts'] ?? null) !== null && ($p['text'] ?? '') === $text) {
+            $rows = [];
+
+            foreach ($p['blocks'] as $block) {
+                if (($block['type'] ?? null) === 'table') {
+                    foreach ($block['rows'] as $row) {
+                        $rows[] = array_map(static fn (array $cell): string => $cell['text'], $row);
+                    }
+                }
+            }
+
+            return $rows;
+        }
+    }
+
+    return [];
+}
+
+/**
  * The per-platform cards only, as JSON — not the closed-day card, which is also a card block.
  *
  * @param  array<int, array<string, mixed>>  $blocks
@@ -2364,8 +2390,13 @@ describe('channel counts and the card replies', function () {
 
         expect($closed)->toContain('Sat 19 Sep — closed')
             ->and($blocks[$at + 1]['type'])->toBe('section')
-            ->and($closed)->toContain('Meta — $2,892.84 spend · 56 bookings · 41 qualified · CPB $321.43')
-            ->and($closed)->toContain('Microsoft — $101.94 spend · 1 booking · 1 qualified');
+            // Costs in the subtitle, counts in the body: Slack truncates a subtitle to one line.
+            ->and($blocks[$at]['subtitle']['text'])->toStartWith('*CPL* ')
+            ->and($blocks[$at]['body']['text'])->toContain('bookings')
+            // Bold plain names, no platform emoji.
+            ->and($closed)->toContain('*Meta* — $2,892.84 spend · 56 bookings · 41 qualified · CPB $321.43')
+            ->and($closed)->toContain('*Microsoft* — $101.94 spend · 1 booking · 1 qualified')
+            ->and($blocks[$at + 1]['text']['text'])->not->toContain(':meta:');
     });
 
     /*
@@ -2442,10 +2473,14 @@ describe('channel counts and the card replies', function () {
         expect($reply)->toContain('Website vs warehouse — Sun 20 Sep, as of 15:00 ET')
             ->and($reply)->toContain('Leads: warehouse 6, site 4 (-2)')
             // Organic Instagram is not a Meta booking the warehouse lost; it is "everything else".
-            ->and($reply)->toContain('Meta                3     2    -1     3     2    -1')
-            ->and($reply)->toContain('Everything else     2     2     0     1     2    +1')
-            ->and($reply)->toContain('Total               5     4    -1     4     4     0')
-            ->and($reply)->not->toContain('Google ');
+            ->and($reply)->not->toContain('```');
+
+        $rows = replyTableRows($transport->posted, 'Website vs warehouse');
+
+        expect($rows)->toContain(['Meta', '3', '2', '-1', '3', '2', '-1'])
+            ->and($rows)->toContain(['Everything else', '2', '2', '0', '1', '2', '+1'])
+            ->and($rows)->toContain(['Total', '5', '4', '-1', '4', '4', '0'])
+            ->and(array_column($rows, 0))->not->toContain('Google');
     });
 
     test('the website reply is skipped when the warehouse did not answer', function () {
@@ -2470,15 +2505,16 @@ describe('channel counts and the card replies', function () {
 
         $transport = $run(costAlertDay(['Date' => '2026-09-20']), null, [], '2026-09-20 15:00:00');
 
-        $reply = replyAmong($transport->posted, 'Bookings by landing page and campaign');
+        $rows = replyTableRows($transport->posted, 'Bookings by landing page and campaign');
+        $labels = array_column($rows, 0);
 
         // Query strings and hosts dropped, so one page is one row however it was reached.
-        expect($reply)->toMatch('#/hire-va/ +2 +1#')
-            ->and($reply)->toMatch('#VA-Broad +2 +1#')
-            ->and($reply)->toMatch('#Brand +1 +1#')
-            ->and($reply)->toContain('(not recorded)')
-            ->and($reply)->toContain('(no campaign)')
-            ->and(strpos($reply, '/hire-va/'))->toBeLessThan(strpos($reply, '(not recorded)'));
+        expect($rows)->toContain(['/hire-va/', '2', '1'])
+            ->and($rows)->toContain(['VA-Broad', '2', '1'])
+            ->and($rows)->toContain(['Brand', '1', '1'])
+            ->and($labels)->toContain('(not recorded)')
+            ->and($labels)->toContain('(no campaign)')
+            ->and(array_search('/hire-va/', $labels))->toBeLessThan(array_search('(not recorded)', $labels));
     });
 
     test('there is no breakdown reply on a day with no bookings', function () use ($run) {
