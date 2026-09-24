@@ -275,6 +275,29 @@ test('the contact payload carries event_source_url and client_user_agent', funct
         ->and($properties['landing_page'])->toBe('https://remoteleverage.com/hire-va-4/');
 });
 
+test('the contact payload carries fbp, Meta match pair with fbc, read from the attribution blob', function () {
+    // `fbp` has no column of its own, same as `client_user_agent` above — read straight out of
+    // `attribution['handl']`, where AttributionCollector::EXTRA puts it.
+    fakeHubSpotSchema(['email', 'firstname', 'lastname', 'fbc', 'fbp']);
+
+    $lead = Lead::query()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Fbp Match',
+        'first_name' => 'Fbp',
+        'last_name' => 'Match',
+        'email' => 'fbp-match+'.Str::random(6).'@example.com',
+        'fbc' => 'fb.1.1700000000000.IwAR-xyz',
+        'source_type' => 'ad',
+        'status' => 'captured',
+        'attribution' => ['handl' => ['_fbp' => 'fb.1.1700000000000.987654321']],
+    ]);
+
+    $properties = hubSpotPropertiesFor($lead);
+
+    expect($properties['fbc'])->toBe('fb.1.1700000000000.IwAR-xyz')
+        ->and($properties['fbp'])->toBe('fb.1.1700000000000.987654321');
+});
+
 test('a property the portal does not define is dropped instead of 400ing the whole sync', function () {
     // The real failure of 2026-09-18: both new names were absent from the portal, HubSpot
     // rejected the entire request, and every other attribution field was lost with it.
