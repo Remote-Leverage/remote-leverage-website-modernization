@@ -25,25 +25,21 @@ use Illuminate\Http\JsonResponse;
  * The HTTP status code mirrors it at the two ends an uptime monitor acts on: 503 when anything
  * is `down` — the site cannot currently reach that integration at all — and 200 otherwise,
  * `degraded` included, because a degraded integration is still serving and paging on every
- * failure-rate blip is how people learn to ignore the monitor. `integrations` carries the full
- * per-integration breakdown from `IntegrationHealthChecker`, keyed by integration name.
+ * failure-rate blip is how people learn to ignore the monitor. `integrations` carries one entry
+ * per check, keyed by `alias` — never by the real `integration` slug `IntegrationHealthChecker`
+ * itself uses internally, which would hand back exactly the vendor name `toPublicArray()`
+ * already withholds from the values, just moved into the keys instead.
  *
  * ## Why unauthenticated
  *
  * Same reasoning as `api.health`: an uptime monitor cannot present a credential a human hasn't
- * configured for it, so a health endpoint it can reach has to be public. What it discloses is
- * which third-party services this site integrates with and whether each is currently reachable
- * — not a credential (`IntegrationCallRecorder` fingerprints those before they ever reach
- * `rl_integration_calls`, which is what this reads).
- *
- * That said, "which vendors we use" is real information for Slack, ZeroBounce and Meta CAPI —
- * unlike PostHog or Customer.io's CDP key, none of those are otherwise visible to a visitor —
- * and `IntegrationHealth::toArray()` carries two fields this endpoint must not repeat
- * unfiltered: `reason` can name a real identity (`GoogleHealthCheck` names the signed-in Google
- * account), and `last_error` is a stored `error_message` that `IntegrationCallRecorder` never
- * redacts, unlike headers, bodies and URLs. `toPublicArray()` is the version safe to answer an
- * anonymous request with; the CLI and the dashboard widget use `toArray()` directly, because
- * both already require a credential of their own to reach.
+ * configured for it, so a health endpoint it can reach has to be public. Which third-party
+ * services this site integrates with is real information — Slack, ZeroBounce and Meta CAPI are
+ * not otherwise visible to a visitor the way PostHog or Customer.io's CDP key are — so this
+ * route never repeats the real vendor name at all: `IntegrationHealth::alias()` is what an
+ * anonymous caller sees, `label()` (the real name, "HubSpot") is reserved for the CLI and the
+ * wp-admin dashboard widget, which already require a credential of their own to reach. `reason`
+ * and `last_error` are withheld for the same reason on top of that — see `toPublicArray()`.
  */
 class IntegrationHealthController
 {
@@ -63,10 +59,16 @@ class IntegrationHealthController
             null,
         ) ?? HealthStatus::Healthy;
 
+        $integrations = [];
+
+        foreach ($results as $health) {
+            $integrations[$health->alias] = $health->toPublicArray();
+        }
+
         return response()->json([
             'status' => $overall->value,
             'checked_at' => now()->toAtomString(),
-            'integrations' => array_map(static fn ($health) => $health->toPublicArray(), $results),
+            'integrations' => $integrations,
         ], $overall === HealthStatus::Down ? 503 : 200);
     }
 }

@@ -23,6 +23,11 @@ class MetaHealthCheck implements IntegrationHealthCheck
         return 'Meta Conversions API';
     }
 
+    public function alias(): string
+    {
+        return 'offline_conversion';
+    }
+
     public function isConfigured(): bool
     {
         return $this->client->enabled();

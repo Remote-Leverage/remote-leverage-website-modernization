@@ -41,6 +41,11 @@ class DatabaseHealthCheck implements SelfEvaluatingHealthCheck
         return 'Database';
     }
 
+    public function alias(): string
+    {
+        return 'data';
+    }
+
     public function isConfigured(): bool
     {
         return true;
@@ -58,6 +63,7 @@ class DatabaseHealthCheck implements SelfEvaluatingHealthCheck
             return new IntegrationHealth(
                 integration: $this->integration(),
                 label: $this->label(),
+                alias: $this->alias(),
                 status: HealthStatus::Down,
                 configured: true,
                 reason: 'Connection failed',
@@ -76,6 +82,7 @@ class DatabaseHealthCheck implements SelfEvaluatingHealthCheck
         return new IntegrationHealth(
             integration: $this->integration(),
             label: $this->label(),
+            alias: $this->alias(),
             status: $degraded ? HealthStatus::Degraded : HealthStatus::Healthy,
             configured: true,
             reason: $degraded

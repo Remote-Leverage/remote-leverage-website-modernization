@@ -23,6 +23,11 @@ class ZeroBounceHealthCheck implements IntegrationHealthCheck
         return 'ZeroBounce';
     }
 
+    public function alias(): string
+    {
+        return 'email_validation';
+    }
+
     /**
      * Same admin-first, env-fallback precedence as `EmailValidationService::validate()`.
      */

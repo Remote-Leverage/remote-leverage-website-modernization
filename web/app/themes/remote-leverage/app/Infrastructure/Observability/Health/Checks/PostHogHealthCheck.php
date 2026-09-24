@@ -18,6 +18,11 @@ class PostHogHealthCheck implements IntegrationHealthCheck
         return 'PostHog';
     }
 
+    public function alias(): string
+    {
+        return 'session_control';
+    }
+
     public function isConfigured(): bool
     {
         return trim((string) config('services.posthog.api_key', '')) !== '';

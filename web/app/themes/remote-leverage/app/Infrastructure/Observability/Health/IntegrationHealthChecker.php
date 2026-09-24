@@ -64,6 +64,7 @@ class IntegrationHealthChecker
                 $results[$check->integration()] = new IntegrationHealth(
                     integration: $check->integration(),
                     label: $check->label(),
+                    alias: $check->alias(),
                     status: HealthStatus::Down,
                     configured: false,
                     reason: 'Health check threw: '.$e->getMessage(),
@@ -83,11 +84,13 @@ class IntegrationHealthChecker
     {
         $integration = $check->integration();
         $label = $check->label();
+        $alias = $check->alias();
 
         if (! $check->isConfigured()) {
             return new IntegrationHealth(
                 integration: $integration,
                 label: $label,
+                alias: $alias,
                 status: HealthStatus::Down,
                 configured: false,
                 reason: $check instanceof ExplainsUnconfiguredReason
@@ -117,6 +120,7 @@ class IntegrationHealthChecker
             return new IntegrationHealth(
                 integration: $integration,
                 label: $label,
+                alias: $alias,
                 status: HealthStatus::Healthy,
                 configured: true,
                 reason: "No calls in the last {$windowMinutes} minutes",
@@ -161,6 +165,7 @@ class IntegrationHealthChecker
         return new IntegrationHealth(
             integration: $integration,
             label: $label,
+            alias: $alias,
             status: $status,
             configured: true,
             reason: $this->reasonFor($status, $sampleSize, $failureRate, $consecutiveFailures, $windowMinutes),
