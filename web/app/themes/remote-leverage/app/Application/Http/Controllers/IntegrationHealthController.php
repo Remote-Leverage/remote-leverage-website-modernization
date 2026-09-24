@@ -34,9 +34,16 @@ use Illuminate\Http\JsonResponse;
  * configured for it, so a health endpoint it can reach has to be public. What it discloses is
  * which third-party services this site integrates with and whether each is currently reachable
  * — not a credential (`IntegrationCallRecorder` fingerprints those before they ever reach
- * `rl_integration_calls`, which is what this reads) and not materially more than a visitor
- * already learns from the page's own public pixels (PostHog, Customer.io's CDP key — see
- * config/services.php) or from watching which requests the booking flow makes.
+ * `rl_integration_calls`, which is what this reads).
+ *
+ * That said, "which vendors we use" is real information for Slack, ZeroBounce and Meta CAPI —
+ * unlike PostHog or Customer.io's CDP key, none of those are otherwise visible to a visitor —
+ * and `IntegrationHealth::toArray()` carries two fields this endpoint must not repeat
+ * unfiltered: `reason` can name a real identity (`GoogleHealthCheck` names the signed-in Google
+ * account), and `last_error` is a stored `error_message` that `IntegrationCallRecorder` never
+ * redacts, unlike headers, bodies and URLs. `toPublicArray()` is the version safe to answer an
+ * anonymous request with; the CLI and the dashboard widget use `toArray()` directly, because
+ * both already require a credential of their own to reach.
  */
 class IntegrationHealthController
 {
@@ -59,7 +66,7 @@ class IntegrationHealthController
         return response()->json([
             'status' => $overall->value,
             'checked_at' => now()->toAtomString(),
-            'integrations' => array_map(static fn ($health) => $health->toArray(), $results),
+            'integrations' => array_map(static fn ($health) => $health->toPublicArray(), $results),
         ], $overall === HealthStatus::Down ? 503 : 200);
     }
 }

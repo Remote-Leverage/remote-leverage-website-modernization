@@ -26,6 +26,8 @@ class RouteFixtureHealthCheck implements SelfEvaluatingHealthCheck
     public function __construct(
         protected string $name,
         protected HealthStatus $status,
+        protected string $reason = 'fixture',
+        protected ?string $lastError = null,
     ) {}
 
     public function integration(): string
@@ -50,12 +52,12 @@ class RouteFixtureHealthCheck implements SelfEvaluatingHealthCheck
             label: $this->label(),
             status: $this->status,
             configured: $this->isConfigured(),
-            reason: 'fixture',
+            reason: $this->reason,
             sampleSize: 0,
             failureRate: null,
             consecutiveFailures: 0,
             lastCallAt: null,
-            lastError: null,
+            lastError: $this->lastError,
         );
     }
 }
@@ -100,11 +102,37 @@ test('no checks registered at all is reported as healthy rather than erroring', 
         ->and($response->getData(true)['integrations'])->toBe([]);
 });
 
-test('the response carries the full per-integration breakdown, keyed by integration name', function () {
+test('the response carries the per-integration breakdown, keyed by integration name', function () {
     $data = integrationHealthController(HealthStatus::Down)->index()->getData(true);
 
     expect($data)->toHaveKeys(['status', 'checked_at', 'integrations'])
         ->and($data['integrations'])->toHaveKey('service0')
         ->and($data['integrations']['service0']['status'])->toBe('down')
         ->and($data['integrations']['service0']['label'])->toBe('Service0');
+});
+
+test('reason and last_error never reach this unauthenticated response', function () {
+    // reason can name a real identity (GoogleHealthCheck names the signed-in Google account),
+    // and last_error is a stored error_message IntegrationCallRecorder never redacts — see
+    // IntegrationHealth::toPublicArray(). This is the regression test for that: an anonymous
+    // caller of this route must never see either field, or anything that was only ever in them.
+    $check = new RouteFixtureHealthCheck(
+        'google',
+        HealthStatus::Down,
+        reason: 'Signed in as ops@remoteleverage.com, but no billing project is set',
+        lastError: 'cURL error 6: Could not resolve host: warehouse-internal.aws.remoteleverage.local',
+    );
+
+    $response = (new IntegrationHealthController(new IntegrationHealthChecker([$check])))->index();
+    $data = $response->getData(true);
+    $raw = $response->getContent();
+
+    expect($data['integrations']['google'])->not->toHaveKeys(['reason', 'last_error'])
+        ->and($raw)->not->toContain('ops@remoteleverage.com')
+        ->and($raw)->not->toContain('warehouse-internal.aws.remoteleverage.local')
+        // The fields this endpoint is supposed to carry are still there.
+        ->and($data['integrations']['google'])->toHaveKeys([
+            'integration', 'label', 'status', 'configured', 'sample_size', 'failure_rate',
+            'consecutive_failures', 'last_call_at',
+        ]);
 });

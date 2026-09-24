@@ -46,4 +46,36 @@ final class IntegrationHealth
             'last_error' => $this->lastError,
         ];
     }
+
+    /**
+     * The subset of `toArray()` safe to hand to an unauthenticated caller — `/api/health/
+     * integrations`, which anyone can reach with no credential of their own.
+     *
+     * `reason` and `last_error` are withheld, not sanitised: `reason` can name a real identity
+     * (`GoogleHealthCheck` names the signed-in Google account when relevant — exactly what an
+     * operator wants from the CLI or the dashboard, and exactly what a spear-phishing attempt
+     * wants from a public endpoint), and `last_error` is `rl_integration_calls.error_message`
+     * verbatim — `IntegrationCallRecorder` redacts headers, bodies and URLs before storing a
+     * call, but never that column, so a connection-level failure can carry a raw driver
+     * exception message with an internal hostname in it. `configured` stays: whether a
+     * credential exists is not identifying on its own, and an uptime monitor needs it to tell
+     * "not set up" from "set up and failing".
+     *
+     * @return array{integration: string, label: string, status: string, configured: bool,
+     *     sample_size: int, failure_rate: float|null, consecutive_failures: int,
+     *     last_call_at: string|null}
+     */
+    public function toPublicArray(): array
+    {
+        return [
+            'integration' => $this->integration,
+            'label' => $this->label,
+            'status' => $this->status->value,
+            'configured' => $this->configured,
+            'sample_size' => $this->sampleSize,
+            'failure_rate' => $this->failureRate,
+            'consecutive_failures' => $this->consecutiveFailures,
+            'last_call_at' => $this->lastCallAt?->format(DATE_ATOM),
+        ];
+    }
 }
