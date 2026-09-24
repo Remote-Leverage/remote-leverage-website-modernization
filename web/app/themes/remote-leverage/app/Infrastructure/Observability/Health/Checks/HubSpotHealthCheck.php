@@ -23,6 +23,11 @@ class HubSpotHealthCheck implements IntegrationHealthCheck
         return 'HubSpot';
     }
 
+    public function alias(): string
+    {
+        return 'lead_control';
+    }
+
     public function isConfigured(): bool
     {
         return $this->gateway->isConfigured();

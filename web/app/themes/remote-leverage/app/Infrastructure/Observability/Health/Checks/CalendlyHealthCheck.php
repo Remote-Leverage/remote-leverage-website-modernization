@@ -23,6 +23,11 @@ class CalendlyHealthCheck implements IntegrationHealthCheck
         return 'Calendly';
     }
 
+    public function alias(): string
+    {
+        return 'booking';
+    }
+
     public function isConfigured(): bool
     {
         return $this->tokens->getEligibleTokens() !== [];

@@ -709,6 +709,14 @@ class MarketingDashboard
      * One row backed by a real `IntegrationHealthChecker` result, in the same
      * `rl-dash-health-item` shape as every hand-written row around it.
      *
+     * The row title pairs `alias` with the vendor-specific `$name` — "Payment — Stripe
+     * Webhooks", "Warehouse — Google (BigQuery)". Nowhere else does that: the CLI and the
+     * public API show only the alias (see `IntegrationHealthCheck::alias()`), because neither
+     * already requires being logged in to reach. This widget lives behind wp-admin, so it is
+     * the one place an operator gets to map a role-shaped alias back to the real service it
+     * names — which is the whole reason to keep the alias here at all rather than just
+     * reverting to the vendor name outright.
+     *
      * `$health` is the integration's `IntegrationHealth::toArray()`, or null when
      * `IntegrationHealthChecker` has no check registered for that key at all — rendered as
      * `down` rather than silently omitted, because a row that vanishes instead of reporting
@@ -721,18 +729,28 @@ class MarketingDashboard
         $status = (string) ($health['status'] ?? 'down');
         $style = $this->healthBadgeStyle($status);
         $desc = (string) ($health['reason'] ?? $description);
+        $alias = $health['alias'] ?? null;
+        $title = $alias !== null ? $this->titleCaseAlias($alias).' — '.$name : $name;
         ?>
         <div class="rl-dash-health-item">
             <div class="rl-dash-health-left">
                 <span class="<?php echo esc_attr($style['indicator']); ?>"></span>
                 <div>
-                    <div class="rl-dash-health-name"><?php echo esc_html($name); ?></div>
+                    <div class="rl-dash-health-name"><?php echo esc_html($title); ?></div>
                     <div class="rl-dash-health-desc"><?php echo esc_html($desc); ?></div>
                 </div>
             </div>
             <span class="<?php echo esc_attr($style['badge']); ?>"><?php echo esc_html(ucfirst($status)); ?></span>
         </div>
         <?php
+    }
+
+    /**
+     * "email_validation" -> "Email Validation".
+     */
+    protected function titleCaseAlias(string $alias): string
+    {
+        return ucwords(str_replace('_', ' ', $alias));
     }
 
     /**

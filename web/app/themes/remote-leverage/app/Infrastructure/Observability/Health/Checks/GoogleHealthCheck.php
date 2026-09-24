@@ -38,6 +38,18 @@ class GoogleHealthCheck implements ExplainsUnconfiguredReason
         return 'Google (BigQuery)';
     }
 
+    /**
+     * `warehouse`, not `big_query` — "BigQuery" is the vendor's own product name, and using it
+     * as the alias would name the vendor exactly as much as `google` did. This theme already
+     * calls this "the marketing warehouse" everywhere else (`WarehouseOAuth`,
+     * `config('marketing.warehouse.*')`), so this reuses that term rather than inventing a
+     * second name for the same thing.
+     */
+    public function alias(): string
+    {
+        return 'warehouse';
+    }
+
     public function isConfigured(): bool
     {
         return $this->client->isConfigured();

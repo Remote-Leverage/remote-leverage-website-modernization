@@ -23,6 +23,11 @@ class StripeHealthCheck implements IntegrationHealthCheck
         return 'Stripe';
     }
 
+    public function alias(): string
+    {
+        return 'payment';
+    }
+
     public function isConfigured(): bool
     {
         return $this->gateway->isConfigured();

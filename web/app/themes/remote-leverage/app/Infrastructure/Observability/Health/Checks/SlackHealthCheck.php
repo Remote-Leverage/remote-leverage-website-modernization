@@ -19,6 +19,11 @@ class SlackHealthCheck implements IntegrationHealthCheck
         return 'Slack';
     }
 
+    public function alias(): string
+    {
+        return 'notification';
+    }
+
     public function isConfigured(): bool
     {
         return SlackCredentials::botToken() !== '';

@@ -26,6 +26,9 @@ class RouteFixtureHealthCheck implements SelfEvaluatingHealthCheck
     public function __construct(
         protected string $name,
         protected HealthStatus $status,
+        protected string $alias,
+        protected string $reason = 'fixture',
+        protected ?string $lastError = null,
     ) {}
 
     public function integration(): string
@@ -38,6 +41,11 @@ class RouteFixtureHealthCheck implements SelfEvaluatingHealthCheck
         return ucfirst($this->name);
     }
 
+    public function alias(): string
+    {
+        return $this->alias;
+    }
+
     public function isConfigured(): bool
     {
         return $this->status !== HealthStatus::Down;
@@ -48,14 +56,15 @@ class RouteFixtureHealthCheck implements SelfEvaluatingHealthCheck
         return new IntegrationHealth(
             integration: $this->name,
             label: $this->label(),
+            alias: $this->alias,
             status: $this->status,
             configured: $this->isConfigured(),
-            reason: 'fixture',
+            reason: $this->reason,
             sampleSize: 0,
             failureRate: null,
             consecutiveFailures: 0,
             lastCallAt: null,
-            lastError: null,
+            lastError: $this->lastError,
         );
     }
 }
@@ -65,7 +74,7 @@ function integrationHealthController(HealthStatus ...$statuses): IntegrationHeal
     $checks = [];
 
     foreach ($statuses as $i => $status) {
-        $checks[] = new RouteFixtureHealthCheck("service{$i}", $status);
+        $checks[] = new RouteFixtureHealthCheck("vendor{$i}", $status, "alias{$i}");
     }
 
     return new IntegrationHealthController(new IntegrationHealthChecker($checks));
@@ -100,11 +109,44 @@ test('no checks registered at all is reported as healthy rather than erroring', 
         ->and($response->getData(true)['integrations'])->toBe([]);
 });
 
-test('the response carries the full per-integration breakdown, keyed by integration name', function () {
+test('the response is keyed by alias, and carries the per-integration breakdown', function () {
     $data = integrationHealthController(HealthStatus::Down)->index()->getData(true);
 
     expect($data)->toHaveKeys(['status', 'checked_at', 'integrations'])
-        ->and($data['integrations'])->toHaveKey('service0')
-        ->and($data['integrations']['service0']['status'])->toBe('down')
-        ->and($data['integrations']['service0']['label'])->toBe('Service0');
+        ->and($data['integrations'])->toHaveKey('alias0')
+        ->and($data['integrations']['alias0']['status'])->toBe('down');
+});
+
+test('the real vendor identity never reaches this unauthenticated response', function () {
+    // integration and label name the real vendor (GoogleHealthCheck's are 'google' and "Google
+    // (BigQuery)"); reason can name a real identity (the signed-in Google account); last_error
+    // is a stored error_message IntegrationCallRecorder never redacts. This is the regression
+    // test for all of it: an anonymous caller must see the alias and nothing that would
+    // reconstruct which vendor sits behind it — not in the response body, and not in the keys
+    // integrations is indexed by, which array_map() would otherwise have preserved verbatim
+    // from the real integration slug.
+    $check = new RouteFixtureHealthCheck(
+        name: 'google',
+        status: HealthStatus::Down,
+        alias: 'warehouse',
+        reason: 'Signed in as ops@remoteleverage.com, but no billing project is set',
+        lastError: 'cURL error 6: Could not resolve host: warehouse-internal.aws.remoteleverage.local',
+    );
+
+    $response = (new IntegrationHealthController(new IntegrationHealthChecker([$check])))->index();
+    $data = $response->getData(true);
+    $raw = $response->getContent();
+
+    expect($data['integrations'])->toHaveKey('warehouse')
+        ->and($data['integrations'])->not->toHaveKey('google')
+        ->and($data['integrations']['warehouse'])->not->toHaveKeys(['integration', 'label', 'reason', 'last_error'])
+        ->and($raw)->not->toContain('google')
+        ->and($raw)->not->toContain('Google')
+        ->and($raw)->not->toContain('ops@remoteleverage.com')
+        ->and($raw)->not->toContain('warehouse-internal.aws.remoteleverage.local')
+        // The fields this endpoint is supposed to carry are still there.
+        ->and($data['integrations']['warehouse'])->toHaveKeys([
+            'alias', 'status', 'configured', 'sample_size', 'failure_rate',
+            'consecutive_failures', 'last_call_at',
+        ]);
 });

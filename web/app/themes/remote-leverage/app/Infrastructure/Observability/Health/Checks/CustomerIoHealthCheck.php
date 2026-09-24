@@ -18,6 +18,11 @@ class CustomerIoHealthCheck implements IntegrationHealthCheck
         return 'Customer.io';
     }
 
+    public function alias(): string
+    {
+        return 'email_marketing';
+    }
+
     public function isConfigured(): bool
     {
         return trim((string) config('services.customer_io.site_id', '')) !== ''
