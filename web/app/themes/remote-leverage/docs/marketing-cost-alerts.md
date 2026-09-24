@@ -632,6 +632,13 @@ those exist to stop the *scheduler* posting when nobody asked. `wp acorn marketi
 --demo` previews the layout with fabricated figures, clearly labelled; `--dry` prints a real run's
 numbers without posting.
 
+The card itself carries the same send as a **Send new alert** button, for someone reading the
+channel who wants the figures now rather than at the next hour. It is a signed link, not an
+interactive button, so it needs no Slack app setting; see "Every button is a link" in
+[`slack-app.md`](slack-app.md). Neither this nor the dashboard button checks in with the Sentry
+cron monitor — only the scheduled tick does, because a person firing cards by hand is exactly the
+situation in which the monitor must not be told the scheduler is alive.
+
 ### Still unscheduled: alert on exception
 
 The daily card is for reading. A separate, immediate message when CPB breaches its band or the
