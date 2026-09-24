@@ -40,6 +40,11 @@ class FixedHealthCheck implements IntegrationHealthCheck
         return ucfirst($this->name);
     }
 
+    public function alias(): string
+    {
+        return $this->name.'_alias';
+    }
+
     public function isConfigured(): bool
     {
         return $this->configured;
@@ -66,6 +71,11 @@ class ThrowingHealthCheck implements IntegrationHealthCheck
         return 'Throws';
     }
 
+    public function alias(): string
+    {
+        return 'throws_alias';
+    }
+
     public function isConfigured(): bool
     {
         throw new RuntimeException('gateway construction failed');
@@ -84,6 +94,11 @@ class FixedSelfEvaluatingCheck implements SelfEvaluatingHealthCheck
     public function label(): string
     {
         return $this->result->label;
+    }
+
+    public function alias(): string
+    {
+        return $this->result->alias;
     }
 
     public function isConfigured(): bool
@@ -306,6 +321,7 @@ describe('checkAll resilience and shape', function () {
         $forced = new IntegrationHealth(
             integration: 'database',
             label: 'Database',
+            alias: 'data',
             status: HealthStatus::Down,
             configured: true,
             reason: 'Connection failed',
