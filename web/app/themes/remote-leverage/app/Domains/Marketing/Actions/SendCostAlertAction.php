@@ -11,6 +11,7 @@ use App\Domains\Marketing\Data\MarketingDay;
 use App\Domains\Marketing\Data\PartialDay;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use App\Domains\Marketing\Support\AlertWindow;
+use App\Domains\Marketing\Support\CostAlertSendLink;
 use App\Infrastructure\Slack\SlackTransport;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Log;
@@ -1086,18 +1087,23 @@ class SendCostAlertAction
      * Empty outside WordPress, which drops the whole actions block — a button pointing nowhere is
      * worse than no button.
      *
+     * `send_url` posts a fresh card, for someone reading the channel who wants the figures now
+     * rather than at the top of the next hour. It is minted per card and expires on its own; see
+     * CostAlertSendLink for why it is a signed link rather than an interactive button.
+     *
      * @return array<string, string>
      */
     private function actionUrls(): array
     {
         if (! function_exists('admin_url')) {
-            return ['dashboard_url' => '', 'leads_url' => '', 'unattributed_url' => ''];
+            return ['dashboard_url' => '', 'leads_url' => '', 'unattributed_url' => '', 'send_url' => ''];
         }
 
         return [
             'dashboard_url' => admin_url('index.php'),
             'leads_url' => admin_url('admin.php?page=rl-leads&date_range=today'),
             'unattributed_url' => admin_url('admin.php?page=rl-leads&date_range=today&platform=direct&status=booked'),
+            'send_url' => CostAlertSendLink::url(),
         ];
     }
 

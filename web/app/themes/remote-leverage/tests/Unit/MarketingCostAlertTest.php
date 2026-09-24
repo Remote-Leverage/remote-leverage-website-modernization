@@ -19,6 +19,7 @@ use App\Domains\Marketing\Services\FindingDismissals;
 use App\Domains\Marketing\Services\FunnelMetricsService;
 use App\Domains\Marketing\Support\AdPlatformCredentials;
 use App\Domains\Marketing\Support\AlertWindow;
+use App\Domains\Marketing\Support\CostAlertSendLink;
 use App\Domains\Marketing\Support\DemoSnapshot;
 use App\Infrastructure\Slack\SlackTransport;
 use App\Infrastructure\WordPress\Admin\MarketingDashboard;
@@ -1153,6 +1154,34 @@ describe('the message', function () {
         $json = json_encode($transport->posted[0]['blocks']);
 
         expect(preg_match('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]/u', (string) $json))->toBe(0);
+    });
+
+    /*
+     * Asked for from Slack on 2026-09-24: a way to get a fresh card without opening wp-admin.
+     * A link, like every other button here, and one whose signature the site will accept — a
+     * button that renders and then refuses is worse than no button.
+     */
+    test('carries a button that posts a fresh card', function () {
+        config(['app.key' => 'base64:'.base64_encode(str_repeat('c', 32))]);
+
+        $action = costAlertAction($transport = recordingCostTransport());
+        $action->execute(CarbonImmutable::parse('2026-09-18 12:00:00', 'UTC'), force: true);
+
+        $buttons = [];
+
+        foreach (cardsAmong($transport->posted)[0]['blocks'] as $block) {
+            foreach ($block['type'] === 'actions' ? $block['elements'] : [] as $element) {
+                $buttons[$element['text']['text']] = $element;
+            }
+        }
+
+        expect($buttons)->toHaveKey('Send new alert')
+            ->and($buttons['Send new alert'])->not->toHaveKey('action_id')
+            ->and($buttons['Send new alert']['url'])->toStartWith('https://remoteleverage.com/cost-alert/send?');
+
+        parse_str((string) parse_url($buttons['Send new alert']['url'], PHP_URL_QUERY), $query);
+
+        expect(CostAlertSendLink::check($query['expires'] ?? null, $query['sig'] ?? null))->toBeNull();
     });
 
     test('a run with nothing to report posts no reply at all', function () {
