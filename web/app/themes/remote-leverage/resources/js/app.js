@@ -1,6 +1,7 @@
 import { loadStylesheet } from './load-stylesheet';
 import { retryImport } from './retry-import';
 import { rlBookingCalendar } from './booking-calendar';
+import { rlPartnershipCalendar, rlPartnershipForm } from './partnership-prospect-form';
 
 window.intlTelInput = window.intlTelInput || null;
 
@@ -821,6 +822,8 @@ const registerAlpine = () => {
     window.Alpine.data('rlBookingWizardIsolated', rlBookingWizardIsolated);
     window.Alpine.data('rlBookingStepScroll', rlBookingStepScroll);
     window.Alpine.data('rlBookingCalendar', rlBookingCalendar);
+    window.Alpine.data('rlPartnershipForm', rlPartnershipForm);
+    window.Alpine.data('rlPartnershipCalendar', rlPartnershipCalendar);
     window.Alpine.data('rlDocumentToc', rlDocumentToc);
     window.Alpine.data('rlAudioPlayer', rlAudioPlayer);
   }

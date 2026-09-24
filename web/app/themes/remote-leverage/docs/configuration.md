@@ -87,8 +87,11 @@ GTM, LinkedIn Insight and Meta Pixel are configured inside the Google Site Kit /
 
 ## PartnerHub
 
-| Variable | Read by |
-| :--- | :--- |
+No environment variables. The `/become-a-partner/` Slack channel, Calendly page and Calendly
+event type are set in **Partners Hub → Partnership Settings** (`PartnershipSettingsAdmin`,
+option `rl_partnership_settings`), which also shows what is in force — including when a channel
+is set but `SLACK_BOT_TOKEN` is missing, so nothing can post. See `PartnershipSettings` for what
+each value switches off when blank.
 
 ## Sync
 

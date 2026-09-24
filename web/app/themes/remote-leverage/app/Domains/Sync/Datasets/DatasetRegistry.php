@@ -15,7 +15,7 @@ use InvalidArgumentException;
  *                      leads)
  *  - purge-only        real customer data or credentials; may be emptied on
  *                      either side but never copied (referrals, scheduling,
- *                      users)
+ *                      partnership prospects, users)
  *  - never synced      per-environment state that must not move or be purged
  *                      by this tool (migrations, comments)
  *
@@ -42,6 +42,8 @@ final class DatasetRegistry
     public const REFERRALS = 'referrals';
 
     public const SCHEDULING = 'scheduling';
+
+    public const PARTNERSHIPS = 'partnerships';
 
     public const USERS = 'users';
 
@@ -151,6 +153,22 @@ final class DatasetRegistry
                 description: 'Live call sessions. Never copied between environments; '
                     .'can be emptied on either side.',
                 tables: ['rl_live_call_sessions'],
+                transferable: false,
+                defaultSelected: false,
+                purgeable: true,
+            ),
+            /*
+             * Purge-only, the same tier as referrers. These are named contacts at real
+             * companies with a message they wrote to us, and nothing needs them outside the
+             * environment they were submitted on — unlike leads, no warehouse cross-check reads
+             * them. A staging copy would be PII with no job to do.
+             */
+            self::PARTNERSHIPS => new Dataset(
+                key: self::PARTNERSHIPS,
+                label: 'Partnership prospects',
+                description: 'Companies that asked to become a partner on /become-a-partner/. '
+                    .'Never copied between environments; can be emptied on either side.',
+                tables: ['rl_partnership_prospects'],
                 transferable: false,
                 defaultSelected: false,
                 purgeable: true,

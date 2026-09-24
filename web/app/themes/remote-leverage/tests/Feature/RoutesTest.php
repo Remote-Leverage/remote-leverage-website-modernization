@@ -413,14 +413,16 @@ describe('every route() name referenced in code is registered (known-issues.md b
         }
     });
 
-    test('the partner directory CTAs resolve to the referrer portal and registration', function () {
-        expect(Route::has('referrer.portal'))->toBeTrue()
-            ->and(Route::has('referrer.register'))->toBeTrue();
-
+    test('the partner directory CTAs point at the partnership program, not the referral program', function () {
+        // /partners is the partnership directory; its banner sold the referral program until
+        // 2026-09-24, sending companies into a commission sign-up meant for individuals.
         $blade = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/archive-rl_partner.blade.php');
 
-        expect($blade)->toContain("route('referrer.register')")
-            ->and($blade)->toContain("route('referrer.portal')")
+        expect($blade)->toContain("home_url('/become-a-partner/')")
+            ->and($blade)->toContain("home_url('/become-a-partner/#booking-footer')")
+            ->and($blade)->not->toContain("route('referrer.register')")
+            ->and($blade)->not->toContain("route('referrer.portal')")
+            ->and($blade)->not->toContain('Recurring Commissions')
             ->and($blade)->not->toContain('partner-dashboard');
     });
 });

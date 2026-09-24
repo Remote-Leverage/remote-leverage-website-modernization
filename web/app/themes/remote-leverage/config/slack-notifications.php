@@ -453,6 +453,68 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | New partnership prospect
+    |--------------------------------------------------------------------------
+    |
+    | A company asking to become a partner, from the /become-a-partner/ form.
+    | Posted only to the channel in Partnership Settings — never the default channel,
+    | which is the sales stream. See HandlePartnershipProspectForSlack.
+    |
+    | Placeholders: name, company, role_line ("Role at Company"), email,
+    | email_link, organization_type, monthly_revenue, businesses_reached (all
+    | three as labels, not slugs), message (already block-quoted), landing_url,
+    | landing_display, admin_url. Visitor-typed values arrive escaped.
+    */
+    'partnership_prospect' => [
+        'color' => null,
+        'fallback' => "New partnership prospect: {{ name }}, {{ company }}\n{{ email }}",
+        'blocks' => [
+            [
+                'type' => 'section',
+                'text' => ['type' => 'mrkdwn', 'text' => '*New partnership prospect*'],
+            ],
+            [
+                'type' => 'card',
+                'title' => ['type' => 'mrkdwn', 'text' => '{{ name }}', 'verbatim' => false],
+                'subtitle' => ['type' => 'mrkdwn', 'text' => '{{ role_line }}', 'verbatim' => false],
+                'body' => ['type' => 'mrkdwn', 'text' => '{{ email_link }}', 'verbatim' => false],
+            ],
+            [
+                'type' => 'section',
+                'fields' => [
+                    ['type' => 'mrkdwn', 'text' => "*Organization*\n{{ organization_type }}"],
+                    ['type' => 'mrkdwn', 'text' => "*Monthly revenue*\n{{ monthly_revenue }}"],
+                    ['type' => 'mrkdwn', 'text' => "*Businesses reached*\n{{ businesses_reached }}"],
+                ],
+            ],
+            [
+                'type' => 'section',
+                '_when' => ['message'],
+                'text' => ['type' => 'mrkdwn', 'text' => '{{ message }}'],
+            ],
+            [
+                'type' => 'context',
+                '_when' => ['landing_url'],
+                'elements' => [
+                    ['type' => 'mrkdwn', 'text' => 'Submitted from: <{{ landing_url }}|{{ landing_display }}>'],
+                ],
+            ],
+            [
+                'type' => 'actions',
+                '_when' => ['admin_url'],
+                'elements' => [
+                    [
+                        'type' => 'button',
+                        'text' => ['type' => 'plain_text', 'text' => 'Open prospects', 'emoji' => false],
+                        'url' => '{{ admin_url }}',
+                    ],
+                ],
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Calendly tier filling up
     |--------------------------------------------------------------------------
     |

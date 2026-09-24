@@ -13,9 +13,10 @@
 
      Params: $text, $url, optional $class for positioning, optional $icon ('arrow', the
      default, or 'chevron-down' for a disclosure control), and optional $size ('default', or
-     'compact' to trim the gap and horizontal padding for a narrow container). --}}
+     'compact' to trim the gap and horizontal padding for a narrow container, or 'small' for the
+     /become-a-partner/ comp's 311x50 pill with no ring). --}}
 <a href="{{ $url ?? '#booking-footer' }}"
    class="{{ \App\Support\BlockDefaults::ctaPillClasses($class ?? '', $size ?? 'default') }}">
     <span>{{ $text ?? 'BOOK A CONSULTATION' }}</span>
-    @include('blocks.partials.cta-pill-icon', ['icon' => $icon ?? 'arrow'])
+    @include('blocks.partials.cta-pill-icon', ['icon' => $icon ?? 'arrow', 'iconSize' => ($size ?? 'default') === 'small' ? 18 : 23])
 </a>

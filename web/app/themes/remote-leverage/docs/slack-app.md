@@ -44,6 +44,7 @@ values for `{{ placeholders }}`.
 | `live_call_routed` | `LiveCallRequested`, routed | Always on — a live call starts within 15 minutes. |
 | `live_call_declined` | `LiveCallRequested`, declined | The reason this event exists; see below. |
 | `referrer_registered`, `referral_recorded`, `payout_completed` | The referral domain | Top level, not threaded — no lead thread to hang them on. |
+| `partnership_prospect` | `PartnershipProspectSubmitted` (the `/become-a-partner/` form) | Its own channel (Partners Hub → Partnership Settings) or **not at all** — never the default sales channel, and skipped without a bot token because a webhook cannot honour the override. A prospect added by hand on Partners Hub → Prospects is never announced (`RecordPartnershipProspectAction` does not dispatch the event). |
 | `marketing_cost_alert` | The hourly `rl_marketing_cost_alert` cron, through `SendCostAlertAction` | Its own channel, and the one template that is edited rather than reposted. See below. |
 
 Two rules the renderer enforces, both there because the alternative shows up in a channel people

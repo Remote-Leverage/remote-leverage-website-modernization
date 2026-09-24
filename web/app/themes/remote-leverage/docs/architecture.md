@@ -178,6 +178,7 @@ A Stage 1 row without its matching Stage 2 row is how you find a listener that s
 | `rl_lead_profiles` | Lead | 2026-09-16 |
 | `rl_lead_identifiers` | Lead | 2026-09-16 |
 | `rl_integration_calls` | Observability | 2026-09-16 |
+| `rl_partnership_prospects` | PartnerHub | 2026-09-24 |
 
 Plus nine alter migrations: tracking columns and a fulltext/search index on leads, `referrer_id`
 on the referral tables, booking-retry and consent columns, and — on 2026-09-16 — full attribution,

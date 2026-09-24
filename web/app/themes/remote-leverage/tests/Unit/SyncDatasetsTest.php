@@ -97,6 +97,7 @@ describe('dataset catalogue', function () {
                 DatasetRegistry::LEADS,
                 DatasetRegistry::REFERRALS,
                 DatasetRegistry::SCHEDULING,
+                DatasetRegistry::PARTNERSHIPS,
             ]);
     });
 
