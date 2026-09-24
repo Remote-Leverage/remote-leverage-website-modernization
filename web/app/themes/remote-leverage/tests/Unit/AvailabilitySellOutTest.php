@@ -28,14 +28,16 @@ describe('Availability sell-out handling', function () {
         ]);
     });
 
-    test('an empty answer is cached for far less time than a populated one', function () {
+    test('an empty answer is never held longer than a populated one, and neither past a minute', function () {
         // The load-bearing number. Twelve bookings landed on t10 during the window it was
         // reporting empty, so the slot a visitor wanted was frequently free again well inside
-        // the old ten-minute hold.
+        // the old ten-minute hold. The populated hold came down to a minute too once every
+        // visitor on a tier shared one answer: a booking stays on everyone's calendar until it
+        // expires. See TierAvailability::TTL_SECONDS.
         expect(MultistepBookingWizard::EMPTY_AVAILABILITY_TTL_SECONDS)
-            ->toBeLessThan(MultistepBookingWizard::AVAILABILITY_TTL_SECONDS)
+            ->toBeLessThanOrEqual(MultistepBookingWizard::AVAILABILITY_TTL_SECONDS)
             ->and(MultistepBookingWizard::EMPTY_AVAILABILITY_TTL_SECONDS)->toBe(60)
-            ->and(MultistepBookingWizard::AVAILABILITY_TTL_SECONDS)->toBe(600);
+            ->and(MultistepBookingWizard::AVAILABILITY_TTL_SECONDS)->toBe(60);
     });
 
     test('tier role follows the revenue band', function () {
