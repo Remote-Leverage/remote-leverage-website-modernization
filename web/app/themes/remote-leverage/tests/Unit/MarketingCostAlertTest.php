@@ -1177,7 +1177,7 @@ describe('the message', function () {
 
         expect($buttons)->toHaveKey('Send new alert')
             ->and($buttons['Send new alert'])->not->toHaveKey('action_id')
-            ->and($buttons['Send new alert']['url'])->toStartWith('https://remoteleverage.com/cost-alert/send?');
+            ->and($buttons['Send new alert']['url'])->toStartWith('https://remoteleverage.com/cost-alert/send/?');
 
         parse_str((string) parse_url($buttons['Send new alert']['url'], PHP_URL_QUERY), $query);
 
