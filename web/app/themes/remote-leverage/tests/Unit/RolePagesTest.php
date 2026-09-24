@@ -221,15 +221,15 @@ describe('the fourteen role pages are one page with fourteen sets of words', fun
         }
     });
 
-    test('the navigation is generated from the same map, not a second hand-written list', function () {
-        $header = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/sections/header.blade.php');
+    test('the default navigation is generated from the same map, not a second hand-written list', function () {
+        $nav = (string) file_get_contents(dirname(__DIR__, 2).'/app/View/PrimaryNavigation.php');
 
-        expect($header)->toContain('RolePages::slugs()')
-            ->and($header)->toContain('RolePages::title($slug)')
+        expect($nav)->toContain('RolePages::slugs()')
+            ->and($nav)->toContain('RolePages::title($slug)')
             // The legacy slugs the hand-written dropdown pointed at are now redirects.
-            ->and($header)->not->toContain('socialmediavirtualassistants')
-            ->and($header)->not->toContain('marketing-assistants-legacy')
-            ->and($header)->not->toContain('bookkeeping-accounting-virtual-assistants');
+            ->and($nav)->not->toContain('socialmediavirtualassistants')
+            ->and($nav)->not->toContain('marketing-assistants-legacy')
+            ->and($nav)->not->toContain('bookkeeping-accounting-virtual-assistants');
     });
 
     test('the page art is shared and tracked, not duplicated per role', function () {
