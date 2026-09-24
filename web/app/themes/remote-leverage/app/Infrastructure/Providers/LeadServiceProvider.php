@@ -7,6 +7,7 @@ namespace App\Infrastructure\Providers;
 use App\Domains\Lead\Actions\CaptureLeadAction;
 use App\Domains\Lead\Actions\ProcessAbandonedLeadsAction;
 use App\Domains\Lead\Actions\PurgeOldLeadsAction;
+use App\Domains\Lead\Api\LeadDataRestRoutes;
 use App\Domains\Lead\Commands\ImportGravityLeadsCommand;
 use App\Domains\Lead\Commands\ProcessAbandonedLeadsCommand;
 use App\Domains\Lead\Commands\PurgeLeadsCommand;
@@ -17,6 +18,7 @@ use App\Domains\Lead\Listeners\HandleLeadEventsForEmailNotification;
 use App\Domains\Lead\Listeners\HandleLeadEventsForSlack;
 use App\Domains\Lead\Listeners\HandleLeadEventsForWebhook;
 use App\Domains\Lead\Models\Lead;
+use App\Domains\Lead\Provisioning\DataApiCredentialProvisioner;
 use App\Domains\Lead\Services\GatedAssetResolver;
 use App\Domains\Lead\Services\HubSpotGateway;
 use App\Domains\Lead\Services\LeadActivityLogger;
@@ -24,6 +26,7 @@ use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Referral\Listeners\HandleLeadBookingCanceledForReferrer;
 use App\Domains\Referral\Listeners\HandleLeadBookingCompletedForReferrer;
+use App\Infrastructure\WordPress\Admin\DataApiAdmin;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -46,6 +49,9 @@ class LeadServiceProvider extends ServiceProvider
         $this->app->singleton(CaptureLeadAction::class);
         $this->app->singleton(PurgeOldLeadsAction::class);
         $this->app->singleton(ProcessAbandonedLeadsAction::class);
+        $this->app->singleton(LeadDataRestRoutes::class);
+        $this->app->singleton(DataApiCredentialProvisioner::class);
+        $this->app->singleton(DataApiAdmin::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -61,6 +67,16 @@ class LeadServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // The data team's leads/bookings export. The routes are added on `rest_api_init`, so this
+        // costs nothing on a request that never reaches the REST API.
+        $this->app->make(LeadDataRestRoutes::class)->register();
+
+        // Settings → Data API, where those routes' credentials are issued. Admin only, like
+        // Settings → AI Access: every entry point it adds is gated on manage_options.
+        if (is_admin()) {
+            $this->app->make(DataApiAdmin::class)->register();
+        }
+
         // Steps 1-3b below are all "fire and forget" notification/CRM side effects
         // that nothing in the request depends on — none of their return values
         // are read by the booking wizard. Running them synchronously (with no

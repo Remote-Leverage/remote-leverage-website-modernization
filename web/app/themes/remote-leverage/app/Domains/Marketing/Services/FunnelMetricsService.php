@@ -7,6 +7,7 @@ namespace App\Domains\Marketing\Services;
 use App\Domains\Lead\Data\LeadAudience;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
+use App\Domains\Lead\Services\LeadBookings;
 use App\Domains\Lead\Services\LeadChannel;
 use App\Domains\Lead\Services\LeadPlatform;
 use App\Domains\Lead\Services\LeadQualification;
@@ -481,18 +482,14 @@ class FunnelMetricsService
     /**
      * Lead ids whose earliest `LeadBookingCompleted` log lands in the window.
      *
+     * The definition lives in {@see LeadBookings} because the data API reports bookings too, and
+     * the data team reconciles its numbers against this alert's.
+     *
      * @return array<int, int>
      */
     private function bookedLeadIdsBetween(CarbonImmutable $fromUtc, CarbonImmutable $toUtc): array
     {
-        return LeadActivityLog::query()
-            ->where('event_type', 'LeadBookingCompleted')
-            ->groupBy('lead_id')
-            ->havingRaw('MIN(created_at) >= ?', [$fromUtc->format('Y-m-d H:i:s')])
-            ->havingRaw('MIN(created_at) <= ?', [$toUtc->format('Y-m-d H:i:s')])
-            ->pluck('lead_id')
-            ->map(static fn ($id): int => (int) $id)
-            ->all();
+        return array_keys(LeadBookings::firstBookedBetween($fromUtc, $toUtc));
     }
 
     /**
