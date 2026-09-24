@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Lead\Services;
 
+use Illuminate\Support\Facades\Log;
+
 /**
  * Renders a Block Kit template from `config/slack-notifications.php` against a value map.
  *
@@ -26,6 +28,12 @@ class SlackMessageRenderer
      * their placeholder resolves to nothing. See renderBlock().
      */
     public const OPTIONAL_TEXT_KEYS = ['subtitle', 'description'];
+
+    /**
+     * Slack's maximum length for each text object on a card block, measured against the live API
+     * on 2026-09-24 — it answers "must be less than 151/201 characters" past these.
+     */
+    public const CARD_TEXT_LIMITS = ['title' => 150, 'subtitle' => 150, 'body' => 200];
 
     /**
      * Render one named template.
@@ -150,6 +158,28 @@ class SlackMessageRenderer
         }
 
         $block = $this->substituteDeep($block, $values);
+
+        /*
+         * A card's text is length-capped, and one character over refuses the WHOLE message.
+         *
+         * Same failure as the empty text object below, different cause: the overnight cost alert's
+         * closed-day body grew to 314 characters, Slack answered `invalid_blocks`, and every card
+         * from midnight to 08:00 on 2026-09-24 went unsent. A shortened field is visibly wrong in
+         * the channel; a refused message is silent.
+         */
+        if (($block['type'] ?? null) === 'card') {
+            foreach (self::CARD_TEXT_LIMITS as $key => $limit) {
+                if (isset($block[$key]['text']) && is_string($block[$key]['text']) && mb_strlen($block[$key]['text']) > $limit) {
+                    Log::warning('SlackMessageRenderer: card text over Slack\'s limit, shortened.', [
+                        'key' => $key,
+                        'length' => mb_strlen($block[$key]['text']),
+                        'limit' => $limit,
+                    ]);
+
+                    $block[$key]['text'] = rtrim(mb_substr($block[$key]['text'], 0, $limit - 1)).'…';
+                }
+            }
+        }
 
         /*
          * Last line of defence: never emit a block still carrying an empty text object.

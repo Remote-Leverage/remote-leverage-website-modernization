@@ -140,3 +140,43 @@ describe('no template can lose a message to an empty text object', function () {
         expect($checked)->toBeGreaterThan(8);
     });
 });
+
+/**
+ * Slack caps a card's title and subtitle at 150 characters and its body at 200, and refuses the
+ * ENTIRE message one character past either. Found on 2026-09-24: the overnight cost alert's
+ * closed-day body reached 314 and every card from midnight to 08:00 went unsent.
+ */
+describe('card text limits', function () {
+    beforeEach(function () {
+        config(['slack-notifications' => require __DIR__.'/../../config/slack-notifications.php']);
+    });
+
+    it('shortens an over-long card body rather than losing the whole message', function () {
+        $rendered = (new SlackMessageRenderer)->render('referrer_registered', [
+            'name' => str_repeat('N', 400),
+            'email_link' => str_repeat('b', 400),
+            'referral_code' => 'DANA123',
+            'status' => str_repeat('s', 400),
+        ]);
+
+        $card = collect($rendered['blocks'] ?? [])->firstWhere('type', 'card');
+
+        expect($card)->not->toBeNull();
+
+        foreach (SlackMessageRenderer::CARD_TEXT_LIMITS as $key => $limit) {
+            expect(mb_strlen($card[$key]['text']))->toBe($limit)
+                ->and($card[$key]['text'])->toEndWith('…');
+        }
+    });
+
+    it('leaves text inside the limit alone', function () {
+        $rendered = (new SlackMessageRenderer)->render('referrer_registered', [
+            'name' => 'Dana Whitfield',
+            'email_link' => '<mailto:dana@agency.com|dana@agency.com>',
+            'referral_code' => 'DANA123',
+            'status' => 'active',
+        ]);
+
+        expect(collect($rendered['blocks'])->firstWhere('type', 'card')['title']['text'])->toBe('Dana Whitfield');
+    });
+});

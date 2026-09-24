@@ -2353,14 +2353,45 @@ describe('channel counts and the card replies', function () {
             '2026-09-20 03:00:00',
         );
 
-        $closed = json_encode(array_values(array_filter(
-            $transport->posted[0]['blocks'],
+        $blocks = $transport->posted[0]['blocks'];
+        $at = array_key_first(array_filter(
+            $blocks,
             static fn (array $b): bool => str_contains((string) ($b['title']['text'] ?? ''), '— closed'),
-        )), JSON_UNESCAPED_UNICODE);
+        ));
+
+        // The box, then its platforms in the section under it — not inside the body.
+        $closed = json_encode([$blocks[$at], $blocks[$at + 1]], JSON_UNESCAPED_UNICODE);
 
         expect($closed)->toContain('Sat 19 Sep — closed')
+            ->and($blocks[$at + 1]['type'])->toBe('section')
             ->and($closed)->toContain('Meta — $2,892.84 spend · 56 bookings · 41 qualified · CPB $321.43')
             ->and($closed)->toContain('Microsoft — $101.94 spend · 1 booking · 1 qualified');
+    });
+
+    /*
+     * Slack caps card text at 150/150/200 characters and refuses the whole message past it. The
+     * closed day's body reached 314 with three platforms, and every overnight card of 2026-09-24
+     * went unsent until 08:00.
+     */
+    test('every card on the overnight report fits Slack\'s card limits', function () use ($counts, $run) {
+        $transport = $run(
+            costAlertDay(['Date' => '2026-09-19', 'report_kind' => 'CLOSING']),
+            PartialDay::fromRow(['date' => '2026-09-20', 'as_of_et' => '03:00', 'total_leads' => 2]),
+            ['2026-09-19' => $counts('2026-09-19'), '2026-09-20' => $counts('2026-09-20')],
+            '2026-09-20 03:00:00',
+        );
+
+        foreach ($transport->posted[0]['blocks'] as $block) {
+            if ($block['type'] !== 'card') {
+                continue;
+            }
+
+            foreach (SlackMessageRenderer::CARD_TEXT_LIMITS as $key => $limit) {
+                expect(mb_strlen((string) ($block[$key]['text'] ?? '')))->toBeLessThanOrEqual($limit);
+            }
+
+            expect((string) $block['body']['text'])->not->toEndWith('…');
+        }
     });
 
     test('there is no closed box once the report is day-to-date', function () use ($run) {

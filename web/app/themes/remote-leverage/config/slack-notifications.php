@@ -661,6 +661,15 @@ return [
                 'body' => ['type' => 'mrkdwn', 'text' => '{{ closed_body }}', 'verbatim' => false],
             ],
             /*
+             * The closed day's platforms, under its box rather than inside it: a card body is capped
+             * at 200 characters, and three platform lines overflow it.
+             */
+            [
+                'type' => 'section',
+                '_when' => ['closed_platforms'],
+                'text' => ['type' => 'mrkdwn', 'text' => '{{ closed_platforms }}'],
+            ],
+            /*
              * The platforms stay boxed, but stacked rather than in a carousel.
              *
              * A carousel scrolls sideways, which on a phone is the one gesture people do not

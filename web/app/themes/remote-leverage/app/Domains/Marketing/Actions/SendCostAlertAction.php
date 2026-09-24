@@ -784,6 +784,10 @@ class SendCostAlertAction
      *
      * Empty from 08:00, when the reported day is today and there is nothing closed to show.
      *
+     * The per-platform lines sit in a section under the box, not in its body. Slack caps a card
+     * body at 200 characters and refuses the whole message over it; three platforms came to 314,
+     * and every overnight card of 2026-09-24 went unsent until 08:00.
+     *
      * @return array<string, string>
      */
     private function closedDayCard(FunnelSnapshot $snapshot): array
@@ -791,17 +795,12 @@ class SendCostAlertAction
         $day = $snapshot->marketingDay;
 
         if ($day === null || ! $day->isClosing() || $snapshot->todaySoFar === null) {
-            return ['closed_title' => '', 'closed_subtitle' => '', 'closed_body' => ''];
+            return ['closed_title' => '', 'closed_subtitle' => '', 'closed_body' => '', 'closed_platforms' => ''];
         }
 
         $currency = $snapshot->currency;
 
-        $lines = [sprintf(
-            '*CPL* %s   *CPB* %s   *CPQB* %s',
-            $this->money($day->cpl, $currency),
-            $this->money($day->cpbPaid, $currency),
-            $this->money($day->cpqbPaid, $currency),
-        )];
+        $lines = [];
 
         foreach ($this->activeChannels($day->channels) as $channel) {
             $lines[] = sprintf(
@@ -828,7 +827,13 @@ class SendCostAlertAction
                 $this->money($day->spend, $currency),
                 $day->spendIsComplete ? '' : ' (Meta feed incomplete)',
             ),
-            'closed_body' => implode("\n", $lines),
+            'closed_body' => sprintf(
+                '*CPL* %s   *CPB* %s   *CPQB* %s',
+                $this->money($day->cpl, $currency),
+                $this->money($day->cpbPaid, $currency),
+                $this->money($day->cpqbPaid, $currency),
+            ),
+            'closed_platforms' => implode("\n", $lines),
         ];
     }
 
