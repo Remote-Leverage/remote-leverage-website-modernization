@@ -4,15 +4,40 @@ namespace App\View;
 
 use Walker_Nav_Menu;
 
+/**
+ * Mobile drawer nav. Renders both a real menu and `PrimaryNavigation::fallback()`.
+ *
+ * Mirrors production's mobile structure: one row per top-level item, hairline separated, with a
+ * circled chevron on the rows that open. A top-level item with children becomes an accordion
+ * rather than being flattened, which is what the fourteen role pages made necessary: flat, they
+ * buried Pricing under fourteen rows.
+ *
+ * `<details>`/`<summary>` rather than a JS disclosure: it is keyboard and screen reader
+ * accessible for free, and the drawer keeps its collapsed height until someone opens a section.
+ * The shared `name` makes the sections an exclusive accordion with no JavaScript; browsers
+ * without it simply allow several open.
+ *
+ * No `<li>`s: the header passes `items_wrap => '%3$s'`, so this emits the rows directly.
+ */
 class MobileNavWalker extends Walker_Nav_Menu
 {
+    private const ROW = 'flex w-full cursor-pointer items-center justify-between gap-3 border-b border-slate-200 py-4 text-base font-semibold text-slate-800 [&::-webkit-details-marker]:hidden';
+
+    private const CHEVRON = '<span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-300 text-slate-700 transition-colors group-open:border-brand-purple group-open:text-brand-purple">'
+        .'<svg class="h-4 w-4 transition-transform duration-200 group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">'
+        .'<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg></span>';
+
+    /** Whether the top-level item being walked opened a `<details>` that end_el must close. */
+    private bool $openSection = false;
+
     /**
      * Starts the list before the elements are added.
      */
     public function start_lvl(&$output, $depth = 0, $args = null): void
     {
-        $indent = str_repeat("\t", $depth);
-        $output .= "\n{$indent}<ul class=\"pl-4 py-1 space-y-1 border-l-2 border-slate-100 ml-3 my-1\">\n";
+        $output .= $depth === 0
+            ? '<div class="flex flex-col border-b border-slate-200 pb-2 pl-3">'
+            : '<div class="flex flex-col pl-3">';
     }
 
     /**
@@ -20,8 +45,7 @@ class MobileNavWalker extends Walker_Nav_Menu
      */
     public function end_lvl(&$output, $depth = 0, $args = null): void
     {
-        $indent = str_repeat("\t", $depth);
-        $output .= "{$indent}</ul>\n";
+        $output .= '</div>';
     }
 
     /**
@@ -29,53 +53,34 @@ class MobileNavWalker extends Walker_Nav_Menu
      */
     public function start_el(&$output, $data_object, $depth = 0, $args = null, $current_object_id = 0): void
     {
-        $indent = ($depth) ? str_repeat("\t", $depth) : '';
-        $classes = empty($data_object->classes) ? [] : (array) $data_object->classes;
-        $has_children = in_array('menu-item-has-children', $classes, true);
+        $label = ($args->link_before ?? '').apply_filters('the_title', $data_object->title, $data_object->ID).($args->link_after ?? '');
 
-        $li_classes = ['menu-item'];
-        $class_names = implode(' ', array_filter(array_unique(array_merge($classes, $li_classes))));
-        $output .= "{$indent}<li class=\"{$class_names}\">\n";
-
-        $title = apply_filters('the_title', $data_object->title, $data_object->ID);
-        $href = ! empty($data_object->url) ? esc_url($data_object->url) : '#';
-
-        if ($depth === 0 && $has_children) {
-            $output .= "{$indent}<details class=\"group/mobile-sub\">\n";
-            $output .= "{$indent}<summary class=\"flex items-center justify-between px-3 py-2.5 rounded-xl text-base font-semibold text-slate-800 hover:bg-slate-100 hover:text-brand-purple transition-colors cursor-pointer list-none\">";
-            $output .= '<span>'.($args->link_before ?? '').$title.($args->link_after ?? '').'</span>';
-            $output .= ' <svg class="w-4 h-4 text-slate-500 transition-transform duration-200 group-open/mobile-sub:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>';
-            $output .= "</summary>\n";
+        if ($depth === 0 && $this->has_children) {
+            $this->openSection = true;
+            $output .= '<details name="rl-mobile-nav" class="group">'
+                .'<summary class="'.self::ROW.' group-open:text-brand-purple"><span>'.$label.'</span>'.self::CHEVRON.'</summary>';
 
             return;
         }
 
-        $atts = [];
-        $atts['title'] = ! empty($data_object->attr_title) ? $data_object->attr_title : '';
-        $atts['target'] = ! empty($data_object->target) ? $data_object->target : '';
-        $atts['rel'] = ! empty($data_object->xfn) ? $data_object->xfn : '';
-        $atts['href'] = $href;
-
-        if ($depth === 0) {
-            $atts['class'] = 'flex items-center justify-between px-3 py-2.5 rounded-xl text-base font-semibold text-slate-800 hover:bg-slate-100 hover:text-brand-purple transition-colors';
-        } else {
-            $atts['class'] = 'block px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-brand-purple hover:bg-slate-50 transition-colors';
-        }
+        $atts = [
+            'href' => esc_url(! empty($data_object->url) ? $data_object->url : '#'),
+            'class' => $depth === 0
+                ? 'block border-b border-slate-200 py-4 text-base font-semibold text-slate-800 hover:text-brand-purple'
+                : 'block py-2.5 text-[15px] font-medium text-slate-700 hover:text-brand-purple',
+            'title' => esc_attr($data_object->attr_title ?? ''),
+            'target' => esc_attr($data_object->target ?? ''),
+            'rel' => esc_attr($data_object->xfn ?? ''),
+        ];
 
         $attributes = '';
         foreach ($atts as $attr => $value) {
-            if ($value === '' || $value === null) {
-                continue;
+            if ($value !== '') {
+                $attributes .= " {$attr}=\"{$value}\"";
             }
-            $value = ($attr === 'href') ? $value : esc_attr($value);
-            $attributes .= " {$attr}=\"{$value}\"";
         }
 
-        $item_output = $args->before ?? '';
-        $item_output .= "<a{$attributes}>";
-        $item_output .= '<span>'.($args->link_before ?? '').$title.($args->link_after ?? '').'</span>';
-        $item_output .= '</a>';
-        $item_output .= $args->after ?? '';
+        $item_output = ($args->before ?? '')."<a{$attributes}>{$label}</a>".($args->after ?? '');
 
         $output .= apply_filters('walker_nav_menu_start_el', $item_output, $data_object, $depth, $args);
     }
@@ -85,11 +90,9 @@ class MobileNavWalker extends Walker_Nav_Menu
      */
     public function end_el(&$output, $data_object, $depth = 0, $args = null): void
     {
-        $classes = empty($data_object->classes) ? [] : (array) $data_object->classes;
-        if ($depth === 0 && in_array('menu-item-has-children', $classes, true)) {
-            $output .= "</details>\n";
+        if ($depth === 0 && $this->openSection) {
+            $this->openSection = false;
+            $output .= '</details>';
         }
-
-        $output .= "</li>\n";
     }
 }

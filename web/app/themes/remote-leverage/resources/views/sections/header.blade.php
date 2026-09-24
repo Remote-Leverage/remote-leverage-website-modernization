@@ -37,61 +37,9 @@
                         'container' => false,
                         'echo' => false,
                         'walker' => new \App\View\NavWalker(),
-                        'fallback_cb' => function () {
-                            return '
-                                  <ul class="flex items-center gap-7 xl:gap-9 text-[17px] font-display font-medium text-slate-900">
-                                    <!-- Reviews Dropdown --><li class="menu-item relative group">
-                                      <a href="'.home_url('/reviews').'" class="flex items-center gap-1.5 py-2 hover:text-brand-purple transition-colors cursor-pointer focus:outline-none">
-                                        <span>Reviews</span>
-                                        <svg class="w-4 h-4 text-slate-700 group-hover:text-brand-purple transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                      </a>
-                                      <ul class="sub-menu absolute left-0 top-full mt-2 min-w-[280px] bg-white rounded-2xl p-2.5 shadow-xl border border-slate-100 z-50 flex-col gap-1">
-                                        <li><a href="' .
-                                home_url('/reviews') .
-                                '" class="block px-4 py-2.5 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Testimonial Reviews</a></li>
-                                        <li><a href="' .
-                                home_url('/case-study/') .
-                                '" class="block px-4 py-2.5 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Case Studies</a></li>
-                                        <li><a href="' .
-                                home_url('/samples') .
-                                '" class="block px-4 py-2.5 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">Sample Applicant Recordings</a></li>
-                                      </ul>
-                                    </li>
-                    
-                                    <!-- Roles Dropdown --><li class="menu-item relative group">
-                                      <a href="'.home_url('/admin-virtual-assistants/').'" class="flex items-center gap-1.5 py-2 hover:text-brand-purple transition-colors cursor-pointer focus:outline-none">
-                                        <span>Roles</span>
-                                        <svg class="w-4 h-4 text-slate-700 group-hover:text-brand-purple transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                      </a>
-                                      <ul class="sub-menu absolute left-0 top-full mt-2 min-w-[320px] bg-white rounded-2xl p-2.5 shadow-xl border border-slate-100 z-50 flex-col gap-1 max-h-[min(72vh,560px)] overflow-y-auto">
-' .
-                                /* The fourteen role pages, straight off the shared map, so a role added to
-                                   App\Support\RolePages appears here without anyone remembering to edit the nav.
-                                   The nine hand-written items this replaced had drifted: Social Media, Marketing
-                                   and Bookkeeping pointed at legacy slugs that are now redirects, and Medical,
-                                   Legal, Insurance, Real Estate and ECommerce were missing entirely. */
-                                implode('', array_map(
-                                    fn ($slug) => '<li><a href="' . home_url('/' . $slug . '/') .
-                                        '" class="block px-4 py-2 text-sm font-medium text-slate-800 hover:text-brand-purple hover:bg-slate-50 rounded-xl transition-colors">' .
-                                        esc_html(\App\Support\RolePages::title($slug)) . '</a></li>',
-                                    \App\Support\RolePages::slugs()
-                                )) . '
-                                      </ul>
-                                    </li>
-                    
-                                    <!-- Pricing Link --><li>
-                                      <a href="' .
-                                home_url('/vapricing') .
-                                '" class="py-2 hover:text-brand-purple transition-colors">
-                                        Pricing
-                                      </a>
-                                    </li>
-                                  </ul>';
-                        },
+                        // Only while no menu is assigned to the location. The same default nav the
+                        // deploy seeds into Appearance > Menus, through the same walker.
+                        'fallback_cb' => [\App\View\PrimaryNavigation::class, 'fallback'],
                     ]) !!}
                 </nav>
 
@@ -147,46 +95,9 @@
                 'container' => false,
                 'echo' => false,
                 'walker' => new \App\View\MobileNavWalker(),
-                /*
-                 * Mirrors production's mobile structure — one row per top-level item, hairline
-                 * separated, with a circled chevron on the rows that open — but in the 2026 type
-                 * and colour. The two desktop dropdowns become accordions rather than being
-                 * flattened into a long list, which is what the fourteen role pages made
-                 * untenable: flat, they buried Pricing under fourteen rows.
-                 *
-                 * <details>/<summary> rather than a JS disclosure: it is keyboard and screen
-                 * reader accessible for free, and the drawer keeps its collapsed height until
-                 * someone opens a section.
-                 */
-                'fallback_cb' => function () {
-                    $row = 'flex w-full cursor-pointer items-center justify-between gap-3 border-b border-slate-200 py-4 text-base font-semibold text-slate-800 [&::-webkit-details-marker]:hidden';
-                    $chevron = '<span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-300 text-slate-700 transition-colors group-open:border-brand-purple group-open:text-brand-purple">'
-                        .'<svg class="h-4 w-4 transition-transform duration-200 group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">'
-                        .'<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg></span>';
-
-                    $child = fn (string $url, string $label) => '<a href="' . $url .
-                        '" class="block py-2.5 text-[15px] font-medium text-slate-700 hover:text-brand-purple">' . esc_html($label) . '</a>';
-
-                    // The shared `name` makes these an exclusive accordion: opening one closes
-                    // the other, with no JavaScript. Browsers without it simply allow both open,
-                    // which is what this did before, so there is nothing to fall back to.
-                    $section = fn (string $label, string $children) => '<details name="rl-mobile-nav" class="group">'
-                        .'<summary class="' . $row . ' group-open:text-brand-purple"><span>' . esc_html($label) . '</span>' . $chevron . '</summary>'
-                        .'<div class="flex flex-col border-b border-slate-200 pb-2 pl-3">' . $children . '</div>'
-                        .'</details>';
-
-                    return $section('Reviews',
-                        $child(home_url('/reviews'), 'Testimonial Reviews')
-                        . $child(home_url('/case-study/'), 'Case Studies')
-                        . $child(home_url('/samples'), 'Sample Applicant Recordings')
-                    ) . $section('Roles',
-                        implode('', array_map(
-                            fn ($slug) => $child(home_url('/' . $slug . '/'), \App\Support\RolePages::title($slug)),
-                            \App\Support\RolePages::slugs()
-                        ))
-                    ) . '<a href="' . home_url('/vapricing') .
-                        '" class="block border-b border-slate-200 py-4 text-base font-semibold text-slate-800 hover:text-brand-purple">Pricing</a>';
-                },
+                // The walker emits the rows itself; see MobileNavWalker for the structure.
+                'items_wrap' => '%3$s',
+                'fallback_cb' => [\App\View\PrimaryNavigation::class, 'fallback'],
             ]) !!}
         </nav>
 

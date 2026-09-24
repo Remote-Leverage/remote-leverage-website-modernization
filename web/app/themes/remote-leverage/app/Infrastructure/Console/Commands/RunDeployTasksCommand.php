@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Console\Commands;
 
 use App\Ai\Provisioning\ContentAgentProvisioner;
+use App\Infrastructure\WordPress\PrimaryNavigationSeeder;
 use App\Infrastructure\WordPress\Security\WordfenceConfigurator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -37,7 +38,7 @@ class RunDeployTasksCommand extends Command
      * @var string
      */
     protected $description = 'Run post-deploy database tasks (migrations, rewrite rules, MCP content-agent '.
-        'reconciliation) under a cross-container lock.';
+        'reconciliation, primary nav seeding) under a cross-container lock.';
 
     private const LOCK_NAME = 'rl_deploy_tasks';
 
@@ -77,6 +78,7 @@ class RunDeployTasksCommand extends Command
         $this->flushRewriteRules();
         $this->provisionContentAgent();
         $this->applyWordfenceConfig();
+        $this->seedPrimaryNavigation();
 
         $this->info('Deploy tasks complete.');
 
@@ -179,6 +181,37 @@ class RunDeployTasksCommand extends Command
         if ($result['unknown'] !== []) {
             $this->warn('  unknown key(s) skipped: '.implode(', ', $result['unknown']));
         }
+    }
+
+    /**
+     * Seed the primary nav into Appearance > Menus, once per database.
+     *
+     * Never fatal: without a menu the header renders the same default nav from code, so a failed
+     * seed costs editability, not the nav itself.
+     */
+    private function seedPrimaryNavigation(): void
+    {
+        if (! function_exists('wp_create_nav_menu')) {
+            $this->warn('WordPress not loaded; skipped primary navigation seeding.');
+
+            return;
+        }
+
+        try {
+            $result = app(PrimaryNavigationSeeder::class)->seed();
+        } catch (Throwable $e) {
+            $this->warn('Could not seed the primary navigation: '.$e->getMessage());
+
+            return;
+        }
+
+        if ($result['skipped'] !== null) {
+            $this->info('Primary navigation seeding skipped: '.$result['skipped'].'.');
+
+            return;
+        }
+
+        $this->info("Seeded the primary navigation: menu {$result['menu_id']}, {$result['items']} items.");
     }
 
     /**
