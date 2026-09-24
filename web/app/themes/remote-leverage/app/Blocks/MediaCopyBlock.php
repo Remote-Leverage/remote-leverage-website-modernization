@@ -63,6 +63,17 @@ class MediaCopyBlock extends Block
             // /referral-program/'s art is 440px square natively; the 560px default would
             // upscale it. Existing usages leave this unset and keep 560.
             'imageMaxWidth' => (int) ($field('image_max_width') ?: 560),
+            // /become-a-partner/ rounds its photo and runs a numbered timeline under the
+            // heading. Both default off, so no existing usage moves. Named `timeline`, not
+            // `steps`: BlockDefaults::filterLoadValue() matches repeaters by name alone and
+            // would fill an empty `steps` with the process-steps presets on every media-copy.
+            'imageRounded' => (bool) $field('image_rounded'),
+            'verticalAlign' => $field('vertical_align') ?: 'center',
+            'padding' => $field('padding') ?: 'default',
+            'timeline' => array_values(array_filter(array_map(
+                fn ($row) => BlockDefaults::cleanText(is_array($row) ? ($row['text'] ?? '') : ''),
+                is_array($field('timeline')) ? $field('timeline') : [],
+            ))),
         ];
     }
 
@@ -106,6 +117,30 @@ class MediaCopyBlock extends Block
                 'ui' => 1,
                 'default_value' => 0,
             ])
+            ->addSelect('vertical_align', [
+                'label' => 'Vertical alignment',
+                'instructions' => 'How the copy sits against the image when the two differ in height.',
+                'choices' => ['center' => 'Centred (default)', 'top' => 'Top'],
+                'default_value' => 'center',
+            ])
+            ->addSelect('padding', [
+                'label' => 'Band padding',
+                'choices' => ['default' => '80px (default)', 'roomy' => '100px'],
+                'default_value' => 'default',
+            ])
+            ->addTrueFalse('image_rounded', [
+                'label' => 'Round the image corners',
+                'ui' => 1,
+                'default_value' => 0,
+            ])
+            ->addRepeater('timeline', [
+                'label' => 'Numbered Timeline',
+                'instructions' => 'Optional. Rendered under the body as a numbered vertical list.',
+                'layout' => 'table',
+                'button_label' => 'Add Step',
+            ])
+            ->addText('text', ['label' => 'Step'])
+            ->endRepeater()
             ->addSelect('tone', [
                 'label' => 'Surface',
                 'choices' => [

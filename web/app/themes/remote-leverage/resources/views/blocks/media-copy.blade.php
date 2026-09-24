@@ -20,7 +20,10 @@
         : ($isDark ? 'text-white' : 'text-black');
 @endphp
 <section @class([
-    'w-full py-14 lg:py-20',
+    'w-full',
+    'py-14 lg:py-20' => ($padding ?? 'default') !== 'roomy',
+    // /become-a-partner/'s bands all run 100px above and below.
+    'py-16 lg:py-[100px]' => ($padding ?? 'default') === 'roomy',
     'bg-bg-light' => ! $isDark && ! $isWhite,
     'bg-surface-white' => $isWhite,
     'bg-brand-dark-violet' => $isDark,
@@ -29,7 +32,10 @@
         <div class="rl-container">
             <div @class([
                 'grid grid-cols-1 gap-10',
-                'lg:grid-cols-2 lg:gap-16 lg:items-center' => ! $splitHeading,
+                'lg:grid-cols-2 lg:gap-16' => ! $splitHeading,
+                'lg:items-center' => ! $splitHeading && ($verticalAlign ?? 'center') !== 'top',
+                // The partner comp tops the heading level with the photo.
+                'lg:items-start' => ! $splitHeading && ($verticalAlign ?? 'center') === 'top',
                 // Production's text-only band, measured off /compare-athena/ on
                 // 2026-09-15: a 196px heading column, a 160px gutter and a 714px
                 // measure for the copy, top-aligned. The copy measure is what makes
@@ -53,7 +59,7 @@
                     <div @class(['flex justify-center', 'lg:order-2' => $imagePosition === 'right'])>
                         <img src="{{ $image }}" alt="" loading="lazy" decoding="async"
                              style="max-width:{{ $imageMaxWidth ?? 560 }}px"
-                             class="w-full h-auto object-contain">
+                             @class(['w-full h-auto object-contain', 'rounded-badge' => $imageRounded ?? false])>
                     </div>
                 @endif
 
@@ -87,6 +93,25 @@
                         ])>
                             {!! $body !!}
                         </div>
+                    @endif
+
+                    {{-- A numbered vertical timeline, /become-a-partner/'s "You identify the need"
+                         list off the Partner LP Figma frame at 1366px: 34px brand-purple discs
+                         joined by a 1px brand-purple rule, 18/25 medium copy 14px to the right,
+                         items 57px apart. Only the last item wraps in the comp, so the rule runs
+                         from each disc to the next rather than being one line behind them all. --}}
+                    @if (! empty($timeline))
+                        <ol class="mt-3 flex flex-col">
+                            @foreach ($timeline as $i => $item)
+                                <li class="relative flex items-start gap-3.5 pb-6 last:pb-0">
+                                    @unless ($loop->last)
+                                        <span class="absolute left-[17px] top-[33px] bottom-0 w-px bg-brand-purple" aria-hidden="true"></span>
+                                    @endunless
+                                    <span class="relative flex h-[33px] w-[34px] shrink-0 items-center justify-center rounded-full bg-brand-purple font-display text-[13px] font-bold text-white" aria-hidden="true">{{ $i + 1 }}</span>
+                                    <span @class(['pt-1 font-display text-[16px] font-medium leading-[25px] sm:text-[18px]', 'text-white' => $isDark, 'text-black' => ! $isDark])>{{ $item }}</span>
+                                </li>
+                            @endforeach
+                        </ol>
                     @endif
 
                     @if ($ctaText)

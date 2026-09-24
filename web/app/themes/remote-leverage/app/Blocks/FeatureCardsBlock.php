@@ -77,6 +77,7 @@ class FeatureCardsBlock extends Block
                     'inset' => 'Inset image (default)',
                     'flush' => 'Image flush to card edges',
                     'horizontal' => 'Text left, image right',
+                    'icon' => 'Icon card — 40px icon over the title, no image',
                 ],
                 'default_value' => 'inset',
             ])
@@ -102,6 +103,11 @@ class FeatureCardsBlock extends Block
                 'button_label' => 'Add Card',
             ])
             ->addImage('img', ['label' => 'Image', 'return_format' => 'url'])
+            ->addImage('icon', [
+                'label' => 'Icon',
+                'instructions' => 'Only used by the Icon card treatment. 40px square, SVG preferred.',
+                'return_format' => 'url',
+            ])
             ->addText('title', ['label' => 'Card Title (supports HTML)'])
             ->addTextarea('desc', ['label' => 'Card Description', 'rows' => 2])
             ->endRepeater();
@@ -120,6 +126,7 @@ class FeatureCardsBlock extends Block
             $card['title'] = BlockDefaults::cleanText($card['title'] ?? '');
             $card['desc'] = BlockDefaults::cleanText($card['desc'] ?? '');
             $card['img'] = BlockDefaults::resolveImageUrl($card['img'] ?? '');
+            $card['icon'] = BlockDefaults::resolveImageUrl($card['icon'] ?? '');
 
             return $card;
         }, $cards);

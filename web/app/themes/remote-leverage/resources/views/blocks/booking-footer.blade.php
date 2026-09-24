@@ -11,6 +11,18 @@
        · `skin` — 'glass' (default) is the dark card; 'light' is the comp's white one.
        · `form_title` — the light card's heading. Production's is "Your Contact Information".
 
+     Three more for /become-a-partner/, off the Partner LP Figma frame at 1366px, each defaulting
+     to what every other page ships:
+
+       · `layout` — 'split' (default) or 'stacked': the heading and description centred at the
+         comp's 48/53 over a centred 548px form, 40px between them, 100px above and below.
+       · `form` — 'booking' (default, the wizard) or 'partnership', the partnership-prospect form.
+         Prospects are not leads, so that form never touches the booking wizard or the lead
+         pipeline; see App\Application\Livewire\Partner.
+       · `background: map-glow` — the map over a violet bloom, the comp's mix of the two
+         existing grounds: #250D4A lifting to #381075 along the top and a #4D1FD5 bloom right of
+         centre, sampled across the frame.
+
      `revenue-first` is deliberately tied to the skin rather than exposed. The wizard renders the
      revenue field three ways: a vertical radio list when revenueFirst is set, a select when
      compactFields is, and pills otherwise. The glass card's step 1 is built around the radio
@@ -18,8 +30,11 @@
      form behaves changes — it is the same single step with every field visible either way. --}}
 @php
   $useGradient = ($background ?? 'map') === 'gradient';
+  $useGlow = ($background ?? 'map') === 'map-glow';
   $skin = $skin ?? 'glass';
   $isLight = $skin === 'light';
+  $isStacked = ($layout ?? 'split') === 'stacked';
+  $isPartnership = ($form ?? 'booking') === 'partnership';
 
   // Field ORDER only — the reveal is gated by enableIsolatedFields, which stays off, so every
   // field is visible exactly as before. The comp puts the revenue pills directly under the
@@ -28,34 +43,53 @@
     ['step_label' => 'Details', 'step_fields' => ['email', 'monthly_revenue', 'name', 'phone', 'consent']],
   ];
 
-  $bandStyle = $useGradient
-    ? 'background-color:#250D4B;background-image:'.implode(',', [
-        'radial-gradient(46% 58% at 46% 42%, #5827AE 0%, rgba(88,39,174,0) 72%)',
-        'radial-gradient(38% 62% at 99% 46%, #400F93 0%, rgba(64,15,147,0) 78%)',
-      ])
-    : ($mapImage ? "background-image:url('".$mapImage."')" : '');
+  $bandStyle = match (true) {
+    $useGradient => 'background-color:#250D4B;background-image:'.implode(',', [
+      'radial-gradient(46% 58% at 46% 42%, #5827AE 0%, rgba(88,39,174,0) 72%)',
+      'radial-gradient(38% 62% at 99% 46%, #400F93 0%, rgba(64,15,147,0) 78%)',
+    ]),
+    // The map is the first layer so it paints over the blooms, as the comp stacks them.
+    $useGlow => 'background-image:'.implode(',', array_filter([
+      $mapImage ? "url('".$mapImage."')" : '',
+      'radial-gradient(40% 36% at 72% 44%, #4D1FD5 0%, rgba(77,31,213,0) 74%)',
+      'radial-gradient(70% 30% at 50% 0%, #381075 0%, rgba(56,16,117,0) 80%)',
+    ])),
+    default => $mapImage ? "background-image:url('".$mapImage."')" : '',
+  };
 @endphp
 <section id="booking-footer"
   @class([
     'w-full text-white',
     'bg-roles-surface bg-cover bg-center bg-no-repeat' => ! $useGradient,
+    // The map-glow layers share one size, so the map spans the band rather than tiling.
   ])
   @if ($bandStyle) style="{{ $bandStyle }}" @endif>
   {{-- The band's own padding lives here rather than on <section>, so the black trust strip
        below can bleed the full width without having to escape it. Pages that leave showTrust
        off render exactly what they did before: this wrapper and nothing after it. --}}
-  <div class="py-16 sm:py-20 lg:py-24">
+  <div @class(['py-16 sm:py-20 lg:py-24' => ! $isStacked, 'py-16 sm:py-20 lg:py-[100px]' => $isStacked])>
     <div class="w-full px-4 sm:px-6 lg:px-8">
       <div class="rl-container">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 lg:items-center">
+      <div @class([
+        'grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 lg:items-center' => ! $isStacked,
+        'mx-auto flex max-w-[548px] flex-col items-center gap-10' => $isStacked,
+      ])>
 
-        <div class="flex flex-col">
-          <h2 class="font-display font-bold text-bg-light text-4xl sm:text-5xl lg:text-hero mb-6" style="color: #ffffff !important;">
+        <div @class(['flex flex-col', 'max-w-[519px] items-center text-center' => $isStacked])>
+          <h2 @class([
+            'font-display font-bold text-bg-light',
+            'text-4xl sm:text-5xl lg:text-hero mb-6' => ! $isStacked,
+            'text-[34px] leading-[1.14] sm:text-5xl lg:text-section mb-5' => $isStacked,
+          ]) style="color: #ffffff !important;">
             {!! $headline !!}
           </h2>
 
           @if (! empty($description))
-            <p class="max-w-[574px] text-white text-lg lg:text-lead" style="color: #ffffff !important;">
+            <p @class([
+              'text-white text-lg',
+              'lg:text-lead max-w-[574px]' => ! $isStacked,
+              'max-w-[480px] font-display lg:leading-[25px] lg:tracking-[-0.36px]' => $isStacked,
+            ]) style="color: #ffffff !important;">
               {!! $description !!}
             </p>
           @endif
@@ -98,10 +132,17 @@
           @endif
         </div>
 
-        <div>
+        <div @class(['w-full' => $isStacked])>
           {{-- lazy:false to match blocks/booking.blade.php — Livewire is injected after
                DOM ready by the island loader, so a #[Lazy] placeholder never gets
                hydrated and the form renders empty. --}}
+          @if ($isPartnership)
+          <livewire:partner.partnership-prospect-form
+            :button-text="$formButtonText ?? 'Book a Partnership Call'"
+            :buttonText="$formButtonText ?? 'Book a Partnership Call'"
+            :lazy="false"
+          />
+          @else
           <livewire:booking.multistep-booking-wizard
             :skin="$skin"
             :revenue-first="! $isLight"
@@ -116,6 +157,7 @@
             :buttonText="$formButtonText ?? 'Book a Consultation'"
             :lazy="false"
           />
+          @endif
         </div>
 
       </div>

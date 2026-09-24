@@ -3860,6 +3860,7 @@ Google Ads',
         'partner-hero' => ['badges', 'field_partner_hero_block_badges'],
         'talent-dossier-carousel' => ['cards', 'field_talent_dossier_carousel_block_cards'],
         'stats-band' => ['stats', 'field_stats_band_block_stats'],
+        'checklist-grid' => ['items', 'field_checklist_grid_block_items'],
         'featured-posts' => ['cards', 'field_featured_posts_block_cards'],
     ];
 
