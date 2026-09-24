@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Lead\Export;
 
+use App\Domains\Lead\Api\LeadDataFeed;
 use App\Domains\Lead\Models\Lead;
 use Closure;
+use Illuminate\Support\Str;
 
 /**
  * What a lead CSV can contain, in groups a human can choose between.
@@ -125,6 +127,37 @@ final class LeadExportColumns
         }
 
         return $values;
+    }
+
+    /**
+     * One lead as a keyed record, for the data API ({@see LeadDataFeed}).
+     *
+     * Built from the same catalogue as the CSV so the API and the file cannot offer different
+     * fields. The key is the header slugged (`UTM Source` becomes `utm_source`), which makes a
+     * header rename an API change for whoever loads this into a warehouse — so the key list is
+     * pinned in LeadDataApiTest, and renaming one fails the build rather than a nightly job.
+     *
+     * An empty cell is null rather than "": the CSV cannot tell the two apart, a loader can.
+     *
+     * @param  array<int, string>  $groups
+     * @return array<string, string|null>
+     */
+    public static function record(Lead $lead, array $groups): array
+    {
+        $record = [];
+
+        foreach (self::columns($groups) as $header => $resolve) {
+            $value = $resolve($lead);
+            $record[self::key($header)] = $value === '' ? null : $value;
+        }
+
+        return $record;
+    }
+
+    /** The record key for a header: `Created Date (UTC)` is `created_date_utc`. */
+    public static function key(string $header): string
+    {
+        return Str::slug($header, '_');
     }
 
     /**

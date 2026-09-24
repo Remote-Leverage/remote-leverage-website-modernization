@@ -17,6 +17,12 @@ namespace App\Ai;
  * DatasetRegistry already classifies leads as purge-only — never copied
  * between environments. This keeps the same posture for reads: the data can be
  * queried where it lives, never transferred.
+ *
+ * With one deliberate exception: the data team's export
+ * (App\Domains\Lead\Api\LeadDataRestRoutes) hands full rows, contact details
+ * included, to a warehouse outside this site. It is gated on this same
+ * capability, held by a dedicated `data-api` user whose credentials are issued
+ * per consumer from Settings → Data API, and every pull is logged.
  */
 final class InsightsCapability
 {

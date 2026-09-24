@@ -1589,15 +1589,218 @@ if (! function_exists('delete_transient')) {
 }
 
 /*
- * There is no users table in the unit suite, so "no such user" is the only
- * honest answer. It is enough to exercise the paths that branch on absence —
- * SyncCredentialProvisioner::revoke() returning early, for one. A test that
- * needs a real user should stub WP_User and override this, not lean on it.
- */
+|--------------------------------------------------------------------------
+| Users and application passwords (credential provisioners)
+|--------------------------------------------------------------------------
+|
+| There is no users table in the unit suite, so users live in
+| $GLOBALS['_wp_mock_users'], keyed by ID. With nothing seeded, get_user_by()
+| still answers "no such user", which is what every suite written before this
+| store existed relies on — SyncCredentialProvisioner::revoke() returning early,
+| for one. A test that seeds users clears the store in afterEach.
+|
+| Capabilities are modelled the way WP_User does it, because that is what a
+| provisioner's least-privilege guarantee is judged on: `caps` is the per-user
+| usermeta (role names included), `allcaps` is role grants overridden by it.
+*/
+
+if (! class_exists('WP_User')) {
+    class WP_User
+    {
+        /** Just enough of each role to tell a subscriber from anything more. */
+        public const ROLE_CAPABILITIES = [
+            'subscriber' => ['read' => true, 'level_0' => true],
+            'editor' => ['read' => true, 'level_0' => true, 'edit_posts' => true, 'edit_pages' => true, 'publish_pages' => true, 'upload_files' => true],
+            'administrator' => ['read' => true, 'level_0' => true, 'edit_posts' => true, 'edit_pages' => true, 'manage_options' => true],
+        ];
+
+        public int $ID = 0;
+
+        public string $user_login = '';
+
+        public string $user_email = '';
+
+        public string $display_name = '';
+
+        /** @var array<int, string> */
+        public array $roles = [];
+
+        /** @var array<string, bool> */
+        public array $caps = [];
+
+        /** @var array<string, bool> */
+        public array $allcaps = [];
+
+        public function has_cap($cap, ...$args)
+        {
+            return ! empty($this->allcaps[$cap]);
+        }
+
+        public function add_cap($cap, $grant = true)
+        {
+            $this->caps[$cap] = (bool) $grant;
+            $this->get_role_caps();
+        }
+
+        public function remove_cap($cap)
+        {
+            unset($this->caps[$cap]);
+            $this->get_role_caps();
+        }
+
+        public function set_role($role)
+        {
+            foreach ($this->roles as $old) {
+                unset($this->caps[$old]);
+            }
+
+            $this->roles = $role === '' ? [] : [$role];
+
+            if ($role !== '') {
+                $this->caps[$role] = true;
+            }
+
+            $this->get_role_caps();
+        }
+
+        public function get_role_caps()
+        {
+            $allcaps = [];
+
+            foreach ($this->roles as $role) {
+                $allcaps = array_merge($allcaps, self::ROLE_CAPABILITIES[$role] ?? []);
+            }
+
+            return $this->allcaps = array_merge($allcaps, $this->caps);
+        }
+    }
+}
+
 if (! function_exists('get_user_by')) {
     function get_user_by($field, $value)
     {
+        foreach ($GLOBALS['_wp_mock_users'] ?? [] as $user) {
+            $matches = match ($field) {
+                'id', 'ID' => $user->ID === (int) $value,
+                'login' => $user->user_login === (string) $value,
+                'email' => $user->user_email === (string) $value,
+                default => false,
+            };
+
+            if ($matches) {
+                return $user;
+            }
+        }
+
         return false;
+    }
+}
+
+if (! function_exists('wp_insert_user')) {
+    function wp_insert_user($userdata)
+    {
+        $login = (string) ($userdata['user_login'] ?? '');
+
+        if ($login === '') {
+            return new WP_Error('empty_user_login', 'Cannot create a user with an empty login name.');
+        }
+
+        if (get_user_by('login', $login)) {
+            return new WP_Error('existing_user_login', 'Sorry, that username already exists!');
+        }
+
+        $user = new WP_User;
+        $user->ID = max(array_merge([0], array_keys($GLOBALS['_wp_mock_users'] ?? []))) + 1;
+        $user->user_login = $login;
+        $user->user_email = (string) ($userdata['user_email'] ?? '');
+        $user->display_name = (string) ($userdata['display_name'] ?? $login);
+        $user->set_role((string) ($userdata['role'] ?? 'subscriber'));
+
+        $GLOBALS['_wp_mock_users'][$user->ID] = $user;
+
+        return $user->ID;
+    }
+}
+
+/*
+ * Core's own rule, not a constant: supported over HTTPS or in a local
+ * environment. Defaults to unavailable (no HTTPS, 'development'), which keeps
+ * the provisioners' refuse-with-a-reason path the one every existing suite
+ * exercises. A test that needs to mint sets $GLOBALS['_wp_mock_is_ssl'].
+ */
+if (! function_exists('is_ssl')) {
+    function is_ssl()
+    {
+        return (bool) ($GLOBALS['_wp_mock_is_ssl'] ?? false);
+    }
+}
+
+if (! function_exists('wp_is_application_passwords_available')) {
+    function wp_is_application_passwords_available()
+    {
+        return is_ssl() || wp_get_environment_type() === 'local';
+    }
+}
+
+/*
+ * Stored per user in $GLOBALS['_wp_mock_application_passwords'], hashed the
+ * way core stores them, so a test can assert the plaintext is not recoverable
+ * from anything a screen could read back. Like core, it does not refuse a
+ * duplicate name — that check lives in the REST controller, so a provisioner
+ * that wants it has to make it.
+ */
+if (! class_exists('WP_Application_Passwords')) {
+    class WP_Application_Passwords
+    {
+        public static function create_new_application_password($user_id, $args = [])
+        {
+            $name = sanitize_text_field((string) ($args['name'] ?? ''));
+
+            if ($name === '') {
+                return new WP_Error('application_password_empty_name', 'An application name is required to create an application password.', ['status' => 400]);
+            }
+
+            $password = wp_generate_password(24, false);
+
+            $item = [
+                'uuid' => wp_generate_uuid4(),
+                'app_id' => empty($args['app_id']) ? '' : $args['app_id'],
+                'name' => $name,
+                'password' => hash('sha256', $password),
+                'created' => time(),
+                'last_used' => null,
+                'last_ip' => null,
+            ];
+
+            $GLOBALS['_wp_mock_application_passwords'][(int) $user_id][] = $item;
+
+            return [$password, $item];
+        }
+
+        public static function get_user_application_passwords($user_id)
+        {
+            return array_values($GLOBALS['_wp_mock_application_passwords'][(int) $user_id] ?? []);
+        }
+
+        public static function delete_application_password($user_id, $uuid)
+        {
+            foreach ($GLOBALS['_wp_mock_application_passwords'][(int) $user_id] ?? [] as $key => $item) {
+                if ($item['uuid'] === $uuid) {
+                    unset($GLOBALS['_wp_mock_application_passwords'][(int) $user_id][$key]);
+
+                    return true;
+                }
+            }
+
+            return new WP_Error('application_password_not_found', 'Could not find an application password with that id.');
+        }
+    }
+}
+
+if (! function_exists('wp_date')) {
+    function wp_date($format, $timestamp = null, $timezone = null)
+    {
+        return date((string) $format, $timestamp ?? time());
     }
 }
 
