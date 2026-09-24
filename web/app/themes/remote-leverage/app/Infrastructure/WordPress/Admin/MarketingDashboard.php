@@ -614,8 +614,8 @@ class MarketingDashboard
      *
      * Bedrock Environment, ADR-0008 Retention Guard, PHP Runtime and Livewire stay
      * informational — none of them are a third-party integration `IntegrationHealthChecker`
-     * has an opinion about. Database, Stripe Webhooks, Calendly API, Google, ZeroBounce, PostHog,
-     * Customer.io and Slack render their real status from it instead of the hardcoded
+     * has an opinion about. Database, HubSpot, Stripe Webhooks, Calendly API, Google, ZeroBounce,
+     * PostHog, Customer.io and Slack render their real status from it instead of the hardcoded
      * "Operational"/"Compliant"/"Connected" badges this widget shipped with, which could not
      * have shown anything else. Livewire is deliberately last: every other row above it now
      * means something a person can act on, and it is the one row that still cannot.
@@ -641,6 +641,8 @@ class MarketingDashboard
             </div>
 
             <?php $this->renderIntegrationHealthRow('Database Engine', 'MySQL / MariaDB transactional connection', $integrations['database'] ?? null); ?>
+
+            <?php $this->renderIntegrationHealthRow('HubSpot', 'CRM contact sync & lifecycle staging', $integrations['hubspot'] ?? null); ?>
 
             <?php $this->renderIntegrationHealthRow('Stripe Webhooks', 'Referrer payouts & checkout — /api/webhooks/stripe', $integrations['stripe'] ?? null); ?>
 
@@ -722,6 +724,12 @@ class MarketingDashboard
      * `down` rather than silently omitted, because a row that vanishes instead of reporting
      * red is the harder failure to notice.
      *
+     * The evidence behind the badge (`consecutive_failures`, `failure_rate`, `sample_size`,
+     * `last_call_at`, `last_error`) sits behind a `<details>` "Failure details" disclosure
+     * rather than printed inline — this row already carries eight rows' worth of vertical space
+     * on a dashboard widget, not a diagnostics page, so it stays closed by default (`<details>`
+     * with no `open` attribute) and an operator opens only the row they are actually chasing.
+     *
      * @param  array<string, mixed>|null  $health
      */
     protected function renderIntegrationHealthRow(string $name, string $description, ?array $health): void
@@ -732,15 +740,32 @@ class MarketingDashboard
         $alias = $health['alias'] ?? null;
         $title = $alias !== null ? $this->titleCaseAlias($alias).' — '.$name : $name;
         ?>
-        <div class="rl-dash-health-item">
-            <div class="rl-dash-health-left">
-                <span class="<?php echo esc_attr($style['indicator']); ?>"></span>
-                <div>
-                    <div class="rl-dash-health-name"><?php echo esc_html($title); ?></div>
-                    <div class="rl-dash-health-desc"><?php echo esc_html($desc); ?></div>
+        <div class="rl-dash-health-item rl-dash-health-item--expandable">
+            <div class="rl-dash-health-top">
+                <div class="rl-dash-health-left">
+                    <span class="<?php echo esc_attr($style['indicator']); ?>"></span>
+                    <div>
+                        <div class="rl-dash-health-name"><?php echo esc_html($title); ?></div>
+                        <div class="rl-dash-health-desc"><?php echo esc_html($desc); ?></div>
+                    </div>
                 </div>
+                <span class="<?php echo esc_attr($style['badge']); ?>"><?php echo esc_html(ucfirst($status)); ?></span>
             </div>
-            <span class="<?php echo esc_attr($style['badge']); ?>"><?php echo esc_html(ucfirst($status)); ?></span>
+            <?php if ($health !== null) { ?>
+                <details class="rl-dash-health-details">
+                    <summary>
+                        <span class="dashicons dashicons-arrow-right-alt2 rl-dash-health-details-caret"></span>
+                        Failure details
+                    </summary>
+                    <div class="rl-dash-health-details-body">
+                        <div>Consecutive failures: <code><?php echo esc_html((string) ($health['consecutive_failures'] ?? 0)); ?></code></div>
+                        <div>Failure rate: <code><?php echo esc_html($health['failure_rate'] !== null ? round(((float) $health['failure_rate']) * 100).'%' : '—'); ?></code></div>
+                        <div>Sample size: <code><?php echo esc_html((string) ($health['sample_size'] ?? 0)); ?> call(s)</code></div>
+                        <div>Last call: <code><?php echo esc_html($health['last_call_at'] ?? '—'); ?></code></div>
+                        <div>Last error: <code><?php echo esc_html($health['last_error'] ?? '—'); ?></code></div>
+                    </div>
+                </details>
+            <?php } ?>
         </div>
         <?php
     }

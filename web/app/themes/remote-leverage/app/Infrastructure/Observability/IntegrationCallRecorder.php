@@ -152,6 +152,10 @@ class IntegrationCallRecorder
                 return null;
             }
 
+            $outcome = $this->outcome($statusCode, $errorMessage);
+            $redactedResponseBody = $this->redactBody($responseBody);
+            $errorMessage ??= $this->summarizeFailure($outcome, $statusCode, $redactedResponseBody);
+
             return IntegrationCall::query()->create([
                 'lead_id' => $leadId ?? $this->leadId,
                 'integration' => $integration,
@@ -163,9 +167,9 @@ class IntegrationCallRecorder
                 'request_body' => $this->redactBody($body),
                 'status_code' => $statusCode,
                 'response_headers' => $this->redactHeaders($responseHeaders),
-                'response_body' => $this->redactBody($responseBody),
+                'response_body' => $redactedResponseBody,
                 'duration_ms' => $durationMs,
-                'outcome' => $this->outcome($statusCode, $errorMessage),
+                'outcome' => $outcome,
                 'error_message' => $errorMessage,
                 'created_at' => now(),
             ]);
@@ -260,6 +264,49 @@ class IntegrationCallRecorder
         }
 
         return $errorMessage ? 'failed' : 'succeeded';
+    }
+
+    /**
+     * A short, human summary of why a call failed, for the calls that never hand `record()` one.
+     *
+     * `ConnectionFailed` and a WordPress `wp_error` already carry a real exception message — but
+     * those are transport failures, the rarer case. The far more common failure is a request
+     * that *completed* with a 4xx/5xx: HubSpot rejecting a contact property, a Stripe key that
+     * lost access. Laravel's `ResponseReceived` event carries no exception at all then, so
+     * `error_message` stayed null for exactly the failures this table exists to explain, while
+     * the detail sat unread in `response_body` — the health widget and the CLI show only
+     * `error_message`, so a real rejection looked identical to an integration nobody has called.
+     *
+     * Reads the already-redacted body, never the raw one, so a summary can never surface a
+     * secret redaction stripped from the full copy.
+     */
+    protected function summarizeFailure(string $outcome, ?int $statusCode, ?string $redactedResponseBody): ?string
+    {
+        if ($outcome !== 'failed' || $statusCode === null) {
+            return null;
+        }
+
+        $decoded = $redactedResponseBody !== null ? json_decode($redactedResponseBody, true) : null;
+
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            foreach (['message', 'error_description', 'error'] as $key) {
+                $value = $decoded[$key] ?? null;
+
+                if (is_string($value) && $value !== '') {
+                    return "HTTP {$statusCode}: {$value}";
+                }
+            }
+
+            $nested = $decoded['error']['message'] ?? null;
+
+            if (is_string($nested) && $nested !== '') {
+                return "HTTP {$statusCode}: {$nested}";
+            }
+        }
+
+        $snippet = trim((string) $redactedResponseBody);
+
+        return $snippet === '' ? "HTTP {$statusCode}" : "HTTP {$statusCode}: ".mb_substr($snippet, 0, 300);
     }
 
     /**
