@@ -297,6 +297,15 @@ class HubSpotGateway
             'gclid' => $lead->gclid,
             'fbclid' => $lead->fbclid,
             'fbc' => $lead->fbc,
+            /*
+             * The other half of Meta's match pair, alongside `fbc` — see `event_source_url`
+             * below for why both are mirrored here. `_fbp` has no column of its own, exactly
+             * like `client_user_agent` below: read straight out of the `attribution` blob rather
+             * than promoting it, since nothing here needs it as a query or filter column, only
+             * as a value to mirror. Like every key in this map it must exist in the portal
+             * before it ships; `dropUnknownProperties()` skips it quietly until then.
+             */
+            'fbp' => ((array) ($lead->attribution ?? []))['handl']['_fbp'] ?? null,
             'li_fat_id' => $lead->li_fat_id,
             'oppref' => $lead->oppref,
             /*

@@ -9,6 +9,7 @@ use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Events\LeadFormSubmitted;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\FbcResolver;
+use App\Domains\Lead\Services\FbpResolver;
 use App\Domains\Lead\Services\IdentityResolver;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\LeadColumnLimits;
@@ -27,10 +28,12 @@ class CaptureLeadAction
         protected PhoneValidationService $phoneValidator,
         protected LeadActivityLogger $activityLogger,
         protected ?FbcResolver $fbcResolver = null,
+        protected ?FbpResolver $fbpResolver = null,
     ) {
         // Optional and self-defaulting: this action is constructed by hand in seven tests, and
         // a required fourth argument would break every one of them for no benefit.
         $this->fbcResolver ??= new FbcResolver;
+        $this->fbpResolver ??= new FbpResolver;
     }
 
     /**
@@ -106,6 +109,23 @@ class CaptureLeadAction
             fbclid: $data->fbclid ?: $lead?->fbclid,
             storedFbc: $lead?->fbc,
             storedIsSynthetic: (bool) ($existingAttribution['fbc_synthetic'] ?? true),
+        );
+    }
+
+    /**
+     * What to store for `_fbp` on this write, or null to leave it exactly as it is.
+     *
+     * Same forced-live-update treatment as `fbc` — see {@see FbpResolver} for why the wizard's
+     * frozen `attributionNamed`/`attribution` are not enough on their own.
+     */
+    private function resolveFbp(array $existingAttribution, LeadCaptureData $data): ?string
+    {
+        $existingHandl = is_array($existingAttribution['handl'] ?? null) ? $existingAttribution['handl'] : [];
+
+        return $this->fbpResolver->resolve(
+            attributionNamed: $data->attributionNamed,
+            attribution: $data->attribution,
+            storedFbp: $existingHandl['_fbp'] ?? null,
         );
     }
 
@@ -226,6 +246,21 @@ class CaptureLeadAction
                 $leadAttributes['attribution'] ?? $existingAttribution,
                 ['fbc_synthetic' => $fbcResolution['synthetic']],
             );
+        }
+
+        /*
+         * `_fbp` gets the same forced-live-update treatment as `fbc`, into the blob rather than
+         * a column of its own — see FbpResolver for why the wizard's mount()-frozen attribution
+         * is not enough on its own to catch a cookie Meta's pixel JS writes a moment later.
+         */
+        $fbpResolution = $this->resolveFbp($existingAttribution, $data);
+
+        if ($fbpResolution !== null) {
+            $attribution = $leadAttributes['attribution'] ?? $existingAttribution;
+            $handl = is_array($attribution['handl'] ?? null) ? $attribution['handl'] : [];
+            $handl['_fbp'] = $fbpResolution;
+            $attribution['handl'] = $handl;
+            $leadAttributes['attribution'] = $attribution;
         }
 
         /*
