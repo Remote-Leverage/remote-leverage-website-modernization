@@ -263,14 +263,10 @@ class MarketingServiceProvider extends ServiceProvider
             try {
                 $this->app->make(FunnelMetricsService::class)->warmCache();
             } catch (\Throwable $e) {
-                $ok = false;
-
                 Log::error('MarketingServiceProvider: could not warm the cost alert snapshot', [
                     'error' => $e->getMessage(),
                 ]);
             }
-
-            $this->app->make(CronHeartbeat::class)->ran($ok, microtime(true) - $startedAt);
         });
 
         \add_action(self::CRON_HOOK, function () {
@@ -314,6 +310,14 @@ class MarketingServiceProvider extends ServiceProvider
                     'error' => $e->getMessage(),
                 ]);
             }
+
+            /*
+             * Last, so the duration covers the whole tick. This line used to sit at the end of
+             * the warm hook instead, where neither `$ok` nor `$startedAt` exists: the warm threw
+             * a TypeError every hour after its work was done, and this tick — the one the monitor
+             * is for — never checked in at all.
+             */
+            $this->app->make(CronHeartbeat::class)->ran($ok, microtime(true) - $startedAt);
         });
     }
 }
