@@ -115,12 +115,15 @@ describe('booking funnel emits the legacy event names', function () {
         expect(array_count_values(eventNames($events))['form_started'] ?? 0)->toBe(1);
     });
 
-    test('calendar paging and timezone do not count as starting the form', function () {
+    test('the zone and the calendar\'s picks do not count as starting the form', function () {
+        // Month paging no longer reaches the server at all; these are the values the browser
+        // calendar and the page-load zone detection send along with other requests.
         $events = captureWizardEvents(function () {
             $wizard = bookingWizardWithEmail();
             $wizard->updated('timezone');
-            $wizard->updated('currentMonth');
-            $wizard->updated('currentYear');
+            $wizard->updated('browserTimezone');
+            $wizard->updated('selectedDate');
+            $wizard->updated('selectedSlot');
         });
 
         expect(eventNames($events))->not->toContain('form_started');

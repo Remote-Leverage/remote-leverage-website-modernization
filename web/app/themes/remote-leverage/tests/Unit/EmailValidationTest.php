@@ -220,15 +220,19 @@ describe('form field binding', function () {
         }
     });
 
-    test('the fields that drive server-side routing stay live', function () {
-        // monthlyRevenue selects the Calendly event type and the pricing warning; timezone
-        // reloads availability. Those must round-trip when they change.
-        $blade = file_get_contents(
-            __DIR__.'/../../resources/views/livewire/booking/multistep-booking-wizard.blade.php'
-        );
+    test('the field that drives server-side routing stays live, and the zone does not', function () {
+        // monthlyRevenue selects the Calendly event type and the pricing warning, so it must
+        // round-trip when it changes. The zone used to as well, to reload availability per zone;
+        // the calendar now relabels UTC slots in the browser, so a zone change is local and
+        // rides along with the next request. A live binding would put the round trip back.
+        $views = __DIR__.'/../../resources/views/livewire/booking/';
+        $blade = file_get_contents($views.'multistep-booking-wizard.blade.php');
 
-        expect($blade)->toContain('wire:model.live="monthlyRevenue"')
-            ->and($blade)->toContain('wire:model.live="timezone"');
+        expect($blade)->toContain('wire:model.live="monthlyRevenue"');
+
+        foreach ([$views.'multistep-booking-wizard.blade.php', ...glob($views.'partials/calendar-*.blade.php')] as $view) {
+            expect(file_get_contents($view))->not->toContain('wire:model.live="timezone"');
+        }
     });
 });
 

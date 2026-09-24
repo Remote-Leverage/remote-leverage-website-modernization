@@ -6,6 +6,7 @@ use App\Domains\Referral\Repositories\EloquentReferrerRepository;
 use App\Domains\Referral\Repositories\ReferrerRepositoryInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Container\Container;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Http\JsonResponse;
@@ -175,6 +176,16 @@ $app->singleton('cache', function () {
                     $this->locks[$this->name] = true;
 
                     return $callback === null ? true : $callback();
+                }
+
+                public function block($seconds, $callback = null)
+                {
+                    // No other request can release it in-process, so a held lock times out now.
+                    if (! empty($this->locks[$this->name])) {
+                        throw new LockTimeoutException;
+                    }
+
+                    return $this->get($callback);
                 }
 
                 public function release()

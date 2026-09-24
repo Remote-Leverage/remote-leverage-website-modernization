@@ -12,10 +12,15 @@ use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Referral\Services\AttributionEngine;
 use App\Domains\Scheduling\Actions\BookMeetingAction;
+use App\Domains\Scheduling\Actions\FetchAvailableSlotsAction;
 use App\Domains\Scheduling\Data\BookingRequestData;
+use App\Domains\Scheduling\Data\TimeSlotData;
 use App\Domains\Scheduling\Listeners\HandleLeadCreatedForBooking;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
+use App\Domains\Scheduling\Services\TierAvailability;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Livewire\Component;
 
 describe('Booking Wizard MRR Routing & Tracking Parity', function () {
     beforeEach(function () {
@@ -215,34 +220,157 @@ describe('Booking Wizard MRR Routing & Tracking Parity', function () {
             ->and($lead->fresh()->status)->toBe('booked');
     });
 
-    test('Wizard month navigation up and back retains accurate availability without mock weekdays', function () {
-        $wizard = new MultistepBookingWizard;
-        $wizard->mount('test', 'glass');
-        $wizard->email = 'test@example.com';
-        $wizard->firstName = 'John';
-        $wizard->lastName = 'Doe';
-        $wizard->monthlyRevenue = '$10k to $25k Per Month';
-        $wizard->phone = '+12015550123';
-        $wizard->roleNeeded = 'Executive Assistant';
+    test('Wizard loads one shared UTC window per tier, whatever the visitor\'s zone', function () {
+        $fetcher = new class extends FetchAvailableSlotsAction
+        {
+            public array $calls = [];
 
-        $wizard->goToStep(2);
-        $initialDates = $wizard->availableDates;
+            public function __construct() {}
 
-        // Navigate forward a month
-        $wizard->nextMonth();
-        expect($wizard->currentMonth)->toBe(10)
-            ->and($wizard->currentYear)->toBe(2026);
+            public function execute(?string $startDate = null, ?string $endDate = null, string $timezone = 'UTC', ?string $eventTypeId = null): array
+            {
+                $this->calls[] = compact('startDate', 'endDate', 'timezone', 'eventTypeId');
 
-        // Navigate back to current month
-        $wizard->prevMonth();
-        expect($wizard->currentMonth)->toBe(9)
-            ->and($wizard->currentYear)->toBe(2026)
-            ->and($wizard->availableDates)->toEqual($initialDates);
+                // Out of order, duplicated, one unavailable, one with an offset: the list the
+                // browser gets is sorted, unique, open-only and Zulu.
+                $slot = fn (string $start, bool $open = true) => new TimeSlotData($start, $start, 'UTC', $open);
 
-        // Cannot navigate before current month
-        $wizard->prevMonth();
-        expect($wizard->currentMonth)->toBe(9)
-            ->and($wizard->currentYear)->toBe(2026);
+                return [
+                    $slot('2026-09-26T15:00:00Z'),
+                    $slot('2026-09-25T14:30:00Z'),
+                    $slot('2026-09-25T09:30:00-05:00'),
+                    $slot('2026-09-25T14:30:00Z'),
+                    $slot('2026-09-27T15:00:00Z', false),
+                ];
+            }
+        };
+
+        app()->instance(FetchAvailableSlotsAction::class, $fetcher);
+        Cache::forget('rl_avail_window_'.md5('https://api.calendly.com/event_types/5c82a248-c65a-4fb1-bdc6-aefd6e89fbfb'));
+
+        try {
+            $manila = new MultistepBookingWizard;
+            $manila->monthlyRevenue = '$10k to $50k Per Month';
+            $manila->timezone = 'Asia/Manila';
+            $manila->loadAvailability();
+
+            $chicago = new MultistepBookingWizard;
+            $chicago->monthlyRevenue = '$10k to $50k Per Month';
+            $chicago->timezone = 'America/Chicago';
+            $chicago->loadAvailability();
+
+            expect($fetcher->calls)->toHaveCount(1)
+                ->and($fetcher->calls[0]['timezone'])->toBe('UTC')
+                ->and($manila->openSlots)->toBe(['2026-09-25T14:30:00Z', '2026-09-26T15:00:00Z'])
+                ->and($chicago->openSlots)->toBe($manila->openSlots);
+
+            // Seven days, never more: Calendly refuses a longer window on this endpoint.
+            $start = Carbon\Carbon::parse($fetcher->calls[0]['startDate']);
+            $end = Carbon\Carbon::parse($fetcher->calls[0]['endDate']);
+            expect($start->diffInDays($end))->toEqual(7);
+        } finally {
+            app()->offsetUnset(FetchAvailableSlotsAction::class);
+        }
+    });
+
+    test('the warm-up fetches once, and not at all when cached or already being fetched', function () {
+        $fetcher = new class extends FetchAvailableSlotsAction
+        {
+            public int $calls = 0;
+
+            public function __construct() {}
+
+            public function execute(?string $startDate = null, ?string $endDate = null, string $timezone = 'UTC', ?string $eventTypeId = null): array
+            {
+                $this->calls++;
+
+                return [new TimeSlotData('2026-09-25T14:30:00Z', '2026-09-25T15:00:00Z', 'UTC')];
+            }
+        };
+
+        $uri = 'https://api.calendly.com/event_types/warm-test';
+        $key = TierAvailability::cacheKey($uri);
+        $tier = new TierAvailability($fetcher);
+        Cache::forget($key);
+
+        // Another request already fetching: skip, do not queue a second Calendly call.
+        $held = Cache::lock($key.'_lock', 30);
+        $held->get();
+        $tier->warm($uri, 't10');
+        expect($fetcher->calls)->toBe(0);
+        $held->release();
+
+        $tier->warm($uri, 't10');
+        $tier->warm($uri, 't10');
+        expect($fetcher->calls)->toBe(1)
+            ->and($tier->slots($uri, 't10'))->toBe(['2026-09-25T14:30:00Z'])
+            ->and($fetcher->calls)->toBe(1);
+
+        Cache::forget($key);
+    });
+
+    test('Wizard declares no property Livewire uses for itself', function () {
+        // A public `$slots` once replaced Livewire 4's own slot registry, and every request that
+        // reached dehydrate died with "Call to a member function getName() on string" — while
+        // this suite, which never runs Livewire's lifecycle, stayed green.
+        $livewire = array_map(
+            fn (ReflectionProperty $p) => $p->getName(),
+            (new ReflectionClass(Component::class))->getProperties()
+        );
+
+        $own = array_map(
+            fn (ReflectionProperty $p) => $p->getName(),
+            array_filter(
+                (new ReflectionClass(MultistepBookingWizard::class))->getProperties(),
+                fn (ReflectionProperty $p) => $p->getDeclaringClass()->getName() === MultistepBookingWizard::class
+            )
+        );
+
+        expect(array_values(array_intersect($own, $livewire)))->toBe([]);
+    });
+
+    test('Wizard warms the calendar after the revenue click, and makes no Calendly call on a date click', function () {
+        $wizard = new class extends MultistepBookingWizard
+        {
+            public int $fetches = 0;
+
+            public int $warmUps = 0;
+
+            public function loadAvailability(bool $fresh = false): void
+            {
+                $this->fetches++;
+            }
+
+            protected function warmAvailability(): void
+            {
+                $this->warmUps++;
+            }
+        };
+
+        $wizard->monthlyRevenue = '$10k to $50k Per Month';
+        $wizard->openSlots = ['2026-09-25T14:30:00Z'];
+        $wizard->updatedMonthlyRevenue();
+
+        // Queued for after the response, never fetched in front of it.
+        expect($wizard->fetches)->toBe(0)
+            ->and($wizard->warmUps)->toBe(1)
+            ->and($wizard->openSlots)->toBe([]);
+
+        $wizard->monthlyRevenue = 'Looking for a job? Click Here';
+        $wizard->updatedMonthlyRevenue();
+        expect($wizard->warmUps)->toBe(1);
+
+        $wizard->monthlyRevenue = '$10k to $50k Per Month';
+        $wizard->currentStep = 2;
+        $wizard->selectDate('2026-09-25');
+
+        expect($wizard->fetches)->toBe(0)
+            ->and($wizard->selectedDate)->toBe('2026-09-25')
+            ->and($wizard->currentStep)->toBe(3);
+
+        // The value arrives from the browser; anything that is not a date is ignored.
+        $wizard->selectDate('2026-09-25T00:00:00Z');
+        expect($wizard->selectedDate)->toBe('2026-09-25');
     });
 
     test('Wizard isolated fields mount defaults and custom configuration', function () {
