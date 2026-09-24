@@ -57,7 +57,9 @@ final class CostAlertSendLink
             return '';
         }
 
-        $base = (string) home_url('/'.self::PATH);
+        // Trailing slash, like ReferralLink's: without one, nginx 301s the press to the
+        // slashed URL before it reaches the page.
+        $base = (string) home_url('/'.self::PATH.'/');
 
         if (preg_match('#^https?://#i', $base) !== 1) {
             return '';

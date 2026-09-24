@@ -73,7 +73,7 @@ describe('the signed link', function () {
     test('a link the card minted is accepted', function () {
         $url = CostAlertSendLink::url();
 
-        expect($url)->toStartWith('https://remoteleverage.com/cost-alert/send?expires=');
+        expect($url)->toStartWith('https://remoteleverage.com/cost-alert/send/?expires=');
 
         $params = sendLinkParams();
 
