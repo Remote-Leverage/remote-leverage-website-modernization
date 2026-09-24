@@ -60,7 +60,12 @@ describe('what gets recorded', function () {
             ->and($call->outcome)->toBe('failed')
             ->and($call->duration_ms)->toBe(214)
             ->and($call->request_body)->toContain('intake_form')
-            ->and($call->response_body)->toContain('Property values were not valid');
+            ->and($call->response_body)->toContain('Property values were not valid')
+            // `ResponseReceived` never hands `record()` an errorMessage — a completed 4xx/5xx
+            // carries no exception. Without this, `error_message` (what the health widget and
+            // the CLI actually show) stayed null for exactly this rejection, even though the
+            // detail was sitting right there in response_body.
+            ->and($call->error_message)->toBe('HTTP 400: Property values were not valid: intake_form');
     });
 
     test('a transport failure is recorded as error, distinct from a rejection', function () {

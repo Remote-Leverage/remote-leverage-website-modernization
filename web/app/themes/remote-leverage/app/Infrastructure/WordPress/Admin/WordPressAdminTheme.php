@@ -2470,6 +2470,66 @@ class WordPressAdminTheme
                 color: #71717a !important;
                 line-height: 1.2 !important;
             }
+            .rl-dash-health-item--expandable {
+                flex-direction: column !important;
+                align-items: stretch !important;
+            }
+            .rl-dash-health-top {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                width: 100% !important;
+                gap: 12px !important;
+            }
+            .rl-dash-health-details {
+                margin-top: 6px !important;
+                padding-left: 18px !important;
+            }
+            .rl-dash-health-details summary {
+                display: flex !important;
+                align-items: center !important;
+                gap: 4px !important;
+                font-size: 11px !important;
+                color: #71717a !important;
+                cursor: pointer !important;
+                font-weight: 500 !important;
+                list-style: none !important;
+            }
+            .rl-dash-health-details summary::-webkit-details-marker {
+                display: none !important;
+            }
+            .rl-dash-health-details summary::marker {
+                content: '' !important;
+            }
+            .rl-dash-health-details-caret {
+                font-size: 14px !important;
+                width: 14px !important;
+                height: 14px !important;
+                line-height: 14px !important;
+                color: #a1a1aa !important;
+                transition: transform 0.15s ease !important;
+            }
+            .rl-dash-health-details[open] .rl-dash-health-details-caret {
+                transform: rotate(90deg) !important;
+            }
+            .rl-dash-health-details-body {
+                margin-top: 6px !important;
+                padding: 8px 10px !important;
+                background: #ffffff !important;
+                border: 1px solid #e4e4e7 !important;
+                border-radius: 6px !important;
+                font-size: 11px !important;
+                color: #3f3f46 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 3px !important;
+            }
+            .rl-dash-health-details-body code {
+                background: #f4f4f5 !important;
+                padding: 1px 4px !important;
+                border-radius: 4px !important;
+                font-size: 10.5px !important;
+            }
 
             /* Dashboard Marketing Shortcuts */
             .rl-dash-shortcuts-grid {
