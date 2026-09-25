@@ -45,7 +45,7 @@ values for `{{ placeholders }}`.
 | `live_call_declined` | `LiveCallRequested`, declined | The reason this event exists; see below. |
 | `referrer_registered`, `referral_recorded`, `payout_completed` | The referral domain | Top level, not threaded — no lead thread to hang them on. |
 | `partnership_prospect` | `PartnershipProspectSubmitted` (the `/become-a-partner/` form) | Its own channel (Partners Hub → Partnership Settings) or **not at all** — never the default sales channel, and skipped without a bot token because a webhook cannot honour the override. A prospect added by hand on Partners Hub → Prospects is never announced (`RecordPartnershipProspectAction` does not dispatch the event). |
-| `marketing_cost_alert` | The hourly `rl_marketing_cost_alert` cron, through `SendCostAlertAction` | Its own channel, and the one template that is edited rather than reposted. See below. |
+| `marketing_cost_alert` | The hourly `rl_marketing_cost_alert` cron, through `SendCostAlertAction` | Its own channel. A new card every run, never an edit; its **Send new alert** button posts one on demand. See below. |
 
 Two rules the renderer enforces, both there because the alternative shows up in a channel people
 watch all day: an unresolved placeholder renders **empty**, never as the literal `{{ key }}`; and
@@ -56,22 +56,13 @@ does not render a grid of dashes.
 Each family of templates has a test asserting it, because the Block Kit Builder picker is one
 click away from the JSON you are about to paste.
 
-### The cost alert edits itself
+### The cost alert posts a card every run
 
-`marketing_cost_alert` breaks the pattern every other template in this file follows. The rest post
-a card when something happens; this one is a running total, refreshed every hour between 09:00 and
-18:00, and posting nine near-identical cards a day is how a channel becomes something people mute.
-The history is worse than the noise: scrolling back a week would mean paging through sixty cards to
-find the six that mattered.
-
-So the first run of the day posts and every run after it edits that same message — one live card in
-the channel, one row per day in the history. `SendCostAlertAction::STATE_OPTION` is the memory that
-makes it possible, holding the `ts`, the channel id and **the date the card belongs to**. The date
-is the part that matters: without it the first run after midnight would edit yesterday's card into
-today's numbers and quietly destroy the only record of yesterday. A stale date posts fresh instead.
-If the edit fails — somebody deleted the message, the channel moved underneath it — it posts a new
-card rather than dropping the run, because a duplicate card is a visible annoyance and a silent gap
-in a cost alert is neither visible nor harmless.
+`marketing_cost_alert` is a running total rather than an event. It was first built to post once a
+day and `chat.update` that card hourly; it now posts a new card on every run, because the channel
+is the record of how the day developed and an edit destroys that record every hour. The reasoning
+is in `SendCostAlertAction`'s class docblock. `STATE_OPTION` still holds the last card's `ts` and
+channel, but only so a card can be found again — nothing decides what to send from it.
 
 It is also the first thing to post outside `#new-appts`. `SlackTransport::post()` grew an optional
 `$channel` argument for it, filled from `marketing.cost_alert.channel`; omitted, everything else
@@ -80,13 +71,6 @@ incoming webhook URL is bound to the channel it was created for — so the overr
 and the message is sent anyway, to the webhook's own channel. A cost digest landing in the wrong
 channel is obvious and somebody fixes it within the hour; sending nothing is the failure that goes
 unnoticed for a month.
-
-`SlackTransport::update()` is new for the same reason, and it is bot-token-only in a way the
-threading degradation is not. A webhook cannot edit anything and never returned a `ts` to try it
-with, so the action refuses to remember a card it cannot edit: storing a null `ts` would send every
-later run down the update path, fail, and post anyway — a duplicate card once an hour, in exactly
-the environment that has no bot token because nobody has finished wiring it up. `update()` returns
-false rather than silently reposting, so the caller decides.
 
 ## One thread per lead
 
@@ -152,6 +136,15 @@ That was not always true. Claim, Mark contacted and Block were interactive butto
 `SLACK_SIGNING_SECRET`; they were removed on 2026-09-21 along with the endpoint, the secret and
 the in-thread confirmations they posted (`lead_claimed`, `lead_contacted`, `lead_blocked`).
 Acting on a lead is done in the portal.
+
+The cost alert's **Send new alert** button (2026-09-24) is still a link, which is the point: it
+opens `/cost-alert/send` on whichever site posted the card, and that page POSTs back to
+`/api/marketing/cost-alert/send`, which posts a fresh card exactly as the dashboard's **Send to
+Slack now** does. The URL carries an expiring HMAC signature (`CostAlertSendLink`, keyed on the
+auth salt, valid for a week), and that signature is the whole permission — anyone holding the card
+can press it, which is the model the removed interactive buttons had too. The GET never sends, so
+a link preview or a scanner cannot post a card, and one press per two minutes goes through, so a
+double click posts one.
 
 **If they ever come back**, the trap that made them awkward is still there: the interactivity
 request URL is a property of the **app**, not of an environment, and every environment shares one

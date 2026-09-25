@@ -840,6 +840,18 @@ return [
                         'text' => ['type' => 'plain_text', 'text' => 'Unattributed', 'emoji' => false],
                         'url' => '{{ unattributed_url }}',
                     ],
+
+                    /*
+                     * Posts a fresh card now. Still a link: it opens a short page on the site
+                     * that does the send, so it needs no interactivity setting either. See
+                     * CostAlertSendLink.
+                     */
+                    [
+                        'type' => 'button',
+                        '_when' => ['send_url'],
+                        'text' => ['type' => 'plain_text', 'text' => 'Send new alert', 'emoji' => false],
+                        'url' => '{{ send_url }}',
+                    ],
                 ],
             ],
         ],

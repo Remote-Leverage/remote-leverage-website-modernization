@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Application\Http\Controllers\CostAlertSendController;
+use App\Application\Http\Controllers\SchedulerLinkController;
+use App\Domains\Marketing\Support\CostAlertSendLink;
 use App\Domains\Scheduling\Actions\RouteInstantCallAction;
 use App\Support\PageRobots;
 use App\Support\SocialKit;
@@ -27,6 +30,9 @@ Route::get('book-consultation', function () {
 Route::get('book', function () {
     return redirect()->route('funnel.book-consultation');
 });
+
+// "Add to calendar" for a booked consultation; the URL stored in HubSpot `schedule_link`.
+Route::get('scheduler-link', SchedulerLinkController::class)->name('funnel.scheduler-link');
 
 /*
  * Live-transfer booking form — the internal tool a BDR fills in after a live call, for a lead
@@ -153,3 +159,9 @@ Route::get('partners', function () {
 Route::get(SocialKit::SLUG, function () {
     return view('pages.social-media-kit');
 })->name('social-media-kit');
+
+/*
+ * Where the cost alert card's "Send new alert" button lands. The GET is a page and posts nothing;
+ * the page POSTs back to `api.marketing.cost-alert.send`, which sends. See CostAlertSendController.
+ */
+Route::get(CostAlertSendLink::PATH, [CostAlertSendController::class, 'show'])->name('marketing.cost-alert.send');

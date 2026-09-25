@@ -54,3 +54,27 @@ test('there is no open check-in left for Sentry to time out', function () {
     expect($src)->not->toContain('inProgress')
         ->and($src)->toContain('maxRuntime: null');
 });
+
+/*
+ * The check-in has to sit in the hook it reports on.
+ *
+ * It landed in the warm hook instead — one hunk up, in the same closure shape — where neither
+ * `$ok` nor `$startedAt` is defined. The warm then threw a TypeError every hour after its work
+ * was done, and the cost alert tick, which is the one the monitor exists to watch, never checked
+ * in. Read from source because the `add_action` stub keeps no callbacks to call.
+ */
+test('the scheduled tick checks in, and the cache warm does not', function () {
+    $src = (string) file_get_contents(__DIR__.'/../../app/Infrastructure/Providers/MarketingServiceProvider.php');
+
+    $warmAt = strpos($src, '\add_action(self::WARM_HOOK');
+    $tickAt = strpos($src, '\add_action(self::CRON_HOOK');
+
+    expect($warmAt)->toBeInt()->and($tickAt)->toBeInt()->and($warmAt)->toBeLessThan($tickAt);
+
+    $warm = substr($src, $warmAt, $tickAt - $warmAt);
+    $tick = substr($src, $tickAt);
+
+    expect($warm)->not->toContain('CronHeartbeat')
+        ->and($tick)->toContain('CronHeartbeat::class)->ran($ok, microtime(true) - $startedAt)')
+        ->and(strpos($tick, '$startedAt = microtime(true)'))->toBeLessThan(strpos($tick, '->ran($ok'));
+});

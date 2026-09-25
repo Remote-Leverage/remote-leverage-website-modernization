@@ -59,17 +59,20 @@ return [
     | Meta (Facebook) Pixel
     |--------------------------------------------------------------------------
     |
-    | Production fires two, both on every page, both with a PageView. Two is
-    | deliberate here only because it is what production does — whether both
-    | accounts are still wanted is a question for whoever owns the ad spend,
-    | and dropping one is a one-line change once somebody answers it.
+    | Two pixels, both on every page, both with a PageView and both receiving
+    | the server-side Lead. **Do not drop 1430907207548734.** It is the
+    | "RL 5/6 Meta Pixel", the only one the legacy HandL CAPI ever sent Leads
+    | to, and so the one the Remote Leverage 5 ad account (~87% of Meta spend)
+    | optimises on. 3075368 removed it as "obsolete" on 2026-09-21; from
+    | 2026-09-22 00:59 ET that pixel received no Lead and no PageView at all.
+    | See docs/booking-rate-diagnostic-2026-09-25.md.
     |
     | Not in GTM. Verified 2026-09-17 against both containers.
     */
     'meta' => [
         'pixel_ids' => array_values(array_filter(array_map(
             'trim',
-            explode(',', trim((string) env('META_PIXEL_IDS', '')) ?: '1482937899395718'),
+            explode(',', trim((string) env('META_PIXEL_IDS', '')) ?: '1430907207548734,1482937899395718'),
         ))),
         'track_page_view' => filter_var(env('META_TRACK_PAGE_VIEW', true), FILTER_VALIDATE_BOOLEAN),
 

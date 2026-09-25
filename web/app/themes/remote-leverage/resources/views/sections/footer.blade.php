@@ -121,9 +121,9 @@
           </a>
         </div>
 
-        <a href="mailto:contact@remoteleverage.com" class="block text-sm text-slate-400 hover:text-white transition-colors mb-4">
+        <span class="block text-sm text-slate-400 transition-colors mb-4">
           contact@remoteleverage.com
-        </a>
+        </span>
 
         <p class="text-sm text-slate-400 leading-relaxed">
           1395 Brickell Avenue, Suite 800, Miami, FL 33131

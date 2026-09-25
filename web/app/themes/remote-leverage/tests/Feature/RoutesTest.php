@@ -28,7 +28,9 @@ describe('Application Routes', function () {
     test('api routes are registered', function () {
         expect(Route::has('api.webhooks.stripe'))->toBeTrue()
             ->and(Route::has('api.webhooks.calendly'))->toBeTrue()
-            ->and(Route::has('api.health'))->toBeTrue();
+            ->and(Route::has('api.health'))->toBeTrue()
+            // The cost alert card's "Send new alert" button POSTs here.
+            ->and(Route::has('api.marketing.cost-alert.send'))->toBeTrue();
     });
 
     test('web routes are registered for standalone funnels', function () {
@@ -38,7 +40,9 @@ describe('Application Routes', function () {
             ->and(Route::has('referrer.register'))->toBeTrue()
             ->and(Route::has('referrer.dashboard.legacy'))->toBeTrue()
             // Internal, unlisted and unindexed, but still a route that must exist (WR-126).
-            ->and(Route::has('sales.referral'))->toBeTrue();
+            ->and(Route::has('sales.referral'))->toBeTrue()
+            // Where the cost alert card's "Send new alert" link lands.
+            ->and(Route::has('marketing.cost-alert.send'))->toBeTrue();
     });
 
     test('health check route returns healthy json response', function () {
