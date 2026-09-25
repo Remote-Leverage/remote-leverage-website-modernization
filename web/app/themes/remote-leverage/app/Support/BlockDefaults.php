@@ -3096,18 +3096,69 @@ class BlockDefaults
         return self::patternBlock('roles-pricing-grid', $merged, ['align' => 'full']);
     }
 
-    public static function renderAboutHero(array $overrides = []): string
+    /**
+     * `acf/about-hero`'s `block_type` field picks headline/subtitle/CTA authoring mode and
+     * defaults here to "acf" — the plain text fields — matching the field's own default_value
+     * in AboutHeroBlock::fields(). That renders as an ordinary self-closing comment.
+     *
+     * Passing `'block_type' => 'inner_blocks'` in `$overrides` switches to editing those three
+     * in place as native blocks (see AboutHeroBlock::$supports and
+     * resources/views/blocks/about-hero.blade.php), which — like `acf/experiment` — needs an
+     * open/close comment pair instead, since the inner blocks are real, separate content. Only
+     * then does `$inner` apply; it defaults to the same markup the block's own InnerBlocks
+     * template seeds a freshly inserted block with. Passed with `block_type` left as "acf",
+     * `$inner` is ignored rather than saved as dead, unrendered content.
+     */
+    public static function renderAboutHero(array $overrides = [], ?string $inner = null): string
     {
-        $data = [
-            'headline' => 'The world leader in staffing solutions',
-            'subtitle' => 'Great talent changes everything. <strong>Remote Leverage makes global hiring easier.</strong> We find top 1% global talent, you hire direct.',
-            'button_text' => 'BOOK A CONSULTATION',
-            'button_url' => '#booking-footer',
+        $blockType = $overrides['block_type'] ?? 'acf';
+
+        $defaults = [
+            'block_type' => 'acf',
             'badge_text' => '2.5K+ pre-vetted candidates',
             'trusted_title' => 'TRUSTED BY SCALING TEAMS GLOBALLY',
         ];
 
-        return self::patternBlock('about-hero', array_merge($data, $overrides), ['align' => 'full']);
+        if ($blockType === 'acf') {
+            $defaults['headline'] = 'The world leader in staffing solutions';
+            $defaults['subtitle'] = 'Great talent changes everything. <strong>Remote Leverage makes global hiring easier.</strong> We find top 1% global talent, you hire direct.';
+            $defaults['button_text'] = 'BOOK A CONSULTATION';
+            $defaults['button_url'] = '#booking-footer';
+        }
+
+        $data = self::withFieldKeys('about_hero_block', array_merge($defaults, $overrides));
+
+        $attrs = json_encode([
+            'name' => 'acf/about-hero',
+            'data' => $data,
+            'align' => 'full',
+            'mode' => 'preview',
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        if ($blockType === 'acf') {
+            return '<!-- wp:acf/about-hero '.$attrs.' /-->';
+        }
+
+        return '<!-- wp:acf/about-hero '.$attrs.' -->'.($inner ?? self::aboutHeroDefaultInner()).'<!-- /wp:acf/about-hero -->';
+    }
+
+    public static function aboutHeroDefaultInner(): string
+    {
+        return <<<'HTML'
+        <!-- wp:heading {"level":1,"className":"font-display text-4xl sm:text-5xl lg:text-[56px] font-bold text-white! tracking-[-0.03em] leading-[1.1] mb-6"} -->
+        <h1 class="wp-block-heading font-display text-4xl sm:text-5xl lg:text-[56px] font-bold text-white! tracking-[-0.03em] leading-[1.1] mb-6">The world leader in staffing solutions</h1>
+        <!-- /wp:heading -->
+
+        <!-- wp:paragraph {"className":"text-base sm:text-lg text-white/80 leading-relaxed mb-8 max-w-xl"} -->
+        <p class="text-base sm:text-lg text-white/80 leading-relaxed mb-8 max-w-xl">Great talent changes everything. <strong>Remote Leverage makes global hiring easier.</strong> We find top 1% global talent, you hire direct.</p>
+        <!-- /wp:paragraph -->
+
+        <!-- wp:buttons -->
+        <div class="wp-block-buttons"><!-- wp:button {"className":"is-style-pill-purple"} -->
+        <div class="wp-block-button is-style-pill-purple"><a class="wp-block-button__link wp-element-button" href="#booking-footer">BOOK A CONSULTATION</a></div>
+        <!-- /wp:button --></div>
+        <!-- /wp:buttons -->
+        HTML;
     }
 
     public static function renderAboutStats(array $overrides = []): string

@@ -7,32 +7,63 @@
 
     <div class="relative w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16 lg:pt-20 lg:pb-24">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-            {{-- Left Content --}}
-            <div class="lg:col-span-7 flex flex-col items-start z-10">
-                <h1 class="font-display text-4xl sm:text-5xl lg:text-[56px] font-bold text-white tracking-[-0.03em] leading-[1.1] mb-6">
-                    {!! $headline !!}
-                </h1>
+            {{-- Left Content: the `block_type` ACF field (AboutHeroBlock::fields()) switches
+                 headline/subtitle/CTA between two authoring modes.
 
-                <div class="text-base sm:text-lg text-white/80 leading-relaxed mb-8 max-w-xl">
-                    {!! $subtitle !!}
-                </div>
+                 "inner_blocks" (default): edited in place as native Gutenberg blocks. `jsx`
+                 support on the block (AboutHeroBlock::$supports) is what makes ACF hydrate the
+                 `<InnerBlocks />` tag into a real block area; `template`/`allowedBlocks` are
+                 plain HTML attributes whose value is JSON built in AboutHeroBlock::with()
+                 (`wp_json_encode()`, escaped here like any other Blade variable) — NOT JSX/JS
+                 object-literal syntax typed inline, which ACF does not parse and simply prints
+                 as literal text. `templateLock="all"` stops editors adding/removing/reordering
+                 pieces so the two-column hero layout can't drift. The CTA reuses the theme's
+                 `is-style-pill-purple` core/button style rather than a bespoke class, at the
+                 cost of a barely-visible purple/weight shift from the original hand-rolled
+                 button (#8028E0/700 vs the shared token #8A2BE2/800).
 
-                @if (! empty($buttonText))
-                    <a href="{{ $buttonUrl ?: '#booking-footer' }}"
-                        class="inline-flex items-center gap-3 bg-[#8028E0] hover:bg-[#6e1ec7] text-white text-sm font-bold uppercase tracking-[0.06em] px-8 py-4 rounded-full transition-all duration-200 shadow-[0_4px_24px_rgba(128,40,224,0.45)] hover:shadow-[0_6px_28px_rgba(128,40,224,0.6)]">
-                        <span>{{ $buttonText }}</span>
-                        <span class="w-6 h-6 rounded-full border border-white/50 flex items-center justify-center bg-white/10">
-                            <svg class="w-3.5 h-3.5 translate-x-[0.5px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                            </svg>
-                        </span>
-                    </a>
+                 "acf" (legacy): the pre-InnerBlocks version — plain text/textarea ACF fields
+                 rendered as static markup, including the original hand-rolled pill button with
+                 its arrow-in-circle SVG that the InnerBlocks mode can't reproduce. --}}
+            <div class="order-2 lg:order-1 lg:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left z-10">
+                @if ($blockType === 'acf')
+                    <h1 class="font-display text-4xl sm:text-5xl lg:text-[56px] font-bold text-white! tracking-[-0.03em] leading-[1.1] mb-6">
+                        {!! $headline !!}
+                    </h1>
+
+                    <div class="text-base sm:text-lg text-white/80 leading-relaxed mb-8 max-w-xl">
+                        {!! $subtitle !!}
+                    </div>
+
+                    @if (! empty($buttonText))
+                        <a href="{{ $buttonUrl ?: '#booking-footer' }}"
+                            class="inline-flex items-center gap-3 bg-[#8028E0] hover:bg-[#6e1ec7] text-white text-sm font-bold uppercase tracking-[0.06em] px-8 py-4 rounded-full transition-all duration-200 shadow-[0_4px_24px_rgba(128,40,224,0.45)] hover:shadow-[0_6px_28px_rgba(128,40,224,0.6)]">
+                            <span>{{ $buttonText }}</span>
+                            <span class="w-6 h-6 rounded-full border border-white/50 flex items-center justify-center bg-white/10">
+                                <svg class="w-3.5 h-3.5 translate-x-[0.5px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </span>
+                        </a>
+                    @endif
+                @else
+                    {{-- The saved `.wp-block-buttons` markup stretches full-width and defaults
+                         to left-aligned content; the button itself already keeps its fixed
+                         width, it just needs centering below `lg` to match the rest of this
+                         column. Scoped here so it doesn't touch `wp-block-buttons` elsewhere. --}}
+                    <div class="[&_.wp-block-buttons]:justify-center lg:[&_.wp-block-buttons]:justify-start">
+                        <InnerBlocks
+                            template="{{ $ctaTemplate }}"
+                            allowedBlocks="{{ $ctaAllowedBlocks }}"
+                            templateLock="all"
+                        />
+                    </div>
                 @endif
             </div>
 
-            {{-- Right Graphic: 3D Dotted Globe & Talent Pins --}}
-            <div class="lg:col-span-5 relative flex flex-col items-center justify-center">
-                <div class="relative w-full max-w-[420px] aspect-square flex items-center justify-center">
+            {{-- Right Graphic: 3D Dotted Globe --}}
+            <div class="order-1 lg:order-2 order lg:col-span-5 relative flex flex-col items-center justify-center">
+                <div class="relative order-2 lg:order-1 w-full max-w-[420px] aspect-square flex items-center justify-center">
                     {{-- Dotted Globe Canvas/Image --}}
                     @if (! empty($globeImage))
                         <img src="{{ $globeImage }}" alt="Remote Leverage Global Network" width="420" height="420"
@@ -40,35 +71,10 @@
                     @else
                         <div class="w-full h-full rounded-full border border-white/10 bg-radial from-purple-900/40 to-transparent"></div>
                     @endif
-
-                    {{-- Floating Talent Avatars --}}
-                    {{-- Avatar 1: North America (Top Right) --}}
-                    <div class="absolute top-[28%] right-[22%] w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-white shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:scale-110">
-                        <img src="{{ \App\Support\BlockDefaults::homeImg('Person_04.png') }}"
-                            alt="Talent" width="88" height="88" class="w-full h-full rounded-full object-cover">
-                    </div>
-
-                    {{-- Avatar 2: Latin America (Top Left) --}}
-                    <div class="absolute top-[42%] left-[12%] w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-white shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:scale-110">
-                        <img src="{{ \App\Support\BlockDefaults::homeImg('person_01.png') }}"
-                            alt="Talent" width="88" height="88" class="w-full h-full rounded-full object-cover">
-                    </div>
-
-                    {{-- Avatar 3: Latin America (Center Right) --}}
-                    <div class="absolute top-[52%] left-[36%] w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-white shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:scale-110">
-                        <img src="{{ \App\Support\BlockDefaults::homeImg('person_02.png') }}"
-                            alt="Talent" width="88" height="88" class="w-full h-full rounded-full object-cover">
-                    </div>
-
-                    {{-- Avatar 4: South America (Bottom Center) --}}
-                    <div class="absolute bottom-[24%] left-[24%] w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-white shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:scale-110">
-                        <img src="{{ \App\Support\BlockDefaults::homeImg('Person_03.png') }}"
-                            alt="Talent" width="88" height="88" class="w-full h-full rounded-full object-cover">
-                    </div>
                 </div>
 
                 {{-- Bottom Overlapping 2.5K+ Trust Badge --}}
-                <div class="mt-4 flex items-center gap-3 self-center sm:self-end sm:mr-6">
+                <div class="mt-4 flex order-1 lg:order-2 items-center gap-3 self-start lg:self-center w-full lg:w-auto">
                     <img class="h-8 w-auto object-contain"
                         src="{{ \App\Support\BlockDefaults::homeImg('Group-207.png') }}"
                         alt="Talent Team" width="100" height="51">
@@ -87,7 +93,7 @@
         {{-- Bottom Logobar Band --}}
         <div class="mt-16 sm:mt-24 pt-8 border-t border-white/10">
             @if (! empty($trustedTitle))
-                <div class="text-center mb-8">
+                <div class="hidden sm:block text-center mb-8">
                     <span class="text-xs font-bold uppercase tracking-[0.14em] text-white/60">
                         {{ $trustedTitle }}
                     </span>
