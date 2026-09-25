@@ -32,9 +32,9 @@
       </a>
 
       <address class="not-italic text-[15px] leading-[30px] text-slate-300 sm:text-right sm:text-base">
-        <a href="mailto:contact@remoteleverage.com" class="block transition-colors hover:text-white">
+        <span class="block transition-colors">
           contact@remoteleverage.com
-        </a>
+        </span>
         <span class="block">1395 Brickell Avenue, Suite 800,</span>
         <span class="block">Miami, FL 33131</span>
       </address>
