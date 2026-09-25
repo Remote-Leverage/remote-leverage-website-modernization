@@ -1,14 +1,14 @@
 # Booking rate: what happened and what we fixed
 
-2026-09-25. The full analysis is in `booking-rate-diagnostic-2026-09-25.md`.
+2026-09-25, revision 2. Rewritten after confirming that pixel 1430 is not the main account's pixel. The full analysis is in `booking-rate-diagnostic-2026-09-25.md`.
 
 ## The answer
 
 - **Fewer people are booking, but only modestly.** CRM bookings are down about 5%, and unique first-time bookers are down about 12%.
 - **Qualified bookings ($10k+/month) are up 13–17%.** All of the loss is from companies under $10k.
 - **What collapsed is the booking *rate*.** Meta sent 4x the clicks for 14% more money, and those extra clicks almost never book.
-- **The cause was on our side.** The new website broke the signal Meta uses to find buyers, so Meta started buying the cheapest clicks it could find.
-- **The fix is merged and deploying today.** Ticket WR-379, release `v-20260925-v1`.
+- **Why:** every one of our Meta ad sets optimises on a single custom conversion, `1361003065662161`. That conversion still arrives in the same numbers. Since the cutover, though, **Meta credits it to the wrong ad sets**, disproportionately the ones with the cheapest clicks. So Meta concludes cheap traffic converts and buys more of it.
+- **The website change is the likeliest cause of the mis-crediting.** Each lead carried the click ID of whoever loaded the page before them. That fix is merged and deploying today (WR-379).
 
 | Meta, weekday average | Before (Sep 8–16) | After (Sep 21–24) | Change |
 |---|---|---|---|
@@ -55,7 +55,7 @@ The dip on the 17th and 18th is the cutover itself. Ads were also paused for 8 h
 
 ## 4. The tell: Meta started buying the cheapest audiences
 
-This is the price Meta paid per 1,000 impressions on our main ad account's sales campaigns. It held around $70 for weeks, then fell to $11. When Meta can't see who converts, it buys the cheapest inventory it can find.
+This is the price Meta paid per 1,000 impressions on our main ad account (RL5) sales campaigns. It held around $70 for weeks, then fell to $11. Flat spend buying 4x the impressions at a quarter of the price means Meta moved to cheaper people.
 
 ```mermaid
 xychart-beta
@@ -65,77 +65,87 @@ xychart-beta
     line [71.9, 68.9, 65.7, 63.7, 78.4, 78.4, 69.9, 67.3, 65.4, 35.2, 39.8, 40.4, 22.4, 21.2, 21.6, 28.4, 11.3]
 ```
 
-## 5. What broke
+## 5. What Meta optimises on, and what went wrong with it
+
+These findings come from Meta's own reporting, as stored in our data warehouse.
+
+- **Every ad set in both ad accounts, sales and "engagement" alike, optimises for one conversion: custom conversion `1361003065662161`.** It is not the standard Lead event and not pixel 1430. The main account never received the old site's Lead events on pixel 1430.
+- **That conversion did not dry up.** Meta credited about 27 a day before the cutover and about 28 a day after. So this was not a starved signal.
+- **What changed is *which* ad sets get the credit.** Real bookings are measured independently, from each visitor's own browser.
+
+| Ad sets, by cost per click | Meta credit per real booking, before | After |
+|---|---|---|
+| Cheapest third | 0.55 | **0.68** |
+| Middle third | 0.58 | 0.40 |
+| Priciest third | 0.46 | **0.36** |
+
+Before the cutover, Meta credited ad sets in proportion to the bookings they really produced. After it, **the cheapest-click ad sets get almost twice the credit per real booking that the priciest ones get**. The optimiser does exactly what that data tells it: it moves budget into cheap traffic.
 
 ```mermaid
 flowchart TD
     A["Ad click lands on our page"] --> B["Page is served from the CDN cache"]
-    B --> C["The booking form carries the FIRST visitor's click ID, IP and browser"]
-    C --> D["The lead we report to Meta is credited to a stranger's click"]
-    E["Sep 21 deploy removes pixel 1430,<br/>the one the main ad account optimises on"] --> F["That pixel receives zero conversions from Sep 22"]
-    D --> G["Meta can no longer tell who converts"]
-    F --> G
-    G --> H["Meta buys the cheapest clicks it can find"]
-    H --> I["4x the traffic, same bookings:<br/>the rate collapses and cost per booking rises"]
+    B --> C["The lead record carries the PREVIOUS visitor's<br/>click ID, IP and browser, about 2 minutes old"]
+    C --> D["The conversion reported to Meta is tied to<br/>a stranger's click, usually from a high-volume cheap ad set"]
+    V["Our ads also count 1-day view-through:<br/>4x cheaper impressions collect more of that credit"] --> E
+    D --> E["Meta sees cheap ad sets 'converting'"]
+    E --> F["Budget shifts to cheap inventory:<br/>CPM falls from about $70 to $11"]
+    F --> G["4x the clicks, same bookings:<br/>the rate collapses and cost per booking rises"]
+    F --> V
 ```
 
-Measured, not estimated:
-
-- From Sep 22, **75–80% of the leads we sent Meta carried another visitor's click**.
-- Clean conversions reaching Meta fell from about 65 a day to about 15–22.
-- Meta's own dashboards could not show this. The fields were present; they just belonged to the wrong person.
+The same pattern shows at ad-set level. **Sales ad sets whose click volume never changed converted 58% worse from Sep 18.** Engagement ad sets at unchanged volume held their rate. So the landing page and the form are working; the targeting is not.
 
 ## 6. How it unfolded
 
 ```mermaid
 timeline
     title September, day by day
+    Sep 15-16 : Meta's credits start falling for recent clicks
     Sep 17 : New site goes live
-           : Meta receives no conversions for 17 hours
+           : Meta credits zero conversions to that day's clicks
     Sep 18 : Ads paused for 8 hours, then relaunched
-           : Conversions restored at half the old volume
+           : RL5 cost per 1,000 impressions halves
     Sep 21 : Night deploy removes pixel 1430
     Sep 22 : 12 new ad sets launched
-           : Pixel 1430 dark, contaminated leads jump to about 80%
+           : Contaminated leads jump to about 80%
     Sep 24 : Budget stepped up across 36 ad sets
+           : Cost per 1,000 impressions hits $11
     Sep 25 : Fix merged and deploying (WR-379)
 ```
 
-Two things happened in the same days. **The site broke Meta's signal**, which is our side, and it is fixed now. At the same time, **ad delivery was scaled up**. Sales ad sets whose volume never changed still converted 58% worse from Sep 18. That shows the signal break, not just the extra traffic.
-
 ## 7. What we fixed today
-
-```mermaid
-flowchart TD
-    A["Ad click lands on our page"] --> B["Page can still come from the cache: that's fine"]
-    B --> C["On submit, the form re-reads the visitor's OWN<br/>click ID, IP and browser from their browser"]
-    C --> D["Lead goes to BOTH pixels: 1430 and 1482"]
-    D --> E["Meta can see who actually converts again"]
-    E --> F["Delivery shifts back toward buyers"]
-```
 
 | Fix | Effect |
 |---|---|
-| Pixel 1430 restored | The main ad account's pixel gets page views and leads again |
-| Every lead carries its own visitor's data | Meta credits the right click, so it can learn who buys |
+| **Every lead now carries its own visitor's data** | Click ID, IP and browser are re-read from the visitor's own submission, never from the cached page. **This is the fix for the mis-crediting.** |
+| Pixel 1430 restored | Not the main account's pixel, but we keep tracking both pixels as before |
 | "Add to calendar" link restored | All 1,585 links in the CRM work again, and new bookings get one. This helps show rate. |
 | Booking link sent to HubSpot again | Confirmation emails and texts can include it, as they did before |
 
-All tests pass, and the change was reviewed and merged. It is deploying now as release `v-20260925-v1`.
+All tests pass, and the change was reviewed and merged. It is deploying as release `v-20260925-v1`.
 
 ## 8. What we need from marketing this week
 
-1. **Confirm in Ads Manager** which pixel each sales ad set optimises on. We expect pixel 1430.
+1. **Tell us what custom conversion `1361003065662161` is.** In Events Manager → Custom Conversions, we need its rule, its data source (which pixel or dataset), and the event it's built on. This is the one fact we can't read from here. It confirms whether the lead data we just fixed is what feeds it.
 2. **Hold new ad sets and budget increases for 3–5 days** while Meta re-learns on clean data.
-3. **Review the ad sets added or scaled since Sep 18.** They buy clicks at $1.44–$4 that almost never book.
+3. **Consider 7-day click attribution only (no 1-day view) on the sales ad sets while they recover.** View-through credit is what lets cheap impressions claim conversions they didn't cause.
+4. **Review the ad sets added or scaled since Sep 18.** They buy clicks at $1.44–$4 that almost never book.
 
 ## 9. How we'll know it worked
 
 | Signal | Now | Target |
 |---|---|---|
-| Pixel 1430 events (Events Manager) | 0 | Page views and leads flowing within hours of deploy |
+| Meta credit per real booking, cheapest vs priciest third | 0.68 vs 0.36 | Back to roughly even (0.55 vs 0.46 before) |
 | RL5 sales cost per 1,000 impressions | $11–28 | Back toward $60–70 |
 | Meta bookings per 100 visits | 0.55–2.1 | Back toward 4–5 |
 | Meta cost per booking | $282 | Back toward $236 |
 
-We expect the first sign within a day (pixel events) and the business effect over 3–7 days, as the ad sets re-learn.
+The first two can be checked from our warehouse daily, and we'll track them. We expect movement over 3–7 days, as the ad sets re-learn on correctly credited conversions.
+
+## What is proven and what is not
+
+| Status | Items |
+|---|---|
+| **Proven** | Which conversion every ad set optimises on. That its volume held. That credit shifted toward cheap-click ad sets. That leads carried other visitors' click IDs. The CPM collapse. |
+| **Strongly supported, not yet proven** | That the contaminated lead data is what feeds custom conversion `1361…`. Closing this needs its definition from Events Manager (action 1). |
+| **Also contributing** | The ad sets and budget added at the same time, and 1-day view-through attribution. Together they amplify the mis-crediting. |

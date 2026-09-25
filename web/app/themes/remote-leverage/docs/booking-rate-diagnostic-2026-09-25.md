@@ -1,5 +1,15 @@
 # Booking rate after the website cutover — diagnostic
 
+> **Revision 2 (2026-09-25).** Pixel 1430 is not the main account's pixel. The corrected root cause:
+>
+> - Every Meta ad set, in both accounts, sales and engagement, optimises on custom conversion `1361003065662161`. This comes from the warehouse `optimization_goal` and `results` fields.
+> - Its volume held at about 27 → 28 credited a day.
+> - Since the cutover, Meta credits it to the wrong ad sets. Credit per real booking went from 0.55 to 0.68 for the cheapest-click third, and from 0.46 to 0.36 for the priciest third.
+> - So the optimiser shifted budget into cheap inventory.
+> - The cached-page contamination (fixed in WR-379) is the only mechanism we found that re-routes credit this way. 1-day view-through attribution amplifies it.
+>
+> See `booking-rate-ceo-brief-2026-09-25.md`. Sections 3 and 5 below predate this correction.
+
 2026-09-25. Covers 2026-08-25 to 2026-09-24. All days are US Eastern.
 
 **Comparison window.** Unless stated otherwise:
@@ -127,7 +137,7 @@ The sales campaigns ran on the same budget but bought 3.7x the impressions at a 
 | 09-18 15:00 ET to 09-22 00:43 ET | ~115 Leads/day (one per person, bookers no longer counted twice) | same |
 | **09-22 00:59 ET to now** | **nothing: no Lead, no PageView** | 124–167 Leads/day |
 
-- A deploy on the night of 09-21 removed 1430 from the site's default pixel list (commit 3075368, released as v-20260921-v19). It's the only pixel with Lead history, and very likely the one the RL5 ad account optimises on (inferred from its name).
+- A deploy on the night of 09-21 removed 1430 from the site's default pixel list (commit 3075368, released as v-20260921-v19). It's the only pixel with Lead history. **Correction (revision 2): it is not the RL5 account's pixel.** RL5 never received those Leads, and every ad set optimises on custom conversion `1361003065662161`. See the revision below.
 
 **Most of what still reaches Meta is corrupted.**
 
@@ -238,7 +248,7 @@ Branch `fix/booking-signal-attribution`, based on production (`v-20260924-v10`).
 
 ## Not verified
 
-- Which pixel the ad sets optimise on. The mapping of "RL 5/6 Meta Pixel" to the RL5 ad account is inferred from its name.
+- ~~Which pixel the ad sets optimise on.~~ Answered in revision 2: custom conversion `1361003065662161`. Its definition (rule, data source) is still unverified.
 - Why RL5 sales CPM already halved on 09-17, before the server-side blackout began at 21:48 ET. The old site's pixel snippets were re-saved that morning (09:19–09:27 PT), and the change cannot be diffed.
 - How Meta treats a Lead whose email and phone are the visitor's but whose click ID, IP and browser are someone else's.
 - ZeroBounce rejections. The rejected-leads table was not part of the data pull.
