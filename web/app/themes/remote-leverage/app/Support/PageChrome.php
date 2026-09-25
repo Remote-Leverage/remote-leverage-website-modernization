@@ -188,6 +188,28 @@ class PageChrome
     }
 
     /**
+     * Whether the CTA-only header sits over a dark hero, and so draws its logo in white.
+     *
+     * Every page that takes the CTA-only header from its content opens on a dark band:
+     * hire-va-hero, consult-landing-hero, and the two campaign families behind the marker.
+     * A page that gets it from the sidebar setting can open on anything, and the homepage's
+     * pale hero turned the white logo invisible. Outside those, the logo stays dark unless
+     * HeaderMode recognises the hero as a dark one.
+     */
+    public static function ctaHeaderIsOverDarkHero(): bool
+    {
+        $post = self::currentPost();
+
+        return $post !== null && self::contentOpensOnDarkHero((string) $post->post_content);
+    }
+
+    public static function contentOpensOnDarkHero(string $content): bool
+    {
+        return self::contentTakesCtaOnlyHeader($content)
+            || HeaderMode::contentOpensWithDarkHero($content);
+    }
+
+    /**
      * Walk parsed block content, following pattern references, looking for a
      * block that brings its own header.
      */

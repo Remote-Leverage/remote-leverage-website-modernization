@@ -70,3 +70,24 @@ describe('sidebar panel', function () {
             ->and($byName[PageChrome::FOOTER_FIELD]['default_value'])->toBe(PageChrome::AUTO);
     });
 });
+
+describe('CTA-only header logo tone', function () use ($ctaContent) {
+    it('keeps the white logo over the dark heroes that take the CTA header from content', function () use ($ctaContent) {
+        expect(PageChrome::contentOpensOnDarkHero($ctaContent))->toBeTrue()
+            ->and(PageChrome::contentOpensOnDarkHero('<!-- rl:cta-only-header -->'))->toBeTrue()
+            ->and(PageChrome::contentOpensOnDarkHero('<!-- wp:acf/partner-hero {"name":"acf/partner-hero","data":{},"mode":"preview"} /-->'))->toBeTrue();
+    });
+
+    it('draws the logo dark over a pale hero given the CTA header from the sidebar', function () {
+        // The homepage opens on acf/home-hero, a pale band; a white knockout logo vanished on it.
+        expect(PageChrome::contentOpensOnDarkHero('<!-- wp:acf/home-hero {"name":"acf/home-hero","data":{},"mode":"preview"} /-->'))->toBeFalse()
+            ->and(PageChrome::contentOpensOnDarkHero('<!-- wp:acf/partner-hero {"name":"acf/partner-hero","data":{"tone":"light"},"mode":"preview"} /-->'))->toBeFalse();
+    });
+
+    it('only inverts the logo when the header sits over a dark hero', function () {
+        $view = file_get_contents(dirname(__DIR__, 2).'/resources/views/sections/header-cta.blade.php');
+
+        expect($view)->toContain('PageChrome::ctaHeaderIsOverDarkHero()')
+            ->and($view)->toContain("\$overDark ? 'brightness-0 invert");
+    });
+});

@@ -13,7 +13,14 @@
 
      On scroll, resources/js/app.js sets `data-stuck` on this element and the bar resolves to
      a white one — the logo is the white knockout of a dark SVG, so it un-inverts in the same
-     step or it vanishes against the new background. --}}
+     step or it vanishes against the new background.
+
+     The knockout is only right over a dark hero. A page given this header from the sidebar
+     setting can open on a pale one (the homepage does), so there the logo starts dark.
+     PageChrome::ctaHeaderIsOverDarkHero() decides. --}}
+@php
+  $overDark = \App\Support\PageChrome::ctaHeaderIsOverDarkHero();
+@endphp
 <header data-rl-cta-header
         class="group fixed inset-x-0 top-0 z-40 w-full transition duration-200 data-[stuck]:bg-white data-[stuck]:shadow-[0_1px_3px_0_rgba(15,23,42,0.10)]">
   <div class="w-full px-4 sm:px-6 lg:px-8">
@@ -22,12 +29,12 @@
         {{-- Deliberately self-referential. These pages offer no way out, and a logo linking
              home is the one remaining exit. --}}
         <a href="#"
-           class="inline-flex min-w-0 items-center gap-2 group/logo focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0 group-data-[stuck]:focus-visible:ring-brand-purple rounded-sm"
+           class="inline-flex min-w-0 items-center gap-2 group/logo focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 rounded-sm {{ $overDark ? 'focus-visible:ring-white/60 group-data-[stuck]:focus-visible:ring-brand-purple' : 'focus-visible:ring-brand-purple' }}"
            aria-label="{{ get_bloginfo('name', 'display') ?: 'Remote Leverage' }}">
           <img src="{{ Vite::asset('resources/images/logo.svg') }}"
                alt="{{ get_bloginfo('name', 'display') ?: 'Remote Leverage' }}"
                width="154" height="18"
-               class="h-6 sm:h-7 w-auto max-w-full object-contain object-left brightness-0 invert group-data-[stuck]:brightness-100 group-data-[stuck]:invert-0 transition duration-200 group-hover/logo:opacity-90" />
+               class="h-6 sm:h-7 w-auto max-w-full object-contain object-left transition duration-200 group-hover/logo:opacity-90 {{ $overDark ? 'brightness-0 invert group-data-[stuck]:brightness-100 group-data-[stuck]:invert-0' : '' }}" />
         </a>
 
         <a href="#booking-footer"
