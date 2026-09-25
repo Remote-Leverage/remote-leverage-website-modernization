@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Application\Http\Controllers\CalendlyWebhookController;
+use App\Application\Http\Controllers\CostAlertSendController;
 use App\Application\Http\Controllers\GatedDownloadController;
 use App\Application\Http\Controllers\IntegrationHealthController;
 use App\Application\Http\Controllers\PaymentIntentController;
@@ -43,6 +44,12 @@ Route::prefix('payments')->group(function () {
 Route::prefix('leads')->group(function () {
     Route::post('gated-download', [GatedDownloadController::class, 'store'])->name('api.leads.gated-download');
 });
+
+/*
+ * The cost alert card's "Send new alert" button. Authorised by the signed link the card carries,
+ * not by a login — see CostAlertSendLink — and POSTed by the page at `marketing.cost-alert.send`.
+ */
+Route::post('marketing/cost-alert/send', [CostAlertSendController::class, 'store'])->name('api.marketing.cost-alert.send');
 
 Route::get('health', function () {
     return response()->json([

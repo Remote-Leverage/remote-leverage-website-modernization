@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Application\Http\Controllers\CostAlertSendController;
+use App\Domains\Marketing\Support\CostAlertSendLink;
 use App\Domains\Scheduling\Actions\RouteInstantCallAction;
 use App\Support\PageRobots;
 use App\Support\SocialKit;
@@ -153,3 +155,9 @@ Route::get('partners', function () {
 Route::get(SocialKit::SLUG, function () {
     return view('pages.social-media-kit');
 })->name('social-media-kit');
+
+/*
+ * Where the cost alert card's "Send new alert" button lands. The GET is a page and posts nothing;
+ * the page POSTs back to `api.marketing.cost-alert.send`, which sends. See CostAlertSendController.
+ */
+Route::get(CostAlertSendLink::PATH, [CostAlertSendController::class, 'show'])->name('marketing.cost-alert.send');
