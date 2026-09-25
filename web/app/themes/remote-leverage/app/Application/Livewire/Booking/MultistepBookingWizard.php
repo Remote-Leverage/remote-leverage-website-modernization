@@ -14,10 +14,8 @@ use App\Domains\Lead\Services\EmailValidationService;
 use App\Domains\Lead\Services\LeadGeoSignals;
 use App\Domains\Lead\Services\LeadQualification;
 use App\Domains\Lead\Services\PhoneValidationService;
-use App\Domains\Scheduling\Actions\FetchAvailableSlotsAction;
-use App\Domains\Scheduling\Services\AvailabilityHealthMonitor;
 use App\Domains\Scheduling\Services\CalendlyEventTypeRoleResolver;
-use App\Domains\Scheduling\Services\TierUtilizationProbe;
+use App\Domains\Scheduling\Services\TierAvailability;
 use App\Domains\Tracking\Data\AnalyticsEventData;
 use App\Domains\Tracking\Gateways\CustomerIOClient;
 use App\Domains\Tracking\Support\GoogleEnhancedConversion;
@@ -33,11 +31,11 @@ use Livewire\Component;
 #[Lazy]
 class MultistepBookingWizard extends Component
 {
-    /** How long a populated availability answer is reused. See availabilityTtl(). */
-    public const AVAILABILITY_TTL_SECONDS = 600;
+    /** How long a populated availability answer is reused. See TierAvailability::ttl(). */
+    public const AVAILABILITY_TTL_SECONDS = TierAvailability::TTL_SECONDS;
 
     /** How long an empty one is. Deliberately an order of magnitude shorter. */
-    public const EMPTY_AVAILABILITY_TTL_SECONDS = 60;
+    public const EMPTY_AVAILABILITY_TTL_SECONDS = TierAvailability::EMPTY_TTL_SECONDS;
 
     /**
      * How long a step-one submission keeps resuming the lead the same visit already created.
@@ -264,19 +262,20 @@ class MultistepBookingWizard extends Component
     public ?int $leadId = null;
 
     // Step 2: Calendar & Dates
-    public int $currentMonth = 0;
 
-    public int $currentYear = 0;
-
+    /** A `Y-m-d` day as the visitor's zone reads it. Set by the calendar in the browser. */
     public ?string $selectedDate = null;
 
-    public array $availableDates = [];
-
     /**
-     * Soonest bookable date on this tier, in any month. Null only when the tier has nothing
-     * bookable at all — which is the sell-out condition, not merely an empty month.
+     * The tier's open slots, as UTC instants (`Y-m-d\TH:i:s\Z`), soonest first.
+     *
+     * The only availability the browser gets. Which day each falls on and how it is labelled
+     * depend on the visitor's zone, so resources/js/booking-calendar.js works those out there —
+     * see loadAvailability() for why the server stopped doing it.
+     *
+     * @var array<int, string>
      */
-    public ?string $nextAvailableDate = null;
+    public array $openSlots = [];
 
     // Step 3: Time Selection
     public ?string $selectedSlot = null;
@@ -288,6 +287,41 @@ class MultistepBookingWizard extends Component
      * detection cannot overwrite a deliberate choice.
      */
     public bool $timezoneChosen = false;
+
+    /** What the browser reports as its zone. Applied through updatedBrowserTimezone(). */
+    public string $browserTimezone = '';
+
+    /**
+     * Pre-rename aliases browsers still report, mapped to the names timezone_identifiers_list()
+     * carries. See canonicalTimezone().
+     */
+    public const TIMEZONE_ALIASES = [
+        'Africa/Asmera' => 'Africa/Asmara',
+        'America/Buenos_Aires' => 'America/Argentina/Buenos_Aires',
+        'America/Catamarca' => 'America/Argentina/Catamarca',
+        'America/Cordoba' => 'America/Argentina/Cordoba',
+        'America/Coral_Harbour' => 'America/Atikokan',
+        'America/Godthab' => 'America/Nuuk',
+        'America/Indianapolis' => 'America/Indiana/Indianapolis',
+        'America/Jujuy' => 'America/Argentina/Jujuy',
+        'America/Louisville' => 'America/Kentucky/Louisville',
+        'America/Mendoza' => 'America/Argentina/Mendoza',
+        'Asia/Calcutta' => 'Asia/Kolkata',
+        'Asia/Dacca' => 'Asia/Dhaka',
+        'Asia/Katmandu' => 'Asia/Kathmandu',
+        'Asia/Rangoon' => 'Asia/Yangon',
+        'Asia/Saigon' => 'Asia/Ho_Chi_Minh',
+        'Asia/Thimbu' => 'Asia/Thimphu',
+        'Asia/Ulan_Bator' => 'Asia/Ulaanbaatar',
+        'Atlantic/Faeroe' => 'Atlantic/Faroe',
+        'Etc/GMT' => 'UTC',
+        'Etc/UTC' => 'UTC',
+        'Europe/Kiev' => 'Europe/Kyiv',
+        'GMT' => 'UTC',
+        'Pacific/Enderbury' => 'Pacific/Kanton',
+        'Pacific/Ponape' => 'Pacific/Pohnpei',
+        'Pacific/Truk' => 'Pacific/Chuuk',
+    ];
 
     /**
      * Zones offered in the picker. Desktop and mobile used to carry two different
@@ -313,8 +347,6 @@ class MultistepBookingWizard extends Component
         'Europe/London' => 'London (GMT/BST)',
         'Europe/Paris' => 'Central Europe (CET)',
     ];
-
-    public array $availableSlots = [];
 
     // Step 4: Additional Info & Guests
     public array $guestEmails = [];
@@ -471,10 +503,6 @@ class MultistepBookingWizard extends Component
             }
         }
 
-        $now = Carbon::now($this->timezone);
-        $this->currentMonth = (int) $now->format('n');
-        $this->currentYear = (int) $now->format('Y');
-
         // Acquisition & UTM tracking extraction (parity with rl-testing)
         $req = app()->bound('request') ? app('request') : null;
         $this->utmSource = (string) ($req?->query('utm_source') ?: $req?->cookie('utm_source', $req?->cookie('handl_utm_source', '')));
@@ -538,7 +566,10 @@ class MultistepBookingWizard extends Component
             $this->skipCalendar = false;
             $this->selectedDate = null;
             $this->selectedSlot = null;
-            $this->loadMonthAvailability();
+            // A different band can be a different tier: drop the old tier's slots and warm the
+            // new one's shared window, after this response, so the calendar opens on a cache hit.
+            $this->openSlots = [];
+            $this->warmAvailability();
         }
     }
 
@@ -662,7 +693,7 @@ class MultistepBookingWizard extends Component
 
         $this->currentStep = max(1, min($this->totalSteps, $step));
         if ($this->currentStep === 2) {
-            $this->loadMonthAvailability();
+            $this->loadAvailability();
         }
 
         // Legacy fired `step_date_selection` only on arrival at the calendar step. `step_viewed`
@@ -824,88 +855,86 @@ class MultistepBookingWizard extends Component
         }
     }
 
-    public function prevMonth(): void
+    /**
+     * Record the day the visitor opened. The browser has already shown its times — this carries
+     * the value and the step-3 funnel event, and costs no Calendly call: the times come from the
+     * slots the calendar already has.
+     */
+    public function selectDate(string $date): void
     {
-        $today = Carbon::today($this->timezone);
-        $currentFirst = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1, $this->timezone);
-        if ($currentFirst->isSameMonth($today) || $currentFirst->isPast()) {
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             return;
         }
 
-        $date = $currentFirst->copy()->subMonth();
-        $this->currentMonth = (int) $date->format('n');
-        $this->currentYear = (int) $date->format('Y');
-        $this->loadMonthAvailability();
-    }
-
-    public function nextMonth(): void
-    {
-        $date = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1)->addMonth();
-        $this->currentMonth = (int) $date->format('n');
-        $this->currentYear = (int) $date->format('Y');
-        $this->loadMonthAvailability();
-    }
-
-    public function selectDate(string $date): void
-    {
         $this->selectedDate = $date;
         $this->selectedSlot = null;
         $this->errorMessage = null;
 
-        $this->loadSlotsForDate($date);
         $this->goToStep(3);
     }
 
     /**
-     * Adopt the browser's own zone on load. Nothing detected one before: every visitor
+     * The browser's zone, queued by the view's x-init with a non-live `$wire.$set`, so it
+     * arrives on the visitor's first real request rather than a request of its own. See the
+     * comment on the root element for why that matters.
+     */
+    public function updatedBrowserTimezone(string $tz): void
+    {
+        $this->detectTimezone($tz);
+    }
+
+    /**
+     * Adopt the browser's own zone. Nothing detected one before: every visitor
      * was shown New York times regardless of where they were, and the only way to see
      * their own was to notice the dropdown and use it.
      *
      * Ignored once the visitor has chosen a zone, and ignored for anything that is not
      * a real zone identifier — the value arrives from the client and reaches Calendly.
+     *
+     * Nothing to reload: availability is held in UTC and the calendar relabels it in the
+     * browser, so a zone is only a label here until submitBooking() hands it to Calendly.
      */
     public function detectTimezone(string $tz): void
     {
-        if ($this->timezoneChosen || $tz === '' || $tz === $this->timezone) {
-            return;
-        }
+        $tz = self::canonicalTimezone($tz);
 
-        if (! in_array($tz, timezone_identifiers_list(), true)) {
+        if ($this->timezoneChosen || $tz === null) {
             return;
         }
 
         $this->timezone = $tz;
-
-        $now = Carbon::now($this->timezone);
-        $this->currentMonth = (int) $now->format('n');
-        $this->currentYear = (int) $now->format('Y');
-
-        $this->loadMonthAvailability();
-
-        if ($this->selectedDate) {
-            $this->loadSlotsForDate($this->selectedDate);
-        }
     }
 
     /**
-     * The offered zones, with the visitor's own prepended when it is not one of them —
-     * a <select> that cannot represent its current value displays a different zone than
-     * the one the times are actually in.
+     * The current IANA name for a browser-reported zone, or null when it is not one.
+     *
+     * Chrome still reports several zones by their pre-rename alias — `Asia/Calcutta` for all of
+     * India, `Asia/Saigon`, `Europe/Kiev` — and timezone_identifiers_list() leaves aliases out,
+     * so those visitors were silently kept on New York time. They are translated rather than
+     * accepted as-is because the zone is passed on to Calendly with the booking, and an alias it
+     * does not know would turn wrong labels into a refused booking.
      */
-    public function timezoneChoices(): array
+    public static function canonicalTimezone(string $tz): ?string
     {
-        $choices = self::TIMEZONE_CHOICES;
+        $tz = self::TIMEZONE_ALIASES[$tz] ?? $tz;
 
-        if (! in_array($this->timezone, $choices, true)) {
-            array_unshift($choices, $this->timezone);
-        }
-
-        return $choices;
+        return in_array($tz, timezone_identifiers_list(), true) ? $tz : null;
     }
 
-    public function timezoneLabel(string $tz): string
+    /**
+     * What the browser calendar needs that never changes per visitor: the offered zones and
+     * their friendly names. It prepends the visitor's own zone when that is not one of them,
+     * because a <select> that cannot represent its value shows a different zone than the one
+     * the times are in.
+     *
+     * @return array{choices: array<int, string>, labels: array<string, string>}
+     */
+    public function calendarConfig(): array
     {
-        return self::TIMEZONE_LABELS[$tz] ?? str_replace(['_', '/'], [' ', ', '], $tz);
+        return [
+            'choices' => self::TIMEZONE_CHOICES,
+            'labels' => self::TIMEZONE_LABELS,
+        ];
     }
 
     public function selectSlot(string $slot): void
@@ -938,13 +967,23 @@ class MultistepBookingWizard extends Component
         }
     }
 
+    /**
+     * The visitor picked a zone in the calendar. It arrives from the browser and goes on to
+     * Calendly with the booking, so anything that is not a zone is refused rather than trusted.
+     * Nothing to reload — see detectTimezone().
+     */
     public function updatedTimezone(): void
     {
-        $this->timezoneChosen = true;
-        $this->loadMonthAvailability();
-        if ($this->selectedDate) {
-            $this->loadSlotsForDate($this->selectedDate);
+        $tz = self::canonicalTimezone($this->timezone);
+
+        if ($tz === null) {
+            $this->timezone = 'America/New_York';
+
+            return;
         }
+
+        $this->timezone = $tz;
+        $this->timezoneChosen = true;
     }
 
     public function submitBooking(): void
@@ -1041,11 +1080,9 @@ class MultistepBookingWizard extends Component
                 $this->currentStep = 3;
                 $this->errorMessage = 'That time was booked by someone else moments before you confirmed. These are the times still open — please pick another.';
 
-                if ($this->selectedDate) {
-                    // The cached day still lists the slot that has just gone.
-                    Cache::forget('rl_avail_slots_'.md5($this->getActiveEventTypeUri().$this->selectedDate.$this->timezone));
-                    $this->loadSlotsForDate($this->selectedDate);
-                }
+                // The cached window still lists the slot that has just gone. The calendar reads
+                // $openSlots, so the refreshed list replaces the visitor's times as this response lands.
+                $this->loadAvailability(fresh: true);
 
                 $this->trackStepEvent('booking_failed', [
                     'lead_id' => $lead->id,
@@ -1177,195 +1214,32 @@ class MultistepBookingWizard extends Component
         }
     }
 
-    public function loadMonthAvailability(): void
+    /**
+     * Load the active tier's open slots into $openSlots, as UTC instants — one cached window per
+     * tier, shared by every visitor. See TierAvailability for why it is not per zone any more.
+     */
+    public function loadAvailability(bool $fresh = false): void
     {
-        if (empty($this->currentYear) || empty($this->currentMonth)) {
-            $now = Carbon::now($this->timezone);
-            $this->currentMonth = (int) $now->format('n');
-            $this->currentYear = (int) $now->format('Y');
-        }
+        $this->openSlots = app(TierAvailability::class)->slots(
+            $this->getActiveEventTypeUri(),
+            $this->activeTierRole(),
+            $fresh
+        );
+    }
 
+    /**
+     * Warm the tier's window while the visitor finishes step one, so entering the calendar is a
+     * cache hit. After the response, so the revenue click itself never waits on Calendly — it
+     * used to, and a slow `.live` round trip is what once reverted a name being typed.
+     */
+    protected function warmAvailability(): void
+    {
         try {
-            $slotsAction = app(FetchAvailableSlotsAction::class);
-            $start = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1, $this->timezone)->startOfMonth();
-            $end = $start->copy()->endOfMonth();
-            $monthKey = $start->format('Y-m');
-
-            $cacheKey = 'rl_avail_dates_'.md5($this->getActiveEventTypeUri().$monthKey.$this->timezone);
-
-            $cached = Cache::get($cacheKey);
-            $fetched = false;
-
-            if (is_array($cached)) {
-                $this->availableDates = $cached;
-            } else {
-                $slots = $slotsAction->execute(
-                    $start->toIso8601String(),
-                    $end->toIso8601String(),
-                    $this->timezone,
-                    $this->getActiveEventTypeUri()
-                );
-
-                $dates = [];
-                foreach ($slots as $slot) {
-                    $dateKey = Carbon::parse($slot->startTime)->setTimezone($this->timezone)->format('Y-m-d');
-                    $dates[$dateKey] = true;
-                }
-
-                $this->availableDates = array_keys($dates);
-                $fetched = true;
-
-                Cache::put($cacheKey, $this->availableDates, self::availabilityTtl($this->availableDates));
-            }
-
-            $this->refreshNextAvailableDate();
-
-            /*
-             * Reported after the next-available lookup, because that is what separates a sold-out
-             * tier from a month the rolling booking window simply has not reached yet — and only
-             * on a real fetch, so a cached empty does not re-report a sell-out on every pageview.
-             */
-            if ($fetched) {
-                $role = $this->activeTierRole();
-
-                app(AvailabilityHealthMonitor::class)->record(
-                    $role,
-                    $this->getActiveEventTypeUri(),
-                    $this->availableDates,
-                    $monthKey,
-                    $this->nextAvailableDate
-                );
-
-                /*
-                 * The leading indicator, measured off the same visit but never in front of it.
-                 * Counting how full the window is means paging Calendly's scheduled_events, and
-                 * the booking widget is the last request on the site that should wait on one —
-                 * so it goes after the response, like the live-call Slack alerts do. The probe
-                 * throttles itself, so a busy hour measures once rather than once per visitor.
-                 *
-                 * `Deferred::call` rather than a closure: it queues where a queue is configured
-                 * and falls back to the same after-response dispatch everywhere else, so this
-                 * behaves identically until an environment sets QUEUE_CONNECTION. Only the role
-                 * string crosses the boundary — no `$this`, because serialising a Livewire
-                 * component would drag the whole form state along with it.
-                 *
-                 * First site converted, and chosen for being the cheapest to be wrong about:
-                 * internal telemetry, self-throttling, and nothing a visitor or a customer ever
-                 * sees.
-                 */
-                Deferred::call(TierUtilizationProbe::class, 'probe', [$role]);
-            }
+            Deferred::call(TierAvailability::class, 'warm', [$this->getActiveEventTypeUri(), $this->activeTierRole()]);
         } catch (\Throwable $e) {
-            Log::warning('Failed to load month availability: '.$e->getMessage());
-            $this->availableDates = [];
+            // Best effort: without it the calendar still loads, just on its own request.
+            Log::warning('Failed to queue availability warm-up: '.$e->getMessage());
         }
-    }
-
-    /**
-     * The soonest bookable date on this tier, in any month, or null when there is none.
-     *
-     * Only consulted when the displayed month came back empty, because that is the only time
-     * the answer is worth a request. Calendly's booking window is a rolling few days, so an
-     * empty month is the normal state of an otherwise healthy calendar viewed from far
-     * enough away — "fully booked" with no date attached reads as broken, and is the message
-     * that sent the 2026-09-17 sell-out to engineering instead of to sales.
-     */
-    protected function refreshNextAvailableDate(): void
-    {
-        if (! empty($this->availableDates)) {
-            /*
-             * Already on screen — no request needed, but still worth setting rather than
-             * nulling. The empty state never renders this branch, so the only reader is
-             * AvailabilityHealthMonitor, and a null here would have the admin panel print
-             * "no bookable dates" beside a tier it had just marked bookable.
-             */
-            $dates = $this->availableDates;
-            sort($dates);
-            $this->nextAvailableDate = $dates[0];
-
-            return;
-        }
-
-        try {
-            $cacheKey = 'rl_avail_next_'.md5($this->getActiveEventTypeUri().$this->timezone);
-
-            /*
-             * A miss and a cached "nothing at all" are both meaningful and have to be
-             * distinguishable. Null cannot carry that: Laravel's cache repository returns the
-             * *default* for a stored null, so caching null would read back as a miss forever
-             * and re-hit Calendly on every pageview — precisely when the tier is sold out and
-             * the calendar is busiest. Empty string is the stored form of "none".
-             */
-            $cached = Cache::get($cacheKey, false);
-
-            if ($cached !== false) {
-                $this->nextAvailableDate = $cached === '' ? null : $cached;
-
-                return;
-            }
-
-            // Nulls let FetchAvailableSlotsAction pick its own window: now through +30 days,
-            // which is past any horizon Calendly will answer for.
-            $slots = app(FetchAvailableSlotsAction::class)->execute(
-                null,
-                null,
-                $this->timezone,
-                $this->getActiveEventTypeUri()
-            );
-
-            $dates = [];
-            foreach ($slots as $slot) {
-                $dates[] = Carbon::parse($slot->startTime)->setTimezone($this->timezone)->format('Y-m-d');
-            }
-
-            sort($dates);
-
-            $this->nextAvailableDate = $dates[0] ?? null;
-
-            Cache::put(
-                $cacheKey,
-                $this->nextAvailableDate ?? '',
-                self::availabilityTtl($dates)
-            );
-        } catch (\Throwable $e) {
-            Log::warning('Failed to resolve next available date: '.$e->getMessage());
-            $this->nextAvailableDate = null;
-        }
-    }
-
-    /**
-     * Move the calendar to the soonest bookable date and open it.
-     */
-    public function jumpToNextAvailable(): void
-    {
-        if (empty($this->nextAvailableDate)) {
-            return;
-        }
-
-        $target = Carbon::parse($this->nextAvailableDate, $this->timezone);
-
-        $this->currentMonth = (int) $target->format('n');
-        $this->currentYear = (int) $target->format('Y');
-
-        $this->loadMonthAvailability();
-        $this->selectDate($target->format('Y-m-d'));
-    }
-
-    /**
-     * How long an availability answer may be reused.
-     *
-     * An empty answer is the perishable one. Availability on these calendars is consumed and
-     * released continuously — twelve bookings landed on `t10` during the five hours it was
-     * reporting empty on 2026-09-17 — so a ten-minute hold on "nothing here" converts every
-     * momentary sell-out into a ten-minute outage for everyone routed to that tier. A
-     * populated answer going stale by the same margin costs a visitor one rejected slot at
-     * submit time, which the booking path already handles.
-     *
-     * @param  array<int, string>  $result
-     */
-    protected static function availabilityTtl(array $result): int
-    {
-        return empty($result) ? self::EMPTY_AVAILABILITY_TTL_SECONDS : self::AVAILABILITY_TTL_SECONDS;
     }
 
     /**
@@ -1374,98 +1248,6 @@ class MultistepBookingWizard extends Component
     public function activeTierRole(): string
     {
         return $this->isUnder10kMrr() ? 't0' : 't10';
-    }
-
-    public function loadSlotsForDate(string $date): void
-    {
-        try {
-            $slotsAction = app(FetchAvailableSlotsAction::class);
-            $start = Carbon::parse($date, $this->timezone)->startOfDay();
-            $end = $start->copy()->endOfDay();
-
-            $cacheKey = 'rl_avail_slots_'.md5($this->getActiveEventTypeUri().$date.$this->timezone);
-
-            $cached = Cache::get($cacheKey);
-
-            if (is_array($cached)) {
-                $this->availableSlots = $cached;
-            } else {
-                $slots = $slotsAction->execute(
-                    $start->toIso8601String(),
-                    $end->toIso8601String(),
-                    $this->timezone,
-                    $this->getActiveEventTypeUri()
-                );
-
-                $times = [];
-                foreach ($slots as $slot) {
-                    $times[] = [
-                        'iso' => $slot->startTime,
-                        // setTimezone, not parse($iso, $tz). Calendly returns UTC Zulu and
-                        // ignores the timezone param, and PHP discards the timezone argument
-                        // whenever the string carries its own offset — so parse($iso, $tz)
-                        // silently labels every slot in UTC under a banner naming the
-                        // visitor's timezone. That is how a 15:45Z slot was offered as
-                        // "3:45pm" and booked at 10:45 Central on 2026-09-21.
-                        'time' => Carbon::parse($slot->startTime)->setTimezone($this->timezone)->format('g:ia'),
-                    ];
-                }
-
-                $this->availableSlots = $times;
-
-                // A day that just sold out is the single most perishable answer here: the
-                // visitor is looking at it, and the next slot to free up is the one they
-                // wanted. Ten minutes of "no times available" on a day that has them again
-                // is a lost booking.
-                Cache::put($cacheKey, $times, self::availabilityTtl($times));
-            }
-        } catch (\Throwable $e) {
-            Log::warning('Failed to load slots for date: '.$e->getMessage());
-            $this->availableSlots = [];
-        }
-    }
-
-    public function getDaysGridProperty(): array
-    {
-        if (empty($this->currentYear) || empty($this->currentMonth)) {
-            $now = Carbon::now($this->timezone);
-            $this->currentMonth = (int) $now->format('n');
-            $this->currentYear = (int) $now->format('Y');
-        }
-
-        $firstDayOfMonth = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1, $this->timezone);
-        $daysInMonth = $firstDayOfMonth->daysInMonth;
-        $startDayOfWeek = (int) $firstDayOfMonth->format('w'); // 0 = Sunday, 6 = Saturday
-        $today = Carbon::today($this->timezone)->format('Y-m-d');
-
-        $grid = [];
-
-        // Preceding empty slots for offset
-        for ($i = 0; $i < $startDayOfWeek; $i++) {
-            $grid[] = ['empty' => true];
-        }
-
-        // Days of month
-        for ($day = 1; $day <= $daysInMonth; $day++) {
-            $dateObj = Carbon::createFromDate($this->currentYear, $this->currentMonth, $day, $this->timezone);
-            $dateStr = $dateObj->format('Y-m-d');
-            $isPast = $dateObj->lt(Carbon::today($this->timezone));
-            $isToday = ($dateStr === $today);
-            $hasAvailability = in_array($dateStr, $this->availableDates, true) && ! $isPast;
-            $isSelected = ($this->selectedDate === $dateStr);
-
-            $grid[] = [
-                'empty' => false,
-                'day' => $day,
-                'date' => $dateStr,
-                'isPast' => $isPast,
-                'isToday' => $isToday,
-                'hasAvailability' => $hasAvailability,
-                'isSelected' => $isSelected,
-            ];
-        }
-
-        return $grid;
     }
 
     /**
@@ -1834,7 +1616,7 @@ class MultistepBookingWizard extends Component
         }
 
         $this->currentStep = 2;
-        $this->loadMonthAvailability();
+        $this->loadAvailability();
         $this->trackStepEvent('step_date_selection');
         $this->trackStepEvent('step_viewed', ['step' => 2]);
     }
@@ -1885,7 +1667,7 @@ class MultistepBookingWizard extends Component
          * they passed.
          */
         $this->currentStep = 2;
-        $this->loadMonthAvailability();
+        $this->loadAvailability();
         $this->trackStepEvent('step_date_selection');
         $this->trackStepEvent('step_viewed', ['step' => 2]);
     }
@@ -2002,9 +1784,9 @@ class MultistepBookingWizard extends Component
             return;
         }
 
-        // Calendar paging and timezone are not "starting the form" — they move the UI without
-        // the visitor having entered anything.
-        if (in_array($property, ['timezone', 'currentMonth', 'currentYear', 'newGuestEmail'], true)) {
+        // The zone and the calendar's picks are not "starting the form" — they move the UI, or
+        // ride along from the browser, without the visitor having entered anything.
+        if (in_array($property, ['timezone', 'browserTimezone', 'selectedDate', 'selectedSlot', 'newGuestEmail'], true)) {
             return;
         }
 
@@ -2028,17 +1810,7 @@ class MultistepBookingWizard extends Component
 
     public function render(): View
     {
-        if (empty($this->currentYear) || empty($this->currentMonth)) {
-            $now = Carbon::now($this->timezone);
-            $this->currentMonth = (int) $now->format('n');
-            $this->currentYear = (int) $now->format('Y');
-        }
-
-        $monthTitle = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1, $this->timezone)->format('F Y');
-
         return view('livewire.booking.multistep-booking-wizard', [
-            'monthTitle' => $monthTitle,
-            'daysGrid' => $this->daysGrid,
             'skin' => $this->skin,
         ]);
     }

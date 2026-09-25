@@ -1,5 +1,6 @@
 import { loadStylesheet } from './load-stylesheet';
 import { retryImport } from './retry-import';
+import { rlBookingCalendar } from './booking-calendar';
 
 window.intlTelInput = window.intlTelInput || null;
 
@@ -819,6 +820,7 @@ const registerAlpine = () => {
     window.Alpine.data('phoneInputComponent', phoneInputComponent);
     window.Alpine.data('rlBookingWizardIsolated', rlBookingWizardIsolated);
     window.Alpine.data('rlBookingStepScroll', rlBookingStepScroll);
+    window.Alpine.data('rlBookingCalendar', rlBookingCalendar);
     window.Alpine.data('rlDocumentToc', rlDocumentToc);
     window.Alpine.data('rlAudioPlayer', rlAudioPlayer);
   }

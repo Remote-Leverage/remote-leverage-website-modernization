@@ -44,72 +44,98 @@ describe('slot labels', function () {
             ->and(Carbon::parse(CALENDLY_SLOT_ISO)->setTimezone('America/Chicago')->format('g:ia'))->toBe('10:45am');
     });
 
-    test('neither render site formats an absolute slot time with a parse-time zone', function () {
+    test('the server no longer labels slots at all; the one time it formats is converted', function () {
         $source = file_get_contents(__DIR__.'/../../app/Application/Livewire/Booking/MultistepBookingWizard.php');
 
+        // Slot labels are the browser's now (BookingCalendarJsTest). The confirmation line is
+        // the only absolute time left on the server, and it must be converted, not re-parsed.
         expect($source)
-            ->toContain("Carbon::parse(\$slot->startTime)->setTimezone(\$this->timezone)->format('g:ia')")
+            ->not->toContain("->format('g:ia')")
             ->toContain('Carbon::parse($this->selectedSlot)->setTimezone($this->timezone)')
-            ->not->toContain('Carbon::parse($slot->startTime, $this->timezone)')
             ->not->toContain('Carbon::parse($this->selectedSlot, $this->timezone)');
     });
 });
 
 describe('the visitor\'s own timezone', function () {
-    test('the browser zone is detected on load and applied once', function () {
+    test('detecting a zone only relabels: no availability is reloaded at any step', function () {
         $wizard = new class extends MultistepBookingWizard
         {
             public int $reloads = 0;
 
-            public function loadMonthAvailability(): void
-            {
-                $this->reloads++;
-            }
-
-            public function loadSlotsForDate(string $date): void
+            public function loadAvailability(bool $fresh = false): void
             {
                 $this->reloads++;
             }
         };
 
-        $wizard->detectTimezone('Asia/Manila');
+        $wizard->updatedBrowserTimezone('Asia/Manila');
+        $wizard->currentStep = 3;
+        $wizard->selectedDate = '2026-09-25';
+        $wizard->timezoneChosen = false;
+        $wizard->detectTimezone('Europe/London');
 
-        expect($wizard->timezone)->toBe('Asia/Manila')
-            ->and($wizard->reloads)->toBe(1);
+        expect($wizard->timezone)->toBe('Europe/London')
+            ->and($wizard->reloads)->toBe(0);
+    });
+
+    test('the aliases browsers still report are translated, not dropped', function () {
+        $wizard = new MultistepBookingWizard;
+        $wizard->detectTimezone('Asia/Calcutta');
+
+        expect($wizard->timezone)->toBe('Asia/Kolkata')
+            ->and(MultistepBookingWizard::canonicalTimezone('Europe/Kiev'))->toBe('Europe/Kyiv')
+            ->and(MultistepBookingWizard::canonicalTimezone('Etc/UTC'))->toBe('UTC')
+            ->and(MultistepBookingWizard::canonicalTimezone('Not/AZone'))->toBeNull();
+
+        foreach (MultistepBookingWizard::TIMEZONE_ALIASES as $alias => $canonical) {
+            expect(in_array($canonical, timezone_identifiers_list(), true))->toBeTrue("{$alias} maps to {$canonical}, which PHP does not know");
+        }
+    });
+
+    test('the page load sends no request of its own to detect the zone', function () {
+        $blade = file_get_contents(__DIR__.'/../../resources/views/livewire/booking/multistep-booking-wizard.blade.php');
+
+        expect($blade)->toContain("\$wire.\$set('browserTimezone', Intl.DateTimeFormat().resolvedOptions().timeZone || '', false)")
+            ->and($blade)->not->toMatch('/x-init="[^"]*\$wire\.detectTimezone\(/');
     });
 
     test('detection never overrides a zone the visitor chose, and never trusts the client blindly', function () {
-        $wizard = new class extends MultistepBookingWizard
-        {
-            public function loadMonthAvailability(): void {}
-
-            public function loadSlotsForDate(string $date): void {}
-        };
+        $wizard = new MultistepBookingWizard;
 
         $wizard->detectTimezone('Not/AZone');
         expect($wizard->timezone)->toBe('America/New_York');
 
-        $wizard->updatedTimezone();
         $wizard->timezone = 'America/Chicago';
+        $wizard->updatedTimezone();
         $wizard->detectTimezone('Europe/London');
 
-        expect($wizard->timezone)->toBe('America/Chicago');
+        expect($wizard->timezone)->toBe('America/Chicago')
+            ->and($wizard->timezoneChosen)->toBeTrue();
     });
 
-    test('a detected zone outside the offered list is still selectable', function () {
+    test('a zone picked in the browser is checked before it can reach Calendly', function () {
         $wizard = new MultistepBookingWizard;
-        $wizard->timezone = 'Asia/Manila';
 
-        expect($wizard->timezoneChoices())->toContain('Asia/Manila')
-            ->and($wizard->timezoneChoices()[0])->toBe('Asia/Manila')
-            ->and($wizard->timezoneLabel('Asia/Manila'))->toBe('Asia, Manila')
-            ->and($wizard->timezoneLabel('America/Chicago'))->toBe('Central Time (CT)');
+        $wizard->timezone = 'Not/AZone';
+        $wizard->updatedTimezone();
+
+        expect($wizard->timezone)->toBe('America/New_York')
+            ->and($wizard->timezoneChosen)->toBeFalse();
+
+        $wizard->timezone = 'Asia/Saigon';
+        $wizard->updatedTimezone();
+
+        expect($wizard->timezone)->toBe('Asia/Ho_Chi_Minh')
+            ->and($wizard->timezoneChosen)->toBeTrue();
     });
 
-    test('both the desktop and mobile pickers offer the same zones', function () {
-        $blade = file_get_contents(__DIR__.'/../../resources/views/livewire/booking/multistep-booking-wizard.blade.php');
+    test('both skins build their zone picker from the same list', function () {
+        $views = __DIR__.'/../../resources/views/livewire/booking/partials/';
 
-        expect(substr_count($blade, '$this->timezoneChoices()'))->toBe(2)
-            ->and($blade)->toContain('$wire.detectTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone');
+        foreach (['calendar-glass', 'calendar-light'] as $partial) {
+            expect(file_get_contents($views.$partial.'.blade.php'))->toContain('x-for="choice in choices"');
+        }
+
+        expect((new MultistepBookingWizard)->calendarConfig()['choices'])->toBe(MultistepBookingWizard::TIMEZONE_CHOICES);
     });
 });
