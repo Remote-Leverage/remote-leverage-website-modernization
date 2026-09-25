@@ -1,11 +1,14 @@
 # Booking rate: what happened, what we fixed, what to expect
 
-2026-09-25, revision 4. Based on Meta's own ad and conversion data, our data warehouse, Calendly, PostHog and the production lead records. The full analysis is in `booking-rate-diagnostic-2026-09-25.md`.
+2026-09-25, revision 5 (cost figures corrected to rolling 7-day, all channels). Based on Meta's own ad and conversion data, our data warehouse, Calendly, PostHog and the production lead records. The full analysis is in `booking-rate-diagnostic-2026-09-25.md`.
 
 ## The answer
 
 - **Fewer people are booking, but only modestly.** CRM bookings are down about 5%, and unique first-time bookers are down about 12%.
-- **Qualified bookings ($10k+/month) are up 13–17%, and they cost the same as before.** All of the loss is from companies under $10k.
+- **Qualified bookings ($10k+/month) held up in volume, but they cost more.** On a rolling 7-day basis:
+  - Cost per qualified booking is **$445**, against about $415 before the cutover (**+7%**).
+  - Cost per booking is **$287**, against about $226 (**+27%**).
+  - The lost bookings are all from companies under $10k.
 - **What collapsed is the booking *rate*.** Meta sent 4x the clicks for 14% more money, and those extra clicks almost never book.
 - **Why:** every Meta ad set optimises on one event, **"Valid Booking"**. An n8n automation sends it to Meta when someone books in Calendly, taking the visitor's click data **from HubSpot**.
   - That feed faltered on Sep 15–17, before our cutover.
@@ -20,7 +23,24 @@
 | Bookings per day | 66.8 | 63.8 | −5% |
 | Bookings per 100 visits | 5.2 | 1.2 | **−76%** |
 | Cost per booking | $236 | $282 | +19% |
-| Cost per qualified booking | $446 | $443 | flat |
+| Cost per qualified booking | $446 | $443 | flat on this Facebook-only weekday view, **+7% on the rolling all-channel view below** |
+
+### Cost trend (all channels, rolling 7 days)
+
+Single days swing a lot. Before the cutover, cost per qualified booking ranged from $336 to $618 on individual days, and Sep 16 was $516, the same as Sep 24. So judge by the rolling week.
+
+| Rolling 7 days | Aug 24–28 | Sep 8–17 (before cutover) | Sep 24 |
+|---|---|---|---|
+| Cost per booking | $247–266 | $216–235 (avg ~$226) | **$287** |
+| Cost per qualified booking | $411–434 | $389–443 (avg ~$415) | **$445** (peak $461 on Sep 22) |
+
+```mermaid
+xychart-beta
+    title "Rolling 7-day cost per booking (USD, all channels)"
+    x-axis ["08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24"]
+    y-axis "USD" 150 --> 320
+    line [235, 222, 228, 224, 225, 225, 222, 216, 232, 232, 249, 263, 266, 275, 284, 283, 287]
+```
 
 ## 1. The rate collapsed
 
@@ -144,11 +164,11 @@ Meta's delivery has not changed yet. Today it is still buying $4–8 CPM traffic
 |---|---|---|---|
 | Bookings per 100 visits | 5.2 | 1.2 | **4–5** |
 | RL5 sales cost per 1,000 impressions | ~$68 | $4–28 | **$50–70** |
-| Cost per booking | $236 | $282 | **~$236** |
-| Bookings per weekday | 67 | 64 | **~72–76** at today's spend |
-| Cost per qualified booking | $446 | $443 | **~$445, unchanged** |
+| Cost per booking, rolling 7 days, all channels | ~$226 | $287 | **~$226–235** |
+| Cost per qualified booking, rolling 7 days, all channels | ~$415 | $445 | **~$400–420** |
+| Meta bookings per weekday | 67 | 64 | **~72–76** at today's spend |
 
-**This is a return to the old baseline, not an improvement on it.** Qualified bookings never got more expensive. The recovery is about 10 more total bookings a weekday and cost per booking back to about $236.
+**This is a return to the old baseline, not an improvement on it.** The recovery is about 10 more Meta bookings a weekday, total cost per booking back to about $226–235, and qualified cost back to about $400–420.
 
 Beating the old baseline is a media decision: consolidate ad sets and consider a cost cap. The account was already fragile before the cutover.
 
