@@ -862,8 +862,9 @@ describe('an empty environment variable falls through to the default', function 
         try {
             $config = require __DIR__.'/../../config/pixels.php';
 
-            // One id since 3075368 dropped the obsolete second account from the default.
-            expect($config['meta']['pixel_ids'])->toBe(['1482937899395718'])
+            // Both ids. 1430907207548734 is the pixel the RL5 ad account optimises on; dropping
+            // it (3075368) starved Meta of every conversion from 2026-09-22.
+            expect($config['meta']['pixel_ids'])->toBe(['1430907207548734', '1482937899395718'])
                 ->and($config['bing_uet']['tag_id'])->toBe('97187250')
                 // Both accounts are emitted here since GTM-53JDTQCZ was retired.
                 ->and($config['linkedin']['partner_ids'])->toBe(['6411876', '9514236'])

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Application\Http\Controllers\CostAlertSendController;
+use App\Application\Http\Controllers\SchedulerLinkController;
 use App\Domains\Marketing\Support\CostAlertSendLink;
 use App\Domains\Scheduling\Actions\RouteInstantCallAction;
 use App\Support\PageRobots;
@@ -29,6 +30,9 @@ Route::get('book-consultation', function () {
 Route::get('book', function () {
     return redirect()->route('funnel.book-consultation');
 });
+
+// "Add to calendar" for a booked consultation; the URL stored in HubSpot `schedule_link`.
+Route::get('scheduler-link', SchedulerLinkController::class)->name('funnel.scheduler-link');
 
 /*
  * Live-transfer booking form — the internal tool a BDR fills in after a live call, for a lead

@@ -784,7 +784,9 @@
       const utmTerm = getParam('utm_term') || getCookie('utm_term') || getCookie('handl_utm_term');
       const utmContent = getParam('utm_content') || getCookie('utm_content') || getCookie('handl_utm_content');
       const gclid = getParam('gclid') || getCookie('gclid');
-      const fbclid = getParam('fbclid') || getCookie('fbclid') || getCookie('_fbc');
+      // Not `_fbc`: that is a whole `fb.1.<ts>.<id>` string, and stored as a click id it
+      // nested into a malformed fbc on the way to Meta.
+      const fbclid = getParam('fbclid') || getCookie('fbclid');
       const referralCode = getParam('via') || getParam('ref') || getParam('r') || getCookie('rl_referrer');
 
       if (utmSource && !$wire.get('utmSource')) $wire.set('utmSource', utmSource, false);
@@ -795,6 +797,14 @@
       if (gclid && !$wire.get('gclid')) $wire.set('gclid', gclid, false);
       if (fbclid && !$wire.get('fbclid')) $wire.set('fbclid', fbclid, false);
       if (referralCode && !$wire.get('referralCode')) $wire.set('referralCode', referralCode, false);
+
+      /*
+       * The page as this browser sees it. The snapshot above may have been rendered for another
+       * visitor (the HTML cache ignores the query string), so the server re-reads every
+       * attribution field from these on submit — MultistepBookingWizard::refreshVisitorContext().
+       */
+      $wire.set('clientPageUrl', window.location.href, false);
+      $wire.set('clientReferrer', document.referrer || '', false);
 
       /*
        * PostHog's session id, so the lead timeline can link to the session replay.
