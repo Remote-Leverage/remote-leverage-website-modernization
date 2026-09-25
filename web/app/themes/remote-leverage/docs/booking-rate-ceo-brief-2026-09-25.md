@@ -1,16 +1,17 @@
-# Booking rate: what happened and what we fixed
+# Booking rate: what happened, what we fixed, what to expect
 
-2026-09-25, revision 3. Rebuilt from Meta's own ad and conversion data. Pixel 1430 is not the main account's pixel. The full analysis is in `booking-rate-diagnostic-2026-09-25.md`.
+2026-09-25, revision 4. Based on Meta's own ad and conversion data, our data warehouse, Calendly, PostHog and the production lead records. The full analysis is in `booking-rate-diagnostic-2026-09-25.md`.
 
 ## The answer
 
 - **Fewer people are booking, but only modestly.** CRM bookings are down about 5%, and unique first-time bookers are down about 12%.
-- **Qualified bookings ($10k+/month) are up 13–17%.** All of the loss is from companies under $10k.
+- **Qualified bookings ($10k+/month) are up 13–17%, and they cost the same as before.** All of the loss is from companies under $10k.
 - **What collapsed is the booking *rate*.** Meta sent 4x the clicks for 14% more money, and those extra clicks almost never book.
-- **Why, confirmed from Meta's own data:** every ad set optimises on one custom event, **"Valid Booking"**, on pixel 1482. A system outside the website sends it.
-  - That feed failed during the cutover: **zero on Sep 17**, and half its normal volume on Sep 15, 16 and 18. With no signal, Meta's lowest-cost bidding drifted to cheap inventory.
-  - When the feed came back, Meta credited it disproportionately to the cheapest-click ad sets. That kept pushing delivery cheaper.
-- **Fixed today (WR-379):** every lead now carries its own visitor's click data. **Still to do:** find and harden the Valid Booking sender, and fix the account's fragile structure. See the asks in section 8.
+- **Why:** every Meta ad set optimises on one event, **"Valid Booking"**. An n8n automation sends it to Meta when someone books in Calendly, taking the visitor's click data **from HubSpot**.
+  - That feed faltered on Sep 15–17, before our cutover.
+  - From the evening of Sep 17, **our new site filled HubSpot with the wrong visitor's click data**.
+  - So Meta credited bookings to the wrong ads and moved budget into cheap, low-intent traffic.
+- **Fixed and live since 11:17 ET today (WR-379).** New leads are clean. We expect Meta to be back to its pre-cutover efficiency **around Oct 1–2**.
 
 | Meta, weekday average | Before (Sep 8–16) | After (Sep 21–24) | Change |
 |---|---|---|---|
@@ -67,18 +68,26 @@ xychart-beta
     line [71.9, 68.9, 65.7, 63.7, 78.4, 78.4, 69.9, 67.3, 65.4, 35.2, 39.8, 40.4, 22.4, 21.2, 21.6, 28.4, 11.3]
 ```
 
-## 5. What Meta optimises on, and what went wrong with it
+## 5. How Meta learns who converts
 
-This section is read directly from Meta's API: ad set settings, the custom conversion's definition, and the change log.
+```mermaid
+flowchart LR
+    A["Visitor books a call"] --> B["Calendly"]
+    B --> C["n8n automation"]
+    C -->|"looks up the contact"| D["HubSpot:<br/>click ID, IP, browser"]
+    W["Our website writes<br/>those HubSpot fields"] --> D
+    C -->|"'Valid Booking'"| M["Meta pixel 1482"]
+    M --> O["Every ad set optimises on this"]
+```
+
+From Meta's API:
 
 | Fact | Evidence |
 |---|---|
-| Every active ad set in both accounts optimises for **"Valid Booking"** on pixel **1482937899395718** | 34 of 34 RL5 ad sets and 3 of 3 RL7 ad sets. `promoted_object` points either at custom conversion `1361003065662161` ("Valid Booking CC") or at the raw event. |
-| Neither the old site nor the new one sends "Valid Booking" | Not in either site's code. An outside system sends it, most likely an n8n flow fed by Calendly and our lead data. |
-| Pixel 1430 plays no part | The main account never registered its events |
-| View-through is not a factor | 0–6 a day of the credit, both before and after. It is nearly all click-through. |
-| The account is fragile | 34 ad sets share about 25 Valid Bookings a day. Each has 0–13 events, against the roughly 50 a week needed to leave learning, so all are stuck in "Learning". Bidding is lowest-cost with no cap. |
-| Ad-team editing was normal | 70–175 changes a day through August and September, the same before and after the cutover |
+| All 34 RL5 ad sets and all 3 RL7 ad sets optimise on **"Valid Booking"** (pixel 1482) | Ad set settings |
+| Pixel 1430 plays no part in optimisation | The main account never registered its events |
+| The account is fragile | 34 ad sets share about 25 Valid Bookings a day, and all are stuck in "Learning". Bidding is lowest-cost with no cap. |
+| Ad-team editing was normal | 70–175 changes a day through August and September |
 
 ```mermaid
 xychart-beta
@@ -88,10 +97,15 @@ xychart-beta
     bar [25, 39, 29, 30, 18, 15, 26, 15, 12, 0, 14, 32, 11, 19, 29, 32, 23]
 ```
 
-**Two things went wrong with that signal.**
+## 6. What caused what
 
-1. **It stopped.** It fell to about half on Sep 15–16, zero on Sep 17, and half again on Sep 18. Lowest-cost bidding with no signal buys the cheapest impressions available: RL5 sales CPM halved on the 17th.
-2. **When it came back, the credit went to the wrong ad sets.** Real bookings are measured from each visitor's own browser:
+| Period | What happened | Cause |
+|---|---|---|
+| **Sep 15 – Sep 17 evening** | Valid Bookings fell to about half, then **zero on Sep 17**. CPM halved on the 17th. | **Not the new website.** The old site was still live, its HubSpot data was correct, and our first HubSpot write was at 21:54 ET on the 17th. Something in the Calendly → n8n → HubSpot → Meta chain changed. A new n8n Calendly trigger was created on Sep 15 at 14:23 ET. Still unexplained. |
+| **Sep 17 evening – Sep 25 11:17 ET** | Meta credited the wrong ads. CPM slid from about $40 to $11. | **Our website.** Cached pages made **75–80% of Meta leads carry the previous visitor's click ID**. Our site wrote that into HubSpot, and n8n passed it to Meta. |
+| **Throughout** | 4x the clicks for the same bookings | **Amplified on the media side:** budget and ad sets were scaled onto a broken signal, with no-cap bidding and a fragmented account |
+
+Credit per real booking, before and after, shows the mis-crediting directly:
 
 | Ad sets, by cost per click | Meta credit per real booking, before | After |
 |---|---|---|
@@ -99,75 +113,58 @@ xychart-beta
 | Middle third | 0.58 | 0.40 |
 | Priciest third | 0.46 | **0.36** |
 
-Cheap-click ad sets now get almost twice the credit per real booking that pricey ones get. So Meta keeps buying cheaper traffic, and CPM went from about $35 to $11.
+## 7. What we fixed
 
-```mermaid
-flowchart TD
-    S["Outside sender (probably n8n) posts<br/>'Valid Booking' to pixel 1482"] --> O{"Sep 15-18"}
-    O -->|"half, then ZERO on Sep 17"| A["Meta has no signal:<br/>lowest-cost bidding buys the cheapest impressions"]
-    O -->|"back from Sep 19"| B["Credit lands on the wrong clicks:<br/>cheap ad sets look like they convert"]
-    C["Our leads carried the PREVIOUS visitor's click ID<br/>(fixed today in WR-379)"] -.->|"if the sender uses our lead data"| B
-    A --> D["CPM falls from about $70 to $11"]
-    B --> D
-    F["34 ad sets share about 25 events a day:<br/>all stuck in Learning"] --> D
-    D --> E["4x the clicks, same bookings"]
-```
-
-## 6. How it unfolded
-
-```mermaid
-timeline
-    title September, day by day
-    Sep 15-16 : Valid Booking feed drops to about half
-    Sep 17 : New site goes live
-           : Valid Booking feed sends zero
-           : RL5 cost per 1,000 impressions halves
-    Sep 18 : Ads paused for 8 hours, then relaunched
-           : Feed back at half volume
-    Sep 21 : Night deploy removes pixel 1430
-    Sep 22 : 12 new ad sets launched
-           : Contaminated leads jump to about 80%
-    Sep 24 : Budget stepped up across 36 ad sets
-           : Cost per 1,000 impressions hits $11
-    Sep 25 : Fix merged and deploying (WR-379)
-```
-
-## 7. What we fixed today
+Live since **11:17 ET, Sep 25**, release `v-20260925-v1`, ticket WR-379.
 
 | Fix | Effect |
 |---|---|
-| **Every lead now carries its own visitor's data** | Click ID, IP and browser are re-read from the visitor's own submission, never from the cached page. This removes the one confirmed source of wrong click IDs in our data. |
-| Pixel 1430 restored | Not the main account's pixel, but we keep tracking both pixels as before |
-| "Add to calendar" link restored | All 1,585 links in the CRM work again, and new bookings get one. This helps show rate. |
-| Booking link sent to HubSpot again | Confirmation emails and texts can include it, as they did before |
+| Every lead carries its own visitor's click ID, IP and browser | HubSpot, and therefore n8n and Meta, get the right click again |
+| Pixel 1430 restored | Both pixels tracked, as before the cutover |
 
-All tests pass, and the change was reviewed and merged. It is deploying as release `v-20260925-v1`.
+**Verified in production, first hour after the fix:**
 
-## 8. What we need this week
-
-1. **Whoever owns n8n: find the flow that sends "Valid Booking" to pixel 1482.** We need three things from it:
-   - What changed on Sep 15–17, and why it sent nothing on the 17th. New n8n Calendly webhooks were created on Sep 10, 15 and 22.
-   - Where it gets the click ID, fbp, IP and browser it sends to Meta: our lead webhook, HubSpot, or Calendly.
-   - An alert for when it sends nothing for an hour during business hours.
-2. **Marketing: consolidate ad sets** so each can reach about 50 Valid Bookings a week and leave learning. Freeze significant edits for 5–7 days.
-3. **Marketing: consider a cost cap on the sales ad sets.** Lowest-cost with no cap is what let delivery race down to $11 CPM.
-4. **Hold budget increases** until the signal has been steady for a few days.
-
-## 9. How we'll know it worked
-
-| Signal | Now | Target |
+| Check | Before the fix | After |
 |---|---|---|
-| Valid Bookings received per weekday (RL5) | 19–32, with a zero day on Sep 17 | Steady about 25+, never a zero day |
-| Meta credit per real booking, cheapest vs priciest third | 0.68 vs 0.36 | Back to roughly even (0.55 vs 0.46 before) |
-| RL5 sales cost per 1,000 impressions | $11–28 | Back toward $60–70 |
-| Meta bookings per 100 visits | 0.55–2.1 | Back toward 4–5 |
-| Meta cost per booking | $282 | Back toward $236 |
+| Leads carrying another visitor's data | 77% yesterday, 82% this morning | **0 of 7** |
+| Meta server-side leads reaching both pixels | 1 of 65 this morning reached 1430 | **11 of 11, 0 failed** |
 
-The first two can be checked from our warehouse daily, and we'll track them. We expect movement over 3–7 days, as the ad sets re-learn on correctly credited conversions.
+## 8. What to expect, and when
+
+Meta's delivery has not changed yet. Today it is still buying $4–8 CPM traffic at 1,000+ clicks an hour. That's expected: **Meta counts conversions for 7 days after a click**, so wrongly credited conversions from the past week keep steering it until they age out.
+
+| When | Expect |
+|---|---|
+| **Now** | Clean data on every new lead (done) |
+| **Sep 26** | Meta starts crediting the right ads again |
+| **Sep 28–29** | First signs: CPM climbs off the floor, clicks fall at the same spend, bookings per 100 visits rise toward 2–3 |
+| **Around Oct 1–2** | Back to pre-cutover efficiency |
+
+| Meta metric | Before cutover | Now | Expected around Oct 2 |
+|---|---|---|---|
+| Bookings per 100 visits | 5.2 | 1.2 | **4–5** |
+| RL5 sales cost per 1,000 impressions | ~$68 | $4–28 | **$50–70** |
+| Cost per booking | $236 | $282 | **~$236** |
+| Bookings per weekday | 67 | 64 | **~72–76** at today's spend |
+| Cost per qualified booking | $446 | $443 | **~$445, unchanged** |
+
+**This is a return to the old baseline, not an improvement on it.** Qualified bookings never got more expensive. The recovery is about 10 more total bookings a weekday and cost per booking back to about $236.
+
+Beating the old baseline is a media decision: consolidate ad sets and consider a cost cap. The account was already fragile before the cutover.
+
+**If the numbers are not recovering by about Oct 2, the remaining cause is the account setup, not the data.**
+
+## 9. What we need this week
+
+1. **Marketing: consider pulling back the Sep 24 evening budget increase** until Meta re-learns. Extra budget is currently buying traffic that doesn't book.
+2. **Marketing: freeze significant ad-set edits for 5–7 days, and consolidate ad sets** so each can reach about 50 Valid Bookings a week.
+3. **n8n owner: check the execution history for Sep 15–18.** Why did "Valid Booking" drop, and why did it send nothing on the 17th? Add an alert for when it sends nothing for an hour during business hours.
+4. **Us:** clear or re-sync the click fields on HubSpot contacts written between Sep 17 21:54 ET and Sep 25 11:17 ET. Otherwise a returning booker from that window would still send the wrong click to Meta.
 
 ## What is proven and what is not
 
 | Status | Items |
 |---|---|
-| **Proven (Meta API and warehouse)** | That all ad sets optimise on "Valid Booking" (pixel 1482). The feed outage on Sep 15–18 (zero on the 17th). That credit shifted toward cheap-click ad sets. The CPM collapse. That leads carried other visitors' click IDs. The fragile structure (34 ad sets, all in Learning). That view-through is negligible. |
-| **Not yet proven** | Who sends "Valid Booking", and whether it uses our lead data for click IDs. If it does, today's fix also fixes the mis-crediting. If it doesn't, the credit shift has another cause inside that sender. Action 1 closes this. |
+| **Proven** | That all ad sets optimise on Valid Booking. The chain from Calendly to n8n to HubSpot to Meta. That our site wrote other visitors' click IDs into HubSpot (75–80% of Meta leads). That credit shifted to cheap-click ad sets. The CPM collapse. That the fix works on new leads. |
+| **Not yet explained** | Why the Valid Booking feed dropped on Sep 15–17, before the cutover. The n8n execution history will show it. |
+| **Forecast** | The recovery timeline in section 8. It depends on budget and edit discipline over the next week. |
