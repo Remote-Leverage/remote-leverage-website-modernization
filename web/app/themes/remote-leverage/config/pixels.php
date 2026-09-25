@@ -60,12 +60,18 @@ return [
     |--------------------------------------------------------------------------
     |
     | Two pixels, both on every page, both with a PageView and both receiving
-    | the server-side Lead. **Do not drop 1430907207548734.** It is the
-    | "RL 5/6 Meta Pixel", the only one the legacy HandL CAPI ever sent Leads
-    | to, and so the one the Remote Leverage 5 ad account (~87% of Meta spend)
-    | optimises on. 3075368 removed it as "obsolete" on 2026-09-21; from
-    | 2026-09-22 00:59 ET that pixel received no Lead and no PageView at all.
-    | See docs/booking-rate-diagnostic-2026-09-25.md.
+    | the server-side Lead.
+    |
+    | 1482937899395718 ("Remote Leverage 2 Pixel") is the one the ad accounts
+    | optimise on: every ad set targets its custom event "Valid Booking",
+    | which n8n sends on each Calendly booking using the click data this site
+    | writes to HubSpot. So what matters most for ad delivery is that lead
+    | attribution is the visitor's own (MultistepBookingWizard::
+    | refreshVisitorContext()), not which pixels load here.
+    |
+    | 1430907207548734 ("RL 5/6") is the pixel the legacy HandL CAPI fed. It
+    | is kept so tracking matches what production ran before the cutover, not
+    | because any ad set uses it. See docs/booking-rate-ceo-brief-2026-09-25.md.
     |
     | Not in GTM. Verified 2026-09-17 against both containers.
     */

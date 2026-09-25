@@ -862,8 +862,8 @@ describe('an empty environment variable falls through to the default', function 
         try {
             $config = require __DIR__.'/../../config/pixels.php';
 
-            // Both ids. 1430907207548734 is the pixel the RL5 ad account optimises on; dropping
-            // it (3075368) starved Meta of every conversion from 2026-09-22.
+            // Both ids, as production ran before the cutover. 1482937899395718 carries the
+            // "Valid Booking" event the ad sets optimise on; see config/pixels.php.
             expect($config['meta']['pixel_ids'])->toBe(['1430907207548734', '1482937899395718'])
                 ->and($config['bing_uet']['tag_id'])->toBe('97187250')
                 // Both accounts are emitted here since GTM-53JDTQCZ was retired.
