@@ -52,7 +52,14 @@
     <livewire:partner.partner-directory-grid />
   </section>
 
-  {{-- Join Network CTA Banner --}}
+  {{-- Partnership Program CTA Banner.
+
+       The partnership program, not the referral program: this page is the partner directory,
+       and the companies on it partner with us through /become-a-partner/. Until 2026-09-24 this
+       banner sold the referral program instead — "recurring commissions", "Apply to Partner
+       Network" pointing at referrer.register, "Partner Portal Login" at the referrer portal —
+       which sent agencies and SaaS vendors into a commission sign-up meant for individuals.
+       The referral program keeps its own page at /referral-program/. --}}
   <section class="py-16 bg-surface-white border-t border-slate-200/70">
     <div class="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
       <div class="relative overflow-hidden rounded-card-lg bg-gradient-to-r from-brand-midnight via-brand-hero to-brand-midnight text-white p-8 sm:p-12 lg:p-16 border border-brand-purple/30 shadow-2xl">
@@ -61,30 +68,30 @@
 
         <div class="relative max-w-3xl space-y-6">
           <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-pill bg-brand-magenta/20 text-brand-magenta text-xs font-bold uppercase tracking-wider">
-            Partner Opportunities
+            Partnership Program
           </div>
 
           <h2 class="text-2xl sm:text-4xl font-bold font-display text-white tracking-tight">
-            Deliver World-Class Talent to Your Clients & Earn Recurring Commissions
+            Become a Remote Leverage Partner
           </h2>
 
           <p class="text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl">
-            Empower your customer base with top-tier nearshore executive assistants, real estate coordinators, and marketing experts. Gain up to 20% recurring referral share and dedicated co-branded landing pages.
+            Give your clients access to top 1% Latin American and global talent, open new referral and co-marketing opportunities for your brand, and add smarter hiring solutions to what you already offer.
           </p>
 
           <div class="pt-4 flex flex-wrap items-center gap-4">
             <a
-              href="{{ route('referrer.register') }}"
+              href="{{ home_url('/become-a-partner/') }}"
               class="px-6 py-3 rounded-pill bg-gradient-to-r from-brand-purple to-brand-magenta hover:opacity-95 text-white font-bold text-sm shadow-btn transition cursor-pointer"
             >
-              Apply to Partner Network &rarr;
+              Become a Partner &rarr;
             </a>
 
             <a
-              href="{{ route('referrer.portal') }}"
+              href="{{ home_url('/become-a-partner/#booking-footer') }}"
               class="px-6 py-3 rounded-pill bg-white/10 hover:bg-white/15 text-white font-semibold text-sm border border-white/20 transition cursor-pointer"
             >
-              Partner Portal Login
+              Book a Partnership Call
             </a>
           </div>
         </div>

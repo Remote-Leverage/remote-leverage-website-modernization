@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 use App\Application\Http\Support\WebhookSignature;
+use App\Domains\PartnerHub\Support\PartnershipSettings;
 use Illuminate\Http\Request;
 use Tests\TestCase;
 
@@ -65,4 +66,19 @@ function signedWebhookRequest(
         'CONTENT_TYPE' => 'application/json',
         'HTTP_'.strtoupper(str_replace('-', '_', $headerName)) => WebhookSignature::sign($body, $secret, $timestamp),
     ], $body);
+}
+
+/**
+ * Save Partners Hub → Partnership Settings values for a test, merged over what is saved.
+ *
+ * The settings are a WordPress option, not config, so tests write the mocked option store the
+ * way the settings screen writes the real one.
+ *
+ * @param  array<string, string>  $values  any of slack_channel, calendly_url, calendly_event_type
+ */
+function partnershipSettings(array $values): void
+{
+    $saved = get_option(PartnershipSettings::OPTION, []);
+
+    update_option(PartnershipSettings::OPTION, array_merge(is_array($saved) ? $saved : [], $values));
 }

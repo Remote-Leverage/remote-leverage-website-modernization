@@ -666,6 +666,24 @@ body.admin-bar {
     filter: none;
     opacity: 1;
   }
+
+  /* Grey rather than black, for /become-a-partner/'s trust bar: the base brightness(0) at 65%
+     over #F4F6FC lands on the ~#555658 the Partner LP comp draws its darkest marks in. */
+  .rl-logo-marquee-muted .rl-logo-marquee-item img {
+    opacity: 0.65;
+  }
+
+  .rl-logo-marquee-muted .rl-logo-marquee-item:hover img {
+    opacity: 0.85;
+  }
+
+  /* Smaller than the base 28px x 140px box, capped on WIDTH first: the Partner LP comp sets each
+     mark to ~80px wide and lets its height fall where its aspect puts it (Carbon's stacked
+     lockup reaches 38px, AdCenter360's wordmark 9px). Measured mark by mark off the frame. */
+  .rl-logo-marquee-compact .rl-logo-marquee-item img {
+    max-height: 38px;
+    max-width: 80px;
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -1238,6 +1256,18 @@ body.admin-bar {
   margin: 0;
   padding: 0;
   z-index: 3;
+}
+.rl-process-container--partner .rl-process-number {
+  color: var(--color-step-num);
+}
+.rl-process-container--partner .rl-process-line {
+  background-color: var(--color-brand-purple);
+}
+.rl-process-container--partner .rl-process-description {
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: -0.42px;
 }
 .rl-process-dot {
   position: absolute;

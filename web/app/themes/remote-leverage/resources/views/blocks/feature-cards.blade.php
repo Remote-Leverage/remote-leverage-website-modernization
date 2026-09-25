@@ -1,7 +1,11 @@
 {{-- Benefit/feature card grid in 2, 3 or 4 columns. The image is optional — production's
      "Built to help you grow" band is a 2-up of text-only cards. Each card is an image, a title and a short
      description. `variant` picks production's inset image or flush-to-edge treatment; `ratio` sets
-     the image aspect. --}}
+     the image aspect.
+
+     `variant: icon` is /become-a-partner/'s card, off the Partner LP Figma frame at 1366px: a 40px
+     outline icon (the card's `icon`) over a 19/24 title and 14/20 body, 20px in from every edge
+     on a 10px-radius card, 8px apart. One treatment, so the icon and the type travel together. --}}
 @php
     $cards = is_array($cards ?? null) ? $cards : [];
     $ratio = trim((string) ($ratio ?? ''));
@@ -11,6 +15,7 @@
     $variant = $variant ?? 'inset';
     $isFlush = $variant === 'flush';
     $isHorizontal = $variant === 'horizontal';
+    $isIcon = $variant === 'icon';
 
     // 'frosted' is the 2026 homepage band: a ~20% white wash over the mesh gradient instead of
     // an opaque card on a flat ground (measured on Homepage V1.png — #F1F2FB reads #F4F4FC
@@ -26,7 +31,9 @@
      band one card per row, and its cards carry 16px body copy that has no business in a
      ~163px column. --}}
 <div @class([
-    'grid gap-card w-full',
+    'grid w-full',
+    'gap-card' => ! $isIcon,
+    'gap-2' => $isIcon,
     'grid-cols-1' => $columns === '1' || $isFrosted,
     'grid-cols-2 sm:grid-cols-2' => $columns !== '1' && ! $isFrosted,
     'lg:grid-cols-4 mb-[12px]' => $columns === '4',
@@ -36,14 +43,21 @@
     @foreach ($cards as $card)
         @continue(!is_array($card))
         <div @class([
-            'rounded-card flex flex-col justify-between transition-all duration-300',
+            'flex flex-col justify-between transition-all duration-300',
+            'rounded-card' => ! $isIcon,
+            'rounded-badge' => $isIcon,
             'bg-white border border-black/4 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.06)]' => ! $isFrosted,
             'bg-white/20 border border-white/45 hover:bg-white/35' => $isFrosted,
-            'p-card' => ! $isFlush,
+            'p-card' => ! $isFlush && ! $isIcon,
+            'p-5' => $isIcon,
             'overflow-hidden' => $isFlush,
         ])>
             <div @class(['grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_200px] gap-5 items-center' => $isHorizontal])>
-                @if (! empty($card['img']))
+                @if ($isIcon && ! empty($card['icon']))
+                    <img src="{{ $card['icon'] }}" alt="" width="40" height="40" loading="lazy" decoding="async"
+                         class="mb-5 h-10 w-10 sm:mb-[23px]">
+                @endif
+                @if (! empty($card['img']) && ! $isIcon)
                 <div @class([
                     'w-full overflow-hidden bg-[#f7f8fc]',
                     'rounded-xl mb-5' => ! $isFlush && ! $isHorizontal,
@@ -62,13 +76,14 @@
                         ])>
                 </div>
                 @endif
-                <div @class(['p-3' => ! $isFlush && ! $isHorizontal && ! $isFrosted, 'px-7 pt-6 pb-7' => $isFlush && ! $isFrosted, 'px-5 pt-6 pb-7' => $isFrosted, 'sm:order-1' => $isHorizontal])>
+                <div @class(['p-3' => ! $isFlush && ! $isHorizontal && ! $isFrosted && ! $isIcon, 'px-7 pt-6 pb-7' => $isFlush && ! $isFrosted, 'px-5 pt-6 pb-7' => $isFrosted, 'sm:order-1' => $isHorizontal])>
                     {{-- Type steps down below sm, where the deck is two across and a card is
                          ~163px wide. At the sm sizes a title wrapped to four ragged lines. --}}
                     <h3 @class([
                         'font-display font-bold text-black tracking-[-0.02em] mb-2 sm:mb-3',
-                        'leading-snug' => ! $isFrosted,
-                        'text-[17px] sm:text-[22px]' => ! $isFlush && ! $isFrosted,
+                        'leading-snug' => ! $isFrosted && ! $isIcon,
+                        'text-[17px] sm:text-[22px]' => ! $isFlush && ! $isFrosted && ! $isIcon,
+                        'text-[17px] leading-[22px] sm:text-[19px] sm:leading-6' => $isIcon,
                         'text-[18px] sm:text-[27px] sm:leading-[32px] tracking-[-0.81px]' => $isFlush && ! $isFrosted,
                         // Two lines are reserved whether the title fills them or not, so every
                         // card in the row starts its body on the same baseline — which is what
@@ -80,7 +95,8 @@
                     </h3>
                     <p @class([
                         'text-black',
-                        'text-[13px] sm:text-[14px] leading-relaxed' => ! $isFrosted,
+                        'text-[13px] sm:text-[14px] leading-relaxed' => ! $isFrosted && ! $isIcon,
+                        'font-display text-[13px] leading-[19px] sm:text-[14px] sm:leading-5 sm:tracking-[-0.42px]' => $isIcon,
                         'text-[15px] sm:text-[16px] sm:leading-[25px] leading-relaxed' => $isFrosted,
                     ])>
                         {{ $card['desc'] }}

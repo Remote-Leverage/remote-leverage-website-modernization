@@ -9,6 +9,7 @@ use App\Domains\Lead\Events\LeadBookingCanceled;
 use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
+use App\Domains\PartnerHub\Support\PartnershipCallCalendar;
 use App\Domains\Tracking\Actions\RecordBehaviorEventAction;
 use App\Domains\Tracking\Data\AnalyticsEventData;
 use App\Infrastructure\Observability\IntegrationCallRecorder;
@@ -58,6 +59,16 @@ class CalendlyWebhookController
         $event = $payload['event'] ?? 'unknown';
 
         Log::info('Calendly Webhook Received: '.$event, ['event' => $event]);
+
+        // A partnership call is not a sales booking: its invitee is a prospect, and the latest
+        // lead with that email is somebody else's funnel. Acknowledge it and touch nothing —
+        // no lead status, no LeadBookingCompleted, no "Consultation Scheduled" telemetry.
+        if (in_array($event, ['invitee.created', 'invitee.canceled'], true)
+            && PartnershipCallCalendar::isPartnershipBooking($payload)) {
+            Log::info('Calendly Webhook: partnership call, not a lead booking; skipped.', ['event' => $event]);
+
+            return response()->json(['status' => 'received']);
+        }
 
         if ($event === 'invitee.created') {
             $invitee = $payload['payload']['invitee'] ?? [];

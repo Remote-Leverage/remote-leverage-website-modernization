@@ -55,6 +55,9 @@ class StatsBandBlock extends Block
             // Production's band is the flat #250D4A surface; 'light' exists for pages
             // that run the same figures on the pale surface.
             'tone' => (string) ($field('tone') ?: 'dark'),
+            // 'pills' is /become-a-partner/'s centred row of white pills, drawn on the
+            // pattern's own background. Default stays the band.
+            'layout' => (string) ($field('layout') ?: 'band'),
             'stats' => $this->stats($field('stats')),
         ];
     }
@@ -64,6 +67,14 @@ class StatsBandBlock extends Block
         $fields = Builder::make('stats_band_block');
 
         $fields
+            ->addSelect('layout', [
+                'label' => 'Layout',
+                'choices' => [
+                    'band' => 'Full-width band, three columns (default)',
+                    'pills' => 'Centred row of white pills, no band',
+                ],
+                'default_value' => 'band',
+            ])
             ->addSelect('tone', [
                 'label' => 'Surface',
                 'choices' => [

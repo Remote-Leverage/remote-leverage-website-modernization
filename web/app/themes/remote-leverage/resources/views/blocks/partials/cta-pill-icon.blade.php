@@ -5,8 +5,9 @@
      weight — the circle is the part that reads, and a 1px difference in it is visible when a
      pill sits directly above another.
 
-     Param: $icon. --}}
-<svg class="h-[23px] w-[23px] shrink-0 transition-transform duration-200 {{ ($icon ?? 'arrow') === 'chevron-down' ? 'group-hover:translate-y-0.5' : 'group-hover:translate-x-0.5' }}"
+     Params: $icon, and optional $iconSize — 23 (default) or 18, the /become-a-partner/ comp's
+     small pill. Whole class strings so Tailwind's scanner sees them. --}}
+<svg class="{{ ($iconSize ?? 23) === 18 ? 'h-[18px] w-[18px]' : 'h-[23px] w-[23px]' }} shrink-0 transition-transform duration-200 {{ ($icon ?? 'arrow') === 'chevron-down' ? 'group-hover:translate-y-0.5' : 'group-hover:translate-x-0.5' }}"
      viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
     <circle cx="12" cy="12" r="10.4" stroke-width="1.5" />
     @if (($icon ?? 'arrow') === 'chevron-down')

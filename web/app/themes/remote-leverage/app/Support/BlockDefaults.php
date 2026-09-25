@@ -1517,6 +1517,23 @@ class BlockDefaults
         // on chrome (36px gap + 40/32px padding + a 23px icon), which in a card narrower than
         // ~340px leaves too little for "BOOK A CONSULTATION" and breaks it over two lines. That
         // is what it did inside the role pages' proof banner at 390px.
+        //
+        // 'small' is a different pill rather than trimmed chrome: /become-a-partner/'s comp draws
+        // it 311x50: 40px either side of a 15px label, a 10px gap, an 18px icon (see
+        // cta-pill-icon's $iconSize) and no ring, read off the Figma frame's layer geometry.
+        // Kept here so it is still one class list.
+        if ($size === 'small') {
+            $base = 'group inline-flex items-center justify-center gap-2.5 px-10 rounded-full bg-brand-magenta '
+                // py-4, not the 17px the 50px height suggests: the 18px icon, not the 16px
+                // label line, is the tallest thing in the row, so 16 + 18 + 16 is the 50.
+                .'py-4 font-display text-[15px] font-bold uppercase leading-4 '
+                .'tracking-[-0.3px] whitespace-nowrap text-white transition-all duration-200 '
+                .'hover:bg-brand-magenta-hover focus-visible:ring-2 focus-visible:ring-brand-magenta '
+                .'focus-visible:ring-offset-2';
+
+            return trim($base.' '.$extra);
+        }
+
         $chrome = $size === 'compact' ? 'gap-5 pl-7 pr-6' : 'gap-9 pl-10 pr-8';
 
         $base = 'group inline-flex items-center justify-center '.$chrome.' rounded-full bg-brand-magenta '
@@ -3843,6 +3860,7 @@ Google Ads',
         'partner-hero' => ['badges', 'field_partner_hero_block_badges'],
         'talent-dossier-carousel' => ['cards', 'field_talent_dossier_carousel_block_cards'],
         'stats-band' => ['stats', 'field_stats_band_block_stats'],
+        'checklist-grid' => ['items', 'field_checklist_grid_block_items'],
         'featured-posts' => ['cards', 'field_featured_posts_block_cards'],
     ];
 

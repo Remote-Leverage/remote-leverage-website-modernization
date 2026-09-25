@@ -308,6 +308,38 @@ if (! Capsule::schema()->hasTable('rl_referral_rewards')) {
     });
 }
 
+if (! Capsule::schema()->hasTable('rl_partnership_prospects')) {
+    Capsule::schema()->create('rl_partnership_prospects', function ($table) {
+        $table->increments('id');
+        $table->string('first_name');
+        $table->string('last_name');
+        $table->string('email')->index();
+        $table->string('company');
+        $table->string('role');
+        $table->string('organization_type');
+        $table->string('monthly_revenue');
+        $table->string('businesses_reached');
+        $table->text('message')->nullable();
+        // Both added 2026-09-24 by add_notes_and_source_to_partnership_prospects_table.
+        $table->text('notes')->nullable();
+        $table->string('status')->default('new');
+        $table->string('source')->default('form');
+        $table->timestamp('booked_at')->nullable();
+        $table->string('calendly_event_uri')->nullable();
+        $table->string('calendly_invitee_uri')->nullable();
+        $table->text('landing_url')->nullable();
+        $table->text('referrer_url')->nullable();
+        $table->string('utm_source')->nullable();
+        $table->string('utm_medium')->nullable();
+        $table->string('utm_campaign')->nullable();
+        $table->string('utm_term')->nullable();
+        $table->string('utm_content')->nullable();
+        $table->string('ip_address')->nullable();
+        $table->text('context')->nullable();
+        $table->timestamps();
+    });
+}
+
 if (! Capsule::schema()->hasTable('rl_leads')) {
     Capsule::schema()->create('rl_leads', function ($table) {
         $table->increments('id');

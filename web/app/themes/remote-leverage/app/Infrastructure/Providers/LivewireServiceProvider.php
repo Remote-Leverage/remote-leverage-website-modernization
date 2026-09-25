@@ -7,6 +7,7 @@ namespace App\Infrastructure\Providers;
 use App\Application\Livewire\Blog\GuideIndexFilter;
 use App\Application\Livewire\Booking\MultistepBookingWizard;
 use App\Application\Livewire\Partner\PartnerDirectoryGrid;
+use App\Application\Livewire\Partner\PartnershipProspectForm;
 use App\Application\Livewire\Referrer\ReferrerPortalDashboard;
 use App\Application\Livewire\Referrer\ReferrerRegistrationForm;
 use App\Application\Livewire\Referrer\SalesReferralForm;
@@ -49,6 +50,7 @@ class LivewireServiceProvider extends ServiceProvider
             Livewire::component('referrer.referrer-registration-form', ReferrerRegistrationForm::class);
             Livewire::component('referrer.sales-referral-form', SalesReferralForm::class);
             Livewire::component('partner.partner-directory-grid', PartnerDirectoryGrid::class);
+            Livewire::component('partner.partnership-prospect-form', PartnershipProspectForm::class);
             Livewire::component('blog.guide-index-filter', GuideIndexFilter::class);
         }
     }

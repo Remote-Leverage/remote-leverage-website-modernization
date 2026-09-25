@@ -25,9 +25,10 @@ describe('the role page options default to the homepage behaviour', function () 
         $flat = flattenFields(block(HomeHeroBlock::class)->fields()['fields']);
 
         expect($flat['media']['default_value'])->toBe('cards')
-            ->and(array_keys($flat['media']['choices']))->toBe(['cards', 'image'])
+            // 'none' (/become-a-partner/) is appended, so the two that shipped keep their order.
+            ->and(array_keys($flat['media']['choices']))->toBe(['cards', 'image', 'none'])
             ->and($flat['tick_tone']['default_value'])->toBe('magenta')
-            ->and(array_keys($flat['tick_tone']['choices']))->toBe(['magenta', 'emerald'])
+            ->and(array_keys($flat['tick_tone']['choices']))->toBe(['magenta', 'emerald', 'leverage'])
             ->and($flat['headline_accent_tone']['default_value'])->toBe('purple')
             ->and(array_keys($flat['headline_accent_tone']['choices']))->toBe(['purple', 'inherit'])
             ->and($flat)->toHaveKey('hero_image');
@@ -80,7 +81,7 @@ describe('the views branch on the new options', function () {
         expect($blade)->toContain("\$isImage = (\$media ?? 'cards') === 'image'")
             // The fan is suppressed rather than merely hidden, so the image variant emits no
             // markup for three cards it never shows.
-            ->and($blade)->toContain('@if ($cards && ! $isImage)')
+            ->and($blade)->toContain('@if ($cards && ! $isImage && ! $isNone)')
             ->and($blade)->toContain('lg:grid-flow-col lg:grid-rows-3')
             ->and($blade)->toContain('fetchpriority="high"')
             // Measured off the comp; see the view for the three samples behind it.
@@ -144,7 +145,7 @@ describe('the booking footer trust strip', function () {
             ->and($src)->toContain('field_booking_footer_checklist')
             // The padding moved off <section> so the strip can bleed; if it moved back, the
             // strip would sit inside the purple band's padding and stop meeting the footer.
-            ->and($blade)->toContain('<div class="py-16 sm:py-20 lg:py-24">')
+            ->and($blade)->toContain("'py-16 sm:py-20 lg:py-24' => ! \$isStacked")
             ->and($blade)->not->toContain("'w-full text-white py-16 sm:py-20 lg:py-24',");
     });
 });

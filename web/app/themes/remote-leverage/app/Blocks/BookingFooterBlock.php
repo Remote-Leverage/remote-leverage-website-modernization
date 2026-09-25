@@ -102,6 +102,12 @@ class BookingFooterBlock extends Block
                 ?: ((function_exists('get_field') ? get_field('form_title') : null) ?: 'Your Contact Information'),
             'formButtonText' => ($this->block->data['form_button_text'] ?? null)
                 ?: ((function_exists('get_field') ? get_field('form_button_text') : null) ?: 'Book a Consultation'),
+            // /become-a-partner/: copy centred over the form, and the partnership-prospect form
+            // in place of the booking wizard. Read raw first like skin/background above.
+            'layout' => ($this->block->data['layout'] ?? null)
+                ?: ((function_exists('get_field') ? get_field('layout') : null) ?: 'split'),
+            'form' => ($this->block->data['form'] ?? null)
+                ?: ((function_exists('get_field') ? get_field('form') : null) ?: 'booking'),
             'mapImage' => BlockDefaults::resolveImageUrl(
                 (function_exists('get_field') ? get_field('map_image') : null) ?: 506
             ),

@@ -90,6 +90,8 @@ class HomeHeroBlock extends Block
         return [
             'ratingLogo' => BlockDefaults::homeImg('google-logo.png'),
             'ratingScore' => BlockDefaults::cleanText($this->field('rating_score')) ?: '4.8',
+            // Only the centred 'none' composition has room for it, under the score row.
+            'ratingCount' => BlockDefaults::cleanText($this->field('rating_count')) ?: '',
             // Explicitly false-aware: an ACF true/false stores 0, and `0 !== false` is true,
             // so a plain !== check would have kept showing the row when it was switched off.
             'showRating' => (bool) ($this->field('show_rating') ?? true),
@@ -100,6 +102,7 @@ class HomeHeroBlock extends Block
             'checklist' => $this->checklist(),
             'ctaText' => BlockDefaults::cleanText($this->field('cta_text')) ?: 'BOOK A CONSULTATION',
             'ctaUrl' => $this->field('cta_url') ?: '#booking-footer',
+            'ctaLead' => BlockDefaults::cleanText($this->field('cta_lead')) ?: '',
             'cards' => $this->cards(),
             'tickTone' => $this->field('tick_tone') ?: 'magenta',
             'media' => $this->field('media') ?: 'cards',
@@ -178,8 +181,14 @@ class HomeHeroBlock extends Block
                 'instructions' => 'Cards is the homepage: a fan of three talent cards on desktop, nothing on '
                     .'mobile. Image is the role pages (/admin-virtual-assistants/ and its siblings): one square '
                     .'composite beside the copy on desktop, under the CTA on mobile, and the copy left-aligned '
-                    .'at every width rather than centred on mobile.',
-                'choices' => ['cards' => 'Talent card fan (default)', 'image' => 'Single hero image'],
+                    .'at every width rather than centred on mobile. None is /become-a-partner/: one centred '
+                    .'column with the checklist boxed in a white card, the rating over its review count, a 48px '
+                    .'headline and the small pill.',
+                'choices' => [
+                    'cards' => 'Talent card fan (default)',
+                    'image' => 'Single hero image',
+                    'none' => 'Nothing — one centred column',
+                ],
                 'default_value' => 'cards',
                 'return_format' => 'value',
             ])
@@ -198,6 +207,10 @@ class HomeHeroBlock extends Block
             ->addText('rating_score', [
                 'label' => 'Google Rating Score',
                 'default_value' => '4.8',
+            ])
+            ->addText('rating_count', [
+                'label' => 'Review Count',
+                'instructions' => 'e.g. "235 reviews". Shown under the score in the centred (None) layout only.',
             ])
             ->addTextarea('headline', [
                 'label' => 'Headline',
@@ -227,8 +240,13 @@ class HomeHeroBlock extends Block
             ->addSelect('tick_tone', [
                 'label' => 'Checklist Tick Colour',
                 'instructions' => 'Magenta is the homepage. Emerald (#10B981, the same green '
-                    .'acf/consult-landing-hero already ticks with) is what the role comps show.',
-                'choices' => ['magenta' => 'Brand magenta (default)', 'emerald' => 'Emerald green'],
+                    .'acf/consult-landing-hero already ticks with) is what the role comps show. Leverage is '
+                    .'/become-a-partner/: a #00D982 disc with a dark tick.',
+                'choices' => [
+                    'magenta' => 'Brand magenta (default)',
+                    'emerald' => 'Emerald green',
+                    'leverage' => 'Leverage green, dark tick',
+                ],
                 'default_value' => 'magenta',
                 'return_format' => 'value',
             ])
@@ -247,6 +265,10 @@ class HomeHeroBlock extends Block
             ->addText('cta_url', [
                 'label' => 'CTA Button Target URL',
                 'default_value' => '#booking-footer',
+            ])
+            ->addText('cta_lead', [
+                'label' => 'Line Above the CTA',
+                'instructions' => 'Optional, e.g. "Ready to become a partner?". Leave blank for none.',
             ])
             ->addRepeater('cards', [
                 'label' => 'Talent Cards (leave empty for the preset three)',
