@@ -122,11 +122,12 @@
       </a>
 
       {{-- The hire-va landing pages carry no site nav on production — a conversion page
-           deliberately offers no way out — so they get the CTA-only header instead. --}}
-      @if (get_page_template_slug() !== 'template-landing.blade.php' && ! is_page_template('template-landing.blade.php'))
-        @includeWhen(\App\Support\PageChrome::usesCtaOnlyHeader(), 'sections.header-cta')
-        @includeUnless(\App\Support\PageChrome::usesCtaOnlyHeader(), 'sections.header')
-      @endif
+           deliberately offers no way out — so they get the CTA-only header instead. The
+           Landing template gets none. An editor can override either per page from the
+           Header & Footer sidebar panel; App\Support\PageChrome resolves all three. --}}
+      @php($pageHeader = \App\Support\PageChrome::header())
+      @includeWhen($pageHeader === \App\Support\PageChrome::HEADER_CTA, 'sections.header-cta')
+      @includeWhen($pageHeader === \App\Support\PageChrome::HEADER_SITE, 'sections.header')
 
       {{-- Renders only for a visitor who has just arrived on a referral link; ordinary
            traffic gets no markup at all. Sits outside <main> because it is fixed-position
@@ -151,7 +152,8 @@
       @endif
 
       {{-- Slim footer site-wide since the 2026 rebuild; a page opts back into the four-column
-           one by emitting the rl:full-footer marker. See App\Support\PageChrome. --}}
+           one by emitting the rl:full-footer marker or from the Header & Footer sidebar
+           panel. See App\Support\PageChrome. --}}
       @include(App\Support\PageChrome::usesFullFooter() ? 'sections.footer' : 'sections.footer-slim')
     </div>
 

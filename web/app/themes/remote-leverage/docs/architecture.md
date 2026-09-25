@@ -281,6 +281,14 @@ families in `resources/patterns/steal-campaign.php` and `va-roles-landing.php` e
 `rl:cta-only-header` inside their opening banner comment. A block-backed page needs no marker;
 listing its block in `PageChrome::CTA_ONLY_HEADER_BLOCKS` is enough.
 
+**Editor override.** The page editor sidebar carries a Header & Footer panel
+(`App\Fields\PageChromeFields`): Header is Auto / Site / CTA-only / None, Footer is Auto / Slim /
+Full. Anything but Auto beats the content-derived answer, and the `template-landing` no-header
+template with it. It is post meta (`_rl_page_header`, `_rl_page_footer`), so unlike the markers it
+lives in the database — set it on production, which the other environments are refreshed from, and
+prefer a marker in the pattern when the choice is part of the page's design rather than an
+editorial call.
+
 **`rl:noindex` has no visible effect locally.** Bedrock's `bedrock-disallow-indexing` mu-plugin
 already noindexes every non-production environment, so a local page looks correctly excluded
 whether or not the filter runs. It exists so the exclusion survives into production, where that
