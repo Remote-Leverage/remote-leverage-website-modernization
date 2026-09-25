@@ -94,11 +94,12 @@ behaviour. Selection is per-run, not global config.
 | `leads` | `wp_rl_lead_profiles`, `wp_rl_lead_identifiers`, `wp_rl_leads`, `wp_rl_lead_activity_logs` | opt-in, **replaces the target** |
 | `referrals` | `wp_rl_referrers`, `wp_rl_referrals`, `wp_rl_referral_clicks`, `wp_rl_referral_rewards`, `wp_rl_payouts` | **never transferred** |
 | `scheduling` | `wp_rl_live_call_sessions` | **never transferred** |
+| `partnerships` | `wp_rl_partnership_prospects` | **never transferred** |
 | `settings` | the `config/rl-sync.php` option whitelist | opt-in |
 | `users` | `wp_users`, `wp_usermeta` | **never transferred** |
 | — | `wp_migrations`, `wp_comments`, `wp_commentmeta` | never synced, not selectable |
 
-`referrals`, `scheduling` and `users` are transfer-excluded by design: they are either
+`referrals`, `scheduling`, `partnerships` and `users` are transfer-excluded by design: they are either
 real customer data or the credentials this tool runs on. They still appear on the
 screen, but only under **Maintenance** (section 5) — you can purge them, on either
 side, without ever copying them between environments.
@@ -279,8 +280,8 @@ requested.
 
 ## 5. Maintenance
 
-Separate from transfer, and the only thing you can do to `referrals` and `scheduling`
-(`leads` can also be transferred — see section 2):
+Separate from transfer, and the only thing you can do to `referrals`, `scheduling` and
+`partnerships` (`leads` can also be transferred — see section 2):
 
 - **Purge on this environment** — truncate the group's tables locally.
 - **Purge on the remote** — same, over the sync channel.

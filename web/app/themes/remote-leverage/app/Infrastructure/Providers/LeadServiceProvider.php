@@ -26,6 +26,7 @@ use App\Domains\Lead\Services\LeadSettingsService;
 use App\Domains\Lead\Services\PhoneValidationService;
 use App\Domains\Referral\Listeners\HandleLeadBookingCanceledForReferrer;
 use App\Domains\Referral\Listeners\HandleLeadBookingCompletedForReferrer;
+use App\Domains\Scheduling\Listeners\StampSchedulerLinkOnBooking;
 use App\Infrastructure\WordPress\Admin\DataApiAdmin;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
@@ -165,6 +166,10 @@ class LeadServiceProvider extends ServiceProvider
                 }
             })->afterResponse();
         });
+
+        // 1b. Stamp the booking's "add to calendar" link and send it to HubSpot `schedule_link`.
+        // Registered before the after-response listeners below, so they all read the stamp.
+        Event::listen(LeadBookingCompleted::class, [StampSchedulerLinkOnBooking::class, 'handle']);
 
         // 2. Dispatch Slack notification on LeadCreated (partial) and LeadBookingCompleted (final)
         Event::listen(LeadCreated::class, function (LeadCreated $event) {

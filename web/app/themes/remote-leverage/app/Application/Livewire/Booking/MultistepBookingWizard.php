@@ -22,6 +22,7 @@ use App\Domains\Tracking\Support\GoogleEnhancedConversion;
 use App\Infrastructure\Queue\Deferred;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -210,6 +211,18 @@ class MultistepBookingWizard extends Component
      * attribution. It is what makes the session replay reachable from the lead timeline.
      */
     public string $posthogSessionId = '';
+
+    /**
+     * The page URL and referrer as this visitor's own browser saw them, pushed in by the
+     * component script. The server re-reads attribution from them on submit — see
+     * refreshVisitorContext() for why mount()'s copy cannot be trusted.
+     */
+    public string $clientPageUrl = '';
+
+    public string $clientReferrer = '';
+
+    /** Whether refreshVisitorContext() has re-issued this instance's own `sessionId` yet. */
+    public bool $visitorContextRefreshed = false;
 
     /**
      * Whether `posthog.identify()` has already been sent for this visitor.
@@ -601,6 +614,10 @@ class MultistepBookingWizard extends Component
             }
 
             if ($this->currentStep === 1) {
+                // Before anything reads ipAddress or attribution: the email check, the bounced
+                // record and the partial capture below all do.
+                $this->refreshVisitorContext();
+
                 if (! empty($this->phone)) {
                     $phoneValidator = app(PhoneValidationService::class);
                     $validation = $phoneValidator->validateAndFormat($this->phone, $this->phoneCountry);
@@ -989,6 +1006,7 @@ class MultistepBookingWizard extends Component
     public function submitBooking(): void
     {
         $this->errorMessage = null;
+        $this->refreshVisitorContext();
 
         // Fired before the attempt, not after it: paired against `booking_finished` this is
         // what makes a failed booking visible as a gap rather than as silence.
@@ -1715,6 +1733,96 @@ class MultistepBookingWizard extends Component
      * `sessionId` is a per-instance UUID that is always present after mount, so it is a better
      * anonymous handle than a session id the container may not offer at all.
      */
+    /**
+     * Re-read every per-visitor attribution field from this submit's own request.
+     *
+     * mount() runs on the page render, and logged-out pages are served from the HTML cache.
+     * CloudFront keys them without the query string but forwards it on a miss, so the snapshot
+     * a visitor hydrates carries whoever filled the cache: their utm/gclid/fbclid, IP, user
+     * agent, landing URL, referral code and session id. From 2026-09-22 that was ~75-80% of
+     * Meta-sourced leads, and it went straight into the Conversions API as someone else's click
+     * (docs/booking-rate-diagnostic-2026-09-25.md). The browser script only fills fields that
+     * are empty, so it could never correct a stale value.
+     *
+     * The Livewire request is never cached and comes from the visitor's own browser, so its
+     * headers and cookies are theirs. Its URL is the Livewire endpoint rather than the page, so
+     * the page's query string comes from `clientPageUrl`, falling back to the Referer header a
+     * same-origin XHR carries. Everything is overwritten, including with empty: a value this
+     * visitor does not have is better absent than borrowed.
+     */
+    protected function refreshVisitorContext(): void
+    {
+        $live = app()->bound('request') ? app('request') : null;
+
+        if (! $live instanceof Request) {
+            return;
+        }
+
+        $pageUrl = $this->pageUrlFrom($this->clientPageUrl)
+            ?? $this->pageUrlFrom((string) $live->header('referer', ''));
+
+        $query = [];
+
+        if ($pageUrl !== null) {
+            parse_str((string) parse_url($pageUrl, PHP_URL_QUERY), $query);
+        }
+
+        // The live request's cookies, headers and IP, with the page's query string.
+        $page = $live->duplicate($query);
+
+        $collector = app(AttributionCollector::class);
+        $collected = $collector->collect($page);
+        $named = $collected['named'];
+
+        $this->attributionNamed = $named;
+        $this->attribution = $collected['attribution'];
+        $this->ipAddress = $collector->ipAddress($live);
+
+        $this->utmSource = $named['utm_source'] ?? '';
+        $this->utmMedium = $named['utm_medium'] ?? '';
+        $this->utmCampaign = $named['utm_campaign'] ?? '';
+        $this->utmTerm = $named['utm_term'] ?? '';
+        $this->utmContent = $named['utm_content'] ?? '';
+        $this->gclid = $named['gclid'] ?? '';
+        $this->fbclid = $named['fbclid'] ?? '';
+
+        $this->referralCode = $page->query('via')
+            ?: $page->query('ref')
+            ?: $page->query('r')
+            ?: $live->cookie('rl_referrer')
+            ?: null;
+
+        if ($pageUrl !== null) {
+            $this->landingUrl = $pageUrl;
+        }
+
+        $this->referrerUrl = (string) ($this->pageUrlFrom($this->clientReferrer) ?? $live->cookie('handl_ref', ''));
+
+        // Once per instance, so every step of one visit shares an id no other visitor has.
+        if (! $this->visitorContextRefreshed) {
+            $this->sessionId = (string) Str::uuid();
+            $this->visitorContextRefreshed = true;
+        }
+    }
+
+    /** An absolute http(s) URL of sane length, or null. */
+    private function pageUrlFrom(string $url): ?string
+    {
+        $url = trim($url);
+
+        if ($url === '' || strlen($url) > 2048) {
+            return null;
+        }
+
+        $parts = parse_url($url);
+
+        if (! is_array($parts) || empty($parts['host']) || ! in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true)) {
+            return null;
+        }
+
+        return $url;
+    }
+
     /**
      * The attribution columns to stamp on the Lead, for either capture point.
      *

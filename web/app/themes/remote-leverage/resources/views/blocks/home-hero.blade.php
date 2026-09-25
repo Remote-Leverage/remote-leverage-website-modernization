@@ -16,6 +16,12 @@
        · Desktop — even halves: copy left, the composite right. The checklist flows down each
          column in turn here, matching the order its own mobile column reads in.
 
+     media = 'none' (/become-a-partner/, off the Partner LP Figma frame at 1366px):
+       · One centred column at every width with nothing beside it. It is one composition, so
+         its type travels with it the way feature-cards' frosted surface does: a 48/53 headline
+         with no xl step up, the rating stacked over its review count and shown at every width,
+         the checklist inside a 912px white card three across, and the small pill.
+
      Tokens measured off Homepage V3.png at 1366px and Page_v1.2.png at 376px. Container stays
      the canonical max-w-[1380px] — per docs/design-system.md rule 1 the container is the one
      thing not taken from the comp. The accent line is brand purple and the checklist ticks
@@ -30,6 +36,7 @@
   // (/admin-virtual-assistants/ and its thirteen siblings), whose comps replace the fan with one
   // square composite and left-align the copy at every width instead of centring it on mobile.
   $isImage = ($media ?? 'cards') === 'image';
+  $isNone = ($media ?? 'cards') === 'none';
 
   // A three-card fan: two cards set back and tilted away to either side, the third centred,
   // lower and nearer. Depth is carried by three things at once — vertical offset, stacking
@@ -54,11 +61,16 @@
 
 {{-- flex-1 + justify-center: the pattern wraps this in a min-h-dvh column with the logo strip
      pinned under it, so the hero takes the slack and centres in whatever is left. --}}
-<section class="relative flex flex-1 flex-col justify-center overflow-hidden bg-bg-light pt-10 pb-10 lg:pt-14 lg:pb-8">
+<section @class([
+  'relative flex flex-1 flex-col justify-center overflow-hidden bg-bg-light',
+  'pt-10 pb-10 lg:pt-14 lg:pb-8' => ! $isNone,
+  // The partner comp: 62px above the rating, 99px under the pill.
+  'pt-12 pb-16 lg:pt-[62px] lg:pb-[99px]' => $isNone,
+])>
   <div class="relative w-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
     <div @class([
-      'lg:grid lg:items-center lg:gap-10 xl:gap-16',
-      'lg:grid-cols-[minmax(0,1fr)_auto]' => ! $isImage,
+      'lg:grid lg:items-center lg:gap-10 xl:gap-16' => ! $isNone,
+      'lg:grid-cols-[minmax(0,1fr)_auto]' => ! $isImage && ! $isNone,
       // Even halves: the composite is square and sits flush to the container's right edge, so
       // an auto track (which sizes to the image's intrinsic 1000px) would crowd out the copy.
       'lg:grid-cols-2 xl:gap-20' => $isImage,
@@ -66,30 +78,52 @@
 
       <div @class([
         'relative z-30 flex flex-col',
-        'mx-auto max-w-[720px] items-center text-center lg:mx-0 lg:max-w-none lg:items-start lg:text-left' => ! $isImage,
+        'mx-auto max-w-[720px] items-center text-center lg:mx-0 lg:max-w-none lg:items-start lg:text-left' => ! $isImage && ! $isNone,
         'max-w-[640px] items-start text-left lg:max-w-none' => $isImage,
+        'mx-auto w-full max-w-[912px] items-center text-center' => $isNone,
       ])>
 
-        {{-- Google rating. Hidden for now (direction 2026-09-16) — the field is still there, so
-             turning it back on is one flag rather than restoring markup. --}}
+        {{-- Google rating. Hidden for now on the homepage (direction 2026-09-16) — the field is
+             still there, so turning it back on is one flag rather than restoring markup.
+
+             The partner comp stacks the score row over "235 reviews" and shows it at every
+             width; everywhere else it is one desktop-only row, as before. --}}
         @if ($showRating)
-          <div class="mb-7 hidden items-center gap-2.5 lg:flex">
-            <img src="{{ $ratingLogo }}" alt="Google" width="66" height="22" class="h-[22px] w-auto" decoding="async">
-            <span class="font-display text-[17px] font-medium text-brand-hero">{{ $ratingScore }}</span>
-            <span class="flex items-center gap-0.5 text-[#FFB400]" role="img" aria-label="{{ $ratingScore }} out of 5 stars">
-              @for ($s = 0; $s < 5; $s++)
-                <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                </svg>
-              @endfor
-            </span>
+          <div @class([
+            'mb-7 hidden items-center gap-2.5 lg:flex' => ! $isNone,
+            'mb-8 flex flex-col items-center gap-1 lg:mb-[33px]' => $isNone,
+          ])>
+            <div class="flex items-center gap-2.5">
+              <img src="{{ $ratingLogo }}" alt="Google" width="66" height="22" class="h-[22px] w-auto" decoding="async">
+              <span @class([
+                'font-display text-[17px] text-brand-hero',
+                'font-medium' => ! $isNone,
+                'font-bold' => $isNone,
+              ])>{{ $ratingScore }}</span>
+              <span class="flex items-center gap-0.5 text-[#FFB400]" role="img" aria-label="{{ $ratingScore }} out of 5 stars">
+                @for ($s = 0; $s < 5; $s++)
+                  <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                @endfor
+              </span>
+            </div>
+            @if ($isNone && $ratingCount)
+              <span class="font-display text-[13px] leading-none text-black/60">{{ $ratingCount }}</span>
+            @endif
           </div>
         @endif
 
         {{-- Always three lines: the two headline lines come from the field's own line breaks,
              the accent line is its own field. Left to wrap on its own the desktop headline sets
              on two lines, which is not what the page is meant to say. --}}
-        <h1 class="font-display font-bold tracking-[-0.02em] text-brand-hero text-[34px] leading-[1.14] sm:text-[42px] lg:text-[48px] lg:leading-[1.1] xl:text-[54px]">
+        <h1 @class([
+          'font-display font-bold tracking-[-0.02em] text-brand-hero text-[34px] leading-[1.14] sm:text-[42px]',
+          'lg:text-[48px] lg:leading-[1.1] xl:text-[54px]' => ! $isNone,
+          // The text-section step, tracking included: -1.44px sets "Become a Remote" at the
+          // comp's 376px where the block's own -0.02em runs it to 383px.
+          'lg:text-[48px] lg:leading-[53px] lg:tracking-[-1.44px]' => $isNone,
+        ])>
           {!! nl2br(e($headline)) !!}<br>
           <span @class(['text-brand-purple' => ($accentTone ?? 'purple') === 'purple'])>{{ $headlineAccent }}</span>
         </h1>
@@ -109,9 +143,12 @@
              free space before justify-content gets a look in, so the columns butt together and
              the longer items wrap. --}}
         @if ($checklist)
+          {{-- The partner comp boxes the three items in a white card, one row of equal
+               columns on desktop: 912x79, 20px in from each side, items 301px apart. --}}
           <ul @class([
-            'mt-8 grid max-w-full grid-cols-1 gap-y-[18px] text-left lg:mt-7 lg:w-auto lg:max-w-none lg:justify-start lg:gap-x-10 lg:gap-y-[14px]',
-            'mx-auto w-fit lg:mx-0 lg:grid-cols-[max-content_max-content]' => ! $isImage,
+            'mt-8 grid max-w-full grid-cols-1 gap-y-[18px] text-left lg:mt-7 lg:w-auto lg:max-w-none lg:justify-start lg:gap-x-10 lg:gap-y-[14px]' => ! $isNone,
+            'mt-8 grid w-full grid-cols-1 gap-y-4 rounded-badge bg-white p-5 text-left sm:grid-cols-3 sm:gap-x-[22px] lg:mt-7' => $isNone,
+            'mx-auto w-fit lg:mx-0 lg:grid-cols-[max-content_max-content]' => ! $isImage && ! $isNone,
             // Column-major, not row-major. The role comps read straight down the left column and
             // then down the right, and their mobile column repeats that same order — so the DOM
             // order is already the mobile order and the desktop grid flows down each column in
@@ -121,27 +158,51 @@
             @foreach ($checklist as $item)
               <li class="flex items-center gap-3">
                 <span @class([
-                  'flex h-4 w-4 shrink-0 items-center justify-center rounded-full',
-                  'bg-brand-magenta' => ($tickTone ?? 'magenta') !== 'emerald',
+                  'flex shrink-0 items-center justify-center rounded-full',
+                  'h-4 w-4' => ! $isNone,
+                  'h-5 w-5' => $isNone,
+                  'bg-brand-magenta' => ! in_array($tickTone ?? 'magenta', ['emerald', 'leverage'], true),
                   // Measured off the role comps: the tick ring reads #21AE78-#30B881 across
                   // three samples, which is #10B981 under webp chroma rounding.
                   'bg-[#10B981]' => ($tickTone ?? 'magenta') === 'emerald',
+                  // The partner comp: a #00D982 disc with a dark tick rather than a white one.
+                  'bg-table-leverage' => ($tickTone ?? 'magenta') === 'leverage',
                 ])>
-                  <svg class="h-2.5 w-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  <svg @class([
+                    'h-2.5 w-2.5',
+                    'text-white' => ($tickTone ?? 'magenta') !== 'leverage',
+                    'text-brand-hero' => ($tickTone ?? 'magenta') === 'leverage',
+                  ]) viewBox="0 0 24 24" fill="none" stroke="currentColor"
                        stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </span>
-                <span class="font-display text-[15px] leading-tight text-brand-hero">{{ $item }}</span>
+                <span @class([
+                  'font-display text-brand-hero',
+                  'text-[15px] leading-tight' => ! $isNone,
+                  // 14/20 medium at -3%, which sets each item on the comp's two lines.
+                  'text-[14px] font-medium leading-5 tracking-[-0.42px]' => $isNone,
+                ])>{{ $item }}</span>
               </li>
             @endforeach
           </ul>
         @endif
 
+        {{-- An optional line over the pill. The partner comp asks "Ready to become a partner?"
+             60px under the checklist card and 20px above the pill. --}}
+        @if ($ctaLead)
+          <p class="mt-12 font-display text-[18px] font-medium leading-[25px] tracking-[-0.6px] text-brand-hero lg:mt-[60px] lg:text-[20px]">
+            {{ $ctaLead }}
+          </p>
+        @endif
+
         @include('blocks.partials.cta-pill', [
           'text' => $ctaText,
           'url' => $ctaUrl,
-          'class' => 'mt-10 w-full max-w-[440px] lg:mt-9 lg:w-auto lg:max-w-none',
+          'size' => $isNone ? 'small' : 'default',
+          'class' => $ctaLead
+            ? 'mt-5 w-full max-w-[440px] sm:w-auto sm:max-w-none'
+            : 'mt-10 w-full max-w-[440px] lg:mt-9 lg:w-auto lg:max-w-none',
         ])
       </div>
 
@@ -168,7 +229,7 @@
 
            The column auto-sizes to the fan, which is why the box carries real widths rather
            than a transform. --}}
-      @if ($cards && ! $isImage)
+      @if ($cards && ! $isImage && ! $isNone)
         {{-- pr clears the rotated corners. A 240x322 card turned 9deg reaches ~50px past its own
              box, and the section clips at the viewport, so without this the right-hand card lost
              its top corner. --}}

@@ -60,6 +60,8 @@ class ImageCardGridBlock extends Block
             'align' => $field('align') ?: 'left',
             'ctaUrl' => $field('cta_url') ?: '#booking-footer',
             'titleSize' => $field('card_title_size') ?: 'small',
+            'imageRatio' => (string) ($field('image_ratio') ?: ''),
+            'ctaStyle' => $field('card_cta_style') ?: 'button',
             // Every per-card field has to be listed here. A field added to fields() but not
             // mapped never reaches the view, and nothing errors — the card just renders
             // without it.
@@ -73,6 +75,11 @@ class ImageCardGridBlock extends Block
                 'cta_text' => $c['cta_text'] ?? '',
                 'cta_url' => $c['cta_url'] ?? '',
                 'emphasis' => ! empty($c['emphasis']) && $c['emphasis'] !== '0',
+                'tags' => array_values(array_filter(
+                    array_map(fn ($line) => BlockDefaults::cleanText(trim($line)), explode("\n", (string) ($c['tags'] ?? ''))),
+                    fn ($line) => $line !== '',
+                )),
+                'tag_tone' => $c['tag_tone'] ?? 'purple',
             ], $cards),
         ];
     }
@@ -96,8 +103,24 @@ class ImageCardGridBlock extends Block
             ])
             ->addSelect('card_title_size', [
                 'label' => 'Card Title Size',
-                'choices' => ['small' => 'Small (15px)', 'large' => 'Large (27px)'],
+                'instructions' => 'Medium is /become-a-partner/: a 20px title over 14px text with 20px padding, in a '
+                    .'band with 100px above and below. It is one treatment, so the type and spacing travel together.',
+                'choices' => ['small' => 'Small (15px)', 'medium' => 'Medium (20px)', 'large' => 'Large (27px)'],
                 'default_value' => 'small',
+            ])
+            ->addText('image_ratio', [
+                'label' => 'Card Image Ratio',
+                'instructions' => 'Optional, as width/height (e.g. 270/150). Leave empty for the fixed 212px (4 across) '
+                    .'or 168px (3 across) height.',
+                'placeholder' => '270/150',
+            ])
+            ->addSelect('card_cta_style', [
+                'label' => 'Card CTA Style',
+                'choices' => [
+                    'button' => 'Black 5px-radius button (default)',
+                    'pill' => 'Black pill with arrow, pinned to the card foot',
+                ],
+                'default_value' => 'button',
             ])
             ->addRepeater('cards', [
                 'label' => 'Cards',
@@ -115,6 +138,17 @@ class ImageCardGridBlock extends Block
             ->addText('cta_url', [
                 'label' => 'Card CTA URL',
                 'default_value' => '#booking-footer',
+            ])
+            ->addTextarea('tags', [
+                'label' => 'Tags',
+                'instructions' => 'Optional audience chips under the text, one per line.',
+                'rows' => 4,
+                'new_lines' => '',
+            ])
+            ->addSelect('tag_tone', [
+                'label' => 'Tag Tint',
+                'choices' => ['purple' => 'Purple', 'teal' => 'Teal', 'blue' => 'Blue', 'red' => 'Red'],
+                'default_value' => 'purple',
             ])
             ->addTrueFalse('emphasis', [
                 'label' => 'Featured card (black outline)',

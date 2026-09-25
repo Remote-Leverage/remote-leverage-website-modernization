@@ -41,6 +41,7 @@ class ProcessStepsBlock extends Block
             // Mobile-only: 'cards' is the 2026 homepage's stacked white cards under 769px.
             // Desktop is the same timeline either way.
             'variant' => (function_exists('get_field') ? get_field('variant') : null) ?: 'timeline',
+            'treatment' => (function_exists('get_field') ? get_field('treatment') : null) ?: 'default',
             'steps' => $this->steps(),
         ];
     }
@@ -59,6 +60,15 @@ class ProcessStepsBlock extends Block
                     'cards' => 'White cards (2026 homepage)',
                 ],
                 'default_value' => 'timeline',
+                'return_format' => 'value',
+            ])
+            ->addSelect('treatment', [
+                'label' => 'Treatment',
+                'choices' => [
+                    'default' => 'Lilac numerals and rule, 15px descriptions (default)',
+                    'partner' => 'Mauve numerals, brand-purple rule, 14/20 descriptions (/become-a-partner/)',
+                ],
+                'default_value' => 'default',
                 'return_format' => 'value',
             ])
             ->addRepeater('steps', [

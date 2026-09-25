@@ -18,6 +18,10 @@ use App\Infrastructure\WordPress\Admin\LeadExportPanel;
 use App\Infrastructure\WordPress\Admin\LeadsAdminDashboard;
 use App\Infrastructure\WordPress\Admin\MarketingDashboard;
 use App\Infrastructure\WordPress\Admin\PartnerHubAdmin;
+use App\Infrastructure\WordPress\Admin\PartnershipOverviewAdmin;
+use App\Infrastructure\WordPress\Admin\PartnershipProspectDetailAdmin;
+use App\Infrastructure\WordPress\Admin\PartnershipProspectsAdmin;
+use App\Infrastructure\WordPress\Admin\PartnershipSettingsAdmin;
 use App\Infrastructure\WordPress\Admin\PixelDeferralAdmin;
 use App\Infrastructure\WordPress\Admin\ReferralAdminDashboard;
 use App\Infrastructure\WordPress\Admin\SecurityAdmin;
@@ -50,6 +54,7 @@ class DomainServiceProvider extends ServiceProvider
         ObservabilityServiceProvider::class,
         MarketingServiceProvider::class,
         ToolsServiceProvider::class,
+        PartnerHubServiceProvider::class,
     ];
 
     /**
@@ -72,6 +77,12 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(MarketingDashboard::class, fn () => new MarketingDashboard);
         $this->app->singleton(ContentAuditAdmin::class, fn () => new ContentAuditAdmin);
         $this->app->singleton(PartnerHubAdmin::class, fn () => new PartnerHubAdmin);
+        $this->app->singleton(PartnershipOverviewAdmin::class, fn () => new PartnershipOverviewAdmin);
+        $this->app->singleton(PartnershipProspectsAdmin::class, fn () => new PartnershipProspectsAdmin);
+        $this->app->singleton(PartnershipSettingsAdmin::class, fn () => new PartnershipSettingsAdmin);
+
+        $this->app->singleton(PartnershipProspectDetailAdmin::class, fn () => new PartnershipProspectDetailAdmin);
+
         $this->app->singleton(ReferralAdminDashboard::class, fn () => new ReferralAdminDashboard);
         $this->app->singleton(CalendlyAdminDashboard::class, fn () => new CalendlyAdminDashboard);
         $this->app->singleton(SecurityAdmin::class, fn () => new SecurityAdmin);
@@ -108,6 +119,13 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->make(MarketingDashboard::class)->register();
         $this->app->make(ContentAuditAdmin::class)->register();
         $this->app->make(PartnerHubAdmin::class)->register();
+        // In menu order: the Overview, the list and each prospect's screen, then Settings.
+        $this->app->make(PartnershipOverviewAdmin::class)->register();
+        $this->app->make(PartnershipProspectsAdmin::class)->register();
+
+        $this->app->make(PartnershipProspectDetailAdmin::class)->register();
+
+        $this->app->make(PartnershipSettingsAdmin::class)->register();
         $this->app->make(ReferralAdminDashboard::class)->register();
         $this->app->make(CalendlyAdminDashboard::class)->register();
         $this->app->make(SecurityAdmin::class)->register();

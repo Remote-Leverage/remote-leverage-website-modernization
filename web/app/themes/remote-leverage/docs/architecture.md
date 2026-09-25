@@ -178,6 +178,7 @@ A Stage 1 row without its matching Stage 2 row is how you find a listener that s
 | `rl_lead_profiles` | Lead | 2026-09-16 |
 | `rl_lead_identifiers` | Lead | 2026-09-16 |
 | `rl_integration_calls` | Observability | 2026-09-16 |
+| `rl_partnership_prospects` | PartnerHub | 2026-09-24 |
 
 Plus nine alter migrations: tracking columns and a fulltext/search index on leads, `referrer_id`
 on the referral tables, booking-retry and consent columns, and — on 2026-09-16 — full attribution,
@@ -279,6 +280,14 @@ The marker form exists for pages whose hero is hand-written rather than a block 
 families in `resources/patterns/steal-campaign.php` and `va-roles-landing.php` emit
 `rl:cta-only-header` inside their opening banner comment. A block-backed page needs no marker;
 listing its block in `PageChrome::CTA_ONLY_HEADER_BLOCKS` is enough.
+
+**Editor override.** The page editor sidebar carries a Header & Footer panel
+(`App\Fields\PageChromeFields`): Header is Auto / Site / CTA-only / None, Footer is Auto / Slim /
+Full. Anything but Auto beats the content-derived answer, and the `template-landing` no-header
+template with it. It is post meta (`_rl_page_header`, `_rl_page_footer`), so unlike the markers it
+lives in the database — set it on production, which the other environments are refreshed from, and
+prefer a marker in the pattern when the choice is part of the page's design rather than an
+editorial call.
 
 **`rl:noindex` has no visible effect locally.** Bedrock's `bedrock-disallow-indexing` mu-plugin
 already noindexes every non-production environment, so a local page looks correctly excluded

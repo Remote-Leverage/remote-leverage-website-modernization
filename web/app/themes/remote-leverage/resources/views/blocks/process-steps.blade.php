@@ -3,7 +3,11 @@
      bands. --}}
 {{-- `variant` only changes the mobile presentation: 'cards' adds the modifier the 2026
      homepage needs (left-aligned white cards under 769px). Desktop is identical either way. --}}
-<div class="rl-process-container w-full {{ ($variant ?? 'timeline') === 'cards' ? 'rl-process-container--cards' : '' }}">
+{{-- `treatment: partner` is /become-a-partner/'s timeline, off the Partner LP Figma frame: the
+     numerals in --color-step-num (#DCCDE0, which reads #DCCCE0 in the render), the rule in brand
+     purple, and 14/20 descriptions — where every other page draws numerals and rule in the lilac
+     --color-step-light-purple over 15px descriptions. --}}
+<div class="rl-process-container w-full {{ ($variant ?? 'timeline') === 'cards' ? 'rl-process-container--cards' : '' }} {{ ($treatment ?? 'default') === 'partner' ? 'rl-process-container--partner' : '' }}">
     <div class="rl-process-line"></div>
     <div class="rl-process-grid" style="--rl-process-cols:{{ max(1, min(4, count($steps))) }}">
         @foreach ($steps as $step)

@@ -168,12 +168,15 @@ describe('Ecommerce block field groups', function () {
             ->and(array_keys($flat['layout']['choices']))->toBe(['carousel', 'grid']);
     });
 
-    test('stats band exposes tone plus an eyebrow/value/label repeater', function () {
+    test('stats band exposes layout and tone plus an eyebrow/value/label repeater', function () {
         $group = block(StatsBandBlock::class)->fields();
         $flat = flattenFields($group['fields']);
 
         expect($group['key'])->toBe('group_stats_band_block')
-            ->and(array_keys($flat))->toBe(['tone', 'stats', 'stats.eyebrow', 'stats.value', 'stats.label'])
+            ->and(array_keys($flat))->toBe(['layout', 'tone', 'stats', 'stats.eyebrow', 'stats.value', 'stats.label'])
+            // /become-a-partner/'s pills are opt-in; the band stays the default.
+            ->and($flat['layout']['default_value'])->toBe('band')
+            ->and(array_keys($flat['layout']['choices']))->toBe(['band', 'pills'])
             ->and($flat['tone']['default_value'])->toBe('dark')
             ->and(array_keys($flat['tone']['choices']))->toBe(['dark', 'light'])
             ->and($flat['stats']['type'])->toBe('repeater');

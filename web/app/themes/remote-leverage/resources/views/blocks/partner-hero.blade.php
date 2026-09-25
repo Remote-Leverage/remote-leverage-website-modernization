@@ -69,17 +69,11 @@
         {{-- Checked reassurance pills, read row-major in two columns. Production's ecommerce
              hero runs six of these between the subhead and the CTA. --}}
         @if (! empty($badges))
-            <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-[720px] mx-auto text-left">
-                @foreach ($badges as $badge)
-                    @continue(empty($badge['text']))
-                    <div class="flex items-center gap-3 rounded-pill border border-[#92B4F4]/30 bg-white px-[17px] py-3.5">
-                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#00D982]">
-                            <svg class="h-3 w-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        </span>
-                        <span class="text-[15px] text-black">{{ $badge['text'] }}</span>
-                    </div>
-                @endforeach
-            </div>
+            {{-- Shared with acf/checklist-grid, so the two cannot drift. --}}
+            @include('blocks.partials.checklist-grid', [
+                'items' => array_map(fn ($badge) => $badge['text'] ?? '', $badges),
+                'class' => 'mt-8 max-w-[720px] mx-auto',
+            ])
         @endif
 
         @if ($talentHtml)
