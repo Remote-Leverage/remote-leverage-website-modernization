@@ -862,9 +862,9 @@ describe('an empty environment variable falls through to the default', function 
         try {
             $config = require __DIR__.'/../../config/pixels.php';
 
-            // Both ids, as production ran before the cutover. 1482937899395718 carries the
-            // "Valid Booking" event the ad sets optimise on; see config/pixels.php.
-            expect($config['meta']['pixel_ids'])->toBe(['1430907207548734', '1482937899395718'])
+            // The one pixel since 2026-09-26, which replaced 1430907207548734 and
+            // 1482937899395718; see config/pixels.php for what did not move with them.
+            expect($config['meta']['pixel_ids'])->toBe(['1821781852398281'])
                 ->and($config['bing_uet']['tag_id'])->toBe('97187250')
                 // Both accounts are emitted here since GTM-53JDTQCZ was retired.
                 ->and($config['linkedin']['partner_ids'])->toBe(['6411876', '9514236'])

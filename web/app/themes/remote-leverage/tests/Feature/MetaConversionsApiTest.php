@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Models\LeadActivityLog;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Tracking\Gateways\MetaConversionsApiClient;
+use App\Domains\Tracking\Listeners\SendBookingToMetaConversionsApi;
 use App\Domains\Tracking\Listeners\SendLeadToMetaConversionsApi;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request;
@@ -246,5 +248,85 @@ describe('SendLeadToMetaConversionsApi timeline entry', function () {
         $log = LeadActivityLog::query()->where('lead_id', $lead->id)->where('actor_domain', 'Meta')->first();
 
         expect($log->outcome)->toBe('failed');
+    });
+});
+
+describe('SendBookingToMetaConversionsApi', function () {
+    /*
+     * The booking conversion. Calendly's own Meta Pixel integration cannot fire it for these
+     * bookings — the wizard books through Calendly's API and no Calendly page ever loads — so
+     * this is the only way `invitee_meeting_scheduled` reaches the pixel.
+     */
+    function sendBooking(Lead $lead): void
+    {
+        (new SendBookingToMetaConversionsApi(new MetaConversionsApiClient, new LeadActivityLogger))
+            ->handle(new LeadBookingCompleted(lead: $lead, meetingId: 'https://api.calendly.com/scheduled_events/abc/invitees/def', provider: 'calendly'));
+    }
+
+    test('sends invitee_meeting_scheduled to every pixel, timed at the booking', function () {
+        Http::fake(fn () => Http::response(['events_received' => 1], 200));
+
+        $lead = metaLead(['created_at' => now()->subDays(2)]);
+        sendBooking($lead);
+
+        Http::assertSentCount(2);
+        Http::assertSent(function (Request $r) use ($lead) {
+            $event = $r->data()['data'][0];
+
+            return $event['event_name'] === 'invitee_meeting_scheduled'
+                && $event['event_id'] === 'booking-'.$lead->uuid
+                // The booking's own time, not the lead's capture two days earlier.
+                && abs($event['event_time'] - time()) < 60
+                && isset($event['user_data']['em'], $event['user_data']['fbc']);
+        });
+    });
+
+    test('records a succeeded Meta entry under LeadBookingCompleted', function () {
+        Http::fake(fn () => Http::response(['events_received' => 1], 200));
+
+        $lead = metaLead();
+        sendBooking($lead);
+
+        $log = LeadActivityLog::query()->where('lead_id', $lead->id)->where('actor_domain', 'Meta')->first();
+
+        expect($log->event_type)->toBe('LeadBookingCompleted')
+            ->and($log->outcome)->toBe('succeeded')
+            ->and($log->payload['event_name'])->toBe('invitee_meeting_scheduled')
+            ->and($log->payload['provider'])->toBe('calendly')
+            ->and($log->payload['pixels_sent'])->toBe(['1430907207548734', '1482937899395718']);
+    });
+
+    test('the webhook reporting the same booking again does not send it twice', function () {
+        Http::fake(fn () => Http::response(['events_received' => 1], 200));
+
+        $lead = metaLead();
+        sendBooking($lead); // the wizard's API booking
+        sendBooking($lead); // Calendly's invitee.created for the same meeting
+
+        Http::assertSentCount(2); // one per pixel, once
+    });
+
+    test('a failed send leaves the next report free to retry', function () {
+        Http::fake(fn () => Http::response(['error' => ['message' => 'Invalid OAuth access token']], 400));
+
+        $lead = metaLead();
+        sendBooking($lead);
+
+        Facade::clearResolvedInstance(HttpFactory::class);
+        Http::swap(new HttpFactory);
+        Http::fake(fn () => Http::response(['events_received' => 1], 200));
+
+        sendBooking($lead);
+
+        Http::assertSentCount(2);
+        expect(LeadActivityLog::query()->where('lead_id', $lead->id)->where('actor_domain', 'Meta')->pluck('outcome')->all())
+            ->toBe(['failed', 'succeeded']);
+    });
+
+    test('the booking never shares an event id with the lead', function () {
+        $lead = metaLead();
+        $client = new MetaConversionsApiClient;
+
+        expect($client->bookingEventId($lead))->not->toBe($client->eventId($lead));
     });
 });
