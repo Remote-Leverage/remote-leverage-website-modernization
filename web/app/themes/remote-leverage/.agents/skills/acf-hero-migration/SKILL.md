@@ -4,8 +4,10 @@ description: >-
   Validate a migrated ACF Composer block/page against its legacy Elementor snapshot, and convert
   an existing ACF block between plain ACF fields and Gutenberg InnerBlocks editing. Use when
   asked to check whether a migrated block/page matches production or the legacy snapshot, when
-  asked to make a block's content editable in place as native blocks, or when adding a
-  field-driven toggle between two authoring modes on an ACF Composer block.
+  asked to make a block's content editable in place as native blocks, when adding a
+  field-driven toggle between two authoring modes on an ACF Composer block, when a CSS/markup
+  edit to one authoring-mode branch doesn't seem to take effect on a live page, or when styling
+  saved InnerBlocks/core-block markup with a Tailwind arbitrary selector has no visible effect.
 ---
 
 # ACF Block ↔ Legacy Parity & InnerBlocks Conversion
@@ -186,6 +188,20 @@ To let editors choose per-instance rather than committing the whole block to one
    `template` default, only affects *new* block insertions. Content already saved in
    `post_content` keeps whatever it was saved with — there is no retroactive migration. Say this
    explicitly rather than implying the toggle fixes already-published pages.
+6. **Before styling or editing either branch, confirm which mode is actually live** on the
+   specific page/instance you're touching. Nothing in the Blade template or the field's
+   `default_value` tells you which mode a *live* page picked — `get_field('block_type')` on a
+   saved page can differ from the default entirely. Inspect the rendered DOM rather than
+   assuming from the default, e.g. in the browser tool:
+   ```js
+   document.querySelector('a[href="#booking-footer"]').className
+   ```
+   If that prints `wp-block-button__link` you're looking at the `inner_blocks` branch; if it
+   prints your own hand-rolled classes you're looking at the `acf` branch. This happened on
+   `AboutHeroBlock`: the field defaults to `'acf'`, but the live about-us page had already saved
+   `inner_blocks` content, so several rounds of editing the `acf` branch's button classes had
+   **zero visible effect** — no error, the page just kept rendering the other branch's markup —
+   until the DOM was actually inspected to see which one was live.
 
 ---
 
@@ -220,6 +236,52 @@ here before looking elsewhere.
 
 ---
 
+## 8. Styling saved InnerBlocks/core-block markup: Tailwind arbitrary-selector underscore escaping
+
+Once an InnerBlocks region has saved content, its markup (`wp-block-button`,
+`wp-block-button__link`, `wp-block-buttons-is-layout-flex`, etc.) is fixed HTML you don't control
+from Blade — you can't add a Tailwind class straight onto `<a class="wp-block-button__link">`
+because that class string comes from saved post content, not your template. The fix is a scoped
+Tailwind **arbitrary variant** on a wrapper element you do own:
+
+```blade
+<div class="[&_.wp-block-button]:w-full">
+    <InnerBlocks ... />
+</div>
+```
+
+**The trap**: inside Tailwind's `[...]` bracket syntax, a bare underscore is converted to a space —
+that's *how* you write the descendant-combinator selector `[&_.foo]` in the first place. WordPress
+core-block classes use BEM double-underscores (`wp-block-button__link`), and Tailwind converts
+**every** unescaped underscore, not just the one you meant as the combinator. So
+`[&_.wp-block-button__link]` silently compiles to a selector for `.wp-block-button link` — two
+words, an element named `<link>` that will never exist in the DOM — not `.wp-block-button__link`.
+There is no build error; the utility class just does nothing.
+
+**Fix**: escape each literal underscore in the BEM class name with a backslash:
+
+```blade
+{{-- WRONG — compiles to ".wp-block-button link", never matches anything --}}
+<div class="[&_.wp-block-button__link]:w-full">
+
+{{-- RIGHT — escaped underscores compile to ".wp-block-button__link" --}}
+<div class="[&_.wp-block-button\_\_link]:w-full">
+```
+
+The same applies to any other punctuation-bearing class targeted this way (double hyphens, etc.)
+— escape it, don't assume Tailwind passes special characters through unchanged.
+
+**Symptom**: the class you wrote compiles without error and even shows up as a substring match if
+you `grep` the compiled CSS for the *class name* — but the actual *selector* it produced is wrong.
+Grep for the literal selector text (e.g. `wp-block-button__link{` with the real double underscore)
+rather than assuming presence of the substring means the selector is correct. This also compounds
+with §5's point 6: a width rule that reaches the wrong nested element (e.g. the `.wp-block-button`
+wrapper div instead of the `.wp-block-button__link` anchor inside it) can look like it "half
+worked" — the wrapper resizes but the visible button doesn't — which reads as a different bug
+until you check computed styles on the actual element, not just its parent.
+
+---
+
 ## Quick diagnosis table
 
 | Symptom | Likely cause | Where to look |
@@ -228,4 +290,6 @@ here before looking elsewhere.
 | InnerBlocks content missing entirely, no error | Block comment is self-closing but should be open/close | §4 |
 | Correct in wp-admin editor, wrong/invisible color on live front end | `.wp-block-*` global-styles class winning a specificity tie by source order | §7 |
 | Changed a field default or template but an existing page didn't change | Defaults only seed new insertions, not saved `post_content` | §5.5 |
+| Edited one branch's classes/markup but the live page looks unchanged, no error | Styled the branch that isn't actually live for that page — check the rendered DOM, not the field default | §5.6 |
+| A Tailwind arbitrary-selector class targeting a `wp-block-*__*`/BEM class has no effect, no build error | Bare `_` inside `[&_...]` is parsed as a space; BEM `__`/`--` need escaping as `\_\_`/`\-\-` | §8 |
 | Element present on the migrated page but visually odd/unexplained | May be migration-invented content with no legacy counterpart | §1 |

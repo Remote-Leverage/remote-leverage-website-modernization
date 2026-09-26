@@ -3187,15 +3187,94 @@ class BlockDefaults
         return self::patternBlock('about-stats', array_merge($data, $overrides));
     }
 
-    public static function renderAboutNarrative(array $overrides = []): string
+    /**
+     * `block_type` (AboutNarrativeBlock::fields()) switches title_prefix/title/lead_statement AND
+     * the two detail columns between plain ACF fields and a single InnerBlocks region — same
+     * toggle as renderAboutHero(). `withFieldKeys()` is required here (unlike the plain
+     * `patternBlock()` call this replaced): without the `_<name>` field-key entries beside each
+     * value, ACF silently drops any override — including a `block_type` override — and always
+     * falls back to the block's own defaults.
+     *
+     * "acf" self-closes, exactly as before this toggle existed. "inner_blocks" needs the
+     * open/close comment pair instead: the `template` attribute on `<InnerBlocks>` only seeds a
+     * *freshly inserted* block in the editor, it does not make WordPress render content for a
+     * pattern-composed block that has no real InnerBlocks markup between open/close tags (see
+     * `.agents/skills/acf-hero-migration/SKILL.md` §4) — `$inner` (or its default) supplies that.
+     */
+    public static function renderAboutNarrative(array $overrides = [], ?string $inner = null): string
     {
-        $data = [
+        $blockType = $overrides['block_type'] ?? 'acf';
+
+        $defaults = [
             'title_prefix' => 'About',
             'title' => 'Remote Leverage',
             'badge_text' => 'Remote Leverage',
         ];
 
-        return self::patternBlock('about-narrative', array_merge($data, $overrides));
+        $data = self::withFieldKeys('about_narrative_block', array_merge($defaults, $overrides));
+
+        $attrs = json_encode([
+            'name' => 'acf/about-narrative',
+            'data' => $data,
+            'align' => '',
+            'mode' => 'preview',
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        if ($blockType === 'acf') {
+            return '<!-- wp:acf/about-narrative '.$attrs.' /-->';
+        }
+
+        return '<!-- wp:acf/about-narrative '.$attrs.' -->'.($inner ?? self::aboutNarrativeDefaultInner()).'<!-- /wp:acf/about-narrative -->';
+    }
+
+    /**
+     * Default InnerBlocks content for `renderAboutNarrative('inner_blocks')`: mirrors
+     * AboutNarrativeBlock::contentTemplate() as real, serialized block comments (what
+     * `<InnerBlocks template="...">` seeds a freshly-inserted block with in the editor is JSON on
+     * an attribute; what a pattern-composed instance renders on the front end must be this). The
+     * two-column prose is seeded with the same copy as col_left/col_right's own defaults (the
+     * live production text), since switching this instance's mode stops reading those ACF fields
+     * entirely — see AboutNarrativeBlock::contentTemplate()'s docblock.
+     */
+    public static function aboutNarrativeDefaultInner(): string
+    {
+        return <<<'HTML'
+        <!-- wp:paragraph {"className":"font-display text-2xl sm:text-3xl font-bold text-black tracking-tight mb-1"} -->
+        <p class="font-display text-2xl sm:text-3xl font-bold text-black tracking-tight mb-1">About</p>
+        <!-- /wp:paragraph -->
+
+        <!-- wp:heading {"level":2,"className":"font-display text-3xl sm:text-4xl lg:text-[44px] font-bold text-black tracking-[-0.03em] leading-tight"} -->
+        <h2 class="wp-block-heading font-display text-3xl sm:text-4xl lg:text-[44px] font-bold text-black tracking-[-0.03em] leading-tight">Remote Leverage</h2>
+        <!-- /wp:heading -->
+
+        <!-- wp:paragraph {"className":"font-display text-2xl sm:text-3xl lg:text-[32px] font-bold text-black tracking-[-0.02em] leading-snug mt-8 sm:mt-10"} -->
+        <p class="font-display text-2xl sm:text-3xl lg:text-[32px] font-bold text-black tracking-[-0.02em] leading-snug mt-8 sm:mt-10">Remote Leverage is a U.S.-based company helping businesses build exceptional global teams. Our own team consists of 120+ team members spanning Latin America, Europe, and Asia, representing over 25 countries. Diversity is the foundation of how we work.</p>
+        <!-- /wp:paragraph -->
+
+        <!-- wp:columns {"className":"hidden md:flex! md:gap-8! lg:gap-14! text-base sm:text-lg text-black/75 leading-relaxed mt-8"} -->
+        <div class="wp-block-columns hidden md:flex! md:gap-8! lg:gap-14! text-base sm:text-lg text-black/75 leading-relaxed mt-8">
+            <!-- wp:column -->
+            <div class="wp-block-column">
+                <!-- wp:paragraph -->
+                <p>Remote Leverage helps businesses grow. We start by finding the right people: our recruiting team sources, vets, and matches top 1% remote talent to roles that fit each client's specific needs.</p>
+                <!-- /wp:paragraph -->
+            </div>
+            <!-- /wp:column -->
+
+            <!-- wp:column -->
+            <div class="wp-block-column">
+                <!-- wp:paragraph -->
+                <p>But our work isn't just about filling roles. We believe great talent exists everywhere, and that the right opportunity can change a career. Every placement we make is an investment in two outcomes: a business that grows with confidence, and a professional who builds a meaningful, long-term career – wherever they are in the world.</p>
+                <!-- /wp:paragraph -->
+
+                <!-- wp:paragraph -->
+                <p><strong>That's the leverage we're after.</strong></p>
+                <!-- /wp:paragraph -->
+            </div>
+            <!-- /wp:column -->
+        </div>
+        <!-- /wp:columns -->
+        HTML;
     }
 
     public static function renderAboutTalentBanner(array $overrides = []): string
