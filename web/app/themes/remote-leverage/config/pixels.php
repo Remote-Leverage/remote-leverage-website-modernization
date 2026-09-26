@@ -83,6 +83,25 @@ return [
         'track_page_view' => filter_var(env('META_TRACK_PAGE_VIEW', true), FILTER_VALIDATE_BOOLEAN),
 
         /*
+         * Standard events, fired by ConversionHooks on the same triggers as `ga4.events`. Sent
+         * with `fbq('track', ...)`, so every pixel id above receives them.
+         *
+         * `Schedule` exists because Meta hands no URL through: since at least 2026-09-26 every
+         * event in Test Events reports `https://remoteleverage.com/` — no path, no UTMs — while
+         * the browser demonstrably sends the full URL as `dl`, and the Stape gateway receives it
+         * as `location`. That is Meta's "Core Setup" data restriction reducing URLs to the
+         * domain, so a custom conversion on "URL contains vathankyou" cannot be tested and is
+         * not something to optimise on. A named event does not depend on the URL at all.
+         *
+         * It fires on every load of the page, refreshes and direct visits included, so it
+         * counts higher than n8n's "Valid Booking" — which is one per real Calendly booking and
+         * is still what the ad sets optimise on.
+         */
+        'events' => [
+            ['name' => 'Schedule', 'trigger' => 'path:VAThankYou'],
+        ],
+
+        /*
         | The server-side half of Meta lives in config/services.php under `meta_capi` — it is a
         | credential, and credentials do not belong in this file. It reuses the ids above, so a
         | pixel added here starts receiving server-side Leads too.

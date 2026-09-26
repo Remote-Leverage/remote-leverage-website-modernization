@@ -166,6 +166,11 @@ HTML;
         if (w.posthog && typeof w.posthog.capture === 'function') w.posthog.capture(call.name, call.params || {});
         return;
       }
+      if (call.vendor === 'meta') {
+        // The stub from wp_head queues this until fbevents.js arrives, deferred or not.
+        if (typeof w.fbq === 'function') w.fbq('track', call.name, call.params || {});
+        return;
+      }
       if (typeof w.gtag === 'function') w.gtag('event', call.name, call.params || {});
     } catch (e) {}
   }
@@ -291,6 +296,23 @@ HTML;
                 $out[] = ['trigger' => $trigger, 'call' => [
                     'vendor' => 'gtag', 'name' => $name, 'params' => ['send_to' => $measurementId],
                 ]];
+            }
+        }
+
+        /*
+         * Gated on the ids MarketingPixelHooks actually emits, so a Meta event is never rendered
+         * onto a page with no `fbq` to receive it.
+         */
+        if ((new MarketingPixelHooks)->metaPixelIds() !== []) {
+            foreach ((array) config('pixels.meta.events', []) as $e) {
+                $name = trim((string) ($e['name'] ?? ''));
+                $trigger = trim((string) ($e['trigger'] ?? ''));
+
+                if ($name === '' || $trigger === '') {
+                    continue;
+                }
+
+                $out[] = ['trigger' => $trigger, 'call' => ['vendor' => 'meta', 'name' => $name]];
             }
         }
 
