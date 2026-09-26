@@ -75,6 +75,7 @@ class SendBookingToMetaConversionsApi
                     'pixels_sent' => $result['sent'],
                     'pixels_failed' => $result['failed'],
                     'errors' => $result['errors'],
+                    'match_keys' => $this->client->matchKeys($lead),
                 ],
             );
         } catch (\Throwable $e) {

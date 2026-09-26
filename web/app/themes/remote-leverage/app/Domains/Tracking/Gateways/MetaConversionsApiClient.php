@@ -243,6 +243,9 @@ class MetaConversionsApiClient
             'ph' => $this->phoneWithCountry($lead),
             'fn' => $lead->first_name,
             'ln' => $lead->last_name,
+            // LeadGeoSignals' ISO-2 verdict; normalises to e.g. `us`, which is Meta's format.
+            'country' => $lead->country,
+            'external_id' => $this->externalId($lead),
         ], static fn ($v): bool => (string) $v !== ''));
 
         /*
@@ -284,6 +287,44 @@ class MetaConversionsApiClient
         }
 
         return $event;
+    }
+
+    /**
+     * The visitor's `rl_vid` cookie (stored as `device_id`), else the lead's uuid.
+     *
+     * The same value on every event for a person is what lets Meta join them: the Lead and the
+     * booking share it today, and a browser event would too if the pixel's advanced matching is
+     * ever given `rl_vid`. It is a lowercase UUID, so normalising before the hash is a no-op and
+     * the two sides cannot disagree. The uuid fallback covers leads from before the cookie.
+     */
+    private function externalId(Lead $lead): string
+    {
+        return (string) ($lead->device_id ?: $lead->uuid ?: '');
+    }
+
+    /**
+     * Which identifiers an event for this lead carries — written to the lead timeline, because
+     * the difference between a matched and an unmatched conversion is almost always a missing
+     * `fbc`, and this is where you look when the match rate drops.
+     *
+     * @return array<string, bool>
+     */
+    public function matchKeys(Lead $lead): array
+    {
+        $attribution = (array) ($lead->attribution ?? []);
+        $handl = (array) ($attribution['handl'] ?? []);
+
+        return [
+            'email' => (string) ($lead->email ?? '') !== '',
+            'phone' => (string) ($lead->phone ?? '') !== '',
+            'name' => (string) ($lead->first_name ?? '') !== '' || (string) ($lead->last_name ?? '') !== '',
+            'country' => (string) ($lead->country ?? '') !== '',
+            'external_id' => $this->externalId($lead) !== '',
+            'fbc' => (string) ($lead->fbc ?? '') !== '' || (string) ($lead->fbclid ?? '') !== '',
+            'fbp' => (string) ($handl['_fbp'] ?? '') !== '',
+            'ip' => (string) ($lead->ip_address ?? '') !== '',
+            'user_agent' => (string) ($attribution['user_agent'] ?? '') !== '',
+        ];
     }
 
     /**

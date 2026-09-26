@@ -59,12 +59,28 @@ describe('Meta Pixel', function () {
          */
         $out = renderPixel(fn (MarketingPixelHooks $h) => $h->injectMetaPixel());
 
-        expect($out)->toContain("fbq('init', '1430907207548734')")
-            ->and($out)->toContain("fbq('init', '1482937899395718')")
+        expect($out)->toContain("fbq('init', '1430907207548734', am)")
+            ->and($out)->toContain("fbq('init', '1482937899395718', am)")
             ->and($out)->toContain("fbq('track', 'PageView')")
             // Meta's loader is idempotent, so several ids share one SDK. Loading it twice would
             // not break, but it would be a second network request for nothing.
             ->and(substr_count($out, 'connect.facebook.net'))->toBe(1);
+    });
+
+    test('every init carries rl_vid as external_id, the id the server-side events send', function () {
+        /*
+         * Advanced matching: without the same external_id on both sides, Meta cannot join a
+         * visitor's browser events (which carry fbp) to their server-side Lead and booking.
+         * Read from the cookie at runtime, so a page served from the HTML cache still sends
+         * this visitor's id rather than the first visitor's.
+         */
+        $out = renderPixel(fn (MarketingPixelHooks $h) => $h->injectMetaPixel());
+
+        expect($out)->toContain('rl_vid=([^;]+)')
+            ->and($out)->toContain('{ external_id: m[1] }')
+            // No cookie still initialises the pixel, just without the match key.
+            ->and($out)->toContain(': {}')
+            ->and(substr_count($out, ', am);'))->toBe(2);
     });
 
     test('each pixel gets a noscript fallback image', function () {
@@ -542,7 +558,7 @@ describe('deferred SDK loading', function () {
         $meta = renderPixel(fn (MarketingPixelHooks $h) => $h->injectMetaPixel());
 
         expect($meta)->toContain('rlDefer')
-            ->and(strpos($meta, "fbq('init', '1430907207548734')"))->toBeLessThan(strpos($meta, 'rlDefer'))
+            ->and(strpos($meta, "fbq('init', '1430907207548734', am)"))->toBeLessThan(strpos($meta, 'rlDefer'))
             ->and(strpos($meta, "fbq('track', 'PageView')"))->toBeLessThan(strpos($meta, 'rlDefer'))
             ->and(strpos($meta, 'connect.facebook.net'))->toBeGreaterThan(strpos($meta, 'rlDefer'));
 
