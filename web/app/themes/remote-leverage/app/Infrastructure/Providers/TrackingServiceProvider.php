@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Providers;
 
+use App\Domains\Lead\Events\LeadBookingCompleted;
 use App\Domains\Lead\Events\LeadCreated;
 use App\Domains\Tracking\Gateways\CustomerIOClient;
 use App\Domains\Tracking\Gateways\MetaConversionsApiClient;
 use App\Domains\Tracking\Gateways\PostHogClient;
 use App\Domains\Tracking\Listeners\HandleLeadCreatedForTracking;
+use App\Domains\Tracking\Listeners\SendBookingToMetaConversionsApi;
 use App\Domains\Tracking\Listeners\SendLeadToMetaConversionsApi;
 use App\Infrastructure\WordPress\Hooks\ConversionHooks;
 use App\Infrastructure\WordPress\Hooks\MarketingPixelHooks;
@@ -33,6 +35,7 @@ class TrackingServiceProvider extends ServiceProvider
         $this->app->singleton(HandleLeadCreatedForTracking::class);
         $this->app->singleton(MetaConversionsApiClient::class, fn () => new MetaConversionsApiClient);
         $this->app->singleton(SendLeadToMetaConversionsApi::class);
+        $this->app->singleton(SendBookingToMetaConversionsApi::class);
     }
 
     /**
@@ -88,6 +91,14 @@ class TrackingServiceProvider extends ServiceProvider
          */
         Event::listen(LeadCreated::class, function (LeadCreated $event) {
             dispatch(static fn () => app(SendLeadToMetaConversionsApi::class)->handle($event))->afterResponse();
+        });
+
+        /*
+         * The booking conversion, `invitee_meeting_scheduled`, once per lead however many times
+         * the booking is reported. See SendBookingToMetaConversionsApi. Same `static` rule.
+         */
+        Event::listen(LeadBookingCompleted::class, function (LeadBookingCompleted $event) {
+            dispatch(static fn () => app(SendBookingToMetaConversionsApi::class)->handle($event))->afterResponse();
         });
     }
 }

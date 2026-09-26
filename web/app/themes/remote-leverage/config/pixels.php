@@ -59,26 +59,26 @@ return [
     | Meta (Facebook) Pixel
     |--------------------------------------------------------------------------
     |
-    | Two pixels, both on every page, both with a PageView and both receiving
-    | the server-side Lead.
+    | One pixel, 1821781852398281, on every page with a PageView, and the
+    | destination of every server-side event (Lead, invitee_meeting_scheduled).
     |
-    | 1482937899395718 ("Remote Leverage 2 Pixel") is the one the ad accounts
-    | optimise on: every ad set targets its custom event "Valid Booking",
-    | which n8n sends on each Calendly booking using the click data this site
-    | writes to HubSpot. So what matters most for ad delivery is that lead
-    | attribution is the visitor's own (MultistepBookingWizard::
-    | refreshVisitorContext()), not which pixels load here.
+    | It replaced both earlier pixels on 2026-09-26: 1482937899395718
+    | ("Remote Leverage 2 Pixel") and 1430907207548734 ("RL 5/6", the one the
+    | legacy HandL CAPI fed). Neither is emitted any more. Two things outside
+    | this repo do not move with a change here:
     |
-    | 1430907207548734 ("RL 5/6") is the pixel the legacy HandL CAPI fed. It
-    | is kept so tracking matches what production ran before the cutover, not
-    | because any ad set uses it. See docs/booking-rate-ceo-brief-2026-09-25.md.
+    |  - n8n's "Valid Booking" custom event, which every ad set optimised on
+    |    at the time of the switch. It is sent from n8n, not from here.
+    |  - The Conversions API token (META_CAPI_ACCESS_TOKEN) must be able to
+    |    write to the new pixel, or every server-side event is rejected — and
+    |    the only trace is a `failed` Meta row on each lead's timeline.
     |
     | Not in GTM. Verified 2026-09-17 against both containers.
     */
     'meta' => [
         'pixel_ids' => array_values(array_filter(array_map(
             'trim',
-            explode(',', trim((string) env('META_PIXEL_IDS', '')) ?: '1430907207548734,1482937899395718'),
+            explode(',', trim((string) env('META_PIXEL_IDS', '')) ?: '1821781852398281'),
         ))),
         'track_page_view' => filter_var(env('META_TRACK_PAGE_VIEW', true), FILTER_VALIDATE_BOOLEAN),
 
@@ -94,8 +94,8 @@ return [
          * not something to optimise on. A named event does not depend on the URL at all.
          *
          * It fires on every load of the page, refreshes and direct visits included, so it
-         * counts higher than n8n's "Valid Booking" — which is one per real Calendly booking and
-         * is still what the ad sets optimise on.
+         * counts higher than the server-side `invitee_meeting_scheduled`, which is one per real
+         * Calendly booking (SendBookingToMetaConversionsApi). Optimise on that one.
          */
         'events' => [
             ['name' => 'Schedule', 'trigger' => 'path:VAThankYou'],

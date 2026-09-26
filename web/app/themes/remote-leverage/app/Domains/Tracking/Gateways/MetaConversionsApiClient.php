@@ -10,9 +10,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
- * Server-side `Lead` events to Meta's Conversions API.
+ * Server-side `Lead` and booking (`invitee_meeting_scheduled`) events to Meta's Conversions API.
  *
- * This is the only conversion signal Meta receives from this site. There is no client-side
+ * Until `invitee_meeting_scheduled` and the browser `Schedule` on `/VAThankYou/` (2026-09-26),
+ * `Lead` was the only conversion signal Meta received from this site. There is no client-side
  * `fbq('track','Lead')` and there never was one to inherit: the legacy stack's HandL UTM Grabber
  * posted a Lead to the Graph API on every Gravity Forms submit, and removing that plugin at
  * cutover took the entire channel with it. Between 2026-09-17 20:46 and 2026-09-18, Ads Manager
@@ -27,12 +28,12 @@ use Illuminate\Support\Str;
  * is the only version of this we have evidence worked, so it is the specification here rather
  * than a starting point.
  *
- * ## Both pixels
+ * ## Every configured pixel
  *
- * Production initialises two pixel ids and nobody has confirmed which the ad account reports
- * against; the legacy CAPI only ever fed the first. The event goes to every id in
- * `pixels.meta.pixel_ids`, because a conversion on the wrong pixel is invisible while a duplicate
- * on the right one is collapsed by `event_id`.
+ * Each event goes to every id in `pixels.meta.pixel_ids` — one since 2026-09-26, two before. With
+ * more than one, a conversion on the wrong pixel is invisible while a duplicate on the right one
+ * is collapsed by `event_id`. The access token has to be able to write to each of them; one it
+ * cannot is a 400, logged per lead.
  */
 class MetaConversionsApiClient
 {
@@ -49,6 +50,18 @@ class MetaConversionsApiClient
      * A replay of an old lead is worth sending with a clamped timestamp rather than not at all.
      */
     private const MAX_EVENT_AGE_SECONDS = 7 * 24 * 60 * 60;
+
+    /**
+     * The booking conversion, named after the custom event Calendly's own Meta Pixel integration
+     * fires from its hosted booking pages, so a custom conversion on this name reads the same
+     * whichever way a booking arrives.
+     *
+     * That integration cannot see this site's bookings: the wizard books through Calendly's API
+     * and the visitor never loads a Calendly page. Do not also switch it on for the one embed
+     * (`service-hiring-full`) — those bookings reach this event through the webhook, and would
+     * then count twice under different event ids.
+     */
+    public const BOOKING_EVENT = 'invitee_meeting_scheduled';
 
     public function __construct(
         protected ?string $accessToken = null,
@@ -92,8 +105,27 @@ class MetaConversionsApiClient
      */
     public function sendLead(Lead $lead, string $eventName = 'Lead'): array
     {
-        $eventId = $this->eventId($lead);
+        return $this->send($lead, $eventName, $this->eventId($lead));
+    }
 
+    /**
+     * Send the booking conversion to every configured pixel. Same contract as `sendLead()`.
+     *
+     * Timed now rather than at the lead's capture: a booking can land well after the lead, through
+     * a retry or Calendly's webhook, and the conversion happened when the meeting was booked.
+     *
+     * @return array{sent: list<string>, failed: list<string>, skipped: bool, event_id: string, errors: list<string>}
+     */
+    public function sendBooking(Lead $lead): array
+    {
+        return $this->send($lead, self::BOOKING_EVENT, $this->bookingEventId($lead), time());
+    }
+
+    /**
+     * @return array{sent: list<string>, failed: list<string>, skipped: bool, event_id: string, errors: list<string>}
+     */
+    private function send(Lead $lead, string $eventName, string $eventId, ?int $eventTime = null): array
+    {
         $result = ['sent' => [], 'failed' => [], 'skipped' => false, 'event_id' => $eventId, 'errors' => []];
 
         if (! $this->enabled()) {
@@ -103,7 +135,7 @@ class MetaConversionsApiClient
             return $result;
         }
 
-        $payload = $this->buildEvent($lead, $eventName, $eventId);
+        $payload = $this->buildEvent($lead, $eventName, $eventId, $eventTime);
 
         foreach ($this->pixelIds() as $pixelId) {
             if ($this->post($pixelId, $payload, $result)) {
@@ -190,9 +222,18 @@ class MetaConversionsApiClient
     }
 
     /**
+     * The booking's id: one per lead, like `eventId()`, under its own prefix so it can never
+     * collide with the lead's `Lead`.
+     */
+    public function bookingEventId(Lead $lead): string
+    {
+        return 'booking-'.($lead->uuid ?: $lead->id);
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    public function buildEvent(Lead $lead, string $eventName, string $eventId): array
+    public function buildEvent(Lead $lead, string $eventName, string $eventId, ?int $eventTime = null): array
     {
         $attribution = (array) ($lead->attribution ?? []);
         $handl = (array) ($attribution['handl'] ?? []);
@@ -218,7 +259,7 @@ class MetaConversionsApiClient
 
         $event = [
             'event_name' => $eventName,
-            'event_time' => $this->eventTime($lead),
+            'event_time' => $eventTime ?? $this->eventTime($lead),
             'event_id' => $eventId,
             // Required by Meta for web conversions; the legacy payload omitted it, which is one
             // of the few places this deliberately improves on what it replaces.
