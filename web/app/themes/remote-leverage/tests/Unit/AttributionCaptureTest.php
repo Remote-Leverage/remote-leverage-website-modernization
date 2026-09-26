@@ -169,6 +169,86 @@ describe('AttributionCollector', function () {
     });
 });
 
+describe("the site's own attribution cookies (the UTM Grabber's replacement)", function () {
+    /*
+     * TrackingHooks::injectAttributionCookies() writes `rl_*` on every page, so a visitor who
+     * browses — or comes back — before booking keeps what the URL no longer shows. HandL did
+     * this on the old site; nothing did between the cutover and 2026-09-26.
+     */
+    test('our cookie beats a frozen HandL cookie, and the URL beats both', function () {
+        $cookies = ['rl_utm_source' => 'facebook', 'utm_source' => 'google', 'handl_utm_source' => 'bing'];
+
+        $fromCookie = (new AttributionCollector)->collect(attributionRequest([], $cookies));
+        $fromUrl = (new AttributionCollector)->collect(attributionRequest(['utm_source' => 'linkedin'], $cookies));
+
+        expect($fromCookie['named']['utm_source'])->toBe('facebook')
+            ->and($fromUrl['named']['utm_source'])->toBe('linkedin');
+    });
+
+    test("HandL's frozen fbclid cookie is never read", function () {
+        // How a 28 August click reached two 25 September bookings: no click time, and an fbc
+        // synthesised from it would tell Meta that old click just happened.
+        $collected = (new AttributionCollector)->collect(attributionRequest([], ['fbclid' => 'IwOLD-handl']));
+
+        expect($collected['named'])->not->toHaveKey('fbclid')
+            ->and($collected['named'])->not->toHaveKey('fbc');
+    });
+
+    test('a remembered fbclid builds its fbc with the time it was clicked', function () {
+        $clickedMs = (time() - 3 * 86400) * 1000;
+
+        $collected = (new AttributionCollector)->collect(attributionRequest([], [
+            'rl_fbclid' => 'IwREMEMBERED',
+            'rl_fbclid_ts' => (string) $clickedMs,
+        ]));
+
+        expect($collected['named']['fbclid'])->toBe('IwREMEMBERED')
+            ->and($collected['named']['fbc'])->toBe("fb.1.{$clickedMs}.IwREMEMBERED")
+            ->and($collected['attribution']['fbc_synthetic'])->toBeTrue();
+    });
+
+    test('an implausible click time falls back to now', function () {
+        $before = (int) round(microtime(true) * 1000);
+
+        $collected = (new AttributionCollector)->collect(attributionRequest([], [
+            'rl_fbclid' => 'IwREMEMBERED',
+            'rl_fbclid_ts' => '99999999999999',
+        ]));
+
+        $stamp = (int) explode('.', $collected['named']['fbc'])[2];
+
+        expect($stamp)->toBeGreaterThanOrEqual($before)
+            ->and($stamp)->toBeLessThan($before + 60_000);
+    });
+
+    test('an fbclid in the URL is this click, whatever an older cookie says', function () {
+        $before = (int) round(microtime(true) * 1000);
+
+        $collected = (new AttributionCollector)->collect(attributionRequest(['fbclid' => 'IwFRESH'], [
+            'rl_fbclid' => 'IwOLDER',
+            'rl_fbclid_ts' => (string) ((time() - 10 * 86400) * 1000),
+        ]));
+
+        expect($collected['named']['fbclid'])->toBe('IwFRESH')
+            ->and((int) explode('.', $collected['named']['fbc'])[2])->toBeGreaterThanOrEqual($before);
+    });
+
+    test('first touch, landing page and original referrer land in the HandL-compatible fields', function () {
+        $collected = (new AttributionCollector)->collect(attributionRequest([], [
+            'rl_ft_utm_campaign' => 'q3-launch',
+            'rl_landing_page' => 'https://remoteleverage.com/hire-va-4?utm_campaign=q3-launch',
+            'rl_original_ref' => 'https://www.facebook.com/',
+            'first_utm_campaign' => 'handl-leftover',
+        ]));
+
+        expect($collected['attribution']['handl'])->toMatchArray([
+            'first_utm_campaign' => 'q3-launch',
+            'handl_landing_page' => 'https://remoteleverage.com/hire-va-4?utm_campaign=q3-launch',
+            'handl_original_ref' => 'https://www.facebook.com/',
+        ]);
+    });
+});
+
 describe('HubSpot field coverage', function () {
     test('every HubSpot-mapped field has a way to be collected', function () {
         // The mapping supplied on 2026-09-16, as HubSpot property => Lead column. A column that

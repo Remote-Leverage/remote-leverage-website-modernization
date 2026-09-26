@@ -24,12 +24,76 @@ use Illuminate\Http\Request;
  *    the column is missing. Promoting one later is a migration plus a line in `NAMED`; the
  *    historical data is already there.
  *
- * Every value is read query-string first, then cookie. HandL writes its cookies on the landing
- * page, so a visitor who browses several pages before converting still carries first-touch data
- * the current URL no longer shows.
+ * Every value is read query-string first, then cookie. The cookies are the site's own `rl_*` set,
+ * written on every page by `TrackingHooks::injectAttributionCookies()`, so a visitor who browses
+ * several pages — or comes back days later — before converting still carries what the current URL
+ * no longer shows. That is the job the legacy HandL UTM Grabber did; it was a plugin on the old
+ * site and did not come across at cutover (2026-09-19), so from then until 2026-09-26 nothing
+ * wrote these cookies at all.
+ *
+ * HandL's own cookies (`utm_*`, `handl_*`) are still read, after ours, for browsers that last
+ * visited the old site — except `fbclid`: see `LEGACY_COOKIES_NOT_READ`.
  */
 class AttributionCollector
 {
+    /**
+     * The click parameters one visit carries, remembered as a set in `rl_<param>` cookies.
+     *
+     * A visit that arrives with any of them replaces the whole set, so a later click carrying
+     * only an `fbclid` does not inherit an older campaign's UTMs.
+     *
+     * @var string[]
+     */
+    public const LAST_TOUCH = [
+        'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id',
+        'gclid', 'fbclid', 'msclkid', 'li_fat_id', 'wbraid', 'gbraid',
+    ];
+
+    /**
+     * The UTMs of the first visit that carried any click parameter, kept in `rl_ft_<param>` and
+     * never overwritten. Read into the HandL-compatible `first_utm_*` fields.
+     *
+     * @var string[]
+     */
+    public const FIRST_TOUCH = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
+
+    /**
+     * When the remembered `fbclid` was clicked, in milliseconds — what an `fbc` built from it has
+     * to carry. See `clickTimeMs()`.
+     */
+    public const FBCLID_TIME_COOKIE = 'rl_fbclid_ts';
+
+    /**
+     * Legacy cookies that are never read, even as a last resort.
+     *
+     * HandL's `fbclid` is frozen at whatever the old site last wrote, carries no click time, and
+     * an `fbc` synthesised from it would stamp that old click with today's date — telling Meta a
+     * click from weeks ago just happened. That is how a 28 August click came to be attached to
+     * two 25 September bookings. Meta's own `_fbc` and our `rl_fbclid` both carry the time.
+     *
+     * @var string[]
+     */
+    public const LEGACY_COOKIES_NOT_READ = ['fbclid'];
+
+    /**
+     * Our own cookie for a NAMED column or EXTRA key, read ahead of anything HandL left behind.
+     */
+    public static function ownCookieFor(string $key): ?string
+    {
+        if (in_array($key, self::LAST_TOUCH, true)) {
+            return 'rl_'.$key;
+        }
+
+        if (str_starts_with($key, 'first_') && in_array(substr($key, 6), self::FIRST_TOUCH, true)) {
+            return 'rl_ft_'.substr($key, 6);
+        }
+
+        return [
+            'handl_landing_page' => 'rl_landing_page',
+            'handl_original_ref' => 'rl_original_ref',
+        ][$key] ?? null;
+    }
+
     /**
      * Parameters with a first-class column, as `column => [source keys in priority order]`.
      *
@@ -124,7 +188,7 @@ class AttributionCollector
         $named = [];
 
         foreach (self::NAMED as $column => $keys) {
-            $value = $this->firstOf($request, $keys);
+            $value = $this->firstOf($request, $keys, self::ownCookieFor($column));
 
             if ($value !== null) {
                 $named[$column] = $value;
@@ -134,7 +198,7 @@ class AttributionCollector
         $extra = [];
 
         foreach (self::EXTRA as $key) {
-            $value = $this->firstOf($request, [$key]);
+            $value = $this->firstOf($request, [$key], self::ownCookieFor($key));
 
             if ($value !== null) {
                 $extra[$key] = $value;
@@ -181,7 +245,7 @@ class AttributionCollector
          */
         if (($named['fbc'] ?? '') === '') {
             if (($named['fbclid'] ?? '') !== '') {
-                $named['fbc'] = sprintf('fb.1.%d.%s', (int) round(microtime(true) * 1000), $named['fbclid']);
+                $named['fbc'] = sprintf('fb.1.%d.%s', $this->clickTimeMs($request), $named['fbclid']);
                 $attribution['fbc_synthetic'] = true;
             }
         } else {
@@ -263,11 +327,11 @@ class AttributionCollector
     }
 
     /**
-     * First non-empty value among these keys, query string before cookie.
+     * First non-empty value among these keys: query string, then our own cookie, then legacy ones.
      *
      * @param  string[]  $keys
      */
-    protected function firstOf(Request $request, array $keys): ?string
+    protected function firstOf(Request $request, array $keys, ?string $ownCookie = null): ?string
     {
         foreach ($keys as $key) {
             $value = $request->query($key);
@@ -280,6 +344,11 @@ class AttributionCollector
                 }
             }
         }
+
+        $keys = array_values(array_filter(
+            [$ownCookie, ...array_diff($keys, self::LEGACY_COOKIES_NOT_READ)],
+            static fn (?string $key): bool => $key !== null,
+        ));
 
         foreach ($keys as $key) {
             $value = $request->cookie($key);
@@ -320,6 +389,33 @@ class AttributionCollector
         }
 
         return null;
+    }
+
+    /**
+     * When the `fbclid` this request carries was clicked, in milliseconds.
+     *
+     * From the URL it is this page load, so now. Remembered in `rl_fbclid`, it is the time
+     * `rl_fbclid_ts` recorded on the landing page, which can be days back — and an `fbc` has to
+     * say when the click happened, not when the form was sent. Anything implausible (missing, in
+     * the future, older than Meta's 90-day `_fbc` lifetime) falls back to now.
+     */
+    protected function clickTimeMs(Request $request): int
+    {
+        $now = (int) round(microtime(true) * 1000);
+
+        if ($this->clean((string) $request->query('fbclid', '')) !== null) {
+            return $now;
+        }
+
+        $stamp = $request->cookie(self::FBCLID_TIME_COOKIE) ?? $_COOKIE[self::FBCLID_TIME_COOKIE] ?? null;
+
+        if (! is_scalar($stamp) || ! ctype_digit((string) $stamp)) {
+            return $now;
+        }
+
+        $stamp = (int) $stamp;
+
+        return $stamp > $now || $stamp < $now - 90 * 24 * 60 * 60 * 1000 ? $now : $stamp;
     }
 
     /**

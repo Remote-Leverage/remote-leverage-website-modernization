@@ -4,8 +4,16 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\WordPress\Hooks;
 
+use App\Domains\Lead\Services\AttributionCollector;
+
 class TrackingHooks
 {
+    /** How long a visit's click parameters are remembered. */
+    public const LAST_TOUCH_DAYS = 30;
+
+    /** How long the first touch, landing page and original referrer are remembered. */
+    public const FIRST_TOUCH_DAYS = 90;
+
     /**
      * Path fragment => Customer.io event name, as the legacy plugin matched them.
      *
@@ -24,6 +32,7 @@ class TrackingHooks
     public function register(): void
     {
         add_action('wp_head', [$this, 'injectVisitorCookie'], 1);
+        add_action('wp_head', [$this, 'injectAttributionCookies'], 1);
         add_action('wp_head', [$this, 'injectPostHogSnippet'], 2);
         add_action('wp_head', [$this, 'injectExperimentRuntime'], 3);
         add_action('wp_footer', [$this, 'injectCustomerIOSnippet'], 20);
@@ -54,7 +63,10 @@ class TrackingHooks
 (function () {
   try {
     var name = 'rl_vid';
-    var match = document.cookie.match(new RegExp('(^|;\\s*)' + name + '=([^;]*)'));
+    // Four backslashes: the heredoc makes them two, the JS string one, so the RegExp sees `\s`.
+    // With two it saw `s*`, matched rl_vid only as the first cookie, and minted a new id on
+    // every page load for anyone who already had cookies from the old site (fixed 2026-09-26).
+    var match = document.cookie.match(new RegExp('(^|;\\\\s*)' + name + '=([^;]*)'));
     var id = match ? match[2] : null;
 
     if (!id) {
@@ -83,6 +95,69 @@ class TrackingHooks
   }
 })();
 </script>
+HTML;
+    }
+
+    /**
+     * Remember the visit's click parameters in first-party cookies — the UTM Grabber's job.
+     *
+     * The legacy HandL UTM Grabber did this on the old site and did not come across at cutover,
+     * so from 2026-09-19 attribution only came from the URL of the page a visitor booked on:
+     * browse to a second page, or come back tomorrow, and the UTMs were gone. This restores it,
+     * written for `AttributionCollector`, which reads these ahead of any HandL leftovers.
+     *
+     *  - **Last touch** — `rl_<param>` for every `AttributionCollector::LAST_TOUCH` parameter, on
+     *    any visit that carries at least one. The whole set is replaced, so a later click with
+     *    only an `fbclid` does not keep an older campaign's UTMs. `rl_fbclid_ts` records when the
+     *    `fbclid` arrived, so an `fbc` built from it days later still carries the click time.
+     *  - **First touch** — `rl_ft_<utm>` from the first visit that carried any, never replaced.
+     *  - **Landing page and original referrer** — from the first visit of all, never replaced.
+     *    The referrer only when it is another site.
+     *
+     * Client-side for the same reason as `rl_vid`: the page may come from the HTML cache.
+     */
+    public function injectAttributionCookies(): void
+    {
+        $lastTouch = json_encode(AttributionCollector::LAST_TOUCH);
+        $firstTouch = json_encode(AttributionCollector::FIRST_TOUCH);
+        $lastDays = self::LAST_TOUCH_DAYS;
+        $firstDays = self::FIRST_TOUCH_DAYS;
+
+        echo <<<HTML
+<script>
+(function () {
+  try {
+    var LAST = {$lastTouch}, FIRST = {$firstTouch}, DAY = 86400;
+    var q = new URLSearchParams(location.search);
+    var tail = '; path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
+    function get(n) { var m = document.cookie.match(new RegExp('(^|;\\\\s*)' + n + '=([^;]*)')); return m ? m[2] : null; }
+    function set(n, v, days) { document.cookie = n + '=' + encodeURIComponent(String(v).slice(0, 500)) + '; max-age=' + (days * DAY) + tail; }
+    function drop(n) { document.cookie = n + '=; max-age=0' + tail; }
+
+    var touched = LAST.some(function (k) { return q.get(k); });
+
+    if (touched) {
+      LAST.forEach(function (k) { var v = q.get(k); v ? set('rl_' + k, v, {$lastDays}) : drop('rl_' + k); });
+      q.get('fbclid') ? set('rl_fbclid_ts', Date.now(), {$lastDays}) : drop('rl_fbclid_ts');
+
+      if (!get('rl_ft_ts')) {
+        FIRST.forEach(function (k) { var v = q.get(k); if (v) set('rl_ft_' + k, v, {$firstDays}); });
+        set('rl_ft_ts', Date.now(), {$firstDays});
+      }
+    }
+
+    if (!get('rl_landing_page')) set('rl_landing_page', location.href.split('#')[0], {$firstDays});
+
+    if (!get('rl_original_ref') && document.referrer) {
+      var ref = new URL(document.referrer);
+      if (ref.hostname !== location.hostname) set('rl_original_ref', document.referrer, {$firstDays});
+    }
+  } catch (e) {
+    // Cookies disabled: attribution falls back to the URL of the page they book on.
+  }
+})();
+</script>
+
 HTML;
     }
 

@@ -518,13 +518,25 @@ class MultistepBookingWizard extends Component
 
         // Acquisition & UTM tracking extraction (parity with rl-testing)
         $req = app()->bound('request') ? app('request') : null;
-        $this->utmSource = (string) ($req?->query('utm_source') ?: $req?->cookie('utm_source', $req?->cookie('handl_utm_source', '')));
-        $this->utmMedium = (string) ($req?->query('utm_medium') ?: $req?->cookie('utm_medium', $req?->cookie('handl_utm_medium', '')));
-        $this->utmCampaign = (string) ($req?->query('utm_campaign') ?: $req?->cookie('utm_campaign', $req?->cookie('handl_utm_campaign', '')));
-        $this->utmTerm = (string) ($req?->query('utm_term') ?: $req?->cookie('utm_term', $req?->cookie('handl_utm_term', '')));
-        $this->utmContent = (string) ($req?->query('utm_content') ?: $req?->cookie('utm_content', $req?->cookie('handl_utm_content', '')));
-        $this->gclid = (string) ($req?->query('gclid') ?: $req?->cookie('gclid', ''));
-        $this->fbclid = (string) ($req?->query('fbclid') ?: $req?->cookie('fbclid', ''));
+
+        /*
+         * Everything the legacy Gravity Form's hidden fields carried. The collector keeps any
+         * query parameter it does not recognise, so a new ad platform's click id is never
+         * silently dropped, and reads the site's own `rl_*` cookies ahead of HandL's leftovers.
+         * The five UTMs, gclid and fbclid come from it too rather than from a second set of
+         * cookie reads here, which is how the frozen HandL `fbclid` used to reach bookings.
+         */
+        $collector = app(AttributionCollector::class);
+        $collected = $collector->collect($req);
+        $named = $collected['named'];
+
+        $this->utmSource = $named['utm_source'] ?? '';
+        $this->utmMedium = $named['utm_medium'] ?? '';
+        $this->utmCampaign = $named['utm_campaign'] ?? '';
+        $this->utmTerm = $named['utm_term'] ?? '';
+        $this->utmContent = $named['utm_content'] ?? '';
+        $this->gclid = $named['gclid'] ?? '';
+        $this->fbclid = $named['fbclid'] ?? '';
         $this->referralCode = $req?->query('via')
             ?: $req?->query('ref')
             ?: $req?->query('r')
@@ -532,15 +544,6 @@ class MultistepBookingWizard extends Component
         $this->landingUrl = (string) ($req?->fullUrl() ?? '');
         $this->referrerUrl = (string) ($req?->header('referer') ?: $req?->cookie('handl_ref', ''));
         $this->sessionId = (string) Str::uuid();
-
-        /*
-         * Everything the legacy Gravity Form's hidden fields carried. The five UTMs, gclid and
-         * fbclid are read above for backwards compatibility with callers that pass them
-         * explicitly; the collector fills in the rest, and crucially keeps any query parameter
-         * it does not recognise so a new ad platform's click id is never silently dropped.
-         */
-        $collector = app(AttributionCollector::class);
-        $collected = $collector->collect($req);
 
         $this->attributionNamed = $collected['named'];
         $this->attribution = $collected['attribution'];
