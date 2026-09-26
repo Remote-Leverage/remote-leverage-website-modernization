@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Domains\Tracking\Listeners;
 
 use App\Domains\Lead\Events\LeadCreated;
-use App\Domains\Lead\Models\Lead;
 use App\Domains\Lead\Services\LeadActivityLogger;
 use App\Domains\Tracking\Gateways\MetaConversionsApiClient;
 use App\Infrastructure\Observability\IntegrationCallRecorder;
@@ -77,7 +76,7 @@ class SendLeadToMetaConversionsApi
                     // Which identifiers Meta actually got. The difference between a matched and
                     // an unmatched conversion is almost always a missing fbc, and this is where
                     // you look when the match rate drops.
-                    'match_keys' => $this->matchKeys($lead),
+                    'match_keys' => $this->client->matchKeys($lead),
                 ],
             );
         } catch (\Throwable $e) {
@@ -111,24 +110,5 @@ class SendLeadToMetaConversionsApi
             implode(', ', $result['sent']),
             implode(', ', $result['failed']),
         );
-    }
-
-    /**
-     * @return array<string, bool>
-     */
-    private function matchKeys(Lead $lead): array
-    {
-        $attribution = (array) ($lead->attribution ?? []);
-        $handl = (array) ($attribution['handl'] ?? []);
-
-        return [
-            'email' => (string) ($lead->email ?? '') !== '',
-            'phone' => (string) ($lead->phone ?? '') !== '',
-            'name' => (string) ($lead->first_name ?? '') !== '' || (string) ($lead->last_name ?? '') !== '',
-            'fbc' => (string) ($lead->fbc ?? '') !== '' || (string) ($lead->fbclid ?? '') !== '',
-            'fbp' => (string) ($handl['_fbp'] ?? '') !== '',
-            'ip' => (string) ($lead->ip_address ?? '') !== '',
-            'user_agent' => (string) ($attribution['user_agent'] ?? '') !== '',
-        ];
     }
 }

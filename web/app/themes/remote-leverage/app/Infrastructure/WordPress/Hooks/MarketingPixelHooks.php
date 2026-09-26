@@ -194,11 +194,11 @@ HTML;
         $inits = '';
 
         foreach ($ids as $id) {
-            $inits .= "fbq('init', '".esc_js($id)."');\n";
+            $inits .= "  fbq('init', '".esc_js($id)."', am);\n";
         }
 
         if ((bool) config('pixels.meta.track_page_view', true)) {
-            $inits .= "fbq('track', 'PageView');\n";
+            $inits .= "  fbq('track', 'PageView');\n";
         }
 
         [$defer, $endDefer] = $this->deferWrap('meta');
@@ -209,6 +209,13 @@ HTML;
          * IIFE returned early when `fbq` already existed (GTM, a second copy of this snippet)
          * and skipped the insert; the flag below preserves that so we do not fetch the SDK
          * twice.
+         *
+         * `am` is advanced matching: the `rl_vid` visitor cookie as `external_id`, the same value
+         * MetaConversionsApiClient sends server-side, so Meta can join a visitor's browser events
+         * (which carry `fbp`) to their Lead and booking. TrackingHooks writes the cookie at
+         * wp_head priority 1, ahead of this. The pixel lowercases, strips whitespace and hashes
+         * it; `rl_vid` is a lowercase UUID, so both sides hash the same string. No cookie, no
+         * `external_id` — the init still runs.
          */
         echo <<<HTML
 
@@ -218,7 +225,9 @@ HTML;
 n.callMethod.apply(n,arguments):n.queue.push(arguments)};
 if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
 n.queue=[];f.__rlMetaNeedsSdk=1}(window);
-{$inits}{$defer}(function(){
+(function (am) {
+{$inits}})((function (m) { return m ? { external_id: m[1] } : {}; })(document.cookie.match(/(?:^|;\s*)rl_vid=([^;]+)/)));
+{$defer}(function(){
   if (!window.__rlMetaNeedsSdk) return;
   window.__rlMetaNeedsSdk=0;
   var t=document.createElement('script');t.async=!0;

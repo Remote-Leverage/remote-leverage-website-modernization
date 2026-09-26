@@ -58,6 +58,8 @@ function metaLead(array $overrides = []): Lead
         'landing_url' => 'https://remoteleverage.com/hire-va-4/?fbclid=IwAR-click-123',
         'source_type' => 'paid_social',
         'status' => 'captured',
+        'device_id' => '7f3c2a10-5b1e-4c9d-9a2f-0e8b6d4c1a77',
+        'country' => 'US',
         'attribution' => [
             'user_agent' => 'Mozilla/5.0 (Macintosh)',
             'handl' => ['_fbp' => 'fb.1.1700000000000.987654321'],
@@ -96,6 +98,10 @@ describe('MetaConversionsApiClient', function () {
                 && $user['fn'] === hash('sha256', 'sarah')
                 && $user['ln'] === hash('sha256', 'oconnor')
                 && $user['ph'] === hash('sha256', '13055550199')
+                // ISO-2 country, lowercased — Meta's format.
+                && $user['country'] === hash('sha256', 'us')
+                // The rl_vid visitor cookie, so every event for this person shares one id.
+                && $user['external_id'] === hash('sha256', '7f3c2a10-5b1e-4c9d-9a2f-0e8b6d4c1a77')
                 // Raw, never hashed — hashing these destroys the match with no error anywhere.
                 && $user['fbp'] === 'fb.1.1700000000000.987654321'
                 && $user['client_ip_address'] === '203.0.113.9'
@@ -321,6 +327,30 @@ describe('SendBookingToMetaConversionsApi', function () {
         Http::assertSentCount(2);
         expect(LeadActivityLog::query()->where('lead_id', $lead->id)->where('actor_domain', 'Meta')->pluck('outcome')->all())
             ->toBe(['failed', 'succeeded']);
+    });
+
+    test('the booking carries the same external_id as the lead, and records its match keys', function () {
+        Http::fake(fn () => Http::response(['events_received' => 1], 200));
+
+        $lead = metaLead();
+        sendBooking($lead);
+
+        Http::assertSent(fn (Request $r) => $r->data()['data'][0]['user_data']['external_id']
+            === hash('sha256', '7f3c2a10-5b1e-4c9d-9a2f-0e8b6d4c1a77'));
+
+        $log = LeadActivityLog::query()->where('lead_id', $lead->id)->where('actor_domain', 'Meta')->first();
+
+        expect($log->payload['match_keys'])->toMatchArray(['external_id' => true, 'country' => true, 'fbp' => true]);
+    });
+
+    test('a lead from before the visitor cookie falls back to its uuid as external_id', function () {
+        Http::fake(fn () => Http::response(['events_received' => 1], 200));
+
+        $lead = metaLead(['device_id' => null]);
+        (new MetaConversionsApiClient)->sendLead($lead);
+
+        Http::assertSent(fn (Request $r) => $r->data()['data'][0]['user_data']['external_id']
+            === hash('sha256', strtolower($lead->uuid)));
     });
 
     test('the booking never shares an event id with the lead', function () {
