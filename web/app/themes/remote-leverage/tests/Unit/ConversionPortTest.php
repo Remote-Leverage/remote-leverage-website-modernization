@@ -33,6 +33,10 @@ beforeEach(function () {
         'pixels.posthog_events' => [
             ['name' => 'appointment_booked_web', 'trigger' => 'path:VAThankYou'],
         ],
+        'pixels.meta.pixel_ids' => ['1430907207548734', '1482937899395718'],
+        'pixels.meta.events' => [
+            ['name' => 'Schedule', 'trigger' => 'path:VAThankYou'],
+        ],
         'pixels.consent.enabled' => true,
         'pixels.consent.defaults' => ['ad_storage' => 'granted', 'analytics_storage' => 'granted'],
         'pixels.defer.vendors' => [],
@@ -135,6 +139,36 @@ describe('GA4 and PostHog events', function () {
 
         expect($out)->toContain('"name":"generate_lead"')
             ->and($out)->toContain('dl:form_submit');
+    });
+});
+
+describe('Meta standard events', function () {
+    /*
+     * Meta reduces every event URL to the bare domain (Core Setup), so a custom conversion on
+     * "URL contains vathankyou" has nothing to match. A named standard event does not need the
+     * URL. See `pixels.meta.events`.
+     */
+    test('Schedule is tracked through fbq on the thank-you page', function () {
+        $out = renderConversions('/VAThankYou/');
+
+        expect($out)->toContain('send({"vendor":"meta","name":"Schedule"});')
+            ->and($out)->toContain("w.fbq('track', call.name");
+    });
+
+    test('Schedule does not fire on any other page', function () {
+        expect(renderConversions('/pricing/'))->not->toContain('"name":"Schedule"');
+    });
+
+    test('no Meta event is rendered when no pixel is configured to receive it', function () {
+        config(['pixels.meta.pixel_ids' => []]);
+
+        expect(renderConversions('/VAThankYou/'))->not->toContain('"vendor":"meta"');
+    });
+
+    test('the shipped config sends Schedule on the thank-you page', function () {
+        $config = require __DIR__.'/../../config/pixels.php';
+
+        expect($config['meta']['events'])->toContain(['name' => 'Schedule', 'trigger' => 'path:VAThankYou']);
     });
 });
 
